@@ -129,11 +129,12 @@ button:disabled {
 
 .tab {
     padding: 12px 40px 12px 24px;
-    background: #f0f0f0;
-    border: none;
+    background: #e0e0e0;
+    color: #333;
+    border: 2px solid #d0d0d0;
     border-radius: 8px;
     cursor: pointer;
-    font-weight: 500;
+    font-weight: 600;
     transition: all 0.3s;
     position: relative;
 }
@@ -141,10 +142,20 @@ button:disabled {
 .tab.active {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
+    border-color: #667eea;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-.tab:hover {
+.tab:hover:not(.active) {
+    background: #d5d5d5;
+    border-color: #b0b0b0;
     transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.tab:hover.active {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
 }
 
 .tab-delete {
