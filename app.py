@@ -182,6 +182,31 @@ def delete_url(url_id):
         conn.close()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/sites/<int:site_id>', methods=['PUT'])
+def update_site(site_id):
+    """Update a site name"""
+    data = request.get_json()
+    new_name = data.get('name')
+    
+    if not new_name:
+        return jsonify({'success': False, 'error': 'Name is required'}), 400
+    
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        if db.is_postgres:
+            cursor.execute('UPDATE sites SET name = %s WHERE id = %s', (new_name, site_id))
+        else:
+            cursor.execute('UPDATE sites SET name = ? WHERE id = ?', (new_name, site_id))
+        
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/sites/<int:site_id>', methods=['DELETE'])
 def delete_site(site_id):
     """Delete a site and all its URLs and test results"""

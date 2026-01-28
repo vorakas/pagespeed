@@ -116,6 +116,18 @@ function createSiteTabs() {
         tab.textContent = site.name;
         tab.onclick = () => switchTab(site.id, tab);
         
+        const buttonGroup = document.createElement('div');
+        buttonGroup.className = 'tab-buttons';
+        
+        const editBtn = document.createElement('button');
+        editBtn.className = 'tab-edit';
+        editBtn.innerHTML = '✎';
+        editBtn.title = 'Rename site';
+        editBtn.onclick = (e) => {
+            e.stopPropagation();
+            renameSite(site.id, site.name);
+        };
+        
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'tab-delete';
         deleteBtn.innerHTML = '×';
@@ -125,7 +137,9 @@ function createSiteTabs() {
             deleteSite(site.id, site.name);
         };
         
-        tab.appendChild(deleteBtn);
+        buttonGroup.appendChild(editBtn);
+        buttonGroup.appendChild(deleteBtn);
+        tab.appendChild(buttonGroup);
         tabWrapper.appendChild(tab);
         tabsContainer.appendChild(tabWrapper);
     });
@@ -405,6 +419,40 @@ async function loadHistoricalChart() {
     } catch (error) {
         console.error('Error loading historical data:', error);
         alert('Failed to load historical data');
+    }
+}
+
+// Rename a site
+async function renameSite(siteId, currentName) {
+    const newName = prompt(`Rename site "${currentName}" to:`, currentName);
+    
+    if (!newName || newName === currentName) {
+        return;
+    }
+    
+    if (newName.trim() === '') {
+        alert('Site name cannot be empty');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/sites/${siteId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: newName.trim()})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage('Site renamed successfully!');
+            loadSites();
+        } else {
+            alert('Failed to rename site: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error renaming site:', error);
+        alert('Failed to rename site');
     }
 }
 
