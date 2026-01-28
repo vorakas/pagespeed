@@ -123,14 +123,19 @@ button:disabled {
     flex-wrap: wrap;
 }
 
+.tab-wrapper {
+    position: relative;
+}
+
 .tab {
-    padding: 12px 24px;
+    padding: 12px 40px 12px 24px;
     background: #f0f0f0;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
     transition: all 0.3s;
+    position: relative;
 }
 
 .tab.active {
@@ -140,6 +145,40 @@ button:disabled {
 
 .tab:hover {
     transform: translateY(-2px);
+}
+
+.tab-delete {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(244, 67, 54, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.tab-delete:hover {
+    background: #f44336;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.tab.active .tab-delete {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.tab.active .tab-delete:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .results-table {
@@ -163,6 +202,22 @@ button:disabled {
 
 .results-table tr:hover {
     background: #f9f9f9;
+}
+
+.btn-delete {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.2s;
+}
+
+.btn-delete:hover {
+    background: #d32f2f;
+    transform: none;
 }
 
 .score {

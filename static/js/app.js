@@ -108,11 +108,26 @@ function createSiteTabs() {
     tabsContainer.innerHTML = '';
     
     sites.forEach((site, index) => {
+        const tabWrapper = document.createElement('div');
+        tabWrapper.className = 'tab-wrapper';
+        
         const tab = document.createElement('button');
         tab.className = 'tab' + (index === 0 ? ' active' : '');
         tab.textContent = site.name;
         tab.onclick = () => switchTab(site.id, tab);
-        tabsContainer.appendChild(tab);
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'tab-delete';
+        deleteBtn.innerHTML = '×';
+        deleteBtn.title = 'Delete site';
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteSite(site.id, site.name);
+        };
+        
+        tab.appendChild(deleteBtn);
+        tabWrapper.appendChild(tab);
+        tabsContainer.appendChild(tabWrapper);
     });
 }
 
@@ -161,6 +176,7 @@ async function loadSiteResults(siteId) {
         html += '<th>LCP (ms)</th>';
         html += '<th>CLS</th>';
         html += '<th>Last Tested</th>';
+        html += '<th>Actions</th>';
         html += '</tr></thead><tbody>';
         
         results.forEach(result => {
@@ -174,6 +190,7 @@ async function loadSiteResults(siteId) {
             html += `<td>${formatLCP(result.lcp)}</td>`;
             html += `<td>${formatCLS(result.cls)}</td>`;
             html += `<td>${formatDate(result.tested_at)}</td>`;
+            html += `<td><button class="btn-delete" onclick="deleteUrl(${result.url_id}, '${result.url}')">🗑️ Delete</button></td>`;
             html += '</tr>';
         });
         
@@ -388,6 +405,56 @@ async function loadHistoricalChart() {
     } catch (error) {
         console.error('Error loading historical data:', error);
         alert('Failed to load historical data');
+    }
+}
+
+// Delete a URL
+async function deleteUrl(urlId, urlText) {
+    if (!confirm(`Are you sure you want to delete "${urlText}"?\n\nThis will also delete all test results for this URL. This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/urls/${urlId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage('URL deleted successfully!');
+            loadDashboard();
+        } else {
+            alert('Failed to delete URL: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error deleting URL:', error);
+        alert('Failed to delete URL');
+    }
+}
+
+// Delete a site
+async function deleteSite(siteId, siteName) {
+    if (!confirm(`Are you sure you want to delete the entire site "${siteName}"?\n\nThis will delete all URLs and test results for this site. This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/sites/${siteId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage('Site deleted successfully!');
+            loadSites();
+        } else {
+            alert('Failed to delete site: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error deleting site:', error);
+        alert('Failed to delete site');
     }
 }
 

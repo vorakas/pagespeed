@@ -228,6 +228,7 @@ class Database:
         
         query = '''
             SELECT 
+                u.id as url_id,
                 u.url,
                 tr.performance_score,
                 tr.accessibility_score,
@@ -248,6 +249,7 @@ class Database:
             ORDER BY u.url
         ''' if self.is_postgres else '''
             SELECT 
+                u.id as url_id,
                 u.url,
                 tr.performance_score,
                 tr.accessibility_score,
