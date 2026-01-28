@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PageSpeed Insights Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 PageSpeed Insights Monitor</h1>
+            <p>Monitor and compare website performance over time</p>
+        </header>
+
+        <!-- Setup Section -->
+        <section class="setup-section">
+            <h2>Setup</h2>
+            <div class="setup-grid">
+                <div class="setup-card">
+                    <h3>Add Site</h3>
+                    <form id="addSiteForm">
+                        <input type="text" id="siteName" placeholder="Site name (e.g., Production)" required>
+                        <button type="submit">Add Site</button>
+                    </form>
+                </div>
+                <div class="setup-card">
+                    <h3>Add URL</h3>
+                    <form id="addUrlForm">
+                        <select id="urlSiteSelect" required>
+                            <option value="">Select a site...</option>
+                        </select>
+                        <input type="url" id="urlInput" placeholder="https://example.com" required>
+                        <button type="submit">Add URL</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Testing Section -->
+        <section class="testing-section">
+            <h2>Run Tests</h2>
+            <div class="button-group">
+                <button onclick="testAllSites()" class="btn-primary">🚀 Test All URLs</button>
+                <button onclick="loadDashboard()" class="btn-secondary">🔄 Refresh Dashboard</button>
+            </div>
+            <div id="testProgress" class="progress-message"></div>
+        </section>
+
+        <!-- Web Vitals Reference Section -->
+        <section class="reference-section">
+            <h2>📖 Core Web Vitals Reference</h2>
+            <p class="reference-description">Understanding metric thresholds based on Google's Web Vitals initiative</p>
+            <table class="reference-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Good</th>
+                        <th>Needs Improvement</th>
+                        <th>Poor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>FCP</strong> (First Contentful Paint)</td>
+                        <td class="metric-good">[0, 1800ms]</td>
+                        <td class="metric-needs-improvement">(1800ms, 3000ms]</td>
+                        <td class="metric-poor">over 3000ms</td>
+                    </tr>
+                    <tr>
+                        <td><strong>LCP</strong> (Largest Contentful Paint)</td>
+                        <td class="metric-good">[0, 2500ms]</td>
+                        <td class="metric-needs-improvement">(2500ms, 4000ms]</td>
+                        <td class="metric-poor">over 4000ms</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CLS</strong> (Cumulative Layout Shift)</td>
+                        <td class="metric-good">[0, 0.1]</td>
+                        <td class="metric-needs-improvement">(0.1, 0.25]</td>
+                        <td class="metric-poor">over 0.25</td>
+                    </tr>
+                    <tr>
+                        <td><strong>INP</strong> (Interaction to Next Paint)</td>
+                        <td class="metric-good">[0, 200ms]</td>
+                        <td class="metric-needs-improvement">(200ms, 500ms]</td>
+                        <td class="metric-poor">over 500ms</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TTFB</strong> (Time to First Byte)</td>
+                        <td class="metric-good">[0, 800ms]</td>
+                        <td class="metric-needs-improvement">(800ms, 1800ms]</td>
+                        <td class="metric-poor">over 1800ms</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Lighthouse Categories Explanation -->
+        <section class="explanation-section">
+            <h2>💡 Understanding Lighthouse Scores</h2>
+            <p class="reference-description">What each category measures (scores range from 0-100)</p>
+            
+            <div class="explanation-grid">
+                <div class="explanation-card">
+                    <div class="explanation-header performance-header">
+                        <span class="explanation-icon">⚡</span>
+                        <h3>Performance</h3>
+                    </div>
+                    <p><strong>Measures:</strong> How quickly content loads and becomes interactive</p>
+                    <ul>
+                        <li><strong>Speed Metrics:</strong> First Contentful Paint, Largest Contentful Paint, Speed Index</li>
+                        <li><strong>Interactivity:</strong> Time to Interactive, Total Blocking Time</li>
+                        <li><strong>Visual Stability:</strong> Cumulative Layout Shift</li>
+                    </ul>
+                    <p class="explanation-impact"><strong>Impact:</strong> Faster sites improve user experience and engagement. Performance is a ranking factor for Google Search.</p>
+                </div>
+
+                <div class="explanation-card">
+                    <div class="explanation-header accessibility-header">
+                        <span class="explanation-icon">♿</span>
+                        <h3>Accessibility</h3>
+                    </div>
+                    <p><strong>Measures:</strong> How usable your site is for all users, including those with disabilities</p>
+                    <ul>
+                        <li><strong>Screen Readers:</strong> Proper ARIA labels, semantic HTML, image alt text</li>
+                        <li><strong>Keyboard Navigation:</strong> Focus indicators, logical tab order</li>
+                        <li><strong>Visual:</strong> Color contrast, text sizing, touch targets</li>
+                        <li><strong>Forms:</strong> Proper labels, error identification</li>
+                    </ul>
+                    <p class="explanation-impact"><strong>Impact:</strong> Makes your site usable by everyone and is often a legal requirement (ADA, WCAG compliance).</p>
+                </div>
+
+                <div class="explanation-card">
+                    <div class="explanation-header practices-header">
+                        <span class="explanation-icon">✅</span>
+                        <h3>Best Practices</h3>
+                    </div>
+                    <p><strong>Measures:</strong> Overall code quality and modern web development standards</p>
+                    <ul>
+                        <li><strong>Security:</strong> HTTPS usage, secure connections, no browser errors</li>
+                        <li><strong>Modern APIs:</strong> Deprecated API usage, console errors</li>
+                        <li><strong>Images:</strong> Proper aspect ratios, appropriate formats</li>
+                        <li><strong>Trust & Safety:</strong> No vulnerable libraries, proper permissions</li>
+                    </ul>
+                    <p class="explanation-impact"><strong>Impact:</strong> Ensures your site follows web standards, is secure, and provides a reliable experience.</p>
+                </div>
+
+                <div class="explanation-card">
+                    <div class="explanation-header seo-header">
+                        <span class="explanation-icon">🔍</span>
+                        <h3>SEO</h3>
+                    </div>
+                    <p><strong>Measures:</strong> How well search engines can crawl and index your site</p>
+                    <ul>
+                        <li><strong>Content:</strong> Page titles, meta descriptions, heading structure</li>
+                        <li><strong>Crawlability:</strong> robots.txt, canonical URLs, mobile-friendliness</li>
+                        <li><strong>Links:</strong> Descriptive link text, valid href attributes</li>
+                        <li><strong>Structure:</strong> Valid HTML, proper status codes, structured data</li>
+                    </ul>
+                    <p class="explanation-impact"><strong>Impact:</strong> Better SEO means higher visibility in search results and more organic traffic.</p>
+                </div>
+            </div>
+
+            <div class="score-guide">
+                <h4>Score Interpretation:</h4>
+                <div class="score-guide-grid">
+                    <div class="score-guide-item">
+                        <span class="score score-good">90-100</span>
+                        <span>Good - No major issues</span>
+                    </div>
+                    <div class="score-guide-item">
+                        <span class="score score-average">50-89</span>
+                        <span>Needs Improvement - Some issues to address</span>
+                    </div>
+                    <div class="score-guide-item">
+                        <span class="score score-poor">0-49</span>
+                        <span>Poor - Significant issues requiring attention</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section class="dashboard-section">
+            <h2>Latest Results</h2>
+            <div id="siteTabs" class="tabs"></div>
+            <div id="siteContent" class="site-content"></div>
+        </section>
+
+        <!-- Comparison Section -->
+        <section class="comparison-section">
+            <h2>Site Comparison</h2>
+            <div class="comparison-controls">
+                <select id="compareSite1">
+                    <option value="">Select first site...</option>
+                </select>
+                <span>vs</span>
+                <select id="compareSite2">
+                    <option value="">Select second site...</option>
+                </select>
+                <button onclick="loadComparison()">Compare</button>
+            </div>
+            <div id="comparisonResults"></div>
+        </section>
+
+        <!-- Historical Charts Section -->
+        <section class="charts-section">
+            <h2>Historical Performance</h2>
+            <div class="chart-controls">
+                <select id="chartSiteSelect">
+                    <option value="">Select a site...</option>
+                </select>
+                <select id="chartUrlSelect">
+                    <option value="">Select a URL...</option>
+                </select>
+                <button onclick="loadHistoricalChart()">Load Chart</button>
+            </div>
+            <div class="chart-container">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
