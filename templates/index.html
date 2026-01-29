@@ -45,7 +45,16 @@
                 <button onclick="testAllSites()" class="btn-primary">🚀 Test All URLs</button>
                 <button onclick="loadDashboard()" class="btn-secondary">🔄 Refresh Dashboard</button>
             </div>
-            <div id="testProgress" class="progress-message"></div>
+            <div id="testProgress" class="progress-container">
+                <div class="progress-header">
+                    <span id="progressText"></span>
+                    <span id="progressCount"></span>
+                </div>
+                <div class="progress-bar-container">
+                    <div id="progressBar" class="progress-bar"></div>
+                </div>
+                <div id="progressDetails" class="progress-details"></div>
+            </div>
         </section>
 
         <!-- Web Vitals Reference Section -->

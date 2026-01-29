@@ -223,33 +223,122 @@ async function loadSiteResults(siteId) {
     }
 }
 
-// Test all sites
+// Test all sites with real-time progress
 async function testAllSites() {
-    const progressDiv = document.getElementById('testProgress');
-    progressDiv.textContent = 'Running tests... This may take several minutes.';
-    progressDiv.classList.add('show');
+    const progressContainer = document.getElementById('testProgress');
+    const progressText = document.getElementById('progressText');
+    const progressCount = document.getElementById('progressCount');
+    const progressBar = document.getElementById('progressBar');
+    const progressDetails = document.getElementById('progressDetails');
     
+    // Get all URLs first
+    let allUrls = [];
+    try {
+        const response = await fetch('/api/sites');
+        const sitesData = await response.json();
+        
+        for (const site of sitesData) {
+            const urlsResponse = await fetch(`/api/sites/${site.id}/urls`);
+            const urls = await urlsResponse.json();
+            urls.forEach(url => {
+                allUrls.push({
+                    id: url.id,
+                    url: url.url,
+                    siteName: site.name
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching URLs:', error);
+        alert('Failed to fetch URLs');
+        return;
+    }
+    
+    if (allUrls.length === 0) {
+        alert('No URLs to test. Please add some URLs first.');
+        return;
+    }
+    
+    // Show progress container
+    progressContainer.classList.add('show');
+    progressText.textContent = 'Preparing to test...';
+    progressCount.textContent = `0 / ${allUrls.length}`;
+    progressBar.style.width = '0%';
+    progressDetails.innerHTML = '';
+    
+    // Disable buttons
     const buttons = document.querySelectorAll('button');
     buttons.forEach(btn => btn.disabled = true);
     
-    try {
-        const response = await fetch('/api/test-all', {method: 'POST'});
-        const result = await response.json();
+    let completed = 0;
+    let successful = 0;
+    let failed = 0;
+    
+    // Test each URL sequentially
+    for (let i = 0; i < allUrls.length; i++) {
+        const urlData = allUrls[i];
         
-        progressDiv.textContent = `Tests completed! ${result.results.filter(r => r.success).length} successful, ${result.results.filter(r => !r.success).length} failed.`;
+        // Update progress
+        progressText.textContent = `Testing ${urlData.siteName}...`;
+        progressDetails.innerHTML = `<div class="testing-url">🔄 ${urlData.url}</div>`;
         
-        setTimeout(() => {
-            loadDashboard();
-            progressDiv.classList.remove('show');
-        }, 2000);
+        try {
+            const response = await fetch('/api/test-url', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    url_id: urlData.id,
+                    url: urlData.url
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                successful++;
+                progressDetails.innerHTML = `<div class="tested-url success">✅ ${urlData.url}</div>` + progressDetails.innerHTML;
+            } else {
+                failed++;
+                progressDetails.innerHTML = `<div class="tested-url failed">❌ ${urlData.url}</div>` + progressDetails.innerHTML;
+            }
+        } catch (error) {
+            failed++;
+            progressDetails.innerHTML = `<div class="tested-url failed">❌ ${urlData.url} (Error)</div>` + progressDetails.innerHTML;
+        }
         
-    } catch (error) {
-        console.error('Error running tests:', error);
-        progressDiv.textContent = 'Error running tests. Please try again.';
-    } finally {
-        buttons.forEach(btn => btn.disabled = false);
+        completed++;
+        const percentage = (completed / allUrls.length) * 100;
+        progressBar.style.width = `${percentage}%`;
+        progressCount.textContent = `${completed} / ${allUrls.length}`;
+        
+        // Keep only last 5 results visible
+        const allResults = progressDetails.querySelectorAll('.tested-url');
+        if (allResults.length > 5) {
+            for (let j = 5; j < allResults.length; j++) {
+                allResults[j].style.display = 'none';
+            }
+        }
     }
+    
+    // Show completion message
+    progressText.textContent = 'Tests Complete!';
+    progressDetails.innerHTML = `
+        <div class="completion-summary">
+            <div class="summary-item success">✅ ${successful} Successful</div>
+            <div class="summary-item failed">❌ ${failed} Failed</div>
+        </div>
+    ` + progressDetails.innerHTML;
+    
+    // Re-enable buttons
+    buttons.forEach(btn => btn.disabled = false);
+    
+    // Refresh dashboard after a short delay
+    setTimeout(() => {
+        loadDashboard();
+        progressContainer.classList.remove('show');
+    }, 3000);
 }
+
 
 // Load URLs for comparison dropdowns
 async function loadUrlsForComparison(siteNumber) {
