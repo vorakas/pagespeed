@@ -471,41 +471,34 @@ button:disabled {
 }
 
 .metrics-contribution {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 12px;
 }
 
 .metric-weight-item {
-    padding: 12px;
+    padding: 12px 15px;
     background: #f9f9f9;
     border-radius: 6px;
+    border-left: 3px solid #667eea;
+}
+
+.metric-weight-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 5px;
 }
 
 .metric-weight-label {
     font-weight: 600;
     color: #333;
-    margin-bottom: 5px;
+    font-size: 0.95em;
 }
 
 .metric-weight-value {
     font-size: 0.9em;
     color: #666;
-    margin-bottom: 8px;
-}
-
-.metric-weight-bar {
-    height: 8px;
-    background: #e0e0e0;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 5px;
-}
-
-.metric-weight-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-    transition: width 0.3s;
 }
 
 .metric-weight-percent {

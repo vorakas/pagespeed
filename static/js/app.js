@@ -736,10 +736,9 @@ function formatMetricWeight(label, value, weight, isDecimal = false) {
     
     return `
         <div class="metric-weight-item">
-            <div class="metric-weight-label">${label}</div>
-            <div class="metric-weight-value">${formattedValue}</div>
-            <div class="metric-weight-bar">
-                <div class="metric-weight-fill" style="width: ${weightPercent}%"></div>
+            <div class="metric-weight-header">
+                <span class="metric-weight-label">${label}:</span>
+                <span class="metric-weight-value">${formattedValue}</span>
             </div>
             <div class="metric-weight-percent">${weightPercent}% of score</div>
         </div>
