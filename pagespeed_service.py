@@ -62,6 +62,15 @@ class PageSpeedService:
             result['tbt'] = metrics.get('totalBlockingTime')  # Total Blocking Time (ms)
             result['speed_index'] = metrics.get('speedIndex')  # Speed Index (ms)
             
+            # Additional Web Vitals
+            result['inp'] = audits.get('interaction-to-next-paint', {}).get('numericValue')  # Interaction to Next Paint (ms)
+            
+            # Server metrics
+            result['ttfb'] = audits.get('server-response-time', {}).get('numericValue')  # Time to First Byte (ms)
+            
+            # Page size (total transfer size in bytes)
+            result['total_byte_weight'] = audits.get('total-byte-weight', {}).get('numericValue')  # Total page size (bytes)
+            
             # Store raw data for reference
             result['raw_data'] = {
                 'fetch_time': data.get('analysisUTCTimestamp'),

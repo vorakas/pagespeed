@@ -189,6 +189,9 @@ async function loadSiteResults(siteId) {
         html += '<th>FCP (ms)</th>';
         html += '<th>LCP (ms)</th>';
         html += '<th>CLS</th>';
+        html += '<th>INP (ms)</th>';
+        html += '<th>TTFB (ms)</th>';
+        html += '<th>Page Size</th>';
         html += '<th>Last Tested</th>';
         html += '<th>Actions</th>';
         html += '</tr></thead><tbody>';
@@ -203,6 +206,9 @@ async function loadSiteResults(siteId) {
             html += `<td>${formatFCP(result.fcp)}</td>`;
             html += `<td>${formatLCP(result.lcp)}</td>`;
             html += `<td>${formatCLS(result.cls)}</td>`;
+            html += `<td>${formatINP(result.inp)}</td>`;
+            html += `<td>${formatTTFB(result.ttfb)}</td>`;
+            html += `<td>${formatPageSize(result.total_byte_weight)}</td>`;
             html += `<td>${formatDate(result.tested_at)}</td>`;
             html += `<td><button class="btn-delete" onclick="deleteUrl(${result.url_id}, '${result.url}')">🗑️ Delete</button></td>`;
             html += '</tr>';
@@ -555,6 +561,41 @@ function formatCLS(value) {
     else if (value <= 0.25) className = 'vitals-needs-improvement';
     
     return `<span class="${className}">${formatted}</span>`;
+}
+
+function formatINP(value) {
+    if (value === null || value === undefined) return '<span>N/A</span>';
+    const rounded = Math.round(value);
+    let className = 'vitals-poor';
+    
+    if (rounded <= 200) className = 'vitals-good';
+    else if (rounded <= 500) className = 'vitals-needs-improvement';
+    
+    return `<span class="${className}">${rounded}ms</span>`;
+}
+
+function formatTTFB(value) {
+    if (value === null || value === undefined) return '<span>N/A</span>';
+    const rounded = Math.round(value);
+    let className = 'vitals-poor';
+    
+    if (rounded <= 800) className = 'vitals-good';
+    else if (rounded <= 1800) className = 'vitals-needs-improvement';
+    
+    return `<span class="${className}">${rounded}ms</span>`;
+}
+
+function formatPageSize(value) {
+    if (value === null || value === undefined) return '<span>N/A</span>';
+    
+    // Convert bytes to appropriate unit
+    if (value < 1024) {
+        return `${Math.round(value)} B`;
+    } else if (value < 1024 * 1024) {
+        return `${(value / 1024).toFixed(1)} KB`;
+    } else {
+        return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+    }
 }
 
 function formatDate(dateString) {

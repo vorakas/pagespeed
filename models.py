@@ -66,11 +66,22 @@ class Database:
                     tti REAL,
                     tbt REAL,
                     speed_index REAL,
+                    inp REAL,
+                    ttfb REAL,
+                    total_byte_weight REAL,
                     raw_data TEXT,
                     tested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (url_id) REFERENCES urls (id)
                 )
             ''')
+            
+            # Add new columns if they don't exist (for existing databases)
+            try:
+                cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS inp REAL")
+                cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS ttfb REAL")
+                cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS total_byte_weight REAL")
+            except:
+                pass  # Columns already exist or other error
         else:
             # SQLite schema
             cursor.execute('''
@@ -106,11 +117,28 @@ class Database:
                     tti REAL,
                     tbt REAL,
                     speed_index REAL,
+                    inp REAL,
+                    ttfb REAL,
+                    total_byte_weight REAL,
                     raw_data TEXT,
                     tested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (url_id) REFERENCES urls (id)
                 )
             ''')
+            
+            # Add new columns if they don't exist (for existing databases)
+            try:
+                cursor.execute("ALTER TABLE test_results ADD COLUMN inp REAL")
+            except:
+                pass
+            try:
+                cursor.execute("ALTER TABLE test_results ADD COLUMN ttfb REAL")
+            except:
+                pass
+            try:
+                cursor.execute("ALTER TABLE test_results ADD COLUMN total_byte_weight REAL")
+            except:
+                pass
         
         conn.commit()
         conn.close()
@@ -188,14 +216,14 @@ class Database:
             INSERT INTO test_results (
                 url_id, performance_score, accessibility_score, 
                 best_practices_score, seo_score, fcp, lcp, cls, 
-                tti, tbt, speed_index, raw_data
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                tti, tbt, speed_index, inp, ttfb, total_byte_weight, raw_data
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''' if self.is_postgres else '''
             INSERT INTO test_results (
                 url_id, performance_score, accessibility_score, 
                 best_practices_score, seo_score, fcp, lcp, cls, 
-                tti, tbt, speed_index, raw_data
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tti, tbt, speed_index, inp, ttfb, total_byte_weight, raw_data
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
         
         cursor.execute(query, (
@@ -210,6 +238,9 @@ class Database:
             result_data.get('tti'),
             result_data.get('tbt'),
             result_data.get('speed_index'),
+            result_data.get('inp'),
+            result_data.get('ttfb'),
+            result_data.get('total_byte_weight'),
             json.dumps(result_data.get('raw_data', {}))
         ))
         
@@ -237,6 +268,9 @@ class Database:
                 tr.fcp,
                 tr.lcp,
                 tr.cls,
+                tr.inp,
+                tr.ttfb,
+                tr.total_byte_weight,
                 tr.tested_at
             FROM urls u
             LEFT JOIN (
@@ -258,6 +292,9 @@ class Database:
                 tr.fcp,
                 tr.lcp,
                 tr.cls,
+                tr.inp,
+                tr.ttfb,
+                tr.total_byte_weight,
                 tr.tested_at
             FROM urls u
             LEFT JOIN (
