@@ -261,11 +261,12 @@ button:disabled {
     background: #f44336;
     color: white;
     border: none;
-    padding: 6px 10px;
-    border-radius: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 0.9em;
+    font-size: 1.1em;
     transition: background 0.2s;
+    line-height: 1;
 }
 
 .btn-delete:hover {
@@ -277,12 +278,13 @@ button:disabled {
     background: #2196f3;
     color: white;
     border: none;
-    padding: 6px 10px;
-    border-radius: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 0.9em;
+    font-size: 1.1em;
     transition: background 0.2s;
-    margin-right: 5px;
+    margin-right: 4px;
+    line-height: 1;
 }
 
 .btn-retest:hover {
@@ -292,6 +294,8 @@ button:disabled {
 
 .action-buttons {
     white-space: nowrap;
+    text-align: center;
+    min-width: 70px;
 }
 
 .error-detail {
