@@ -551,6 +551,55 @@ button:disabled {
     font-size: 0.9em;
 }
 
+/* Tooltip Styles */
+.tooltip-trigger {
+    position: relative;
+    cursor: help;
+    border-bottom: 1px dotted #667eea;
+}
+
+.tooltip-trigger:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 0;
+    top: 100%;
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: #333;
+    color: white;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: normal;
+    white-space: normal;
+    width: 280px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    line-height: 1.4;
+    animation: tooltipFadeIn 0.2s;
+}
+
+.tooltip-trigger:hover::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 100%;
+    margin-top: 2px;
+    border: 6px solid transparent;
+    border-bottom-color: #333;
+    z-index: 1001;
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .error-detail {
     display: block;
     font-size: 0.85em;

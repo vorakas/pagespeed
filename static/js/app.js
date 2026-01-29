@@ -696,14 +696,14 @@ async function showDetails(urlId) {
                         <div class="detail-section">
                             <h3>📈 All Metrics</h3>
                             <div class="all-metrics">
-                                <div class="metric-item"><strong>FCP:</strong> ${formatMetric(data.fcp)}ms</div>
-                                <div class="metric-item"><strong>LCP:</strong> ${formatMetric(data.lcp)}ms</div>
-                                <div class="metric-item"><strong>CLS:</strong> ${data.cls?.toFixed(3) || 'N/A'}</div>
-                                <div class="metric-item"><strong>TBT:</strong> ${formatMetric(data.tbt)}ms</div>
-                                <div class="metric-item"><strong>Speed Index:</strong> ${formatMetric(data.speed_index)}ms</div>
-                                <div class="metric-item"><strong>TTI:</strong> ${formatMetric(data.tti)}ms</div>
-                                <div class="metric-item"><strong>INP:</strong> ${formatMetric(data.inp)}ms</div>
-                                <div class="metric-item"><strong>TTFB:</strong> ${formatMetric(data.ttfb)}ms</div>
+                                <div class="metric-item"><strong class="tooltip-trigger" data-tooltip="First Contentful Paint - When first content appears. Good: < 1.8s">FCP:</strong> ${formatMetric(data.fcp)}ms</div>
+                                <div class="metric-item"><strong class="tooltip-trigger" data-tooltip="Largest Contentful Paint - When largest content is visible. Good: < 2.5s">LCP:</strong> ${formatMetric(data.lcp)}ms</div>
+                                <div class="metric-item"><strong class="tooltip-trigger" data-tooltip="Cumulative Layout Shift - Visual stability. Good: < 0.1">CLS:</strong> ${data.cls?.toFixed(3) || 'N/A'}</div>
+                                <div class="metric-item"><strong class="tooltip-trigger" data-tooltip="Total Blocking Time - Time blocked from user input. Good: < 200ms">TBT:</strong> ${formatMetric(data.tbt)}ms</div>
+                                <div class="metric-item"><strong class="tooltip-trigger" data-tooltip="Speed Index - How quickly content displays. Good: < 3.4s">Speed Index:</strong> ${formatMetric(data.speed_index)}ms</div>
+                                <div class="metric-item"><strong class="tooltip-trigger" data-tooltip="Time to Interactive - When page becomes fully interactive. Good: < 3.8s">TTI:</strong> ${formatMetric(data.tti)}ms</div>
+                                <div class="metric-item"><strong class="tooltip-trigger" data-tooltip="Interaction to Next Paint - Responsiveness to interactions. Good: < 200ms">INP:</strong> ${formatMetric(data.inp)}ms</div>
+                                <div class="metric-item"><strong class="tooltip-trigger" data-tooltip="Time to First Byte - Server response time. Good: < 800ms">TTFB:</strong> ${formatMetric(data.ttfb)}ms</div>
                                 <div class="metric-item"><strong>Page Size:</strong> ${formatPageSize(data.total_byte_weight)}</div>
                             </div>
                         </div>
@@ -735,15 +735,34 @@ function formatMetricWeight(label, value, weight, isDecimal = false) {
     // Handle both formats: if weight > 1, it's already a percentage, otherwise multiply by 100
     const weightPercent = weight ? (weight > 1 ? Math.round(weight) : Math.round(weight * 100)) : 0;
     
+    // Get tooltip info for the metric
+    const tooltipInfo = getMetricTooltip(label);
+    
     return `
         <div class="metric-weight-item">
             <div class="metric-weight-header">
-                <span class="metric-weight-label">${label}:</span>
+                <span class="metric-weight-label tooltip-trigger" data-tooltip="${tooltipInfo}">${label}:</span>
                 <span class="metric-weight-value">${formattedValue}</span>
             </div>
             <div class="metric-weight-percent">${weightPercent}% of score</div>
         </div>
     `;
+}
+
+// Get tooltip information for metrics
+function getMetricTooltip(label) {
+    const tooltips = {
+        'First Contentful Paint': 'FCP - Measures when the first content (text, image) appears on screen. Good: < 1.8s',
+        'Largest Contentful Paint': 'LCP - Measures when the largest content element becomes visible. Good: < 2.5s',
+        'Cumulative Layout Shift': 'CLS - Measures visual stability. How much content shifts unexpectedly. Good: < 0.1',
+        'Total Blocking Time': 'TBT - Measures how long the page is blocked from responding to user input. Good: < 200ms',
+        'Speed Index': 'SI - Measures how quickly content is visually displayed during page load. Good: < 3.4s',
+        'Time to Interactive': 'TTI - Measures when the page becomes fully interactive. Good: < 3.8s',
+        'Interaction to Next Paint': 'INP - Measures responsiveness to user interactions. Good: < 200ms',
+        'Time to First Byte': 'TTFB - Measures server response time. Good: < 800ms'
+    };
+    
+    return tooltips[label] || label;
 }
 
 function formatSavings(ms) {
