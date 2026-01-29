@@ -261,6 +261,96 @@ def comparison():
         'site2': site2_results
     })
 
+@app.route('/api/comparison/urls')
+def url_comparison():
+    """Get comparison data between two specific URLs"""
+    url1_id = request.args.get('url1', type=int)
+    url2_id = request.args.get('url2', type=int)
+    
+    if not url1_id or not url2_id:
+        return jsonify({'error': 'Both url1 and url2 parameters are required'}), 400
+    
+    # Get latest result for each URL
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    # Get URL 1 data
+    query = '''
+        SELECT 
+            u.url,
+            s.name as site_name,
+            tr.performance_score,
+            tr.accessibility_score,
+            tr.best_practices_score,
+            tr.seo_score,
+            tr.fcp,
+            tr.lcp,
+            tr.cls,
+            tr.inp,
+            tr.ttfb,
+            tr.total_byte_weight,
+            tr.tested_at
+        FROM urls u
+        JOIN sites s ON u.site_id = s.id
+        LEFT JOIN (
+            SELECT url_id, MAX(tested_at) as max_date
+            FROM test_results
+            GROUP BY url_id
+        ) latest ON u.id = latest.url_id
+        LEFT JOIN test_results tr ON u.id = tr.url_id AND tr.tested_at = latest.max_date
+        WHERE u.id = %s
+    ''' if db.is_postgres else '''
+        SELECT 
+            u.url,
+            s.name as site_name,
+            tr.performance_score,
+            tr.accessibility_score,
+            tr.best_practices_score,
+            tr.seo_score,
+            tr.fcp,
+            tr.lcp,
+            tr.cls,
+            tr.inp,
+            tr.ttfb,
+            tr.total_byte_weight,
+            tr.tested_at
+        FROM urls u
+        JOIN sites s ON u.site_id = s.id
+        LEFT JOIN (
+            SELECT url_id, MAX(tested_at) as max_date
+            FROM test_results
+            GROUP BY url_id
+        ) latest ON u.id = latest.url_id
+        LEFT JOIN test_results tr ON u.id = tr.url_id AND tr.tested_at = latest.max_date
+        WHERE u.id = ?
+    '''
+    
+    cursor.execute(query, (url1_id,))
+    if db.is_postgres:
+        columns = [desc[0] for desc in cursor.description]
+        row = cursor.fetchone()
+        url1_data = dict(zip(columns, row)) if row else None
+    else:
+        row = cursor.fetchone()
+        url1_data = dict(row) if row else None
+    
+    cursor.execute(query.replace('u.id = %s' if db.is_postgres else 'u.id = ?', 
+                                  'u.id = %s' if db.is_postgres else 'u.id = ?'), (url2_id,))
+    if db.is_postgres:
+        columns = [desc[0] for desc in cursor.description]
+        row = cursor.fetchone()
+        url2_data = dict(zip(columns, row)) if row else None
+    else:
+        row = cursor.fetchone()
+        url2_data = dict(row) if row else None
+    
+    conn.close()
+    
+    return jsonify({
+        'url1': url1_data,
+        'url2': url2_data
+    })
+
 if __name__ == '__main__':
     # Create some sample data if database is empty
     sites = db.get_sites()

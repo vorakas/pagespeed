@@ -190,15 +190,28 @@
 
         <!-- Comparison Section -->
         <section class="comparison-section">
-            <h2>Site Comparison</h2>
+            <h2>Page Comparison</h2>
+            <p class="reference-description">Compare the same page across different sites</p>
             <div class="comparison-controls">
-                <select id="compareSite1">
-                    <option value="">Select first site...</option>
-                </select>
-                <span>vs</span>
-                <select id="compareSite2">
-                    <option value="">Select second site...</option>
-                </select>
+                <div class="comparison-select-group">
+                    <label>Site 1:</label>
+                    <select id="compareSite1" onchange="loadUrlsForComparison(1)">
+                        <option value="">Select first site...</option>
+                    </select>
+                    <select id="compareUrl1">
+                        <option value="">Select URL...</option>
+                    </select>
+                </div>
+                <span class="vs-text">vs</span>
+                <div class="comparison-select-group">
+                    <label>Site 2:</label>
+                    <select id="compareSite2" onchange="loadUrlsForComparison(2)">
+                        <option value="">Select second site...</option>
+                    </select>
+                    <select id="compareUrl2">
+                        <option value="">Select URL...</option>
+                    </select>
+                </div>
                 <button onclick="loadComparison()">Compare</button>
             </div>
             <div id="comparisonResults"></div>

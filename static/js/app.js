@@ -251,39 +251,76 @@ async function testAllSites() {
     }
 }
 
-// Load comparison between two sites
+// Load URLs for comparison dropdowns
+async function loadUrlsForComparison(siteNumber) {
+    const siteId = document.getElementById(`compareSite${siteNumber}`).value;
+    const urlSelect = document.getElementById(`compareUrl${siteNumber}`);
+    
+    urlSelect.innerHTML = '<option value="">Select URL...</option>';
+    
+    if (!siteId) return;
+    
+    try {
+        const response = await fetch(`/api/sites/${siteId}/urls`);
+        const urls = await response.json();
+        
+        urls.forEach(url => {
+            const option = document.createElement('option');
+            option.value = url.id;
+            option.textContent = url.url;
+            urlSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading URLs for comparison:', error);
+    }
+}
+
+// Load comparison between two URLs
 async function loadComparison() {
-    const site1Id = document.getElementById('compareSite1').value;
-    const site2Id = document.getElementById('compareSite2').value;
+    const url1Id = document.getElementById('compareUrl1').value;
+    const url2Id = document.getElementById('compareUrl2').value;
     const resultsDiv = document.getElementById('comparisonResults');
     
-    if (!site1Id || !site2Id) {
-        alert('Please select both sites to compare');
+    if (!url1Id || !url2Id) {
+        alert('Please select URLs from both sites to compare');
         return;
     }
     
     resultsDiv.innerHTML = '<div class="loading">Loading comparison...</div>';
     
     try {
-        const response = await fetch(`/api/comparison?site1=${site1Id}&site2=${site2Id}`);
+        const response = await fetch(`/api/comparison/urls?url1=${url1Id}&url2=${url2Id}`);
         const data = await response.json();
         
-        const site1Name = sites.find(s => s.id == site1Id).name;
-        const site2Name = sites.find(s => s.id == site2Id).name;
+        if (!data.url1 || !data.url2) {
+            resultsDiv.innerHTML = '<div class="no-data">No test results available for one or both URLs</div>';
+            return;
+        }
         
         let html = '<div class="comparison-grid">';
         
-        // Site 1
-        html += `<div class="comparison-site"><h3>${site1Name}</h3>`;
-        html += formatComparisonResults(data.site1);
+        // URL 1
+        html += `<div class="comparison-site">`;
+        html += `<h3>${data.url1.site_name}</h3>`;
+        html += `<p class="comparison-url">${data.url1.url}</p>`;
+        html += formatUrlComparisonResults(data.url1);
         html += '</div>';
         
-        // Site 2
-        html += `<div class="comparison-site"><h3>${site2Name}</h3>`;
-        html += formatComparisonResults(data.site2);
+        // URL 2
+        html += `<div class="comparison-site">`;
+        html += `<h3>${data.url2.site_name}</h3>`;
+        html += `<p class="comparison-url">${data.url2.url}</p>`;
+        html += formatUrlComparisonResults(data.url2);
         html += '</div>';
         
         html += '</div>';
+        
+        // Add difference summary
+        html += '<div class="comparison-summary">';
+        html += '<h4>Performance Difference</h4>';
+        html += formatComparisonDifference(data.url1, data.url2);
+        html += '</div>';
+        
         resultsDiv.innerHTML = html;
         
     } catch (error) {
@@ -292,29 +329,87 @@ async function loadComparison() {
     }
 }
 
-// Format comparison results
-function formatComparisonResults(results) {
-    if (results.length === 0) {
-        return '<div class="no-data">No test results available</div>';
-    }
+// Format URL comparison results
+function formatUrlComparisonResults(result) {
+    let html = '<div class="metric-group">';
+    html += '<h4>Lighthouse Scores</h4>';
+    html += `<div class="metric-row"><span class="metric-label">Performance:</span>${formatScore(result.performance_score)}</div>`;
+    html += `<div class="metric-row"><span class="metric-label">Accessibility:</span>${formatScore(result.accessibility_score)}</div>`;
+    html += `<div class="metric-row"><span class="metric-label">Best Practices:</span>${formatScore(result.best_practices_score)}</div>`;
+    html += `<div class="metric-row"><span class="metric-label">SEO:</span>${formatScore(result.seo_score)}</div>`;
+    html += '</div>';
     
-    const avg = {
-        performance: average(results.map(r => r.performance_score)),
-        accessibility: average(results.map(r => r.accessibility_score)),
-        best_practices: average(results.map(r => r.best_practices_score)),
-        seo: average(results.map(r => r.seo_score))
-    };
+    html += '<div class="metric-group">';
+    html += '<h4>Core Web Vitals</h4>';
+    html += `<div class="metric-row"><span class="metric-label">FCP:</span>${formatFCP(result.fcp)}</div>`;
+    html += `<div class="metric-row"><span class="metric-label">LCP:</span>${formatLCP(result.lcp)}</div>`;
+    html += `<div class="metric-row"><span class="metric-label">CLS:</span>${formatCLS(result.cls)}</div>`;
+    html += `<div class="metric-row"><span class="metric-label">INP:</span>${formatINP(result.inp)}</div>`;
+    html += `<div class="metric-row"><span class="metric-label">TTFB:</span>${formatTTFB(result.ttfb)}</div>`;
+    html += '</div>';
     
-    let html = '<div class="metric-row"><span class="metric-label">Avg Performance:</span>' + formatScore(avg.performance) + '</div>';
-    html += '<div class="metric-row"><span class="metric-label">Avg Accessibility:</span>' + formatScore(avg.accessibility) + '</div>';
-    html += '<div class="metric-row"><span class="metric-label">Avg Best Practices:</span>' + formatScore(avg.best_practices) + '</div>';
-    html += '<div class="metric-row"><span class="metric-label">Avg SEO:</span>' + formatScore(avg.seo) + '</div>';
-    html += `<div class="metric-row"><span class="metric-label">URLs Tested:</span><span>${results.length}</span></div>`;
+    html += '<div class="metric-group">';
+    html += '<h4>Additional Info</h4>';
+    html += `<div class="metric-row"><span class="metric-label">Page Size:</span><span>${formatPageSize(result.total_byte_weight)}</span></div>`;
+    html += `<div class="metric-row"><span class="metric-label">Last Tested:</span><span>${formatDate(result.tested_at)}</span></div>`;
+    html += '</div>';
     
     return html;
 }
 
-// Update URLs dropdown when site is selected for charts
+// Format comparison difference
+function formatComparisonDifference(url1, url2) {
+    const metrics = [
+        { name: 'Performance', key: 'performance_score', format: 'score' },
+        { name: 'FCP', key: 'fcp', format: 'ms', lower: true },
+        { name: 'LCP', key: 'lcp', format: 'ms', lower: true },
+        { name: 'CLS', key: 'cls', format: 'decimal', lower: true },
+        { name: 'INP', key: 'inp', format: 'ms', lower: true },
+        { name: 'TTFB', key: 'ttfb', format: 'ms', lower: true },
+        { name: 'Page Size', key: 'total_byte_weight', format: 'bytes', lower: true }
+    ];
+    
+    let html = '<div class="difference-grid">';
+    
+    metrics.forEach(metric => {
+        const val1 = url1[metric.key];
+        const val2 = url2[metric.key];
+        
+        if (val1 === null || val1 === undefined || val2 === null || val2 === undefined) {
+            return;
+        }
+        
+        const diff = val1 - val2;
+        const absDiff = Math.abs(diff);
+        
+        // Determine if difference is better or worse
+        const isBetter = metric.lower ? (diff < 0) : (diff > 0);
+        const diffClass = isBetter ? 'diff-better' : 'diff-worse';
+        const arrow = isBetter ? '↑' : '↓';
+        
+        let formattedDiff;
+        if (metric.format === 'score') {
+            formattedDiff = `${absDiff.toFixed(1)} points`;
+        } else if (metric.format === 'ms') {
+            formattedDiff = `${Math.round(absDiff)}ms`;
+        } else if (metric.format === 'decimal') {
+            formattedDiff = absDiff.toFixed(3);
+        } else if (metric.format === 'bytes') {
+            formattedDiff = formatPageSize(absDiff);
+        }
+        
+        html += `<div class="difference-item">`;
+        html += `<span class="diff-metric">${metric.name}:</span>`;
+        html += `<span class="${diffClass}">${arrow} ${formattedDiff} ${isBetter ? 'better' : 'worse'} on ${url1.site_name}</span>`;
+        html += `</div>`;
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+// Update historical chart
+// Update historical chart
 async function updateUrlsForChart() {
     const siteId = document.getElementById('chartSiteSelect').value;
     const urlSelect = document.getElementById('chartUrlSelect');
