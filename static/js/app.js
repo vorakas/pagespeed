@@ -210,7 +210,10 @@ async function loadSiteResults(siteId) {
             html += `<td>${formatTTFB(result.ttfb)}</td>`;
             html += `<td>${formatPageSize(result.total_byte_weight)}</td>`;
             html += `<td>${formatDate(result.tested_at)}</td>`;
-            html += `<td><button class="btn-delete" onclick="deleteUrl(${result.url_id}, '${result.url}')">🗑️ Delete</button></td>`;
+            html += `<td class="action-buttons">
+                        <button class="btn-retest" onclick="retestUrl(${result.url_id}, '${result.url}')" title="Retest this URL">🔄</button>
+                        <button class="btn-delete" onclick="deleteUrl(${result.url_id}, '${result.url}')" title="Delete this URL">🗑️</button>
+                    </td>`;
             html += '</tr>';
         });
         
@@ -299,11 +302,13 @@ async function testAllSites() {
                 progressDetails.innerHTML = `<div class="tested-url success">✅ ${urlData.url}</div>` + progressDetails.innerHTML;
             } else {
                 failed++;
-                progressDetails.innerHTML = `<div class="tested-url failed">❌ ${urlData.url}</div>` + progressDetails.innerHTML;
+                const errorMsg = result.error || 'Test failed';
+                progressDetails.innerHTML = `<div class="tested-url failed">❌ ${urlData.url}<br><span class="error-detail">${errorMsg}</span></div>` + progressDetails.innerHTML;
             }
         } catch (error) {
             failed++;
-            progressDetails.innerHTML = `<div class="tested-url failed">❌ ${urlData.url} (Error)</div>` + progressDetails.innerHTML;
+            const errorMsg = error.message || 'Network error';
+            progressDetails.innerHTML = `<div class="tested-url failed">❌ ${urlData.url}<br><span class="error-detail">Error: ${errorMsg}</span></div>` + progressDetails.innerHTML;
         }
         
         completed++;
@@ -609,6 +614,62 @@ async function loadHistoricalChart() {
     } catch (error) {
         console.error('Error loading historical data:', error);
         alert('Failed to load historical data');
+    }
+}
+
+// Retest a single URL
+async function retestUrl(urlId, urlText) {
+    const progressContainer = document.getElementById('testProgress');
+    const progressText = document.getElementById('progressText');
+    const progressCount = document.getElementById('progressCount');
+    const progressBar = document.getElementById('progressBar');
+    const progressDetails = document.getElementById('progressDetails');
+    
+    // Show progress container
+    progressContainer.classList.add('show');
+    progressText.textContent = 'Retesting URL...';
+    progressCount.textContent = '0 / 1';
+    progressBar.style.width = '0%';
+    progressDetails.innerHTML = `<div class="testing-url">🔄 ${urlText}</div>`;
+    
+    try {
+        const response = await fetch('/api/test-url', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                url_id: urlId,
+                url: urlText
+            })
+        });
+        
+        const result = await response.json();
+        
+        progressBar.style.width = '100%';
+        progressCount.textContent = '1 / 1';
+        
+        if (result.success) {
+            progressText.textContent = 'Test Complete!';
+            progressDetails.innerHTML = `<div class="tested-url success">✅ ${urlText}</div>`;
+        } else {
+            progressText.textContent = 'Test Failed';
+            const errorMsg = result.error || 'Test failed';
+            progressDetails.innerHTML = `<div class="tested-url failed">❌ ${urlText}<br><span class="error-detail">${errorMsg}</span></div>`;
+        }
+        
+        // Refresh dashboard after delay
+        setTimeout(() => {
+            loadDashboard();
+            progressContainer.classList.remove('show');
+        }, 2000);
+        
+    } catch (error) {
+        progressText.textContent = 'Error';
+        const errorMsg = error.message || 'Network error';
+        progressDetails.innerHTML = `<div class="tested-url failed">❌ ${urlText}<br><span class="error-detail">Error: ${errorMsg}</span></div>`;
+        
+        setTimeout(() => {
+            progressContainer.classList.remove('show');
+        }, 3000);
     }
 }
 

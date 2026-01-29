@@ -13,7 +13,7 @@ body {
 }
 
 .container {
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
 }
 
@@ -228,27 +228,29 @@ button:disabled {
 }
 
 .site-content {
-    overflow-x: auto;
+    /* No overflow - let table fit naturally */
 }
 
 .results-table {
     width: 100%;
-    min-width: 1200px;
     border-collapse: collapse;
     margin-top: 20px;
+    table-layout: auto;
 }
 
 .results-table th {
     background: #667eea;
     color: white;
-    padding: 12px;
+    padding: 10px 8px;
     text-align: left;
     font-weight: 600;
+    font-size: 0.9em;
 }
 
 .results-table td {
-    padding: 12px;
+    padding: 10px 8px;
     border-bottom: 1px solid #e0e0e0;
+    font-size: 0.9em;
 }
 
 .results-table tr:hover {
@@ -259,7 +261,7 @@ button:disabled {
     background: #f44336;
     color: white;
     border: none;
-    padding: 6px 12px;
+    padding: 6px 10px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 0.9em;
@@ -269,6 +271,35 @@ button:disabled {
 .btn-delete:hover {
     background: #d32f2f;
     transform: none;
+}
+
+.btn-retest {
+    background: #2196f3;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.2s;
+    margin-right: 5px;
+}
+
+.btn-retest:hover {
+    background: #1976d2;
+    transform: none;
+}
+
+.action-buttons {
+    white-space: nowrap;
+}
+
+.error-detail {
+    display: block;
+    font-size: 0.85em;
+    margin-top: 5px;
+    color: #c62828;
+    font-style: italic;
 }
 
 .score {
