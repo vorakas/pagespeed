@@ -354,7 +354,8 @@ button:disabled {
 .modal-content {
     background: white;
     border-radius: 12px;
-    max-width: 900px;
+    width: 95%;
+    max-width: 1200px;
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
@@ -546,7 +547,7 @@ button:disabled {
 
 .all-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 10px;
 }
 
