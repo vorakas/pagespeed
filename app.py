@@ -374,6 +374,91 @@ def url_comparison():
         'url2': url2_data
     })
 
+@app.route('/api/test-details/<int:url_id>')
+def test_details(url_id):
+    """Get detailed test results including opportunities and diagnostics"""
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    query = '''
+        SELECT 
+            u.url,
+            s.name as site_name,
+            tr.performance_score,
+            tr.accessibility_score,
+            tr.best_practices_score,
+            tr.seo_score,
+            tr.fcp,
+            tr.lcp,
+            tr.cls,
+            tr.tti,
+            tr.tbt,
+            tr.speed_index,
+            tr.inp,
+            tr.ttfb,
+            tr.total_byte_weight,
+            tr.raw_data,
+            tr.tested_at
+        FROM urls u
+        JOIN sites s ON u.site_id = s.id
+        LEFT JOIN (
+            SELECT url_id, MAX(tested_at) as max_date
+            FROM test_results
+            GROUP BY url_id
+        ) latest ON u.id = latest.url_id
+        LEFT JOIN test_results tr ON u.id = tr.url_id AND tr.tested_at = latest.max_date
+        WHERE u.id = %s
+    ''' if db.is_postgres else '''
+        SELECT 
+            u.url,
+            s.name as site_name,
+            tr.performance_score,
+            tr.accessibility_score,
+            tr.best_practices_score,
+            tr.seo_score,
+            tr.fcp,
+            tr.lcp,
+            tr.cls,
+            tr.tti,
+            tr.tbt,
+            tr.speed_index,
+            tr.inp,
+            tr.ttfb,
+            tr.total_byte_weight,
+            tr.raw_data,
+            tr.tested_at
+        FROM urls u
+        JOIN sites s ON u.site_id = s.id
+        LEFT JOIN (
+            SELECT url_id, MAX(tested_at) as max_date
+            FROM test_results
+            GROUP BY url_id
+        ) latest ON u.id = latest.url_id
+        LEFT JOIN test_results tr ON u.id = tr.url_id AND tr.tested_at = latest.max_date
+        WHERE u.id = ?
+    '''
+    
+    cursor.execute(query, (url_id,))
+    
+    if db.is_postgres:
+        columns = [desc[0] for desc in cursor.description]
+        row = cursor.fetchone()
+        result = dict(zip(columns, row)) if row else None
+    else:
+        row = cursor.fetchone()
+        result = dict(row) if row else None
+    
+    conn.close()
+    
+    if not result:
+        return jsonify({'error': 'No test results found'}), 404
+    
+    # Parse raw_data JSON
+    if result.get('raw_data'):
+        result['raw_data'] = json.loads(result['raw_data'])
+    
+    return jsonify(result)
+
 if __name__ == '__main__':
     # Create some sample data if database is empty
     sites = db.get_sites()

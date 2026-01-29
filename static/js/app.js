@@ -211,6 +211,7 @@ async function loadSiteResults(siteId) {
             html += `<td>${formatPageSize(result.total_byte_weight)}</td>`;
             html += `<td>${formatDate(result.tested_at)}</td>`;
             html += `<td class="action-buttons">
+                        <button class="btn-details" onclick="showDetails(${result.url_id})" title="View detailed breakdown">📊</button>
                         <button class="btn-retest" onclick="retestUrl(${result.url_id}, '${result.url}')" title="Retest this URL">🔄</button>
                         <button class="btn-delete" onclick="deleteUrl(${result.url_id}, '${result.url}')" title="Delete this URL">🗑️</button>
                     </td>`;
@@ -615,6 +616,140 @@ async function loadHistoricalChart() {
         console.error('Error loading historical data:', error);
         alert('Failed to load historical data');
     }
+}
+
+// Show detailed breakdown modal
+async function showDetails(urlId) {
+    try {
+        const response = await fetch(`/api/test-details/${urlId}`);
+        const data = await response.json();
+        
+        if (!data || !data.raw_data) {
+            alert('No detailed data available for this URL. Please run a test first.');
+            return;
+        }
+        
+        const rawData = data.raw_data;
+        
+        // Build modal content
+        let modalHTML = `
+            <div class="modal-overlay" onclick="closeModal()">
+                <div class="modal-content" onclick="event.stopPropagation()">
+                    <div class="modal-header">
+                        <h2>📊 Performance Details</h2>
+                        <button class="modal-close" onclick="closeModal()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="detail-url">${data.url}</div>
+                        <div class="detail-site">Site: ${data.site_name}</div>
+                        
+                        <div class="detail-section">
+                            <h3>Performance Score Breakdown</h3>
+                            <div class="score-breakdown">
+                                <div class="breakdown-item">
+                                    <span class="breakdown-label">Overall Performance:</span>
+                                    ${formatScore(data.performance_score)}
+                                </div>
+                            </div>
+                            
+                            <h4>Metric Contributions</h4>
+                            <div class="metrics-contribution">
+                                ${formatMetricWeight('First Contentful Paint', data.fcp, rawData.metric_weights?.fcp)}
+                                ${formatMetricWeight('Largest Contentful Paint', data.lcp, rawData.metric_weights?.lcp)}
+                                ${formatMetricWeight('Cumulative Layout Shift', data.cls, rawData.metric_weights?.cls, true)}
+                                ${formatMetricWeight('Total Blocking Time', data.tbt, rawData.metric_weights?.tbt)}
+                                ${formatMetricWeight('Speed Index', data.speed_index, rawData.metric_weights?.si)}
+                            </div>
+                        </div>
+                        
+                        ${rawData.opportunities && rawData.opportunities.length > 0 ? `
+                        <div class="detail-section">
+                            <h3>🚀 Optimization Opportunities</h3>
+                            <p class="section-desc">Potential improvements to boost performance</p>
+                            <div class="opportunities-list">
+                                ${rawData.opportunities.map(opp => `
+                                    <div class="opportunity-item">
+                                        <div class="opp-title">${opp.title}</div>
+                                        <div class="opp-savings">💡 Potential savings: ${formatSavings(opp.savingsMs)}</div>
+                                        ${opp.displayValue ? `<div class="opp-detail">${opp.displayValue}</div>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${rawData.failed_audits && rawData.failed_audits.length > 0 ? `
+                        <div class="detail-section">
+                            <h3>⚠️ Failed Audits</h3>
+                            <p class="section-desc">Areas that need improvement</p>
+                            <div class="failed-audits-list">
+                                ${rawData.failed_audits.map(audit => `
+                                    <div class="audit-item">
+                                        <div class="audit-title">${audit.title}</div>
+                                        ${audit.displayValue ? `<div class="audit-detail">${audit.displayValue}</div>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <div class="detail-section">
+                            <h3>📈 All Metrics</h3>
+                            <div class="all-metrics">
+                                <div class="metric-item"><strong>FCP:</strong> ${formatMetric(data.fcp)}ms</div>
+                                <div class="metric-item"><strong>LCP:</strong> ${formatMetric(data.lcp)}ms</div>
+                                <div class="metric-item"><strong>CLS:</strong> ${data.cls?.toFixed(3) || 'N/A'}</div>
+                                <div class="metric-item"><strong>TBT:</strong> ${formatMetric(data.tbt)}ms</div>
+                                <div class="metric-item"><strong>Speed Index:</strong> ${formatMetric(data.speed_index)}ms</div>
+                                <div class="metric-item"><strong>TTI:</strong> ${formatMetric(data.tti)}ms</div>
+                                <div class="metric-item"><strong>INP:</strong> ${formatMetric(data.inp)}ms</div>
+                                <div class="metric-item"><strong>TTFB:</strong> ${formatMetric(data.ttfb)}ms</div>
+                                <div class="metric-item"><strong>Page Size:</strong> ${formatPageSize(data.total_byte_weight)}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error loading details:', error);
+        alert('Failed to load detailed data');
+    }
+}
+
+function closeModal() {
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function formatMetricWeight(label, value, weight, isDecimal = false) {
+    if (value === null || value === undefined) return '';
+    
+    const formattedValue = isDecimal ? value.toFixed(3) : `${Math.round(value)}ms`;
+    const weightPercent = weight ? Math.round(weight * 100) : 0;
+    
+    return `
+        <div class="metric-weight-item">
+            <div class="metric-weight-label">${label}</div>
+            <div class="metric-weight-value">${formattedValue}</div>
+            <div class="metric-weight-bar">
+                <div class="metric-weight-fill" style="width: ${weightPercent}%"></div>
+            </div>
+            <div class="metric-weight-percent">${weightPercent}% of score</div>
+        </div>
+    `;
+}
+
+function formatSavings(ms) {
+    if (!ms) return 'N/A';
+    const seconds = (ms / 1000).toFixed(1);
+    return `${seconds}s`;
 }
 
 // Retest a single URL
