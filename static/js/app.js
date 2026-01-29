@@ -151,6 +151,11 @@ function switchTab(siteId, tabElement) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     tabElement.classList.add('active');
     
+    // Reset sorting state
+    currentSortColumn = null;
+    currentSortDirection = null;
+    unsortedResults = [];
+    
     // Load results for this site
     loadSiteResults(siteId);
 }
@@ -181,18 +186,18 @@ async function loadSiteResults(siteId) {
         }
         
         let html = '<table class="results-table"><thead><tr>';
-        html += '<th>URL</th>';
-        html += '<th>Performance</th>';
-        html += '<th>Accessibility</th>';
-        html += '<th>Best Practices</th>';
-        html += '<th>SEO</th>';
-        html += '<th>FCP (ms)</th>';
-        html += '<th>LCP (ms)</th>';
-        html += '<th>CLS</th>';
-        html += '<th>INP (ms)</th>';
-        html += '<th>TTFB (ms)</th>';
-        html += '<th>Page Size</th>';
-        html += '<th>Last Tested</th>';
+        html += '<th class="sortable" onclick="sortTable(\'url\')">URL <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="Performance - Overall page speed and optimization. Score: 0-100" onclick="sortTable(\'performance_score\')">Performance <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="Accessibility - How accessible the page is to users with disabilities. Score: 0-100" onclick="sortTable(\'accessibility_score\')">Accessibility <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="Best Practices - Follows web development best practices. Score: 0-100" onclick="sortTable(\'best_practices_score\')">Best Practices <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="SEO - Search engine optimization and discoverability. Score: 0-100" onclick="sortTable(\'seo_score\')">SEO <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="First Contentful Paint - When first content appears. Good: < 1.8s" onclick="sortTable(\'fcp\')">FCP (ms) <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="Largest Contentful Paint - When largest content is visible. Good: < 2.5s" onclick="sortTable(\'lcp\')">LCP (ms) <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="Cumulative Layout Shift - Visual stability. Good: < 0.1" onclick="sortTable(\'cls\')">CLS <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="Interaction to Next Paint - Responsiveness to interactions. Good: < 200ms" onclick="sortTable(\'inp\')">INP (ms) <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="Time to First Byte - Server response time. Good: < 800ms" onclick="sortTable(\'ttfb\')">TTFB (ms) <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable tooltip-trigger" data-tooltip="Total page size including all resources" onclick="sortTable(\'total_byte_weight\')">Page Size <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'tested_at\')">Last Tested <span class="sort-indicator"></span></th>';
         html += '<th>Actions</th>';
         html += '</tr></thead><tbody>';
         
@@ -769,6 +774,96 @@ function formatSavings(ms) {
     if (!ms) return 'N/A';
     const seconds = (ms / 1000).toFixed(1);
     return `${seconds}s`;
+}
+
+// Table sorting state
+let currentSortColumn = null;
+let currentSortDirection = null; // null = no sort, 'asc' = ascending, 'desc' = descending
+let unsortedResults = []; // Store original order
+
+// Sort table by column
+function sortTable(column) {
+    const resultsDiv = document.getElementById('latestResults');
+    
+    if (!unsortedResults.length) {
+        // Store original unsorted order
+        unsortedResults = [...sites.find(s => s.id === currentSiteId)?.results || []];
+    }
+    
+    let results = sites.find(s => s.id === currentSiteId)?.results;
+    if (!results) return;
+    
+    // Three-state sorting: unsorted -> asc -> desc -> unsorted
+    if (currentSortColumn === column) {
+        if (currentSortDirection === null) {
+            currentSortDirection = 'asc';
+        } else if (currentSortDirection === 'asc') {
+            currentSortDirection = 'desc';
+        } else {
+            // Reset to unsorted
+            currentSortDirection = null;
+            currentSortColumn = null;
+            sites.find(s => s.id === currentSiteId).results = [...unsortedResults];
+            displayResults(unsortedResults);
+            updateSortIndicators();
+            return;
+        }
+    } else {
+        currentSortColumn = column;
+        currentSortDirection = 'asc';
+    }
+    
+    // Sort the results
+    results.sort((a, b) => {
+        let valA = a[column];
+        let valB = b[column];
+        
+        // Handle null/undefined values
+        if (valA === null || valA === undefined) return 1;
+        if (valB === null || valB === undefined) return -1;
+        
+        // Handle different data types
+        if (column === 'url') {
+            valA = valA.toLowerCase();
+            valB = valB.toLowerCase();
+        } else if (column === 'tested_at') {
+            valA = new Date(valA).getTime();
+            valB = new Date(valB).getTime();
+        }
+        
+        if (currentSortDirection === 'asc') {
+            return valA > valB ? 1 : valA < valB ? -1 : 0;
+        } else {
+            return valA < valB ? 1 : valA > valB ? -1 : 0;
+        }
+    });
+    
+    displayResults(results);
+    updateSortIndicators();
+}
+
+// Update sort indicators in table headers
+function updateSortIndicators() {
+    document.querySelectorAll('.sort-indicator').forEach(indicator => {
+        indicator.textContent = '';
+        indicator.className = 'sort-indicator';
+    });
+    
+    if (currentSortColumn && currentSortDirection) {
+        const headers = document.querySelectorAll('.sortable');
+        headers.forEach(header => {
+            if (header.onclick && header.onclick.toString().includes(`'${currentSortColumn}'`)) {
+                const indicator = header.querySelector('.sort-indicator');
+                if (currentSortDirection === 'asc') {
+                    indicator.textContent = '▲';
+                    indicator.className = 'sort-indicator sort-asc';
+                } else {
+                    indicator.textContent = '▼';
+                    indicator.className = 'sort-indicator sort-desc';
+                }
+            }
+        });
+    }
 }
 
 // Retest a single URL
