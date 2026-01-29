@@ -732,8 +732,8 @@ function formatMetricWeight(label, value, weight, isDecimal = false) {
     if (value === null || value === undefined) return '';
     
     const formattedValue = isDecimal ? value.toFixed(3) : `${Math.round(value)}ms`;
-    // Divide by 100 since weights appear to be stored as 1000, 2500 instead of 10, 25
-    const weightPercent = weight ? Math.round(weight / 100) : 0;
+    // Handle both formats: if weight > 1, it's already a percentage, otherwise multiply by 100
+    const weightPercent = weight ? (weight > 1 ? Math.round(weight) : Math.round(weight * 100)) : 0;
     
     return `
         <div class="metric-weight-item">
