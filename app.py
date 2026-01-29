@@ -83,6 +83,29 @@ def url_history(url_id):
     history = db.get_historical_data(url_id, days)
     return jsonify(history)
 
+@app.route('/api/test-url-async', methods=['POST'])
+def test_url_async():
+    """Queue a URL test that runs in background - returns immediately"""
+    data = request.get_json()
+    url_id = data.get('url_id')
+    url_text = data.get('url')
+    
+    if not url_text:
+        return jsonify({'success': False, 'error': 'URL is required'}), 400
+    
+    # Start test in background thread
+    import threading
+    def run_test():
+        result = pagespeed.test_url(url_text)
+        if result and url_id:
+            db.save_test_result(url_id, result)
+    
+    thread = threading.Thread(target=run_test)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'success': True, 'status': 'queued'})
+
 @app.route('/api/test-url', methods=['POST'])
 def test_url():
     """Run a test for a specific URL on demand"""
