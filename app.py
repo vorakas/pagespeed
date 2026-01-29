@@ -4,6 +4,7 @@ from pagespeed_service import PageSpeedService
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
