@@ -581,7 +581,6 @@ button:disabled {
     position: relative;
     cursor: help;
     border-bottom: 1px dotted #667eea;
-    pointer-events: none; /* Allow clicks to pass through to parent */
 }
 
 .sortable .tooltip-trigger {
@@ -1417,6 +1416,64 @@ button:hover {
 .metric-weight-item, .opportunity-item, .audit-item, .metric-item {
     background: #1a1f2e;
     border-left-color: #10b981;
+}
+
+/* Modal: URL and site info */
+.detail-url {
+    color: #ffffff !important;
+}
+
+.detail-site {
+    color: #9ca3af !important;
+}
+
+/* Modal: Section titles */
+.detail-section h3 {
+    color: #ffffff !important;
+}
+
+.detail-section h4 {
+    color: #ffffff !important;
+}
+
+/* Modal: Overall Performance Bar */
+.breakdown-item {
+    background: #1a1f2e !important;
+}
+
+.breakdown-label {
+    color: #ffffff !important;
+}
+
+/* Modal: Metric Contributions */
+.metric-weight-label {
+    color: #ffffff !important;
+}
+
+.metric-weight-value {
+    color: #9ca3af !important;
+}
+
+/* Modal: Optimization Opportunities */
+.opp-title {
+    color: #ffffff !important;
+}
+
+.opp-savings {
+    color: #9ca3af !important;
+}
+
+.opp-detail {
+    color: #9ca3af !important;
+}
+
+/* Modal: Failed Audits */
+.audit-title {
+    color: #ffffff !important;
+}
+
+.audit-detail {
+    color: #9ca3af !important;
 }
 
 .score-guide {
