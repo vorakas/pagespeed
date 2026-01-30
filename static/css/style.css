@@ -1682,3 +1682,9 @@ body:not(.light-mode) .explanation-card p,
 body:not(.light-mode) .explanation-card li {
     color: #e3e8ee !important;
 }
+
+body:not(.light-mode) .explanation-impact {
+    background: #0f1419 !important;
+    border-left-color: #667eea !important;
+    color: #e3e8ee !important;
+}
