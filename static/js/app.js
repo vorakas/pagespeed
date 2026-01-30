@@ -187,16 +187,16 @@ async function loadSiteResults(siteId) {
         
         let html = '<table class="results-table"><thead><tr>';
         html += '<th class="sortable" onclick="sortTable(\'url\')">URL <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'performance_score\')"><span class="tooltip-trigger" data-tooltip="Performance - Overall page speed and optimization. Score: 0-100">Performance</span> <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'accessibility_score\')"><span class="tooltip-trigger" data-tooltip="Accessibility - How accessible the page is to users with disabilities. Score: 0-100">Accessibility</span> <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'best_practices_score\')"><span class="tooltip-trigger" data-tooltip="Best Practices - Follows web development best practices. Score: 0-100">Best Practices</span> <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'seo_score\')"><span class="tooltip-trigger" data-tooltip="SEO - Search engine optimization and discoverability. Score: 0-100">SEO</span> <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'fcp\')"><span class="tooltip-trigger" data-tooltip="First Contentful Paint - When first content appears. Good: < 1.8s">FCP (ms)</span> <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'lcp\')"><span class="tooltip-trigger" data-tooltip="Largest Contentful Paint - When largest content is visible. Good: < 2.5s">LCP (ms)</span> <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'cls\')"><span class="tooltip-trigger" data-tooltip="Cumulative Layout Shift - Visual stability. Good: < 0.1">CLS</span> <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'inp\')"><span class="tooltip-trigger" data-tooltip="Interaction to Next Paint - Responsiveness to interactions. Good: < 200ms">INP (ms)</span> <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'ttfb\')"><span class="tooltip-trigger" data-tooltip="Time to First Byte - Server response time. Good: < 800ms">TTFB (ms)</span> <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'total_byte_weight\')"><span class="tooltip-trigger" data-tooltip="Total page size including all resources">Page Size</span> <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'performance_score\')">Performance <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'accessibility_score\')">Accessibility <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'best_practices_score\')">Best Practices <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'seo_score\')">SEO <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'fcp\')">FCP (ms) <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'lcp\')">LCP (ms) <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'cls\')">CLS <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'inp\')">INP (ms) <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'ttfb\')">TTFB (ms) <span class="sort-indicator"></span></th>';
+        html += '<th class="sortable" onclick="sortTable(\'total_byte_weight\')">Page Size <span class="sort-indicator"></span></th>';
         html += '<th class="sortable" onclick="sortTable(\'tested_at\')">Last Tested <span class="sort-indicator"></span></th>';
         html += '<th>Actions</th>';
         html += '</tr></thead><tbody>';
