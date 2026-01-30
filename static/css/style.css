@@ -1395,6 +1395,46 @@ button:hover {
     color: #10b981;
 }
 
+/* Comparison: URL boxes */
+.comparison-url {
+    background: #0f1419 !important;
+    color: #e3e8ee !important;
+}
+
+/* Comparison: Section titles (Lighthouse Scores, Core Web Vitals, etc.) */
+.metric-group h4 {
+    color: #ffffff !important;
+    border-bottom-color: #374151 !important;
+}
+
+/* Comparison: Metric labels and rows */
+.metric-label {
+    color: #ffffff !important;
+}
+
+.metric-row {
+    background: #0f1419 !important;
+    color: #e3e8ee !important;
+}
+
+/* Comparison: Performance Difference section */
+.comparison-summary {
+    background: #1a1f2e !important;
+    border-color: #374151 !important;
+}
+
+.comparison-summary h4 {
+    color: #ffffff !important;
+}
+
+.difference-item {
+    background: #0f1419 !important;
+}
+
+.diff-metric {
+    color: #ffffff !important;
+}
+
 .modal-content {
     background: #111827;
     color: #e3e8ee;
