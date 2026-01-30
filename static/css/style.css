@@ -1054,6 +1054,22 @@ button:disabled {
     font-weight: 600;
 }
 
+/* Dark mode overrides for Core Web Vitals Reference table */
+body:not(.light-mode) .metric-good {
+    background: #065f46 !important;
+    color: #047857 !important;
+}
+
+body:not(.light-mode) .metric-needs-improvement {
+    background: #92400e !important;
+    color: #b45309 !important;
+}
+
+body:not(.light-mode) .metric-poor {
+    background: #991b1b !important;
+    color: #b91c1c !important;
+}
+
 /* Core Web Vitals color coding in results table */
 .vitals-good {
     background: #4caf50;
@@ -1625,11 +1641,6 @@ body:not(.light-mode) .reference-table .poor {
     background: #991b1b !important;
     color: #b91c1c !important;
     font-weight: 600;
-}
-
-/* Light mode theme toggle */
-body.light-mode .theme-toggle .theme-label {
-    display: none;
 }
 
 /* Setup section card styling */
