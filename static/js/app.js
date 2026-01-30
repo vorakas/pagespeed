@@ -1131,20 +1131,21 @@ function showMessage(message) {
 
 // Theme toggle functionality
 function toggleTheme() {
+    const themeLabel = themeToggle.querySelector('.theme-label');
     const body = document.body;
     const themeToggle = document.getElementById('themeToggle');
     const themeIcon = themeToggle.querySelector('.theme-icon');
-    const themeLabel = themeToggle.querySelector('.theme-label');
+    
     
     if (body.classList.contains('light-mode')) {
         body.classList.remove('light-mode');
         themeIcon.textContent = '☀️';
-        themeLabel.textContent = 'Light Mode';
+        themeLabel.textContent = "Light Mode";
         localStorage.setItem('theme', 'dark');
     } else {
         body.classList.add('light-mode');
         themeIcon.textContent = '🌙';
-        themeLabel.textContent = 'Dark Mode';
+        themeLabel.textContent = "Dark Mode";
         localStorage.setItem('theme', 'light');
     }
 }

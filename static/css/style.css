@@ -1233,23 +1233,25 @@ header {
     background: #1f2937;
     color: #e3e8ee;
     border: 1px solid #374151;
-    padding: 8px 12px;
+    padding: 6px 12px;
     border-radius: 6px;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 6px;
     transition: all 0.2s;
-    font-size: 0.85em;
+    font-size: 0.8em;
     white-space: nowrap;
 }
 
 .theme-toggle .theme-label {
-    display: none;
+    display: inline;
+    font-weight: 500;
 }
 
 .theme-toggle .theme-icon {
-    font-size: 1.2em;
+    font-size: 1.1em;
+    line-height: 1;
 }
 
 .theme-toggle:hover {
@@ -1624,17 +1626,24 @@ body:not(.light-mode) .reference-table .poor {
     font-weight: 600;
 }
 
-/* Make theme toggle icon-only */
-.theme-toggle .theme-label {
-    display: none;
-}
-
-.theme-toggle .theme-icon {
-    font-size: 1.3em;
-    line-height: 1;
-}
-
 /* Light mode theme toggle */
 body.light-mode .theme-toggle .theme-label {
     display: none;
+}
+
+/* Setup section card styling */
+body:not(.light-mode) .setup-grid {
+    gap: 20px;
+}
+
+body:not(.light-mode) .setup-card {
+    background: #0f1419 !important;
+    border: 1px solid #374151;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+body:not(.light-mode) .setup-card h3 {
+    color: #f9fafb !important;
+    margin-bottom: 15px;
 }
