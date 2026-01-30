@@ -1233,14 +1233,23 @@ header {
     background: #1f2937;
     color: #e3e8ee;
     border: 1px solid #374151;
-    padding: 10px 16px;
+    padding: 8px 12px;
     border-radius: 6px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     transition: all 0.2s;
-    font-size: 0.9em;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.theme-toggle .theme-label {
+    display: none;
+}
+
+.theme-toggle .theme-icon {
+    font-size: 1.2em;
 }
 
 .theme-toggle:hover {
@@ -1545,4 +1554,87 @@ body.light-mode .metric-item {
 body.light-mode .score-guide {
     background: #f9fafb;
     border-color: #e5e7eb;
+}
+
+/* Dark theme specific overrides */
+body:not(.light-mode) .setup-section {
+    background: #1a1f2e !important;
+}
+
+body:not(.light-mode) .setup-section input,
+body:not(.light-mode) .setup-section select {
+    background: #111827;
+    border-color: #374151;
+    color: #e3e8ee;
+}
+
+body:not(.light-mode) .setup-section input:focus,
+body:not(.light-mode) .setup-section select:focus {
+    border-color: #10b981;
+    outline: none;
+}
+
+body:not(.light-mode) .reference-section {
+    background: #1a1f2e !important;
+}
+
+body:not(.light-mode) .reference-section h2 {
+    color: #f9fafb !important;
+}
+
+body:not(.light-mode) .reference-description {
+    color: #e3e8ee !important;
+}
+
+body:not(.light-mode) .reference-table {
+    background: #111827 !important;
+}
+
+body:not(.light-mode) .reference-table th {
+    background: #1f2937 !important;
+    color: #f9fafb !important;
+    border-color: #374151;
+}
+
+body:not(.light-mode) .reference-table td {
+    border-color: #374151;
+    color: #e3e8ee;
+}
+
+body:not(.light-mode) .reference-table td:first-child {
+    color: #f9fafb !important;
+    font-weight: 600;
+}
+
+body:not(.light-mode) .reference-table .good {
+    background: #064e3b !important;
+    color: #10b981 !important;
+    font-weight: 600;
+}
+
+body:not(.light-mode) .reference-table .needs-improvement {
+    background: #78350f !important;
+    color: #fbbf24 !important;
+    font-weight: 600;
+}
+
+body:not(.light-mode) .reference-table .poor {
+    background: #7f1d1d !important;
+    color: #ef4444 !important;
+    font-weight: 600;
+}
+
+/* Make theme toggle icon-only */
+.theme-toggle .theme-label {
+    display: none;
+}
+
+.theme-toggle .theme-icon {
+    font-size: 1.3em;
+    line-height: 1;
+}
+
+/* Light mode theme toggle */
+body.light-mode .theme-toggle .theme-label {
+    display: none;
 }
