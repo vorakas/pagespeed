@@ -1056,18 +1056,18 @@ button:disabled {
 
 /* Dark mode overrides for Core Web Vitals Reference table */
 body:not(.light-mode) .metric-good {
-    background: #065f46 !important;
-    color: #047857 !important;
+    background: #4caf50 !important;
+    color: white !important;
 }
 
 body:not(.light-mode) .metric-needs-improvement {
-    background: #92400e !important;
-    color: #b45309 !important;
+    background: #ff9800 !important;
+    color: white !important;
 }
 
 body:not(.light-mode) .metric-poor {
-    background: #991b1b !important;
-    color: #b91c1c !important;
+    background: #f44336 !important;
+    color: white !important;
 }
 
 /* Core Web Vitals color coding in results table */
