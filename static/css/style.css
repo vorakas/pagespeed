@@ -1659,3 +1659,26 @@ body:not(.light-mode) .setup-card h3 {
     color: #f9fafb !important;
     margin-bottom: 15px;
 }
+
+/* Dark mode for Understanding Lighthouse Scores section */
+body:not(.light-mode) .explanation-section {
+    background: #111827 !important;
+}
+
+body:not(.light-mode) .explanation-section h2 {
+    color: #ffffff !important;
+}
+
+body:not(.light-mode) .explanation-section .reference-description {
+    color: #ffffff !important;
+}
+
+body:not(.light-mode) .explanation-card {
+    background: #1a1f2e !important;
+    border-color: #374151 !important;
+}
+
+body:not(.light-mode) .explanation-card p,
+body:not(.light-mode) .explanation-card li {
+    color: #e3e8ee !important;
+}
