@@ -1698,3 +1698,27 @@ body:not(.light-mode) .explanation-impact {
     border-left-color: #667eea !important;
     color: #e3e8ee !important;
 }
+
+/* Dark mode for Score Interpretation section */
+body:not(.light-mode) .score-guide {
+    background: #1a1f2e !important;
+    border-color: #374151 !important;
+    margin-top: 30px;
+}
+
+body:not(.light-mode) .score-guide h4 {
+    color: #ffffff !important;
+}
+
+body:not(.light-mode) .score-guide-item {
+    background: #0f1419 !important;
+}
+
+body:not(.light-mode) .score-guide-item span:last-child {
+    color: #e3e8ee !important;
+}
+
+/* Dark mode for Page Comparison section */
+body:not(.light-mode) .comparison-select-group label {
+    color: #ffffff !important;
+}
