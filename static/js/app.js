@@ -1131,10 +1131,10 @@ function showMessage(message) {
 
 // Theme toggle functionality
 function toggleTheme() {
-    const themeLabel = themeToggle.querySelector('.theme-label');
     const body = document.body;
     const themeToggle = document.getElementById('themeToggle');
     const themeIcon = themeToggle.querySelector('.theme-icon');
+    const themeLabel = themeToggle.querySelector('.theme-label');
     
     
     if (body.classList.contains('light-mode')) {
