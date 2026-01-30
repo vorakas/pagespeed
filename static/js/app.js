@@ -1127,3 +1127,41 @@ function showMessage(message) {
     progressDiv.classList.add('show');
     setTimeout(() => progressDiv.classList.remove('show'), 3000);
 }
+
+
+// Theme toggle functionality
+function toggleTheme() {
+    const body = document.body;
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = themeToggle.querySelector('.theme-icon');
+    const themeLabel = themeToggle.querySelector('.theme-label');
+    
+    if (body.classList.contains('light-mode')) {
+        body.classList.remove('light-mode');
+        themeIcon.textContent = '☀️';
+        themeLabel.textContent = 'Light Mode';
+        localStorage.setItem('theme', 'dark');
+    } else {
+        body.classList.add('light-mode');
+        themeIcon.textContent = '🌙';
+        themeLabel.textContent = 'Dark Mode';
+        localStorage.setItem('theme', 'light');
+    }
+}
+
+// Load saved theme preference
+function loadTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-mode');
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.querySelector('.theme-icon').textContent = '🌙';
+            themeToggle.querySelector('.theme-label').textContent = 'Dark Mode';
+        }
+    }
+}
+
+// Load theme and initialize
+loadTheme();
+window.onload = loadDashboard;

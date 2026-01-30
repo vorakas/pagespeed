@@ -1200,3 +1200,349 @@ button:disabled {
     color: #555;
     font-size: 0.95em;
 }
+
+/* ============================================
+   DARK THEME (DEFAULT)
+   ============================================ */
+body {
+    background: #0b0e11;
+    color: #e3e8ee;
+}
+
+header {
+    background: linear-gradient(135deg, #1a1f2e 0%, #0f1419 100%);
+    border-bottom: 1px solid #1f2937;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-text h1 {
+    color: #f9fafb;
+    margin-bottom: 5px;
+}
+
+.header-text p {
+    color: #9ca3af;
+}
+
+.theme-toggle {
+    background: #1f2937;
+    color: #e3e8ee;
+    border: 1px solid #374151;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    font-size: 0.9em;
+}
+
+.theme-toggle:hover {
+    background: #374151;
+    border-color: #4b5563;
+}
+
+section {
+    background: #111827;
+    border: 1px solid #1f2937;
+}
+
+section h2 {
+    color: #f9fafb;
+}
+
+.tabs {
+    border-bottom: 2px solid #1f2937;
+}
+
+.tab {
+    background: #1f2937;
+    color: #9ca3af;
+    border: 1px solid #374151;
+}
+
+.tab.active {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border-color: #10b981;
+}
+
+.tab:hover:not(.active) {
+    background: #374151;
+    border-color: #4b5563;
+}
+
+.results-table {
+    background: #0b0e11;
+}
+
+.results-table th {
+    background: #1f2937;
+    color: #f9fafb;
+    border-bottom: 2px solid #374151;
+}
+
+.results-table th.sortable:hover {
+    background: #374151;
+}
+
+.results-table td {
+    border-bottom: 1px solid #1f2937;
+    color: #e3e8ee;
+}
+
+.results-table tr:hover {
+    background: #1a1f2e;
+}
+
+button, input, select {
+    background: #1f2937;
+    color: #e3e8ee;
+    border: 1px solid #374151;
+}
+
+button:hover {
+    background: #374151;
+    border-color: #4b5563;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-color: #10b981;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.reference-table {
+    background: #0b0e11;
+}
+
+.reference-table th {
+    background: #1f2937;
+    color: #f9fafb;
+    border: 1px solid #374151;
+}
+
+.reference-table td {
+    border: 1px solid #1f2937;
+    color: #e3e8ee;
+}
+
+.explanation-grid {
+    background: #0b0e11;
+}
+
+.explanation-category {
+    background: #1a1f2e;
+    border: 1px solid #374151;
+}
+
+.explanation-category h3 {
+    color: #10b981;
+}
+
+.comparison-site {
+    background: #1a1f2e;
+    border: 2px solid #374151;
+}
+
+.comparison-site h3 {
+    color: #10b981;
+}
+
+.modal-content {
+    background: #111827;
+    color: #e3e8ee;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-bottom: 2px solid #374151;
+}
+
+.modal-header h2 {
+    color: #f9fafb;
+}
+
+.detail-section {
+    border-bottom: 1px solid #1f2937;
+}
+
+.metric-weight-item, .opportunity-item, .audit-item, .metric-item {
+    background: #1a1f2e;
+    border-left-color: #10b981;
+}
+
+.score-guide {
+    background: #1a1f2e;
+    border: 1px solid #374151;
+}
+
+/* ============================================
+   LIGHT THEME
+   ============================================ */
+body.light-mode {
+    background: #f9fafb;
+    color: #1f2937;
+}
+
+body.light-mode header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-bottom: 1px solid #e5e7eb;
+}
+
+body.light-mode .header-text h1 {
+    color: white;
+}
+
+body.light-mode .header-text p {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+body.light-mode .theme-toggle {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+body.light-mode .theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+body.light-mode section {
+    background: white;
+    border-color: #e5e7eb;
+}
+
+body.light-mode section h2 {
+    color: #1f2937;
+}
+
+body.light-mode .tabs {
+    border-bottom-color: #e5e7eb;
+}
+
+body.light-mode .tab {
+    background: #e0e0e0;
+    color: #333;
+    border-color: #d0d0d0;
+}
+
+body.light-mode .tab.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+}
+
+body.light-mode .tab:hover:not(.active) {
+    background: #d5d5d5;
+}
+
+body.light-mode .results-table {
+    background: white;
+}
+
+body.light-mode .results-table th {
+    background: #667eea;
+    color: white;
+    border-bottom-color: #5568d3;
+}
+
+body.light-mode .results-table th.sortable:hover {
+    background: #5568d3;
+}
+
+body.light-mode .results-table td {
+    border-bottom-color: #e5e7eb;
+    color: #1f2937;
+}
+
+body.light-mode .results-table tr:hover {
+    background: #f9fafb;
+}
+
+body.light-mode button,
+body.light-mode input,
+body.light-mode select {
+    background: white;
+    color: #1f2937;
+    border-color: #d1d5db;
+}
+
+body.light-mode button:hover {
+    background: #f3f4f6;
+}
+
+body.light-mode .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    color: white;
+}
+
+body.light-mode .btn-primary:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+}
+
+body.light-mode .reference-table {
+    background: white;
+}
+
+body.light-mode .reference-table th {
+    background: #f3f4f6;
+    color: #1f2937;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .reference-table td {
+    border-color: #e5e7eb;
+    color: #1f2937;
+}
+
+body.light-mode .explanation-category {
+    background: white;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .explanation-category h3 {
+    color: #667eea;
+}
+
+body.light-mode .comparison-site {
+    background: white;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .comparison-site h3 {
+    color: #667eea;
+}
+
+body.light-mode .modal-content {
+    background: white;
+    color: #1f2937;
+}
+
+body.light-mode .modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-bottom-color: #e5e7eb;
+}
+
+body.light-mode .metric-weight-item,
+body.light-mode .opportunity-item,
+body.light-mode .audit-item,
+body.light-mode .metric-item {
+    background: #f9fafb;
+}
+
+body.light-mode .score-guide {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+}
