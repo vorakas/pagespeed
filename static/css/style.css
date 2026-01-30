@@ -1054,6 +1054,15 @@ button:disabled {
     font-weight: 600;
 }
 
+/* Dark mode overrides */
+body:not(.light-mode) header h1 {
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #00dc82 !important;
+    background-clip: unset !important;
+    color: #00dc82 !important;
+}
+
 /* Dark mode overrides for Core Web Vitals Reference table */
 body:not(.light-mode) .metric-good {
     background: #4caf50 !important;
@@ -1595,6 +1604,7 @@ body:not(.light-mode) .setup-section select:focus {
 
 body:not(.light-mode) .reference-section {
     background: #1a1f2e !important;
+    border-left: none !important;
 }
 
 body:not(.light-mode) .reference-section h2 {
