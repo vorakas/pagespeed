@@ -1242,6 +1242,7 @@ header {
     transition: all 0.2s;
     font-size: 0.8em;
     white-space: nowrap;
+    width: auto;
 }
 
 .theme-toggle .theme-label {
@@ -1609,20 +1610,20 @@ body:not(.light-mode) .reference-table td:first-child {
 }
 
 body:not(.light-mode) .reference-table .good {
-    background: #064e3b !important;
-    color: #10b981 !important;
+    background: #065f46 !important;
+    color: #047857 !important;
     font-weight: 600;
 }
 
 body:not(.light-mode) .reference-table .needs-improvement {
-    background: #78350f !important;
-    color: #fbbf24 !important;
+    background: #92400e !important;
+    color: #b45309 !important;
     font-weight: 600;
 }
 
 body:not(.light-mode) .reference-table .poor {
-    background: #7f1d1d !important;
-    color: #ef4444 !important;
+    background: #991b1b !important;
+    color: #b91c1c !important;
     font-weight: 600;
 }
 
