@@ -581,6 +581,11 @@ button:disabled {
     position: relative;
     cursor: help;
     border-bottom: 1px dotted #667eea;
+    pointer-events: none; /* Allow clicks to pass through to parent */
+}
+
+.sortable .tooltip-trigger {
+    cursor: pointer; /* Use pointer cursor in sortable headers */
 }
 
 .tooltip-trigger:hover::after {
