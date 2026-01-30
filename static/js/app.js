@@ -176,55 +176,25 @@ async function loadSiteResults(siteId) {
     const contentDiv = document.getElementById('siteContent');
     contentDiv.innerHTML = '<div class="loading">Loading results...</div>';
     
+    // Reset sorting state when loading new site
+    currentSortColumn = null;
+    currentSortDirection = null;
+    unsortedResults = [];
+    currentSiteIdForSorting = siteId;
+    
     try {
         const response = await fetch(`/api/sites/${siteId}/latest-results`);
         const results = await response.json();
         
         if (results.length === 0) {
             contentDiv.innerHTML = '<div class="no-data">No test results yet. Click "Test All URLs" to run your first test.</div>';
+            currentResults = [];
             return;
         }
         
-        let html = '<table class="results-table"><thead><tr>';
-        html += '<th class="sortable" onclick="sortTable(\'url\')">URL <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'performance_score\')">Performance <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'accessibility_score\')">Accessibility <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'best_practices_score\')">Best Practices <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'seo_score\')">SEO <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'fcp\')">FCP (ms) <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'lcp\')">LCP (ms) <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'cls\')">CLS <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'inp\')">INP (ms) <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'ttfb\')">TTFB (ms) <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'total_byte_weight\')">Page Size <span class="sort-indicator"></span></th>';
-        html += '<th class="sortable" onclick="sortTable(\'tested_at\')">Last Tested <span class="sort-indicator"></span></th>';
-        html += '<th>Actions</th>';
-        html += '</tr></thead><tbody>';
-        
-        results.forEach(result => {
-            html += '<tr>';
-            html += `<td>${result.url}</td>`;
-            html += `<td>${formatScore(result.performance_score)}</td>`;
-            html += `<td>${formatScore(result.accessibility_score)}</td>`;
-            html += `<td>${formatScore(result.best_practices_score)}</td>`;
-            html += `<td>${formatScore(result.seo_score)}</td>`;
-            html += `<td>${formatFCP(result.fcp)}</td>`;
-            html += `<td>${formatLCP(result.lcp)}</td>`;
-            html += `<td>${formatCLS(result.cls)}</td>`;
-            html += `<td>${formatINP(result.inp)}</td>`;
-            html += `<td>${formatTTFB(result.ttfb)}</td>`;
-            html += `<td>${formatPageSize(result.total_byte_weight)}</td>`;
-            html += `<td>${formatDate(result.tested_at)}</td>`;
-            html += `<td class="action-buttons">
-                        <button class="btn-details" onclick="showDetails(${result.url_id})" title="View detailed breakdown">📊</button>
-                        <button class="btn-retest" onclick="retestUrl(${result.url_id}, '${result.url}')" title="Retest this URL">🔄</button>
-                        <button class="btn-delete" onclick="deleteUrl(${result.url_id}, '${result.url}')" title="Delete this URL">🗑️</button>
-                    </td>`;
-            html += '</tr>';
-        });
-        
-        html += '</tbody></table>';
-        contentDiv.innerHTML = html;
+        // Store results for sorting
+        currentResults = results;
+        renderTable(results);
         
     } catch (error) {
         console.error('Error loading site results:', error);
@@ -779,19 +749,18 @@ function formatSavings(ms) {
 // Table sorting state
 let currentSortColumn = null;
 let currentSortDirection = null; // null = no sort, 'asc' = ascending, 'desc' = descending
+let currentResults = []; // Store current results
 let unsortedResults = []; // Store original order
+let currentSiteIdForSorting = null;
 
 // Sort table by column
 function sortTable(column) {
-    const resultsDiv = document.getElementById('latestResults');
+    if (!currentResults.length) return;
     
+    // Store unsorted copy on first sort
     if (!unsortedResults.length) {
-        // Store original unsorted order
-        unsortedResults = [...sites.find(s => s.id === currentSiteId)?.results || []];
+        unsortedResults = JSON.parse(JSON.stringify(currentResults));
     }
-    
-    let results = sites.find(s => s.id === currentSiteId)?.results;
-    if (!results) return;
     
     // Three-state sorting: unsorted -> asc -> desc -> unsorted
     if (currentSortColumn === column) {
@@ -803,8 +772,8 @@ function sortTable(column) {
             // Reset to unsorted
             currentSortDirection = null;
             currentSortColumn = null;
-            sites.find(s => s.id === currentSiteId).results = [...unsortedResults];
-            displayResults(unsortedResults);
+            currentResults = JSON.parse(JSON.stringify(unsortedResults));
+            renderTable(currentResults);
             updateSortIndicators();
             return;
         }
@@ -814,7 +783,7 @@ function sortTable(column) {
     }
     
     // Sort the results
-    results.sort((a, b) => {
+    currentResults.sort((a, b) => {
         let valA = a[column];
         let valB = b[column];
         
@@ -838,7 +807,55 @@ function sortTable(column) {
         }
     });
     
-    displayResults(results);
+    renderTable(currentResults);
+    updateSortIndicators();
+}
+
+// Render the table with given results
+function renderTable(results) {
+    const contentDiv = document.getElementById('siteContent');
+    
+    let html = '<table class="results-table"><thead><tr>';
+    html += '<th class="sortable" onclick="sortTable(\'url\')">URL <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'performance_score\')">Performance <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'accessibility_score\')">Accessibility <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'best_practices_score\')">Best Practices <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'seo_score\')">SEO <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'fcp\')">FCP (ms) <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'lcp\')">LCP (ms) <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'cls\')">CLS <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'inp\')">INP (ms) <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'ttfb\')">TTFB (ms) <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'total_byte_weight\')">Page Size <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable" onclick="sortTable(\'tested_at\')">Last Tested <span class="sort-indicator"></span></th>';
+    html += '<th>Actions</th>';
+    html += '</tr></thead><tbody>';
+    
+    results.forEach(result => {
+        html += '<tr>';
+        html += `<td>${result.url}</td>`;
+        html += `<td>${formatScore(result.performance_score)}</td>`;
+        html += `<td>${formatScore(result.accessibility_score)}</td>`;
+        html += `<td>${formatScore(result.best_practices_score)}</td>`;
+        html += `<td>${formatScore(result.seo_score)}</td>`;
+        html += `<td>${formatFCP(result.fcp)}</td>`;
+        html += `<td>${formatLCP(result.lcp)}</td>`;
+        html += `<td>${formatCLS(result.cls)}</td>`;
+        html += `<td>${formatINP(result.inp)}</td>`;
+        html += `<td>${formatTTFB(result.ttfb)}</td>`;
+        html += `<td>${formatPageSize(result.total_byte_weight)}</td>`;
+        html += `<td>${formatDate(result.tested_at)}</td>`;
+        html += `<td class="action-buttons">
+                    <button class="btn-details" onclick="showDetails(${result.url_id})" title="View detailed breakdown">📊</button>
+                    <button class="btn-retest" onclick="retestUrl(${result.url_id}, '${result.url}')" title="Retest this URL">🔄</button>
+                    <button class="btn-delete" onclick="deleteUrl(${result.url_id}, '${result.url}')" title="Delete this URL">🗑️</button>
+                </td>`;
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    contentDiv.innerHTML = html;
+    
     updateSortIndicators();
 }
 
