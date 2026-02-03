@@ -15,6 +15,7 @@
         </div>
         <ul class="side-nav-list">
             <li><a href="/setup" class="side-nav-link">Site/URL Setup</a></li>
+            <li><a href="/test" class="side-nav-link">Test URLs</a></li>
         </ul>
     </nav>
 
@@ -32,25 +33,6 @@
                 </button>
             </div>
         </header>
-
-        <!-- Testing Section -->
-        <section class="testing-section">
-            <h2>Run Tests</h2>
-            <div class="button-group">
-                <button onclick="testAllSites()" class="btn-primary">🚀 Test All URLs</button>
-                <button onclick="loadDashboard()" class="btn-secondary">🔄 Refresh Dashboard</button>
-            </div>
-            <div id="testProgress" class="progress-container">
-                <div class="progress-header">
-                    <span id="progressText"></span>
-                    <span id="progressCount"></span>
-                </div>
-                <div class="progress-bar-container">
-                    <div id="progressBar" class="progress-bar"></div>
-                </div>
-                <div id="progressDetails" class="progress-details"></div>
-            </div>
-        </section>
 
         <!-- Web Vitals Reference Section -->
         <section class="reference-section">
@@ -163,31 +145,6 @@
                         <li><strong>Structure:</strong> Valid HTML, proper status codes, structured data</li>
                     </ul>
                     <p class="explanation-impact"><strong>Impact:</strong> Better SEO means higher visibility in search results and more organic traffic.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Dashboard Section -->
-        <section class="dashboard-section">
-            <h2>Latest Results</h2>
-            <div id="siteTabs" class="tabs"></div>
-            <div id="siteContent" class="site-content"></div>
-            
-            <div class="score-guide">
-                <h4>Score Interpretation:</h4>
-                <div class="score-guide-grid">
-                    <div class="score-guide-item">
-                        <span class="score score-good">90-100</span>
-                        <span>Good - No major issues</span>
-                    </div>
-                    <div class="score-guide-item">
-                        <span class="score score-average">50-89</span>
-                        <span>Needs Improvement - Some issues to address</span>
-                    </div>
-                    <div class="score-guide-item">
-                        <span class="score score-poor">0-49</span>
-                        <span>Poor - Significant issues requiring attention</span>
-                    </div>
                 </div>
             </div>
         </section>

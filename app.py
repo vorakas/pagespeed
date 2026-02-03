@@ -51,6 +51,12 @@ def setup():
     sites = db.get_sites()
     return render_template('setup.html', sites=sites)
 
+@app.route('/test')
+def test():
+    """Test URLs page"""
+    sites = db.get_sites()
+    return render_template('test.html', sites=sites)
+
 @app.route('/api/sites', methods=['GET', 'POST'])
 def sites():
     """Get all sites or create a new site"""
