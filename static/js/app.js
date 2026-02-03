@@ -1166,3 +1166,131 @@ function loadTheme() {
 // Load theme and initialize
 loadTheme();
 window.onload = loadDashboard;
+
+// Load sites and URLs for the setup page
+async function loadSitesAndUrls() {
+    const container = document.getElementById('sitesUrlsList');
+    if (!container) return; // Not on setup page
+    
+    try {
+        const response = await fetch('/api/sites');
+        const sites = await response.json();
+        
+        if (sites.length === 0) {
+            container.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 30px;">No sites created yet. Use the form above to add your first site.</p>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        for (const site of sites) {
+            // Fetch URLs for this site
+            const urlsResponse = await fetch(`/api/sites/${site.id}/urls`);
+            const urls = await urlsResponse.json();
+            
+            const siteCard = document.createElement('div');
+            siteCard.className = 'site-urls-card';
+            
+            let urlsHtml = '';
+            if (urls.length === 0) {
+                urlsHtml = '<div class="no-urls">No URLs added yet</div>';
+            } else {
+                urlsHtml = '<ul class="url-list">';
+                urls.forEach(url => {
+                    urlsHtml += `
+                        <li class="url-item">
+                            <span class="url-text">${url.url}</span>
+                            <div class="url-actions">
+                                <button class="btn-delete" onclick="deleteUrl(${url.id}, ${site.id})" title="Delete URL">×</button>
+                            </div>
+                        </li>
+                    `;
+                });
+                urlsHtml += '</ul>';
+            }
+            
+            siteCard.innerHTML = `
+                <h3>
+                    ${site.name}
+                    <button class="btn-delete" onclick="deleteSiteFromList(${site.id})" title="Delete Site">×</button>
+                </h3>
+                ${urlsHtml}
+            `;
+            
+            container.appendChild(siteCard);
+        }
+    } catch (error) {
+        console.error('Error loading sites and URLs:', error);
+        container.innerHTML = '<p style="color: #f87171; text-align: center; padding: 30px;">Error loading sites and URLs</p>';
+    }
+}
+
+// Delete a URL from the list
+async function deleteUrl(urlId, siteId) {
+    if (!confirm('Are you sure you want to delete this URL? All test results will be lost.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/urls/${urlId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            loadSitesAndUrls(); // Reload the list
+            loadSites(); // Also reload sites for the dropdowns
+        } else {
+            alert('Error deleting URL: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting URL:', error);
+        alert('Error deleting URL');
+    }
+}
+
+// Delete a site from the list
+async function deleteSiteFromList(siteId) {
+    if (!confirm('Are you sure you want to delete this site? All URLs and test results will be lost.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/sites/${siteId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            loadSitesAndUrls(); // Reload the list
+            loadSites(); // Also reload sites for the dropdowns
+        } else {
+            alert('Error deleting site: ' + (result.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting site:', error);
+        alert('Error deleting site');
+    }
+}
+
+// Load sites and URLs when on setup page
+if (document.getElementById('sitesUrlsList')) {
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSites();
+        loadSitesAndUrls();
+        
+        // Setup form handlers
+        document.getElementById('addSiteForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await addSite(e);
+            loadSitesAndUrls(); // Refresh the list after adding a site
+        });
+        
+        document.getElementById('addUrlForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await addUrl(e);
+            loadSitesAndUrls(); // Refresh the list after adding a URL
+        });
+    });
+}
+

@@ -1796,6 +1796,130 @@ body:not(.light-mode) .setup-section select:focus {
     outline: none;
 }
 
+/* Sites and URLs List Section */
+.sites-urls-section {
+    background: #1a1f2e;
+    padding: 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+}
+
+.sites-urls-section h2 {
+    color: #f9fafb;
+    border-bottom: 3px solid #10b981;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.sites-urls-list {
+    display: grid;
+    gap: 20px;
+}
+
+.site-urls-card {
+    background: #0f1419;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.site-urls-card h3 {
+    color: #10b981;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.site-urls-card .url-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.site-urls-card .url-item {
+    background: #1a1f2e;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 12px 15px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s;
+}
+
+.site-urls-card .url-item:hover {
+    background: #242936;
+    border-color: #10b981;
+}
+
+.site-urls-card .url-item:last-child {
+    margin-bottom: 0;
+}
+
+.site-urls-card .url-text {
+    color: #e3e8ee;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    flex: 1;
+}
+
+.site-urls-card .url-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.site-urls-card .no-urls {
+    color: #9ca3af;
+    font-style: italic;
+    padding: 15px;
+    text-align: center;
+    background: #1a1f2e;
+    border-radius: 6px;
+    border: 1px dashed #374151;
+}
+
+/* Light mode for sites and URLs section */
+body.light-mode .sites-urls-section {
+    background: white;
+}
+
+body.light-mode .sites-urls-section h2 {
+    color: #1f2937;
+    border-bottom-color: #667eea;
+}
+
+body.light-mode .site-urls-card {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .site-urls-card h3 {
+    color: #667eea;
+}
+
+body.light-mode .site-urls-card .url-item {
+    background: white;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .site-urls-card .url-item:hover {
+    background: #f3f4f6;
+    border-color: #667eea;
+}
+
+body.light-mode .site-urls-card .url-text {
+    color: #1f2937;
+}
+
+body.light-mode .site-urls-card .no-urls {
+    background: white;
+    border-color: #d1d5db;
+    color: #6b7280;
+}
+
 body:not(.light-mode) .reference-section {
     background: #1a1f2e !important;
     border-left: none !important;
