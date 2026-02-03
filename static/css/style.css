@@ -6,10 +6,77 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #0a0f1a;
     min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    color: #e3e8ee;
+    display: flex;
+}
+
+/* Side Navigation */
+.side-nav {
+    width: 280px;
+    background: #111827;
+    border-right: 1px solid #374151;
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.side-nav-header {
+    padding: 30px 20px;
+    border-bottom: 1px solid #374151;
+}
+
+.side-nav-header h2 {
+    color: #ffffff;
+    font-size: 1.5em;
+    margin: 0;
+}
+
+.side-nav-list {
+    list-style: none;
+    padding: 20px 0;
+    margin: 0;
+}
+
+.side-nav-list li {
+    margin: 0;
+}
+
+.side-nav-link {
+    display: block;
+    padding: 12px 20px;
+    color: #9ca3af;
+    text-decoration: none;
+    font-size: 1em;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.side-nav-link:hover {
+    background: #1a1f2e;
+    color: #ffffff;
+    border-left-color: #10b981;
+}
+
+.side-nav-link.active {
+    background: #1a1f2e;
+    color: #10b981;
+    border-left-color: #10b981;
+    font-weight: 600;
+}
+
+/* Main Content Area */
+.main-content {
+    margin-left: 280px;
+    flex: 1;
     padding: 20px;
-    color: #333;
+    min-height: 100vh;
 }
 
 .container {
@@ -1527,6 +1594,36 @@ button:hover {
 body.light-mode {
     background: #f9fafb;
     color: #1f2937;
+}
+
+/* Light mode side navigation */
+body.light-mode .side-nav {
+    background: #ffffff;
+    border-right-color: #e5e7eb;
+}
+
+body.light-mode .side-nav-header {
+    border-bottom-color: #e5e7eb;
+}
+
+body.light-mode .side-nav-header h2 {
+    color: #1f2937;
+}
+
+body.light-mode .side-nav-link {
+    color: #6b7280;
+}
+
+body.light-mode .side-nav-link:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+    border-left-color: #667eea;
+}
+
+body.light-mode .side-nav-link.active {
+    background: #f3f4f6;
+    color: #667eea;
+    border-left-color: #667eea;
 }
 
 body.light-mode header {

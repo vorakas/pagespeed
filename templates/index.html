@@ -8,7 +8,18 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <div class="container">
+    <!-- Side Navigation -->
+    <nav class="side-nav">
+        <div class="side-nav-header">
+            <h2>Menu</h2>
+        </div>
+        <ul class="side-nav-list">
+            <li><a href="/setup" class="side-nav-link">Site/URL Setup</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
         <header>
             <div class="header-content">
                 <div class="header-text">
@@ -21,30 +32,6 @@
                 </button>
             </div>
         </header>
-
-        <!-- Setup Section -->
-        <section class="setup-section">
-            <h2>Setup</h2>
-            <div class="setup-grid">
-                <div class="setup-card">
-                    <h3>Add Site</h3>
-                    <form id="addSiteForm">
-                        <input type="text" id="siteName" placeholder="Site name (e.g., Production)" required>
-                        <button type="submit">Add Site</button>
-                    </form>
-                </div>
-                <div class="setup-card">
-                    <h3>Add URL</h3>
-                    <form id="addUrlForm">
-                        <select id="urlSiteSelect" required>
-                            <option value="">Select a site...</option>
-                        </select>
-                        <input type="url" id="urlInput" placeholder="https://example.com" required>
-                        <button type="submit">Add URL</button>
-                    </form>
-                </div>
-            </div>
-        </section>
 
         <!-- Testing Section -->
         <section class="testing-section">
