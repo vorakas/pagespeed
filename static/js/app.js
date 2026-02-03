@@ -240,7 +240,7 @@ async function testAllSites() {
     
     // Show progress container
     progressContainer.classList.add('show');
-    progressText.textContent = 'Preparing to test...';
+    progressText.textContent = 'Preparing to test... (Please stay on this page)';
     progressCount.textContent = `0 / ${allUrls.length}`;
     progressBar.style.width = '0%';
     progressDetails.innerHTML = '';
@@ -302,7 +302,7 @@ async function testAllSites() {
     }
     
     // Show completion message
-    progressText.textContent = 'Tests Complete!';
+    progressText.textContent = 'Tests Complete! ✅';
     progressDetails.innerHTML = `
         <div class="completion-summary">
             <div class="summary-item success">✅ ${successful} Successful</div>
@@ -313,11 +313,13 @@ async function testAllSites() {
     // Re-enable buttons
     buttons.forEach(btn => btn.disabled = false);
     
-    // Refresh dashboard after a short delay
+    // Automatically refresh dashboard to show new results
+    loadDashboard();
+    
+    // Hide progress container after 5 seconds
     setTimeout(() => {
-        loadDashboard();
         progressContainer.classList.remove('show');
-    }, 3000);
+    }, 5000);
 }
 
 

@@ -795,6 +795,8 @@ button:disabled {
     border-radius: 4px;
     margin-bottom: 8px;
     font-size: 0.9em;
+    color: #1f2937;
+    font-weight: 500;
     animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -808,6 +810,8 @@ button:disabled {
     border-radius: 4px;
     margin-bottom: 8px;
     font-size: 0.9em;
+    color: #1f2937;
+    font-weight: 500;
     animation: slideIn 0.3s ease-out;
 }
 
@@ -2039,4 +2043,63 @@ body:not(.light-mode) .score-guide-item span:last-child {
 /* Dark mode for Page Comparison section */
 body:not(.light-mode) .comparison-select-group label {
     color: #ffffff !important;
+}
+
+/* Dark mode for progress and testing elements */
+body:not(.light-mode) .progress-container {
+    background: #1a1f2e;
+    border-left-color: #10b981;
+}
+
+body:not(.light-mode) .progress-header #progressText {
+    color: #10b981;
+}
+
+body:not(.light-mode) .progress-header #progressCount {
+    background: #0f1419;
+    color: #e3e8ee;
+}
+
+body:not(.light-mode) .progress-bar-container {
+    background: #0f1419;
+}
+
+body:not(.light-mode) .progress-bar {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+body:not(.light-mode) .testing-url {
+    background: #1a1f2e;
+    border-left-color: #fbbf24;
+    color: #fbbf24;
+}
+
+body:not(.light-mode) .tested-url {
+    color: #e3e8ee;
+}
+
+body:not(.light-mode) .tested-url.success {
+    background: #064e3b;
+    border-left-color: #10b981;
+}
+
+body:not(.light-mode) .tested-url.failed {
+    background: #7f1d1d;
+    border-left-color: #ef4444;
+}
+
+body:not(.light-mode) .completion-summary {
+    background: #0f1419;
+}
+
+body:not(.light-mode) .summary-item {
+    color: #e3e8ee;
+}
+
+body:not(.light-mode) .testing-section {
+    background: #1a1f2e;
+}
+
+body:not(.light-mode) .testing-section h2 {
+    color: #f9fafb;
 }
