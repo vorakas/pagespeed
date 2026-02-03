@@ -5,10 +5,21 @@ let currentChart = null;
 document.addEventListener('DOMContentLoaded', function() {
     loadSites();
     
-    // Setup form handlers
-    document.getElementById('addSiteForm').addEventListener('submit', addSite);
-    document.getElementById('addUrlForm').addEventListener('submit', addUrl);
-    document.getElementById('chartSiteSelect').addEventListener('change', updateUrlsForChart);
+    // Setup form handlers only if they exist on this page
+    const addSiteForm = document.getElementById('addSiteForm');
+    if (addSiteForm) {
+        addSiteForm.addEventListener('submit', addSite);
+    }
+    
+    const addUrlForm = document.getElementById('addUrlForm');
+    if (addUrlForm) {
+        addUrlForm.addEventListener('submit', addUrl);
+    }
+    
+    const chartSiteSelect = document.getElementById('chartSiteSelect');
+    if (chartSiteSelect) {
+        chartSiteSelect.addEventListener('change', updateUrlsForChart);
+    }
 });
 
 // Load all sites
@@ -31,6 +42,8 @@ function updateSiteSelects() {
     
     selects.forEach(selectId => {
         const select = document.getElementById(selectId);
+        if (!select) return; // Element doesn't exist on this page
+        
         select.innerHTML = '<option value="">Select a site...</option>';
         
         sites.forEach(site => {
@@ -105,6 +118,8 @@ async function addUrl(e) {
 // Create site tabs
 function createSiteTabs() {
     const tabsContainer = document.getElementById('siteTabs');
+    if (!tabsContainer) return; // Not on a page with tabs
+    
     tabsContainer.innerHTML = '';
     
     sites.forEach((site, index) => {
@@ -162,8 +177,11 @@ function switchTab(siteId, tabElement) {
 
 // Load dashboard with latest results
 async function loadDashboard() {
+    const siteContent = document.getElementById('siteContent');
+    if (!siteContent) return; // Not on a page with dashboard
+    
     if (sites.length === 0) {
-        document.getElementById('siteContent').innerHTML = '<div class="no-data">No sites configured. Add sites and URLs to get started.</div>';
+        siteContent.innerHTML = '<div class="no-data">No sites configured. Add sites and URLs to get started.</div>';
         return;
     }
     
