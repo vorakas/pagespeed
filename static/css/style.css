@@ -100,6 +100,17 @@ header h1 {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.header-logo {
+    height: 60px;
+    width: auto;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 header p {
