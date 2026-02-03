@@ -16,6 +16,7 @@
         <ul class="side-nav-list">
             <li><a href="/setup" class="side-nav-link">Site/URL Setup</a></li>
             <li><a href="/test" class="side-nav-link">Test URLs</a></li>
+            <li><a href="/metrics" class="side-nav-link">Page Performance Metrics</a></li>
         </ul>
     </nav>
 
@@ -146,52 +147,6 @@
                     </ul>
                     <p class="explanation-impact"><strong>Impact:</strong> Better SEO means higher visibility in search results and more organic traffic.</p>
                 </div>
-            </div>
-        </section>
-
-        <!-- Comparison Section -->
-        <section class="comparison-section">
-            <h2>Page Comparison</h2>
-            <p class="reference-description">Compare the same page across different sites</p>
-            <div class="comparison-controls">
-                <div class="comparison-select-group">
-                    <label>Site 1:</label>
-                    <select id="compareSite1" onchange="loadUrlsForComparison(1)">
-                        <option value="">Select first site...</option>
-                    </select>
-                    <select id="compareUrl1">
-                        <option value="">Select URL...</option>
-                    </select>
-                </div>
-                <span class="vs-text">vs</span>
-                <div class="comparison-select-group">
-                    <label>Site 2:</label>
-                    <select id="compareSite2" onchange="loadUrlsForComparison(2)">
-                        <option value="">Select second site...</option>
-                    </select>
-                    <select id="compareUrl2">
-                        <option value="">Select URL...</option>
-                    </select>
-                </div>
-                <button onclick="loadComparison()">Compare</button>
-            </div>
-            <div id="comparisonResults"></div>
-        </section>
-
-        <!-- Historical Charts Section -->
-        <section class="charts-section">
-            <h2>Historical Performance</h2>
-            <div class="chart-controls">
-                <select id="chartSiteSelect">
-                    <option value="">Select a site...</option>
-                </select>
-                <select id="chartUrlSelect">
-                    <option value="">Select a URL...</option>
-                </select>
-                <button onclick="loadHistoricalChart()">Load Chart</button>
-            </div>
-            <div class="chart-container">
-                <canvas id="performanceChart"></canvas>
             </div>
         </section>
     </div>

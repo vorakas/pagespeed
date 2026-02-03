@@ -57,6 +57,12 @@ def test():
     sites = db.get_sites()
     return render_template('test.html', sites=sites)
 
+@app.route('/metrics')
+def metrics():
+    """Page Performance Metrics page"""
+    sites = db.get_sites()
+    return render_template('metrics.html', sites=sites)
+
 @app.route('/api/sites', methods=['GET', 'POST'])
 def sites():
     """Get all sites or create a new site"""
