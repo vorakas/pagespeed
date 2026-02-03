@@ -63,6 +63,18 @@ def metrics():
     sites = db.get_sites()
     return render_template('metrics.html', sites=sites)
 
+@app.route('/newrelic')
+def newrelic():
+    """New Relic Metrics page"""
+    sites = db.get_sites()
+    return render_template('newrelic.html', sites=sites)
+
+@app.route('/iislogs')
+def iislogs():
+    """IIS Logs page"""
+    sites = db.get_sites()
+    return render_template('iislogs.html', sites=sites)
+
 @app.route('/api/sites', methods=['GET', 'POST'])
 def sites():
     """Get all sites or create a new site"""

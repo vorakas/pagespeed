@@ -2103,3 +2103,52 @@ body:not(.light-mode) .testing-section {
 body:not(.light-mode) .testing-section h2 {
     color: #f9fafb;
 }
+
+/* Under Construction Section */
+.construction-section {
+    background: #1a1f2e;
+    padding: 80px 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.construction-content {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.construction-icon {
+    font-size: 5em;
+    margin-bottom: 20px;
+    animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
+
+.construction-section h2 {
+    color: #f9fafb;
+    font-size: 2.5em;
+    margin-bottom: 15px;
+}
+
+.construction-section p {
+    color: #9ca3af;
+    font-size: 1.2em;
+}
+
+/* Light mode for construction section */
+body.light-mode .construction-section {
+    background: white;
+}
+
+body.light-mode .construction-section h2 {
+    color: #1f2937;
+}
+
+body.light-mode .construction-section p {
+    color: #6b7280;
+}

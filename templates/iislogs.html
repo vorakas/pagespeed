@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IIS Logs - PageSpeed Insights Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Side Navigation -->
+    <nav class="side-nav">
+        <div class="side-nav-header">
+            <h2>Menu</h2>
+        </div>
+        <ul class="side-nav-list">
+            <li><a href="/" class="side-nav-link">← Back</a></li>
+            <li><a href="/setup" class="side-nav-link">Site/URL Setup</a></li>
+            <li><a href="/test" class="side-nav-link">Test URLs</a></li>
+            <li><a href="/metrics" class="side-nav-link">Page Performance Metrics</a></li>
+            <li><a href="/newrelic" class="side-nav-link">New Relic Metrics</a></li>
+            <li><a href="/iislogs" class="side-nav-link active">IIS Logs</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <header>
+            <div class="header-content">
+                <div class="header-text">
+                    <h1>📊 PageSpeed Insights Monitor</h1>
+                    <p>Monitor and compare website performance over time</p>
+                </div>
+                <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()">
+                    <span class="theme-icon">☀️</span>
+                    <span class="theme-label">Light Mode</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Under Construction Section -->
+        <section class="construction-section">
+            <div class="construction-content">
+                <div class="construction-icon">🚧</div>
+                <h2>Under Construction</h2>
+                <p>IIS Logs analysis coming soon!</p>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
