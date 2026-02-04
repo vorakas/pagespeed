@@ -948,13 +948,11 @@
             content.textContent = JSON.stringify(window.rawCWVData, null, 2);
             
             modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
         }
 
         function closeRawResults() {
             const modal = document.getElementById('rawResultsModal');
             modal.style.display = 'none';
-            document.body.style.overflow = 'auto';
         }
 
         // Close modal when clicking outside
@@ -979,7 +977,7 @@
                 <button class="modal-close" onclick="closeRawResults()">×</button>
             </div>
             <div class="modal-body">
-                <pre id="rawResultsContent" style="background: #0f1419; color: #e3e8ee; padding: 20px; border-radius: 8px; overflow: auto; max-height: 600px; font-size: 0.9em; line-height: 1.5;"></pre>
+                <pre id="rawResultsContent" style="background: #0f1419; color: #e3e8ee; padding: 20px; border-radius: 8px; overflow: auto; font-size: 0.9em; line-height: 1.5;"></pre>
             </div>
         </div>
     </div>
