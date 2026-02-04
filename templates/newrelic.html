@@ -60,8 +60,8 @@
                 <div class="config-card">
                     <h3>Application Settings</h3>
                     <div class="form-group">
-                        <label for="nrAppId">Application ID</label>
-                        <input type="text" id="nrAppId" placeholder="Enter your Application ID">
+                        <label for="nrAppName">Application Name</label>
+                        <input type="text" id="nrAppName" placeholder="Enter your Application Name (e.g., 'Production Web App')">
                     </div>
                     <div class="form-group">
                         <label for="nrRefreshRate">Refresh Rate (seconds)</label>
@@ -405,14 +405,14 @@
         let nrConfig = {
             apiKey: null,
             accountId: null,
-            appId: null,
+            appName: null,
             refreshRate: 60
         };
 
         function saveNewRelicConfig() {
             nrConfig.apiKey = document.getElementById('nrApiKey').value;
             nrConfig.accountId = document.getElementById('nrAccountId').value;
-            nrConfig.appId = document.getElementById('nrAppId').value;
+            nrConfig.appName = document.getElementById('nrAppName').value;
             nrConfig.refreshRate = parseInt(document.getElementById('nrRefreshRate').value);
             
             // Save to localStorage
@@ -427,7 +427,7 @@
                 nrConfig = JSON.parse(saved);
                 document.getElementById('nrApiKey').value = nrConfig.apiKey || '';
                 document.getElementById('nrAccountId').value = nrConfig.accountId || '';
-                document.getElementById('nrAppId').value = nrConfig.appId || '';
+                document.getElementById('nrAppName').value = nrConfig.appName || '';
                 document.getElementById('nrRefreshRate').value = nrConfig.refreshRate || 60;
             }
         }
