@@ -3074,6 +3074,12 @@ body.light-mode .browser-metric-card:hover {
     margin-bottom: 30px;
 }
 
+.interactions-side {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
 .interactions-card-half {
     background: #0f1419;
     border: 2px solid #374151;
@@ -3112,12 +3118,14 @@ body.light-mode .browser-metric-card:hover {
     padding: 20px;
     display: flex;
     flex-direction: column;
+    max-height: 400px; /* Restrict height to match screenshot */
 }
 
 .raw-results-card h3 {
     color: #10b981;
     font-size: 1.3em;
     margin-bottom: 15px;
+    flex-shrink: 0; /* Keep header visible */
 }
 
 .raw-results-card pre {
@@ -3125,7 +3133,7 @@ body.light-mode .browser-metric-card:hover {
     color: #e3e8ee;
     padding: 15px;
     border-radius: 8px;
-    overflow: auto;
+    overflow: auto; /* Scrollbar when content exceeds height */
     font-size: 0.85em;
     line-height: 1.5;
     font-family: 'Courier New', monospace;

@@ -252,22 +252,25 @@
 
                 <!-- Interactions Counter & Raw Results Side by Side -->
                 <div class="interactions-and-raw-section">
-                    <div class="interactions-card-half">
-                        <h3>Browser Interactions</h3>
-                        <div class="interactions-count" id="interactionsCount">--</div>
-                        <p class="interactions-note">Interactions detected in the last <span id="timeRangeDisplay">30 minutes</span></p>
+                    <div class="interactions-side">
+                        <div class="interactions-card-half">
+                            <h3>Browser Interactions</h3>
+                            <div class="interactions-count" id="interactionsCount">--</div>
+                            <p class="interactions-note">Interactions detected in the last <span id="timeRangeDisplay">30 minutes</span></p>
+                        </div>
+                        
+                        <!-- Metadata Display -->
+                        <div class="cwv-metadata">
+                            <p><strong>App Name:</strong> <span id="metaAppName">--</span></p>
+                            <p><strong>Page URL:</strong> <span id="metaPageUrl">--</span></p>
+                            <p><strong>Last Updated:</strong> <span id="metaLastUpdated">--</span></p>
+                        </div>
                     </div>
+                    
                     <div class="raw-results-card">
                         <h3>Raw Query Results</h3>
                         <pre id="rawResultsContent"></pre>
                     </div>
-                </div>
-
-                <!-- Metadata Display -->
-                <div class="cwv-metadata">
-                    <p><strong>App Name:</strong> <span id="metaAppName">--</span></p>
-                    <p><strong>Page URL:</strong> <span id="metaPageUrl">--</span></p>
-                    <p><strong>Last Updated:</strong> <span id="metaLastUpdated">--</span></p>
                 </div>
             </div>
         </section>
@@ -828,10 +831,11 @@
                 document.getElementById('cwvMetricsContainer').style.display = 'block';
                 document.getElementById('coreWebVitalsSection').style.display = 'block';
 
-                // Populate inline raw results
+                // Populate inline raw results - show only the New Relic response data
                 const rawContent = document.getElementById('rawResultsContent');
-                if (rawContent) {
-                    rawContent.textContent = JSON.stringify(data, null, 2);
+                if (rawContent && data.raw_response) {
+                    const nrData = data.raw_response.data?.actor?.account || data.raw_response;
+                    rawContent.textContent = JSON.stringify(nrData, null, 2);
                 }
 
                 // Populate metrics
