@@ -78,6 +78,171 @@
             <div id="connectionStatus" class="connection-status" style="display: none;"></div>
         </section>
 
+        <!-- Core Web Vitals Section -->
+        <section class="core-web-vitals-section" id="coreWebVitalsSection" style="display: none;">
+            <h2>🎯 Core Web Vitals - Live Metrics</h2>
+            
+            <div class="cwv-config">
+                <div class="form-group">
+                    <label for="cwvPageUrl">Page URL to Monitor</label>
+                    <input type="text" id="cwvPageUrl" placeholder="https://www.lampsplus.com/" value="https://www.lampsplus.com/">
+                </div>
+                <div class="form-group">
+                    <label for="cwvTimeRange">Time Range</label>
+                    <select id="cwvTimeRange">
+                        <option value="30 minutes ago" selected>Last 30 minutes</option>
+                        <option value="1 hour ago">Last 1 hour</option>
+                        <option value="3 hours ago">Last 3 hours</option>
+                        <option value="6 hours ago">Last 6 hours</option>
+                        <option value="12 hours ago">Last 12 hours</option>
+                        <option value="24 hours ago">Last 24 hours</option>
+                    </select>
+                </div>
+                <button onclick="loadCoreWebVitals()" class="btn-primary">Load Metrics</button>
+                <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="btn-secondary">Enable Auto-Refresh</button>
+            </div>
+
+            <div id="cwvLoadingIndicator" class="loading-indicator" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Loading Core Web Vitals data from New Relic...</p>
+            </div>
+
+            <div id="cwvMetricsContainer" style="display: none;">
+                <!-- Core Web Vitals Cards -->
+                <div class="cwv-primary-metrics">
+                    <div class="cwv-metric-card lcp-card">
+                        <div class="cwv-metric-header">
+                            <h3>LCP</h3>
+                            <span class="cwv-metric-name">Largest Contentful Paint</span>
+                        </div>
+                        <div class="cwv-percentiles">
+                            <div class="percentile-item">
+                                <span class="percentile-label">P50</span>
+                                <span class="percentile-value" id="lcp-p50">--</span>
+                                <span class="percentile-unit">ms</span>
+                            </div>
+                            <div class="percentile-item">
+                                <span class="percentile-label">P75</span>
+                                <span class="percentile-value" id="lcp-p75">--</span>
+                                <span class="percentile-unit">ms</span>
+                            </div>
+                            <div class="percentile-item">
+                                <span class="percentile-label">P90</span>
+                                <span class="percentile-value" id="lcp-p90">--</span>
+                                <span class="percentile-unit">ms</span>
+                            </div>
+                        </div>
+                        <div class="cwv-threshold-indicator" id="lcp-indicator"></div>
+                    </div>
+
+                    <div class="cwv-metric-card cls-card">
+                        <div class="cwv-metric-header">
+                            <h3>CLS</h3>
+                            <span class="cwv-metric-name">Cumulative Layout Shift</span>
+                        </div>
+                        <div class="cwv-percentiles">
+                            <div class="percentile-item">
+                                <span class="percentile-label">P50</span>
+                                <span class="percentile-value" id="cls-p50">--</span>
+                                <span class="percentile-unit"></span>
+                            </div>
+                            <div class="percentile-item">
+                                <span class="percentile-label">P75</span>
+                                <span class="percentile-value" id="cls-p75">--</span>
+                                <span class="percentile-unit"></span>
+                            </div>
+                            <div class="percentile-item">
+                                <span class="percentile-label">P90</span>
+                                <span class="percentile-value" id="cls-p90">--</span>
+                                <span class="percentile-unit"></span>
+                            </div>
+                        </div>
+                        <div class="cwv-threshold-indicator" id="cls-indicator"></div>
+                    </div>
+
+                    <div class="cwv-metric-card pageload-card">
+                        <div class="cwv-metric-header">
+                            <h3>Page Load</h3>
+                            <span class="cwv-metric-name">Total Page Load Time</span>
+                        </div>
+                        <div class="cwv-percentiles">
+                            <div class="percentile-item">
+                                <span class="percentile-label">P50</span>
+                                <span class="percentile-value" id="pageLoad-p50">--</span>
+                                <span class="percentile-unit">ms</span>
+                            </div>
+                            <div class="percentile-item">
+                                <span class="percentile-label">P75</span>
+                                <span class="percentile-value" id="pageLoad-p75">--</span>
+                                <span class="percentile-unit">ms</span>
+                            </div>
+                            <div class="percentile-item">
+                                <span class="percentile-label">P90</span>
+                                <span class="percentile-value" id="pageLoad-p90">--</span>
+                                <span class="percentile-unit">ms</span>
+                            </div>
+                        </div>
+                        <div class="cwv-threshold-indicator" id="pageLoad-indicator"></div>
+                    </div>
+                </div>
+
+                <!-- Performance Breakdown -->
+                <div class="performance-breakdown">
+                    <h3>Performance Breakdown</h3>
+                    <div class="breakdown-grid">
+                        <div class="breakdown-card">
+                            <h4>Backend Duration</h4>
+                            <div class="breakdown-values">
+                                <span class="breakdown-value" id="backend-p50">--</span>
+                                <span class="breakdown-value" id="backend-p75">--</span>
+                                <span class="breakdown-value" id="backend-p90">--</span>
+                            </div>
+                        </div>
+                        <div class="breakdown-card">
+                            <h4>Frontend Duration</h4>
+                            <div class="breakdown-values">
+                                <span class="breakdown-value" id="frontend-p50">--</span>
+                                <span class="breakdown-value" id="frontend-p75">--</span>
+                                <span class="breakdown-value" id="frontend-p90">--</span>
+                            </div>
+                        </div>
+                        <div class="breakdown-card">
+                            <h4>TTFB-like (Queue + Network)</h4>
+                            <div class="breakdown-values">
+                                <span class="breakdown-value" id="ttfbLike-p50">--</span>
+                                <span class="breakdown-value" id="ttfbLike-p75">--</span>
+                                <span class="breakdown-value" id="ttfbLike-p90">--</span>
+                            </div>
+                        </div>
+                        <div class="breakdown-card">
+                            <h4>DOM Processing</h4>
+                            <div class="breakdown-values">
+                                <span class="breakdown-value" id="domProcessing-p50">--</span>
+                                <span class="breakdown-value" id="domProcessing-p75">--</span>
+                                <span class="breakdown-value" id="domProcessing-p90">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactions Counter -->
+                <div class="interactions-section">
+                    <div class="interactions-card">
+                        <h3>Browser Interactions</h3>
+                        <div class="interactions-count" id="interactionsCount">--</div>
+                        <p class="interactions-note">Interactions detected in the last <span id="timeRangeDisplay">30 minutes</span></p>
+                    </div>
+                </div>
+
+                <!-- Metadata Display -->
+                <div class="cwv-metadata">
+                    <p><strong>App Name:</strong> <span id="metaAppName">--</span></p>
+                    <p><strong>Page URL:</strong> <span id="metaPageUrl">--</span></p>
+                    <p><strong>Last Updated:</strong> <span id="metaLastUpdated">--</span></p>
+                </div>
+            </div>
+        </section>
+
         <!-- Quick Stats Overview -->
         <section class="stats-overview">
             <h2>📊 Performance Overview</h2>
@@ -438,19 +603,39 @@
             statusDiv.className = 'connection-status testing';
             statusDiv.innerHTML = '🔄 Testing connection to New Relic...';
             
-            // Simulate API test (replace with actual New Relic API call)
-            setTimeout(() => {
-                if (nrConfig.apiKey && nrConfig.accountId) {
+            if (!nrConfig.apiKey) {
+                statusDiv.className = 'connection-status error';
+                statusDiv.innerHTML = '❌ Please enter an API key first.';
+                return;
+            }
+            
+            // Call the backend API to test connection
+            fetch('/api/newrelic/test-connection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    api_key: nrConfig.apiKey
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
                     statusDiv.className = 'connection-status success';
-                    statusDiv.innerHTML = '✅ Connection successful! New Relic API is responding.';
+                    statusDiv.innerHTML = '✅ ' + data.message;
                     
-                    // Load demo data
-                    loadDemoData();
+                    // Show Core Web Vitals section
+                    document.getElementById('coreWebVitalsSection').style.display = 'block';
                 } else {
                     statusDiv.className = 'connection-status error';
-                    statusDiv.innerHTML = '❌ Connection failed. Please check your API key and Account ID.';
+                    statusDiv.innerHTML = '❌ ' + data.message;
                 }
-            }, 1500);
+            })
+            .catch(error => {
+                statusDiv.className = 'connection-status error';
+                statusDiv.innerHTML = '❌ Connection failed: ' + error.message;
+            });
         }
 
         function switchAPMTab(tabName) {
@@ -565,6 +750,153 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Core Web Vitals functionality
+        let autoRefreshInterval = null;
+
+        async function loadCoreWebVitals() {
+            const pageUrl = document.getElementById('cwvPageUrl').value;
+            const timeRange = document.getElementById('cwvTimeRange').value;
+
+            if (!nrConfig.apiKey || !nrConfig.accountId || !nrConfig.appName) {
+                showNotification('Please configure your New Relic API settings first', 'error');
+                return;
+            }
+
+            if (!pageUrl) {
+                showNotification('Please enter a page URL to monitor', 'error');
+                return;
+            }
+
+            // Show loading indicator
+            document.getElementById('cwvLoadingIndicator').style.display = 'block';
+            document.getElementById('cwvMetricsContainer').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/newrelic/core-web-vitals', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        api_key: nrConfig.apiKey,
+                        account_id: parseInt(nrConfig.accountId),
+                        app_name: nrConfig.appName,
+                        page_url: pageUrl,
+                        time_range: timeRange
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to load metrics');
+                }
+
+                // Hide loading, show metrics
+                document.getElementById('cwvLoadingIndicator').style.display = 'none';
+                document.getElementById('cwvMetricsContainer').style.display = 'block';
+                document.getElementById('coreWebVitalsSection').style.display = 'block';
+
+                // Populate metrics
+                populateCoreWebVitals(data.metrics, data.metadata);
+
+            } catch (error) {
+                document.getElementById('cwvLoadingIndicator').style.display = 'none';
+                showNotification('Error loading Core Web Vitals: ' + error.message, 'error');
+            }
+        }
+
+        function populateCoreWebVitals(metrics, metadata) {
+            // LCP
+            document.getElementById('lcp-p50').textContent = formatMetric(metrics.lcp.p50);
+            document.getElementById('lcp-p75').textContent = formatMetric(metrics.lcp.p75);
+            document.getElementById('lcp-p90').textContent = formatMetric(metrics.lcp.p90);
+            updateThresholdIndicator('lcp-indicator', metrics.lcp.p75, 2500, 4000);
+
+            // CLS
+            document.getElementById('cls-p50').textContent = formatMetric(metrics.cls.p50, 3);
+            document.getElementById('cls-p75').textContent = formatMetric(metrics.cls.p75, 3);
+            document.getElementById('cls-p90').textContent = formatMetric(metrics.cls.p90, 3);
+            updateThresholdIndicator('cls-indicator', metrics.cls.p75, 0.1, 0.25);
+
+            // Page Load
+            document.getElementById('pageLoad-p50').textContent = formatMetric(metrics.pageLoad.p50);
+            document.getElementById('pageLoad-p75').textContent = formatMetric(metrics.pageLoad.p75);
+            document.getElementById('pageLoad-p90').textContent = formatMetric(metrics.pageLoad.p90);
+            updateThresholdIndicator('pageLoad-indicator', metrics.pageLoad.p75, 2000, 4000);
+
+            // Breakdown metrics
+            document.getElementById('backend-p50').textContent = formatMetric(metrics.backend.p50) + ' ms';
+            document.getElementById('backend-p75').textContent = formatMetric(metrics.backend.p75) + ' ms';
+            document.getElementById('backend-p90').textContent = formatMetric(metrics.backend.p90) + ' ms';
+
+            document.getElementById('frontend-p50').textContent = formatMetric(metrics.frontend.p50) + ' ms';
+            document.getElementById('frontend-p75').textContent = formatMetric(metrics.frontend.p75) + ' ms';
+            document.getElementById('frontend-p90').textContent = formatMetric(metrics.frontend.p90) + ' ms';
+
+            document.getElementById('ttfbLike-p50').textContent = formatMetric(metrics.ttfbLike.p50) + ' ms';
+            document.getElementById('ttfbLike-p75').textContent = formatMetric(metrics.ttfbLike.p75) + ' ms';
+            document.getElementById('ttfbLike-p90').textContent = formatMetric(metrics.ttfbLike.p90) + ' ms';
+
+            document.getElementById('domProcessing-p50').textContent = formatMetric(metrics.domProcessing.p50) + ' ms';
+            document.getElementById('domProcessing-p75').textContent = formatMetric(metrics.domProcessing.p75) + ' ms';
+            document.getElementById('domProcessing-p90').textContent = formatMetric(metrics.domProcessing.p90) + ' ms';
+
+            // Interactions
+            document.getElementById('interactionsCount').textContent = metrics.interactions || 0;
+
+            // Metadata
+            document.getElementById('metaAppName').textContent = metadata.app_name;
+            document.getElementById('metaPageUrl').textContent = metadata.page_url;
+            document.getElementById('metaLastUpdated').textContent = new Date().toLocaleString();
+            document.getElementById('timeRangeDisplay').textContent = metadata.time_range;
+        }
+
+        function formatMetric(value, decimals = 0) {
+            if (value === null || value === undefined) {
+                return '--';
+            }
+            return Number(value).toFixed(decimals);
+        }
+
+        function updateThresholdIndicator(elementId, value, goodThreshold, poorThreshold) {
+            const indicator = document.getElementById(elementId);
+            if (!value) {
+                indicator.textContent = '';
+                indicator.className = 'cwv-threshold-indicator';
+                return;
+            }
+
+            if (value <= goodThreshold) {
+                indicator.textContent = '✓ Good';
+                indicator.className = 'cwv-threshold-indicator good';
+            } else if (value <= poorThreshold) {
+                indicator.textContent = '⚠ Needs Improvement';
+                indicator.className = 'cwv-threshold-indicator warning';
+            } else {
+                indicator.textContent = '✗ Poor';
+                indicator.className = 'cwv-threshold-indicator poor';
+            }
+        }
+
+        function toggleAutoRefresh() {
+            const btn = document.getElementById('autoRefreshBtn');
+            
+            if (autoRefreshInterval) {
+                // Disable auto-refresh
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                btn.textContent = 'Enable Auto-Refresh';
+                btn.classList.remove('active');
+            } else {
+                // Enable auto-refresh (every 60 seconds)
+                autoRefreshInterval = setInterval(loadCoreWebVitals, 60000);
+                btn.textContent = 'Disable Auto-Refresh';
+                btn.classList.add('active');
+                showNotification('Auto-refresh enabled (every 60 seconds)', 'success');
+            }
         }
 
         // Load config on page load
