@@ -3301,11 +3301,67 @@ body.light-mode .cwv-metadata span {
 }
 
 /* Raw Query Results Modal */
+#rawResultsModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: flex-start; /* Align to top instead of center */
+    justify-content: center;
+    z-index: 1000;
+    padding-top: 20px; /* Small padding from top */
+    overflow-y: auto; /* Allow scrolling the modal container */
+}
+
 .raw-results-modal {
     max-width: 1100px;
     width: 95%;
-    max-height: 90vh;
+    max-height: calc(100vh - 40px); /* Leave 20px padding top and bottom */
     overflow-y: auto;
+    background: #1a1f2e;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    margin-bottom: 20px; /* Padding at bottom */
+}
+
+.raw-results-modal .modal-header {
+    padding: 20px 30px;
+    border-bottom: 2px solid #374151;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 12px 12px 0 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.raw-results-modal .modal-header h2 {
+    margin: 0;
+    color: white;
+}
+
+.raw-results-modal .modal-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 28px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.raw-results-modal .modal-close:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .raw-results-modal .modal-body {
@@ -3319,6 +3375,19 @@ body.light-mode .cwv-metadata span {
     white-space: pre-wrap;
     word-wrap: break-word;
     max-height: none;
+}
+
+body.light-mode #rawResultsModal {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+body.light-mode .raw-results-modal {
+    background: white;
+}
+
+body.light-mode .raw-results-modal .modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-bottom-color: #e5e7eb;
 }
 
 body.light-mode .raw-results-modal pre {
