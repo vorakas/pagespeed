@@ -2897,6 +2897,7 @@ body.light-mode .browser-metric-card:hover {
     margin-bottom: 20px;
     border-bottom: 2px solid #374151;
     padding-bottom: 12px;
+    min-height: 95px; /* Ensures uniform height across all cards */
 }
 
 .cwv-metric-header h3 {
@@ -2910,6 +2911,15 @@ body.light-mode .browser-metric-card:hover {
     color: #9ca3af;
     font-size: 0.85em;
     display: block;
+    margin-bottom: 5px;
+}
+
+.cwv-ideal-score {
+    color: #6b7280;
+    font-size: 0.75em;
+    display: block;
+    font-style: italic;
+    margin-top: 5px;
 }
 
 .cwv-percentiles {
@@ -2925,6 +2935,10 @@ body.light-mode .browser-metric-card:hover {
     background: #1a1f2e;
     border-radius: 8px;
     padding: 15px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 120px; /* Ensures uniform height */
 }
 
 .percentile-label {
@@ -2937,18 +2951,25 @@ body.light-mode .browser-metric-card:hover {
     margin-bottom: 8px;
 }
 
+.percentile-value-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px; /* Fixed height for value container */
+}
+
 .percentile-value {
-    display: block;
     color: #f9fafb;
     font-size: 1.8em;
     font-weight: 700;
-    margin-bottom: 2px;
 }
 
 .percentile-unit {
     display: block;
     color: #6b7280;
     font-size: 0.85em;
+    margin-top: 5px;
 }
 
 .cwv-threshold-indicator {
@@ -3179,6 +3200,10 @@ body.light-mode .cwv-metric-header h3 {
 
 body.light-mode .cwv-metric-name {
     color: #6b7280;
+}
+
+body.light-mode .cwv-ideal-score {
+    color: #9ca3af;
 }
 
 body.light-mode .percentile-item {
