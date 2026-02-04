@@ -152,38 +152,34 @@ class NewRelicService:
         print(f"DEBUG: First result object = {result}")
         print(f"DEBUG: Result keys = {list(result.keys())}")
 
-        # The result might have keys like 'percentile.50', 'percentile.75', etc.
-        # or direct keys based on the AS clause
+        # New Relic returns percentiles in a nested structure like:
+        # {'LCP_ms': {'50': 1104.0, '75': 1584.0, '90': 2656.0}}
+        # We need to extract the inner dictionary
+
         p50 = None
         p75 = None
         p90 = None
 
-        # Try to find the percentile values
-        for key, value in result.items():
-            print(f"DEBUG: Checking key '{key}' with value {value}")
-            if 'percentile.50' in key.lower() or key.endswith('_ms') or key == 'CLS':
-                p50 = value
-                print(f"DEBUG: Set p50 = {value} from key '{key}'")
-            if 'percentile.75' in key.lower():
-                p75 = value
-                print(f"DEBUG: Set p75 = {value} from key '{key}'")
-            if 'percentile.90' in key.lower():
-                p90 = value
-                print(f"DEBUG: Set p90 = {value} from key '{key}'")
+        # Get the first (and usually only) key in the result
+        if len(result) > 0:
+            # Get the nested percentile dictionary
+            metric_key = list(result.keys())[0]
+            percentile_dict = result[metric_key]
 
-        # If we didn't find them with the above logic, try extracting by position
-        # New Relic returns percentiles in order when using percentile(column, 50, 75, 90)
-        keys = list(result.keys())
-        if len(keys) >= 3:
-            if p50 is None:
-                p50 = result.get(keys[0])
-                print(f"DEBUG: Set p50 = {p50} from position 0 (key '{keys[0]}')")
-            if p75 is None:
-                p75 = result.get(keys[1])
-                print(f"DEBUG: Set p75 = {p75} from position 1 (key '{keys[1]}')")
-            if p90 is None:
-                p90 = result.get(keys[2])
-                print(f"DEBUG: Set p90 = {p90} from position 2 (key '{keys[2]}')")
+            print(f"DEBUG: Metric key = '{metric_key}'")
+            print(f"DEBUG: Percentile dict = {percentile_dict}")
+
+            # Check if it's a dictionary with percentile keys
+            if isinstance(percentile_dict, dict):
+                # Extract percentiles from the nested dict
+                p50 = percentile_dict.get('50') or percentile_dict.get(50)
+                p75 = percentile_dict.get('75') or percentile_dict.get(75)
+                p90 = percentile_dict.get('90') or percentile_dict.get(90)
+                print(f"DEBUG: Extracted from nested dict - p50={p50}, p75={p75}, p90={p90}")
+            else:
+                # Fallback: it's a single value, not percentiles
+                print(f"DEBUG: Not a dict, using single value: {percentile_dict}")
+                p50 = percentile_dict
 
         final_result = {
             'p50': p50,
