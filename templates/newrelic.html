@@ -32,7 +32,7 @@
                         <img src="{{ url_for('static', filename='images/lampsplus-logo-transparent.png') }}" alt="Lamps Plus" class="header-logo">
                         PageSpeed Insights Monitor
                     </h1>
-                    <p>Monitor and compare website performance over time</p>
+                    <p>New Relic Application Performance Monitoring</p>
                 </div>
                 <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()">
                     <span class="theme-icon">☀️</span>
@@ -41,16 +41,536 @@
             </div>
         </header>
 
-        <!-- Under Construction Section -->
-        <section class="construction-section">
-            <div class="construction-content">
-                <div class="construction-icon">🚧</div>
-                <h2>Under Construction</h2>
-                <p>New Relic Metrics integration coming soon!</p>
+        <!-- Configuration Section -->
+        <section class="newrelic-config-section">
+            <h2>🔧 New Relic Configuration</h2>
+            <div class="config-grid">
+                <div class="config-card">
+                    <h3>API Configuration</h3>
+                    <div class="form-group">
+                        <label for="nrApiKey">API Key</label>
+                        <input type="password" id="nrApiKey" placeholder="Enter your New Relic API key">
+                    </div>
+                    <div class="form-group">
+                        <label for="nrAccountId">Account ID</label>
+                        <input type="text" id="nrAccountId" placeholder="Enter your Account ID">
+                    </div>
+                    <button onclick="saveNewRelicConfig()" class="btn-primary">Save Configuration</button>
+                </div>
+                <div class="config-card">
+                    <h3>Application Settings</h3>
+                    <div class="form-group">
+                        <label for="nrAppId">Application ID</label>
+                        <input type="text" id="nrAppId" placeholder="Enter your Application ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="nrRefreshRate">Refresh Rate (seconds)</label>
+                        <select id="nrRefreshRate">
+                            <option value="30">30 seconds</option>
+                            <option value="60" selected>1 minute</option>
+                            <option value="300">5 minutes</option>
+                            <option value="600">10 minutes</option>
+                        </select>
+                    </div>
+                    <button onclick="testNewRelicConnection()" class="btn-secondary">Test Connection</button>
+                </div>
+            </div>
+            <div id="connectionStatus" class="connection-status" style="display: none;"></div>
+        </section>
+
+        <!-- Quick Stats Overview -->
+        <section class="stats-overview">
+            <h2>📊 Performance Overview</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg Response Time</div>
+                        <div class="stat-value" id="avgResponseTime">-- ms</div>
+                        <div class="stat-change positive">↓ 12% from yesterday</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Throughput</div>
+                        <div class="stat-value" id="throughput">-- rpm</div>
+                        <div class="stat-change positive">↑ 8% from yesterday</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">❌</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Error Rate</div>
+                        <div class="stat-value" id="errorRate">-- %</div>
+                        <div class="stat-change negative">↑ 0.2% from yesterday</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Apdex Score</div>
+                        <div class="stat-value" id="apdexScore">--</div>
+                        <div class="stat-change positive">↑ 0.05 from yesterday</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- APM Metrics -->
+        <section class="apm-section">
+            <h2>🚀 Application Performance Monitoring</h2>
+            <div class="tabs">
+                <button class="tab active" onclick="switchAPMTab('transactions')">Transactions</button>
+                <button class="tab" onclick="switchAPMTab('database')">Database</button>
+                <button class="tab" onclick="switchAPMTab('external')">External Services</button>
+                <button class="tab" onclick="switchAPMTab('errors')">Errors</button>
+            </div>
+            
+            <div id="transactions-content" class="tab-content active">
+                <div class="metrics-table-container">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Transaction Name</th>
+                                <th class="sortable" onclick="sortTable(this, 1)">Avg Response Time <span class="sort-indicator">↕</span></th>
+                                <th class="sortable" onclick="sortTable(this, 2)">Calls/Min <span class="sort-indicator">↕</span></th>
+                                <th class="sortable" onclick="sortTable(this, 3)">Total Time % <span class="sort-indicator">↕</span></th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTable">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">
+                                    Configure New Relic API to load transaction data
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="database-content" class="tab-content">
+                <div class="metrics-table-container">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Database Operation</th>
+                                <th class="sortable" onclick="sortTable(this, 1)">Avg Duration <span class="sort-indicator">↕</span></th>
+                                <th class="sortable" onclick="sortTable(this, 2)">Calls/Min <span class="sort-indicator">↕</span></th>
+                                <th class="sortable" onclick="sortTable(this, 3)">Total Time % <span class="sort-indicator">↕</span></th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody id="databaseTable">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">
+                                    Configure New Relic API to load database metrics
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="external-content" class="tab-content">
+                <div class="metrics-table-container">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>External Service</th>
+                                <th class="sortable" onclick="sortTable(this, 1)">Avg Response Time <span class="sort-indicator">↕</span></th>
+                                <th class="sortable" onclick="sortTable(this, 2)">Calls/Min <span class="sort-indicator">↕</span></th>
+                                <th class="sortable" onclick="sortTable(this, 3)">Total Time % <span class="sort-indicator">↕</span></th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="externalTable">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">
+                                    Configure New Relic API to load external service data
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="errors-content" class="tab-content">
+                <div class="metrics-table-container">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Error Type</th>
+                                <th>Error Message</th>
+                                <th class="sortable" onclick="sortTable(this, 2)">Count <span class="sort-indicator">↕</span></th>
+                                <th>Last Occurrence</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="errorsTable">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">
+                                    Configure New Relic API to load error data
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Infrastructure Metrics -->
+        <section class="infrastructure-section">
+            <h2>💻 Infrastructure Monitoring</h2>
+            <div class="infrastructure-grid">
+                <div class="infra-card">
+                    <h3>CPU Usage</h3>
+                    <div class="metric-display">
+                        <div class="metric-value" id="cpuUsage">--%</div>
+                        <div class="metric-chart">
+                            <div class="mini-chart" id="cpuChart">
+                                <!-- Mini sparkline chart placeholder -->
+                                <div class="chart-placeholder">📊 Chart will appear here</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="metric-status">Status: <span class="status-good">Normal</span></div>
+                </div>
+                
+                <div class="infra-card">
+                    <h3>Memory Usage</h3>
+                    <div class="metric-display">
+                        <div class="metric-value" id="memoryUsage">--%</div>
+                        <div class="metric-chart">
+                            <div class="mini-chart" id="memoryChart">
+                                <div class="chart-placeholder">📊 Chart will appear here</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="metric-status">Status: <span class="status-good">Normal</span></div>
+                </div>
+                
+                <div class="infra-card">
+                    <h3>Network I/O</h3>
+                    <div class="metric-display">
+                        <div class="metric-value" id="networkIO">-- MB/s</div>
+                        <div class="metric-chart">
+                            <div class="mini-chart" id="networkChart">
+                                <div class="chart-placeholder">📊 Chart will appear here</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="metric-status">Status: <span class="status-good">Normal</span></div>
+                </div>
+                
+                <div class="infra-card">
+                    <h3>Disk Usage</h3>
+                    <div class="metric-display">
+                        <div class="metric-value" id="diskUsage">--%</div>
+                        <div class="metric-chart">
+                            <div class="mini-chart" id="diskChart">
+                                <div class="chart-placeholder">📊 Chart will appear here</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="metric-status">Status: <span class="status-good">Normal</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Browser Metrics -->
+        <section class="browser-section">
+            <h2>🌐 Browser Performance</h2>
+            <div class="browser-grid">
+                <div class="browser-metric-card">
+                    <h3>Page Load Time</h3>
+                    <div class="browser-metric-value" id="pageLoadTime">-- s</div>
+                    <div class="browser-metric-breakdown">
+                        <div class="breakdown-item">
+                            <span>Network</span>
+                            <span id="networkTime">-- ms</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span>DOM Processing</span>
+                            <span id="domTime">-- ms</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span>Rendering</span>
+                            <span id="renderTime">-- ms</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="browser-metric-card">
+                    <h3>AJAX Performance</h3>
+                    <div class="browser-metric-value" id="ajaxTime">-- ms</div>
+                    <div class="browser-metric-breakdown">
+                        <div class="breakdown-item">
+                            <span>Avg Duration</span>
+                            <span id="ajaxAvg">-- ms</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span>Requests/Min</span>
+                            <span id="ajaxRate">--</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span>Success Rate</span>
+                            <span id="ajaxSuccess">--%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="browser-metric-card">
+                    <h3>JavaScript Errors</h3>
+                    <div class="browser-metric-value error-count" id="jsErrors">--</div>
+                    <div class="browser-metric-breakdown">
+                        <div class="breakdown-item">
+                            <span>Last Hour</span>
+                            <span id="jsErrorsHour">--</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span>Today</span>
+                            <span id="jsErrorsDay">--</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span>This Week</span>
+                            <span id="jsErrorsWeek">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Custom Queries -->
+        <section class="nrql-section">
+            <h2>🔍 Custom NRQL Queries</h2>
+            <div class="nrql-editor">
+                <div class="editor-header">
+                    <h3>Query Builder</h3>
+                    <div class="query-actions">
+                        <button onclick="loadSampleQuery('apm')" class="btn-secondary">Load APM Sample</button>
+                        <button onclick="loadSampleQuery('browser')" class="btn-secondary">Load Browser Sample</button>
+                        <button onclick="runNRQLQuery()" class="btn-primary">Run Query</button>
+                    </div>
+                </div>
+                <textarea id="nrqlQuery" rows="4" placeholder="SELECT average(duration) FROM Transaction WHERE appName = 'Your App' SINCE 1 hour ago"></textarea>
+                <div id="queryResults" class="query-results" style="display: none;">
+                    <h4>Results</h4>
+                    <div id="queryResultsContent"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Alerts & Incidents -->
+        <section class="alerts-section">
+            <h2>🚨 Recent Alerts & Incidents</h2>
+            <div class="alerts-container">
+                <div class="alert-item alert-warning">
+                    <div class="alert-icon">⚠️</div>
+                    <div class="alert-content">
+                        <div class="alert-title">High Response Time Detected</div>
+                        <div class="alert-description">Average response time exceeded 2s threshold</div>
+                        <div class="alert-meta">2 hours ago • Duration: 15 minutes</div>
+                    </div>
+                    <div class="alert-status">Resolved</div>
+                </div>
+                
+                <div class="alert-item alert-critical">
+                    <div class="alert-icon">🔴</div>
+                    <div class="alert-content">
+                        <div class="alert-title">Database Connection Pool Exhausted</div>
+                        <div class="alert-description">All database connections in use, new requests queuing</div>
+                        <div class="alert-meta">5 hours ago • Duration: 8 minutes</div>
+                    </div>
+                    <div class="alert-status">Resolved</div>
+                </div>
+                
+                <div class="alert-item alert-info">
+                    <div class="alert-icon">ℹ️</div>
+                    <div class="alert-content">
+                        <div class="alert-title">Deployment Completed</div>
+                        <div class="alert-description">Version 2.5.0 successfully deployed to production</div>
+                        <div class="alert-meta">1 day ago</div>
+                    </div>
+                    <div class="alert-status">Info</div>
+                </div>
             </div>
         </section>
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // New Relic specific JavaScript
+        let nrConfig = {
+            apiKey: null,
+            accountId: null,
+            appId: null,
+            refreshRate: 60
+        };
+
+        function saveNewRelicConfig() {
+            nrConfig.apiKey = document.getElementById('nrApiKey').value;
+            nrConfig.accountId = document.getElementById('nrAccountId').value;
+            nrConfig.appId = document.getElementById('nrAppId').value;
+            nrConfig.refreshRate = parseInt(document.getElementById('nrRefreshRate').value);
+            
+            // Save to localStorage
+            localStorage.setItem('nrConfig', JSON.stringify(nrConfig));
+            
+            showNotification('Configuration saved successfully!', 'success');
+        }
+
+        function loadNewRelicConfig() {
+            const saved = localStorage.getItem('nrConfig');
+            if (saved) {
+                nrConfig = JSON.parse(saved);
+                document.getElementById('nrApiKey').value = nrConfig.apiKey || '';
+                document.getElementById('nrAccountId').value = nrConfig.accountId || '';
+                document.getElementById('nrAppId').value = nrConfig.appId || '';
+                document.getElementById('nrRefreshRate').value = nrConfig.refreshRate || 60;
+            }
+        }
+
+        function testNewRelicConnection() {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'connection-status testing';
+            statusDiv.innerHTML = '🔄 Testing connection to New Relic...';
+            
+            // Simulate API test (replace with actual New Relic API call)
+            setTimeout(() => {
+                if (nrConfig.apiKey && nrConfig.accountId) {
+                    statusDiv.className = 'connection-status success';
+                    statusDiv.innerHTML = '✅ Connection successful! New Relic API is responding.';
+                    
+                    // Load demo data
+                    loadDemoData();
+                } else {
+                    statusDiv.className = 'connection-status error';
+                    statusDiv.innerHTML = '❌ Connection failed. Please check your API key and Account ID.';
+                }
+            }, 1500);
+        }
+
+        function switchAPMTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.apm-section .tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + '-content').classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        function loadSampleQuery(type) {
+            const queries = {
+                apm: "SELECT average(duration), count(*) FROM Transaction WHERE appName = 'YourApp' FACET name SINCE 1 hour ago",
+                browser: "SELECT average(pageRenderingDuration), average(domProcessingDuration) FROM PageView SINCE 1 hour ago"
+            };
+            
+            document.getElementById('nrqlQuery').value = queries[type];
+        }
+
+        function runNRQLQuery() {
+            const query = document.getElementById('nrqlQuery').value;
+            const resultsDiv = document.getElementById('queryResults');
+            const contentDiv = document.getElementById('queryResultsContent');
+            
+            if (!query.trim()) {
+                showNotification('Please enter a NRQL query', 'error');
+                return;
+            }
+            
+            resultsDiv.style.display = 'block';
+            contentDiv.innerHTML = '<div class="loading">Running query...</div>';
+            
+            // Simulate query execution (replace with actual New Relic API call)
+            setTimeout(() => {
+                contentDiv.innerHTML = `
+                    <div class="query-result-message">
+                        <p>⚠️ This is a demo interface. Connect your New Relic API to run actual queries.</p>
+                        <p>Your query: <code>${escapeHtml(query)}</code></p>
+                    </div>
+                `;
+            }, 1000);
+        }
+
+        function loadDemoData() {
+            // Populate demo data in the overview cards
+            document.getElementById('avgResponseTime').textContent = '245 ms';
+            document.getElementById('throughput').textContent = '1,247 rpm';
+            document.getElementById('errorRate').textContent = '0.8%';
+            document.getElementById('apdexScore').textContent = '0.92';
+            
+            // Populate infrastructure metrics
+            document.getElementById('cpuUsage').textContent = '42%';
+            document.getElementById('memoryUsage').textContent = '68%';
+            document.getElementById('networkIO').textContent = '12.3 MB/s';
+            document.getElementById('diskUsage').textContent = '54%';
+            
+            // Populate browser metrics
+            document.getElementById('pageLoadTime').textContent = '2.4 s';
+            document.getElementById('networkTime').textContent = '850 ms';
+            document.getElementById('domTime').textContent = '920 ms';
+            document.getElementById('renderTime').textContent = '630 ms';
+            document.getElementById('ajaxTime').textContent = '158 ms';
+            document.getElementById('ajaxAvg').textContent = '158 ms';
+            document.getElementById('ajaxRate').textContent = '42';
+            document.getElementById('ajaxSuccess').textContent = '99.2%';
+            document.getElementById('jsErrors').textContent = '12';
+            document.getElementById('jsErrorsHour').textContent = '3';
+            document.getElementById('jsErrorsDay').textContent = '12';
+            document.getElementById('jsErrorsWeek').textContent = '87';
+            
+            // Populate transactions table
+            populateTransactionsTable();
+        }
+
+        function populateTransactionsTable() {
+            const tbody = document.getElementById('transactionsTable');
+            const demoTransactions = [
+                { name: '/api/products', avgTime: 245, callsPerMin: 342, timePercent: 28.5, status: 'good' },
+                { name: '/api/checkout', avgTime: 892, callsPerMin: 45, timePercent: 13.2, status: 'warning' },
+                { name: '/api/user/profile', avgTime: 156, callsPerMin: 234, timePercent: 12.1, status: 'good' },
+                { name: '/api/search', avgTime: 478, callsPerMin: 128, timePercent: 20.3, status: 'good' },
+                { name: '/api/cart', avgTime: 201, callsPerMin: 189, timePercent: 12.6, status: 'good' }
+            ];
+            
+            tbody.innerHTML = demoTransactions.map(t => `
+                <tr>
+                    <td><code>${t.name}</code></td>
+                    <td>${t.avgTime} ms</td>
+                    <td>${t.callsPerMin}</td>
+                    <td>${t.timePercent}%</td>
+                    <td><span class="score ${t.status}">${t.status === 'good' ? '✓' : '⚠'}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function showNotification(message, type) {
+            // You can implement a toast notification here
+            alert(message);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load config on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadNewRelicConfig();
+        });
+    </script>
 </body>
 </html>
