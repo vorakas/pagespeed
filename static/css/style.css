@@ -2915,7 +2915,7 @@ body.light-mode .browser-metric-card:hover {
 }
 
 .cwv-ideal-score {
-    color: #6b7280;
+    color: #ffffff;
     font-size: 0.75em;
     display: block;
     font-style: italic;
@@ -3035,9 +3035,17 @@ body.light-mode .browser-metric-card:hover {
 .breakdown-card h4 {
     color: #9ca3af;
     font-size: 0.9em;
-    margin-bottom: 12px;
+    margin-bottom: 5px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.breakdown-ideal {
+    color: #ffffff;
+    font-size: 0.75em;
+    font-style: italic;
+    margin-bottom: 12px;
+    margin-top: 2px;
 }
 
 .breakdown-values {
@@ -3203,7 +3211,7 @@ body.light-mode .cwv-metric-name {
 }
 
 body.light-mode .cwv-ideal-score {
-    color: #9ca3af;
+    color: #1f2937;
 }
 
 body.light-mode .percentile-item {
@@ -3257,6 +3265,10 @@ body.light-mode .breakdown-card:hover {
 
 body.light-mode .breakdown-card h4 {
     color: #6b7280;
+}
+
+body.light-mode .breakdown-ideal {
+    color: #1f2937;
 }
 
 body.light-mode .breakdown-value {

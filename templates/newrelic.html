@@ -213,6 +213,7 @@
                     <div class="breakdown-grid">
                         <div class="breakdown-card">
                             <h4>Backend Duration</h4>
+                            <p class="breakdown-ideal">Ideal P75: ≤ 500ms</p>
                             <div class="breakdown-values">
                                 <span class="breakdown-value" id="backend-p50">--</span>
                                 <span class="breakdown-value" id="backend-p75">--</span>
@@ -221,6 +222,7 @@
                         </div>
                         <div class="breakdown-card">
                             <h4>Frontend Duration</h4>
+                            <p class="breakdown-ideal">Ideal P75: ≤ 1500ms</p>
                             <div class="breakdown-values">
                                 <span class="breakdown-value" id="frontend-p50">--</span>
                                 <span class="breakdown-value" id="frontend-p75">--</span>
@@ -229,6 +231,7 @@
                         </div>
                         <div class="breakdown-card">
                             <h4>TTFB-like (Queue + Network)</h4>
+                            <p class="breakdown-ideal">Ideal P75: ≤ 800ms</p>
                             <div class="breakdown-values">
                                 <span class="breakdown-value" id="ttfbLike-p50">--</span>
                                 <span class="breakdown-value" id="ttfbLike-p75">--</span>
@@ -237,6 +240,7 @@
                         </div>
                         <div class="breakdown-card">
                             <h4>DOM Processing</h4>
+                            <p class="breakdown-ideal">Ideal P75: ≤ 500ms</p>
                             <div class="breakdown-values">
                                 <span class="breakdown-value" id="domProcessing-p50">--</span>
                                 <span class="breakdown-value" id="domProcessing-p75">--</span>
@@ -842,11 +846,15 @@
             document.getElementById('cls-p90').textContent = formatMetric(metrics.cls.p90, 3);
             updateThresholdIndicator('cls-indicator', metrics.cls.p75, 0.1, 0.25);
 
-            // Page Load
-            document.getElementById('pageLoad-p50').textContent = formatMetric(metrics.pageLoad.p50);
-            document.getElementById('pageLoad-p75').textContent = formatMetric(metrics.pageLoad.p75);
-            document.getElementById('pageLoad-p90').textContent = formatMetric(metrics.pageLoad.p90);
-            updateThresholdIndicator('pageLoad-indicator', metrics.pageLoad.p75, 2000, 4000);
+            // Page Load - New Relic returns in seconds, convert to milliseconds
+            const pageLoadP50 = metrics.pageLoad.p50 ? metrics.pageLoad.p50 * 1000 : null;
+            const pageLoadP75 = metrics.pageLoad.p75 ? metrics.pageLoad.p75 * 1000 : null;
+            const pageLoadP90 = metrics.pageLoad.p90 ? metrics.pageLoad.p90 * 1000 : null;
+            
+            document.getElementById('pageLoad-p50').textContent = formatMetric(pageLoadP50);
+            document.getElementById('pageLoad-p75').textContent = formatMetric(pageLoadP75);
+            document.getElementById('pageLoad-p90').textContent = formatMetric(pageLoadP90);
+            updateThresholdIndicator('pageLoad-indicator', pageLoadP75, 2000, 4000);
 
             // Breakdown metrics
             document.getElementById('backend-p50').textContent = formatMetric(metrics.backend.p50) + ' ms';
@@ -865,8 +873,9 @@
             document.getElementById('domProcessing-p75').textContent = formatMetric(metrics.domProcessing.p75) + ' ms';
             document.getElementById('domProcessing-p90').textContent = formatMetric(metrics.domProcessing.p90) + ' ms';
 
-            // Interactions
-            document.getElementById('interactionsCount').textContent = metrics.interactions || 0;
+            // Interactions - format with commas for readability
+            const interactionsCount = metrics.interactions || 0;
+            document.getElementById('interactionsCount').textContent = interactionsCount.toLocaleString();
 
             // Metadata
             document.getElementById('metaAppName').textContent = metadata.app_name;
