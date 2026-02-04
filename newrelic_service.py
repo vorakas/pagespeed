@@ -84,7 +84,8 @@ class NewRelicService:
               frontend: nrql(query: "FROM PageView SELECT percentile(domProcessingDuration + pageRenderingDuration, 50, 75, 90) AS Frontend_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               ttfbLike: nrql(query: "FROM PageView SELECT percentile(queueDuration + networkDuration, 50, 75, 90) AS TTFB_like_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               domProcessing: nrql(query: "FROM PageView SELECT percentile(domProcessingDuration, 50, 75, 90) AS DomProcessing_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
-              inpCollectionCheck: nrql(query: "FROM BrowserInteraction SELECT count(*) AS interactions WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
+              inpCollectionCheck: nrql(query: "FROM BrowserInteraction SELECT count(*) AS interactions WHERE appName = '{app_name}' SINCE {time_range}") {{ results }}
+              inpAnyInteractions: nrql(query: "FROM BrowserInteraction SELECT count(*) WHERE appName = '{app_name}' SINCE {time_range}") {{ results }}
             }}
           }}
         }}
@@ -106,25 +107,44 @@ class NewRelicService:
 
             # Extract interactions count - handle nested structure
             interactions_results = account_data.get('inpCollectionCheck', {}).get('results', [])
-            print(f"DEBUG: Interactions results: {interactions_results}")
+            print(f"DEBUG: Interactions results (with pageUrl): {interactions_results}")
+
+            # Try fallback without pageUrl filter
+            interactions_any_results = account_data.get('inpAnyInteractions', {}).get('results', [])
+            print(f"DEBUG: Interactions results (any, no pageUrl): {interactions_any_results}")
 
             interactions_count = 0
+
+            # Try to get from the pageUrl-filtered query first
             if interactions_results and len(interactions_results) > 0:
                 interactions_data = interactions_results[0]
-                print(f"DEBUG: Interactions data: {interactions_data}")
+                print(f"DEBUG: Interactions data (with pageUrl): {interactions_data}")
 
                 # Handle nested structure like other metrics
                 if 'interactions' in interactions_data:
-                    # Direct key
                     interactions_count = interactions_data['interactions']
                 elif len(interactions_data) > 0:
-                    # Might be nested like {'interactions': {'count': 123}}
                     first_key = list(interactions_data.keys())[0]
                     nested_value = interactions_data[first_key]
                     if isinstance(nested_value, dict):
-                        # Try to get 'count' or first value
                         interactions_count = nested_value.get('count') or nested_value.get(list(nested_value.keys())[0],
                                                                                            0)
+                    else:
+                        interactions_count = nested_value
+
+            # If still 0, try the fallback query (all interactions for the app)
+            if interactions_count == 0 and interactions_any_results and len(interactions_any_results) > 0:
+                any_interactions_data = interactions_any_results[0]
+                print(f"DEBUG: Any interactions data (no pageUrl): {any_interactions_data}")
+
+                if 'count' in any_interactions_data:
+                    interactions_count = any_interactions_data['count']
+                elif len(any_interactions_data) > 0:
+                    first_key = list(any_interactions_data.keys())[0]
+                    nested_value = any_interactions_data[first_key]
+                    if isinstance(nested_value, dict):
+                        interactions_count = nested_value.get('count') or list(nested_value.values())[
+                            0] if nested_value else 0
                     else:
                         interactions_count = nested_value
 
@@ -150,7 +170,8 @@ class NewRelicService:
                     'app_name': app_name,
                     'page_url': page_url,
                     'time_range': time_range
-                }
+                },
+                'raw_response': response  # Include raw New Relic response for debugging
             }
 
         except (KeyError, IndexError, TypeError) as e:

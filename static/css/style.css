@@ -3299,3 +3299,30 @@ body.light-mode .cwv-metadata strong {
 body.light-mode .cwv-metadata span {
     color: #4b5563;
 }
+
+/* Raw Query Results Modal */
+.raw-results-modal {
+    max-width: 900px;
+    width: 90%;
+}
+
+.raw-results-modal .modal-body {
+    padding: 0;
+}
+
+.raw-results-modal pre {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+body.light-mode .raw-results-modal pre {
+    background: #f9fafb !important;
+    color: #1f2937 !important;
+    border: 1px solid #e5e7eb;
+}
+
+#rawResultsBtn {
+    margin-left: 10px;
+}
