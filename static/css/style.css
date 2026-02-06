@@ -115,8 +115,23 @@ header h1 {
 .header-logo {
     height: 60px;
     width: auto;
-    display: inline-block;
     vertical-align: middle;
+}
+
+.header-logo-dark {
+    display: inline-block;
+}
+
+.header-logo-light {
+    display: none;
+}
+
+.light-mode .header-logo-dark {
+    display: none;
+}
+
+.light-mode .header-logo-light {
+    display: inline-block;
 }
 
 header p {
