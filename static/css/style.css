@@ -132,6 +132,7 @@ header h1 {
 
 .light-mode .header-logo-light {
     display: inline-block;
+    filter: brightness(0);
 }
 
 header p {
