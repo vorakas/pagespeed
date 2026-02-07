@@ -342,6 +342,142 @@ class NewRelicService:
             print(f"DEBUG: Error parsing performance overview: {str(e)}")
             return {'error': f'Error parsing New Relic response: {str(e)}'}
 
+    def get_apm_metrics(self, account_id, app_name, time_range='30 minutes ago'):
+        """
+        Get APM metrics: Top Transactions, Database operations, External services, and Errors
+
+        Args:
+            account_id (int): New Relic account ID
+            app_name (str): Application name in New Relic
+            time_range (str): NRQL time range
+
+        Returns:
+            dict: APM metrics for all four tabs
+        """
+        query = f"""
+        {{
+          actor {{
+            account(id: {account_id}) {{
+              transactions: nrql(query: "SELECT average(duration) * 1000 AS 'avg_ms', rate(count(*), 1 minute) AS 'rpm', percentage(count(*), WHERE error IS true) AS 'error_pct' FROM Transaction WHERE appName = '{app_name}' FACET name SINCE {time_range} LIMIT 20") {{ results }}
+              database: nrql(query: "SELECT average(databaseDuration) * 1000 AS 'avg_ms', rate(count(*), 1 minute) AS 'rpm' FROM Transaction WHERE appName = '{app_name}' AND databaseDuration IS NOT NULL FACET name SINCE {time_range} LIMIT 20") {{ results }}
+              external: nrql(query: "SELECT average(externalDuration) * 1000 AS 'avg_ms', rate(count(*), 1 minute) AS 'rpm' FROM Transaction WHERE appName = '{app_name}' AND externalDuration IS NOT NULL FACET name SINCE {time_range} LIMIT 20") {{ results }}
+              errors: nrql(query: "SELECT count(*) AS 'error_count', latest(timestamp) AS 'last_seen' FROM TransactionError WHERE appName = '{app_name}' FACET error.class, error.message SINCE {time_range} LIMIT 20") {{ results }}
+              totalTime: nrql(query: "SELECT sum(duration) AS 'total' FROM Transaction WHERE appName = '{app_name}' SINCE {time_range}") {{ results }}
+            }}
+          }}
+        }}
+        """
+
+        response = self.execute_query(query)
+        print(f"DEBUG: APM response keys: {list(response.get('data', {}).get('actor', {}).get('account', {}).keys()) if 'data' in response else 'error'}")
+
+        if 'error' in response:
+            return response
+
+        try:
+            account_data = response.get('data', {}).get('actor', {}).get('account', {})
+
+            # Get total time for percentage calculation
+            total_time_results = account_data.get('totalTime', {}).get('results', [])
+            total_time = 0
+            if total_time_results and len(total_time_results) > 0:
+                total_time = total_time_results[0].get('total', 0) or 0
+
+            # Parse transactions
+            transactions_raw = account_data.get('transactions', {}).get('results', [])
+            transactions = []
+            for t in transactions_raw:
+                name = t.get('name', 'Unknown')
+                avg_ms = t.get('avg_ms', 0) or 0
+                rpm = t.get('rpm', 0) or 0
+                error_pct = t.get('error_pct', 0) or 0
+                # Estimate time percentage based on avg_ms * rpm relative to total
+                time_pct = 0
+                if total_time > 0 and rpm > 0:
+                    # duration in seconds * calls per minute / 60 = total seconds per second
+                    time_pct = ((avg_ms / 1000) * rpm / 60) / (total_time / 60) * 100 if total_time > 0 else 0
+
+                status = 'good' if avg_ms < 500 else ('warning' if avg_ms < 2000 else 'critical')
+                transactions.append({
+                    'name': name,
+                    'avgTime': round(avg_ms, 1),
+                    'callsPerMin': round(rpm, 1),
+                    'timePercent': round(time_pct, 1),
+                    'status': status
+                })
+
+            # Parse database operations
+            database_raw = account_data.get('database', {}).get('results', [])
+            database = []
+            for d in database_raw:
+                name = d.get('name', 'Unknown')
+                avg_ms = d.get('avg_ms', 0) or 0
+                rpm = d.get('rpm', 0) or 0
+                time_pct = 0
+                if total_time > 0 and rpm > 0:
+                    time_pct = ((avg_ms / 1000) * rpm / 60) / (total_time / 60) * 100 if total_time > 0 else 0
+                database.append({
+                    'name': name,
+                    'avgDuration': round(avg_ms, 1),
+                    'callsPerMin': round(rpm, 1),
+                    'timePercent': round(time_pct, 1),
+                    'type': 'SQL'
+                })
+
+            # Parse external services
+            external_raw = account_data.get('external', {}).get('results', [])
+            external = []
+            for e in external_raw:
+                name = e.get('name', 'Unknown')
+                avg_ms = e.get('avg_ms', 0) or 0
+                rpm = e.get('rpm', 0) or 0
+                time_pct = 0
+                if total_time > 0 and rpm > 0:
+                    time_pct = ((avg_ms / 1000) * rpm / 60) / (total_time / 60) * 100 if total_time > 0 else 0
+                status = 'good' if avg_ms < 500 else ('warning' if avg_ms < 2000 else 'critical')
+                external.append({
+                    'name': name,
+                    'avgTime': round(avg_ms, 1),
+                    'callsPerMin': round(rpm, 1),
+                    'timePercent': round(time_pct, 1),
+                    'status': status
+                })
+
+            # Parse errors
+            errors_raw = account_data.get('errors', {}).get('results', [])
+            errors = []
+            for err in errors_raw:
+                facets = err.get('facet', [])
+                error_class = facets[0] if len(facets) > 0 else 'Unknown'
+                error_message = facets[1] if len(facets) > 1 else 'No message'
+                error_count = err.get('error_count', 0) or 0
+                last_seen = err.get('last_seen', '')
+                errors.append({
+                    'errorClass': error_class,
+                    'errorMessage': error_message[:100],  # Truncate long messages
+                    'count': error_count,
+                    'lastOccurrence': last_seen
+                })
+
+            print(f"DEBUG: APM parsed - {len(transactions)} transactions, {len(database)} db ops, {len(external)} external, {len(errors)} errors")
+
+            return {
+                'success': True,
+                'transactions': transactions,
+                'database': database,
+                'external': external,
+                'errors': errors,
+                'metadata': {
+                    'account_id': account_id,
+                    'app_name': app_name,
+                    'time_range': time_range
+                }
+            }
+
+        except (KeyError, IndexError, TypeError) as e:
+            print(f"DEBUG: Error parsing APM metrics: {str(e)}")
+            return {'error': f'Error parsing APM response: {str(e)}'}
+
     def test_connection(self):
         """
         Test the connection to New Relic API

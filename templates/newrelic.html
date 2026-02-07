@@ -794,6 +794,113 @@
             }
         }
 
+        // APM Metrics
+        async function loadAPMMetrics() {
+            if (!nrConfig.apiKey || !nrConfig.accountId || !nrConfig.appName) {
+                return;
+            }
+
+            const timeRange = document.getElementById('cwvTimeRange').value;
+
+            try {
+                const response = await fetch('/api/newrelic/apm-metrics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: nrConfig.apiKey,
+                        account_id: parseInt(nrConfig.accountId),
+                        app_name: nrConfig.appName,
+                        time_range: timeRange
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    console.error('APM metrics error:', data.error);
+                    return;
+                }
+
+                populateTransactionsTable(data.transactions);
+                populateDatabaseTable(data.database);
+                populateExternalTable(data.external);
+                populateErrorsTable(data.errors);
+
+            } catch (error) {
+                console.error('Error loading APM metrics:', error);
+            }
+        }
+
+        function populateTransactionsTable(transactions) {
+            const tbody = document.getElementById('transactionsTable');
+            if (!transactions || transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">No transaction data found for this time range</td></tr>';
+                return;
+            }
+            tbody.innerHTML = transactions.map(t => `
+                <tr>
+                    <td><code>${escapeHtml(t.name)}</code></td>
+                    <td>${t.avgTime} ms</td>
+                    <td>${t.callsPerMin}</td>
+                    <td>${t.timePercent}%</td>
+                    <td><span class="score ${t.status}">${t.status === 'good' ? '✓ Good' : (t.status === 'warning' ? '⚠ Slow' : '✗ Critical')}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function populateDatabaseTable(database) {
+            const tbody = document.getElementById('databaseTable');
+            if (!database || database.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">No database data found for this time range</td></tr>';
+                return;
+            }
+            tbody.innerHTML = database.map(d => `
+                <tr>
+                    <td><code>${escapeHtml(d.name)}</code></td>
+                    <td>${d.avgDuration} ms</td>
+                    <td>${d.callsPerMin}</td>
+                    <td>${d.timePercent}%</td>
+                    <td>${d.type}</td>
+                </tr>
+            `).join('');
+        }
+
+        function populateExternalTable(external) {
+            const tbody = document.getElementById('externalTable');
+            if (!external || external.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">No external service data found for this time range</td></tr>';
+                return;
+            }
+            tbody.innerHTML = external.map(e => `
+                <tr>
+                    <td><code>${escapeHtml(e.name)}</code></td>
+                    <td>${e.avgTime} ms</td>
+                    <td>${e.callsPerMin}</td>
+                    <td>${e.timePercent}%</td>
+                    <td><span class="score ${e.status}">${e.status === 'good' ? '✓ Good' : (e.status === 'warning' ? '⚠ Slow' : '✗ Critical')}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function populateErrorsTable(errors) {
+            const tbody = document.getElementById('errorsTable');
+            if (!errors || errors.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">No errors found for this time range 🎉</td></tr>';
+                return;
+            }
+            tbody.innerHTML = errors.map(e => {
+                const lastSeen = e.lastOccurrence ? new Date(e.lastOccurrence).toLocaleString() : '--';
+                return `
+                <tr>
+                    <td><code>${escapeHtml(e.errorClass)}</code></td>
+                    <td>${escapeHtml(e.errorMessage)}</td>
+                    <td>${e.count}</td>
+                    <td>${lastSeen}</td>
+                    <td>-</td>
+                </tr>
+            `}).join('');
+        }
+
         function updateChangeIndicator(elementId, current, previous, direction) {
             const el = document.getElementById(elementId);
             if (!el || current === null || previous === null || previous === 0) {
@@ -875,8 +982,9 @@
                 // Populate metrics
                 populateCoreWebVitals(data.metrics, data.metadata);
 
-                // Also load Performance Overview
+                // Also load Performance Overview and APM metrics
                 loadPerformanceOverview();
+                loadAPMMetrics();
 
             } catch (error) {
                 document.getElementById('cwvLoadingIndicator').style.display = 'none';
