@@ -303,7 +303,11 @@ class NewRelicService:
                     return None
                 # Get the first key's value
                 first_key = list(result.keys())[0]
-                return result[first_key]
+                value = result[first_key]
+                # Apdex returns a nested dict with 'score' key - extract just the score
+                if isinstance(value, dict) and 'score' in value:
+                    return value['score']
+                return value
 
             current = {
                 'avgResponseTime': extract_single_value(account_data.get('avgResponseTime', {}).get('results', [])),

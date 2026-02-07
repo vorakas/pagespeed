@@ -775,9 +775,11 @@
                     updateChangeIndicator('throughputChange', current.throughput, previous.throughput, 'higher-better');
                 }
 
-                // Error Rate (percentage)
+                // Error Rate (percentage) - use more decimals for very small values
                 if (current.errorRate !== null) {
-                    document.getElementById('errorRate').textContent = Number(current.errorRate).toFixed(2) + ' %';
+                    const errRate = Number(current.errorRate);
+                    const decimals = errRate < 0.01 ? 4 : 2;
+                    document.getElementById('errorRate').textContent = errRate.toFixed(decimals) + ' %';
                     updateChangeIndicator('errorRateChange', current.errorRate, previous.errorRate, 'lower-better');
                 }
 
