@@ -762,6 +762,21 @@ button:disabled {
     color: white;
 }
 
+.score.good {
+    background: #22c55e;
+    color: white;
+}
+
+.score.warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.score.critical {
+    background: #ef4444;
+    color: white;
+}
+
 .progress-container {
     display: none;
     padding: 20px;
