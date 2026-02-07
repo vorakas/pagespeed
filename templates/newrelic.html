@@ -285,7 +285,7 @@
                     <div class="stat-content">
                         <div class="stat-label">Avg Response Time</div>
                         <div class="stat-value" id="avgResponseTime">-- ms</div>
-                        <div class="stat-change positive">↓ 12% from yesterday</div>
+                        <div class="stat-change" id="avgResponseTimeChange"></div>
                     </div>
                 </div>
                 <div class="stat-card">
@@ -293,7 +293,7 @@
                     <div class="stat-content">
                         <div class="stat-label">Throughput</div>
                         <div class="stat-value" id="throughput">-- rpm</div>
-                        <div class="stat-change positive">↑ 8% from yesterday</div>
+                        <div class="stat-change" id="throughputChange"></div>
                     </div>
                 </div>
                 <div class="stat-card">
@@ -301,7 +301,7 @@
                     <div class="stat-content">
                         <div class="stat-label">Error Rate</div>
                         <div class="stat-value" id="errorRate">-- %</div>
-                        <div class="stat-change negative">↑ 0.2% from yesterday</div>
+                        <div class="stat-change" id="errorRateChange"></div>
                     </div>
                 </div>
                 <div class="stat-card">
@@ -309,7 +309,7 @@
                     <div class="stat-content">
                         <div class="stat-label">Apdex Score</div>
                         <div class="stat-value" id="apdexScore">--</div>
-                        <div class="stat-change positive">↑ 0.05 from yesterday</div>
+                        <div class="stat-change" id="apdexScoreChange"></div>
                     </div>
                 </div>
             </div>
@@ -722,58 +722,6 @@
             }, 1000);
         }
 
-        function loadDemoData() {
-            // Populate demo data in the overview cards
-            document.getElementById('avgResponseTime').textContent = '245 ms';
-            document.getElementById('throughput').textContent = '1,247 rpm';
-            document.getElementById('errorRate').textContent = '0.8%';
-            document.getElementById('apdexScore').textContent = '0.92';
-            
-            // Populate infrastructure metrics
-            document.getElementById('cpuUsage').textContent = '42%';
-            document.getElementById('memoryUsage').textContent = '68%';
-            document.getElementById('networkIO').textContent = '12.3 MB/s';
-            document.getElementById('diskUsage').textContent = '54%';
-            
-            // Populate browser metrics
-            document.getElementById('pageLoadTime').textContent = '2.4 s';
-            document.getElementById('networkTime').textContent = '850 ms';
-            document.getElementById('domTime').textContent = '920 ms';
-            document.getElementById('renderTime').textContent = '630 ms';
-            document.getElementById('ajaxTime').textContent = '158 ms';
-            document.getElementById('ajaxAvg').textContent = '158 ms';
-            document.getElementById('ajaxRate').textContent = '42';
-            document.getElementById('ajaxSuccess').textContent = '99.2%';
-            document.getElementById('jsErrors').textContent = '12';
-            document.getElementById('jsErrorsHour').textContent = '3';
-            document.getElementById('jsErrorsDay').textContent = '12';
-            document.getElementById('jsErrorsWeek').textContent = '87';
-            
-            // Populate transactions table
-            populateTransactionsTable();
-        }
-
-        function populateTransactionsTable() {
-            const tbody = document.getElementById('transactionsTable');
-            const demoTransactions = [
-                { name: '/api/products', avgTime: 245, callsPerMin: 342, timePercent: 28.5, status: 'good' },
-                { name: '/api/checkout', avgTime: 892, callsPerMin: 45, timePercent: 13.2, status: 'warning' },
-                { name: '/api/user/profile', avgTime: 156, callsPerMin: 234, timePercent: 12.1, status: 'good' },
-                { name: '/api/search', avgTime: 478, callsPerMin: 128, timePercent: 20.3, status: 'good' },
-                { name: '/api/cart', avgTime: 201, callsPerMin: 189, timePercent: 12.6, status: 'good' }
-            ];
-            
-            tbody.innerHTML = demoTransactions.map(t => `
-                <tr>
-                    <td><code>${t.name}</code></td>
-                    <td>${t.avgTime} ms</td>
-                    <td>${t.callsPerMin}</td>
-                    <td>${t.timePercent}%</td>
-                    <td><span class="score ${t.status}">${t.status === 'good' ? '✓' : '⚠'}</span></td>
-                </tr>
-            `).join('');
-        }
-
         function showNotification(message, type) {
             // You can implement a toast notification here
             alert(message);
@@ -783,6 +731,89 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Performance Overview
+        async function loadPerformanceOverview() {
+            if (!nrConfig.apiKey || !nrConfig.accountId || !nrConfig.appName) {
+                return;
+            }
+
+            const timeRange = document.getElementById('cwvTimeRange').value;
+
+            try {
+                const response = await fetch('/api/newrelic/performance-overview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: nrConfig.apiKey,
+                        account_id: parseInt(nrConfig.accountId),
+                        app_name: nrConfig.appName,
+                        time_range: timeRange
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    console.error('Performance overview error:', data.error);
+                    return;
+                }
+
+                const current = data.current;
+                const previous = data.previous;
+
+                // Avg Response Time (already in ms from backend)
+                if (current.avgResponseTime !== null) {
+                    document.getElementById('avgResponseTime').textContent = Math.round(current.avgResponseTime) + ' ms';
+                    updateChangeIndicator('avgResponseTimeChange', current.avgResponseTime, previous.avgResponseTime, 'lower-better');
+                }
+
+                // Throughput (requests per minute)
+                if (current.throughput !== null) {
+                    document.getElementById('throughput').textContent = Number(current.throughput).toLocaleString(undefined, {maximumFractionDigits: 0}) + ' rpm';
+                    updateChangeIndicator('throughputChange', current.throughput, previous.throughput, 'higher-better');
+                }
+
+                // Error Rate (percentage)
+                if (current.errorRate !== null) {
+                    document.getElementById('errorRate').textContent = Number(current.errorRate).toFixed(2) + ' %';
+                    updateChangeIndicator('errorRateChange', current.errorRate, previous.errorRate, 'lower-better');
+                }
+
+                // Apdex Score
+                if (current.apdex !== null) {
+                    document.getElementById('apdexScore').textContent = Number(current.apdex).toFixed(2);
+                    updateChangeIndicator('apdexScoreChange', current.apdex, previous.apdex, 'higher-better');
+                }
+
+            } catch (error) {
+                console.error('Error loading performance overview:', error);
+            }
+        }
+
+        function updateChangeIndicator(elementId, current, previous, direction) {
+            const el = document.getElementById(elementId);
+            if (!el || current === null || previous === null || previous === 0) {
+                if (el) el.textContent = '';
+                return;
+            }
+
+            const pctChange = ((current - previous) / Math.abs(previous)) * 100;
+            const absChange = Math.abs(pctChange).toFixed(1);
+
+            let isPositive;
+            if (direction === 'lower-better') {
+                // For response time and error rate, going down is good
+                isPositive = pctChange <= 0;
+            } else {
+                // For throughput and apdex, going up is good
+                isPositive = pctChange >= 0;
+            }
+
+            const arrow = pctChange >= 0 ? '↑' : '↓';
+            el.textContent = `${arrow} ${absChange}% from previous period`;
+            el.className = `stat-change ${isPositive ? 'positive' : 'negative'}`;
         }
 
         // Core Web Vitals functionality
@@ -841,6 +872,9 @@
 
                 // Populate metrics
                 populateCoreWebVitals(data.metrics, data.metadata);
+
+                // Also load Performance Overview
+                loadPerformanceOverview();
 
             } catch (error) {
                 document.getElementById('cwvLoadingIndicator').style.display = 'none';

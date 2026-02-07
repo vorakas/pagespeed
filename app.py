@@ -583,6 +583,46 @@ def get_core_web_vitals():
     return jsonify(result)
 
 
+@app.route('/api/newrelic/performance-overview', methods=['POST'])
+def get_performance_overview():
+    """
+    Get Performance Overview metrics from New Relic
+
+    Expected JSON body:
+    {
+        "api_key": "NRAK-...",
+        "account_id": 122363,
+        "app_name": "LampsPlus Site Live",
+        "time_range": "30 minutes ago"
+    }
+    """
+    data = request.get_json()
+
+    required_fields = ['api_key', 'account_id', 'app_name']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({
+                'success': False,
+                'error': f'Missing required field: {field}'
+            }), 400
+
+    api_key = data.get('api_key')
+    account_id = data.get('account_id')
+    app_name = data.get('app_name')
+    time_range = data.get('time_range', '30 minutes ago')
+
+    nr_service = NewRelicService(api_key=api_key)
+    result = nr_service.get_performance_overview(account_id, app_name, time_range)
+
+    if 'error' in result:
+        return jsonify({
+            'success': False,
+            'error': result['error']
+        }), 500
+
+    return jsonify(result)
+
+
 @app.route('/api/newrelic/custom-query', methods=['POST'])
 def execute_custom_query():
     """

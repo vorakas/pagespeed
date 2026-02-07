@@ -235,6 +235,109 @@ class NewRelicService:
         print(f"DEBUG: Final percentiles result = {final_result}")
         return final_result
 
+    def _parse_time_range_minutes(self, time_range):
+        """Convert a NRQL time range string to minutes for comparison period calculation"""
+        parts = time_range.lower().split()
+        # e.g. "30 minutes ago", "1 hour ago", "3 hours ago", "6 hours ago", "12 hours ago", "24 hours ago"
+        value = int(parts[0])
+        unit = parts[1]
+        if 'hour' in unit:
+            return value * 60
+        elif 'minute' in unit:
+            return value
+        elif 'day' in unit:
+            return value * 1440
+        return 60  # default 1 hour
+
+    def get_performance_overview(self, account_id, app_name, time_range='30 minutes ago'):
+        """
+        Get Performance Overview metrics: Avg Response Time, Throughput, Error Rate, Apdex
+
+        Queries both the current period and the previous equivalent period for comparison.
+
+        Args:
+            account_id (int): New Relic account ID
+            app_name (str): Application name in New Relic
+            time_range (str): NRQL time range (e.g., '30 minutes ago', '1 hour ago')
+
+        Returns:
+            dict: Performance overview metrics with comparison data
+        """
+        # Calculate the previous period for comparison
+        minutes = self._parse_time_range_minutes(time_range)
+        previous_start = f"{minutes * 2} minutes ago"
+        previous_end = f"{minutes} minutes ago"
+
+        query = f"""
+        {{
+          actor {{
+            account(id: {account_id}) {{
+              avgResponseTime: nrql(query: "SELECT average(duration) * 1000 AS 'avg_ms' FROM Transaction WHERE appName = '{app_name}' SINCE {time_range}") {{ results }}
+              throughput: nrql(query: "SELECT rate(count(*), 1 minute) AS 'rpm' FROM Transaction WHERE appName = '{app_name}' SINCE {time_range}") {{ results }}
+              errorRate: nrql(query: "SELECT percentage(count(*), WHERE error IS true) AS 'error_pct' FROM Transaction WHERE appName = '{app_name}' SINCE {time_range}") {{ results }}
+              apdex: nrql(query: "SELECT apdex(duration, t: 0.5) AS 'apdex_score' FROM Transaction WHERE appName = '{app_name}' SINCE {time_range}") {{ results }}
+              prevAvgResponseTime: nrql(query: "SELECT average(duration) * 1000 AS 'avg_ms' FROM Transaction WHERE appName = '{app_name}' SINCE {previous_start} UNTIL {previous_end}") {{ results }}
+              prevThroughput: nrql(query: "SELECT rate(count(*), 1 minute) AS 'rpm' FROM Transaction WHERE appName = '{app_name}' SINCE {previous_start} UNTIL {previous_end}") {{ results }}
+              prevErrorRate: nrql(query: "SELECT percentage(count(*), WHERE error IS true) AS 'error_pct' FROM Transaction WHERE appName = '{app_name}' SINCE {previous_start} UNTIL {previous_end}") {{ results }}
+              prevApdex: nrql(query: "SELECT apdex(duration, t: 0.5) AS 'apdex_score' FROM Transaction WHERE appName = '{app_name}' SINCE {previous_start} UNTIL {previous_end}") {{ results }}
+            }}
+          }}
+        }}
+        """
+
+        response = self.execute_query(query)
+        print(f"DEBUG: Performance Overview response: {json.dumps(response, indent=2)}")
+
+        if 'error' in response:
+            return response
+
+        try:
+            account_data = response.get('data', {}).get('actor', {}).get('account', {})
+
+            def extract_single_value(results):
+                """Extract a single value from NRQL results"""
+                if not results or len(results) == 0:
+                    return None
+                result = results[0]
+                if not result:
+                    return None
+                # Get the first key's value
+                first_key = list(result.keys())[0]
+                return result[first_key]
+
+            current = {
+                'avgResponseTime': extract_single_value(account_data.get('avgResponseTime', {}).get('results', [])),
+                'throughput': extract_single_value(account_data.get('throughput', {}).get('results', [])),
+                'errorRate': extract_single_value(account_data.get('errorRate', {}).get('results', [])),
+                'apdex': extract_single_value(account_data.get('apdex', {}).get('results', [])),
+            }
+
+            previous = {
+                'avgResponseTime': extract_single_value(account_data.get('prevAvgResponseTime', {}).get('results', [])),
+                'throughput': extract_single_value(account_data.get('prevThroughput', {}).get('results', [])),
+                'errorRate': extract_single_value(account_data.get('prevErrorRate', {}).get('results', [])),
+                'apdex': extract_single_value(account_data.get('prevApdex', {}).get('results', [])),
+            }
+
+            print(f"DEBUG: Performance current: {current}")
+            print(f"DEBUG: Performance previous: {previous}")
+
+            return {
+                'success': True,
+                'current': current,
+                'previous': previous,
+                'metadata': {
+                    'account_id': account_id,
+                    'app_name': app_name,
+                    'time_range': time_range
+                },
+                'raw_response': response
+            }
+
+        except (KeyError, IndexError, TypeError) as e:
+            print(f"DEBUG: Error parsing performance overview: {str(e)}")
+            return {'error': f'Error parsing New Relic response: {str(e)}'}
+
     def test_connection(self):
         """
         Test the connection to New Relic API
