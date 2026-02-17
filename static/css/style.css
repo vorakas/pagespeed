@@ -4046,12 +4046,31 @@ body.light-mode .export-size-label {
     margin: 16px 0 8px 0;
 }
 
-.ai-result-body ul, .ai-result-body ol {
+.ai-result-body ul, .ai-result-body ol,
+.ai-message-content ul, .ai-message-content ol {
     padding-left: 24px;
     margin-bottom: 12px;
 }
 
-.ai-result-body li {
+.ai-result-body ul, .ai-message-content ul {
+    list-style-type: disc;
+}
+
+.ai-result-body ol, .ai-message-content ol {
+    list-style-type: decimal;
+}
+
+.ai-result-body li, .ai-message-content li {
+    margin-bottom: 6px;
+    display: list-item;
+}
+
+.ai-message-content p {
+    margin-bottom: 10px;
+}
+
+.ai-message-content h3, .ai-message-content h4 {
+    margin-top: 14px;
     margin-bottom: 6px;
 }
 
