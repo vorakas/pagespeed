@@ -348,24 +348,9 @@ def build_user_message(url, time_range, newrelic_data, iis_data):
         sections.append(json.dumps(newrelic_data['apm_metrics'], indent=2, default=str))
         sections.append("")
 
-    # IIS Log Summary
-    if iis_data.get('summary'):
-        sections.append("## IIS Logs: Dashboard Summary")
-        sections.append(json.dumps(iis_data['summary'], indent=2, default=str))
-        sections.append("")
-
-    if iis_data.get('status_distribution'):
-        sections.append("## IIS Logs: Status Code Distribution")
-        sections.append(json.dumps(iis_data['status_distribution'], indent=2, default=str))
-        sections.append("")
-
-    if iis_data.get('top_pages'):
-        sections.append("## IIS Logs: Top Pages by Request Count")
-        sections.append(json.dumps(iis_data['top_pages'], indent=2, default=str))
-        sections.append("")
-
+    # IIS Log data (filtered for the specific URL only)
     if iis_data.get('slow_requests'):
-        sections.append("## IIS Logs: Slowest Requests for this URL")
+        sections.append("## IIS Logs: Requests for this URL")
         sections.append(json.dumps(iis_data['slow_requests'], indent=2, default=str))
         sections.append("")
 

@@ -960,18 +960,7 @@ def ai_analyze():
 
             site_name = data.get('azure_site_name')
 
-            # Dashboard summary
-            summary_result = az_service.get_dashboard_summary(
-                start_date=start_date,
-                end_date=end_date,
-                site_name=site_name
-            )
-            if isinstance(summary_result, dict) and summary_result.get('success'):
-                iis_data['summary'] = summary_result.get('summary', {})
-                iis_data['status_distribution'] = summary_result.get('statusDistribution', [])
-                iis_data['top_pages'] = summary_result.get('topPages', [])
-
-            # Slow requests for this specific URL
+            # IIS log requests for this specific URL only
             slow_result = az_service.search_logs(
                 start_date=start_date,
                 end_date=end_date,
