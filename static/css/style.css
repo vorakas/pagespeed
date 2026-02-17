@@ -4145,6 +4145,8 @@ body.light-mode .export-size-label {
 
 .ai-followup-textarea {
     flex: 1;
+    min-width: 0;
+    width: auto;
     background: #1f2937;
     color: #e3e8ee;
     border: 1px solid #374151;
@@ -4156,6 +4158,7 @@ body.light-mode .export-size-label {
     min-height: 44px;
     max-height: 150px;
     line-height: 1.5;
+    margin-bottom: 0;
 }
 
 .ai-followup-textarea:focus {
@@ -4170,9 +4173,12 @@ body.light-mode .export-size-label {
 
 .ai-followup-btn {
     white-space: nowrap;
-    padding: 12px 20px;
-    min-width: 130px;
+    padding: 10px 20px;
+    width: auto;
+    min-width: 120px;
     height: fit-content;
+    flex-shrink: 0;
+    margin-bottom: 0;
 }
 
 .ai-followup-loading {
