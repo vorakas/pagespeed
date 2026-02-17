@@ -61,6 +61,55 @@ class ClaudeService:
         except Exception as e:
             return {'error': f'Error calling Claude API: {str(e)}'}
 
+    def follow_up(self, system_prompt, messages):
+        """
+        Continue a multi-turn conversation with Claude.
+
+        Args:
+            system_prompt (str): The system prompt (same as initial analysis)
+            messages (list): List of {"role": "user"|"assistant", "content": "..."} dicts
+
+        Returns:
+            dict: Same shape as analyze() return value
+        """
+        if not self.api_key:
+            return {'error': 'Claude API key not configured'}
+
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=self.api_key)
+
+            message = client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=messages
+            )
+
+            analysis_text = ''
+            for block in message.content:
+                if block.type == 'text':
+                    analysis_text += block.text
+
+            return {
+                'success': True,
+                'analysis': analysis_text,
+                'model': self.model,
+                'usage': {
+                    'input_tokens': message.usage.input_tokens,
+                    'output_tokens': message.usage.output_tokens
+                }
+            }
+
+        except anthropic.AuthenticationError:
+            return {'error': 'Invalid Claude API key'}
+        except anthropic.RateLimitError:
+            return {'error': 'Claude API rate limit exceeded. Please try again shortly.'}
+        except anthropic.APIError as e:
+            return {'error': f'Claude API error: {str(e)}'}
+        except Exception as e:
+            return {'error': f'Error calling Claude API: {str(e)}'}
+
 
 class OpenAIService:
     """Service class for interacting with OpenAI's API"""
@@ -117,6 +166,54 @@ class OpenAIService:
                 return {'error': 'OpenAI API rate limit exceeded. Please try again shortly.'}
             return {'error': f'Error calling OpenAI API: {error_msg}'}
 
+    def follow_up(self, system_prompt, messages):
+        """
+        Continue a multi-turn conversation with OpenAI.
+
+        Args:
+            system_prompt (str): The system prompt
+            messages (list): List of {"role": "user"|"assistant", "content": "..."} dicts
+
+        Returns:
+            dict: Same shape as analyze() return value
+        """
+        if not self.api_key:
+            return {'error': 'OpenAI API key not configured'}
+
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=self.api_key)
+
+            # Prepend system message to conversation history
+            full_messages = [{"role": "system", "content": system_prompt}] + messages
+
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=full_messages,
+                max_tokens=4096,
+                temperature=0.3
+            )
+
+            analysis_text = response.choices[0].message.content
+
+            return {
+                'success': True,
+                'analysis': analysis_text,
+                'model': self.model,
+                'usage': {
+                    'prompt_tokens': response.usage.prompt_tokens,
+                    'completion_tokens': response.usage.completion_tokens
+                }
+            }
+
+        except Exception as e:
+            error_msg = str(e)
+            if 'authentication' in error_msg.lower() or 'api key' in error_msg.lower():
+                return {'error': 'Invalid OpenAI API key'}
+            if 'rate limit' in error_msg.lower():
+                return {'error': 'OpenAI API rate limit exceeded. Please try again shortly.'}
+            return {'error': f'Error calling OpenAI API: {error_msg}'}
+
 
 def run_parallel_analysis(claude_service, openai_service, system_prompt, user_message):
     """
@@ -139,6 +236,44 @@ def run_parallel_analysis(claude_service, openai_service, system_prompt, user_me
             futures[executor.submit(claude_service.analyze, system_prompt, user_message)] = 'claude'
         if openai_service:
             futures[executor.submit(openai_service.analyze, system_prompt, user_message)] = 'openai'
+
+        for future in as_completed(futures):
+            provider = futures[future]
+            try:
+                results[provider] = future.result()
+            except Exception as e:
+                results[provider] = {'error': f'Unexpected error from {provider}: {str(e)}'}
+
+    return results
+
+
+def run_parallel_followup(claude_service, openai_service, system_prompt,
+                          claude_messages, openai_messages):
+    """
+    Run follow-up analysis in parallel for both providers.
+
+    Args:
+        claude_service: ClaudeService instance (or None)
+        openai_service: OpenAIService instance (or None)
+        system_prompt (str): The system prompt string
+        claude_messages (list): Conversation history for Claude
+        openai_messages (list): Conversation history for OpenAI
+
+    Returns:
+        dict: {'claude': {...}, 'openai': {...}}
+    """
+    results = {'claude': None, 'openai': None}
+
+    futures = {}
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        if claude_service and claude_messages:
+            futures[executor.submit(
+                claude_service.follow_up, system_prompt, claude_messages
+            )] = 'claude'
+        if openai_service and openai_messages:
+            futures[executor.submit(
+                openai_service.follow_up, system_prompt, openai_messages
+            )] = 'openai'
 
         for future in as_completed(futures):
             provider = futures[future]

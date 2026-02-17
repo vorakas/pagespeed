@@ -175,6 +175,23 @@
                 </div>
             </div>
 
+            <!-- Follow-up Question Input -->
+            <div class="ai-followup-section" id="followupSection" style="display: none;">
+                <div class="ai-followup-input-row">
+                    <textarea id="followupInput"
+                              class="ai-followup-textarea"
+                              placeholder="Ask a follow-up question about the analysis..."
+                              rows="2"></textarea>
+                    <button onclick="sendFollowup()" class="btn-primary ai-followup-btn" id="followupBtn">
+                        Ask Follow-up
+                    </button>
+                </div>
+                <div id="followupLoading" class="ai-followup-loading" style="display: none;">
+                    <div class="loading-spinner" style="width: 24px; height: 24px; border-width: 3px;"></div>
+                    <span>Sending follow-up...</span>
+                </div>
+            </div>
+
             <!-- Prompt Preview (collapsible) -->
             <details class="ai-prompt-preview">
                 <summary>View Data Sent to AI</summary>
@@ -285,9 +302,39 @@
             }
         }
 
+        // ==================== Conversation State ====================
+
+        let conversationState = {
+            active: false,
+            systemPrompt: null,
+            providers: [],
+            claudeHistory: [],
+            openaiHistory: [],
+            claudeTotalUsage: { input_tokens: 0, output_tokens: 0 },
+            openaiTotalUsage: { prompt_tokens: 0, completion_tokens: 0 },
+            turnCount: 0
+        };
+
+        function resetConversation() {
+            conversationState = {
+                active: false,
+                systemPrompt: null,
+                providers: [],
+                claudeHistory: [],
+                openaiHistory: [],
+                claudeTotalUsage: { input_tokens: 0, output_tokens: 0 },
+                openaiTotalUsage: { prompt_tokens: 0, completion_tokens: 0 },
+                turnCount: 0
+            };
+        }
+
         // ==================== Run Analysis ====================
 
         async function runAnalysis() {
+            // Reset any previous conversation
+            resetConversation();
+            document.getElementById('followupSection').style.display = 'none';
+
             const urlPath = document.getElementById('aiUrlPath').value.trim();
             const pageUrl = document.getElementById('aiPageUrl').value.trim();
             const timeRange = document.getElementById('aiTimeRange').value;
@@ -370,6 +417,31 @@
 
                 displayResults(data);
 
+                // Initialize conversation state for follow-ups
+                conversationState.active = true;
+                conversationState.systemPrompt = data.system_prompt;
+                conversationState.providers = providers;
+                conversationState.turnCount = 1;
+
+                if (data.claude && data.claude.success) {
+                    conversationState.claudeHistory = [
+                        { role: 'user', content: data.user_message },
+                        { role: 'assistant', content: data.claude.analysis }
+                    ];
+                    conversationState.claudeTotalUsage = { ...data.claude.usage };
+                }
+
+                if (data.openai && data.openai.success) {
+                    conversationState.openaiHistory = [
+                        { role: 'user', content: data.user_message },
+                        { role: 'assistant', content: data.openai.analysis }
+                    ];
+                    conversationState.openaiTotalUsage = { ...data.openai.usage };
+                }
+
+                // Show follow-up section
+                document.getElementById('followupSection').style.display = 'block';
+
             } catch (error) {
                 document.getElementById('aiLoadingIndicator').style.display = 'none';
                 document.getElementById('analyzeBtn').disabled = false;
@@ -398,7 +470,11 @@
             if (data.claude) {
                 claudePanel.style.display = 'block';
                 if (data.claude.success) {
-                    document.getElementById('claudeResult').innerHTML = marked.parse(data.claude.analysis);
+                    document.getElementById('claudeResult').innerHTML =
+                        '<div class="ai-message ai-message-assistant">' +
+                        '<div class="ai-message-label">Initial Analysis</div>' +
+                        '<div class="ai-message-content">' + marked.parse(data.claude.analysis) + '</div>' +
+                        '</div>';
                     document.getElementById('claudeModelBadge').textContent = data.claude.model;
                     if (data.claude.usage) {
                         document.getElementById('claudeFooter').textContent =
@@ -419,7 +495,11 @@
             if (data.openai) {
                 openaiPanel.style.display = 'block';
                 if (data.openai.success) {
-                    document.getElementById('openaiResult').innerHTML = marked.parse(data.openai.analysis);
+                    document.getElementById('openaiResult').innerHTML =
+                        '<div class="ai-message ai-message-assistant">' +
+                        '<div class="ai-message-label">Initial Analysis</div>' +
+                        '<div class="ai-message-content">' + marked.parse(data.openai.analysis) + '</div>' +
+                        '</div>';
                     document.getElementById('openaiModelBadge').textContent = data.openai.model;
                     if (data.openai.usage) {
                         document.getElementById('openaiFooter').textContent =
@@ -440,6 +520,202 @@
 
             // Scroll to results
             document.getElementById('aiResultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ==================== Follow-up Functions ====================
+
+        async function sendFollowup() {
+            const followupInput = document.getElementById('followupInput');
+            const question = followupInput.value.trim();
+
+            if (!question) {
+                alert('Please enter a follow-up question.');
+                return;
+            }
+
+            if (!conversationState.active) {
+                alert('No active analysis. Please run an initial analysis first.');
+                return;
+            }
+
+            // Append user question to histories
+            if (conversationState.claudeHistory.length > 0) {
+                conversationState.claudeHistory.push({ role: 'user', content: question });
+            }
+            if (conversationState.openaiHistory.length > 0) {
+                conversationState.openaiHistory.push({ role: 'user', content: question });
+            }
+
+            // Show user question in panels immediately
+            appendUserMessage(question);
+
+            // Disable input, show loading
+            followupInput.value = '';
+            followupInput.disabled = true;
+            document.getElementById('followupBtn').disabled = true;
+            document.getElementById('followupBtn').textContent = 'Sending...';
+            document.getElementById('followupLoading').style.display = 'flex';
+
+            // Build payload
+            const payload = {
+                providers: conversationState.providers,
+                system_prompt: conversationState.systemPrompt,
+                claude_api_key: aiConfig.claudeApiKey,
+                claude_model: aiConfig.claudeModel,
+                openai_api_key: aiConfig.openaiApiKey,
+                openai_model: aiConfig.openaiModel,
+                claude_history: conversationState.claudeHistory.length > 0 ? conversationState.claudeHistory : null,
+                openai_history: conversationState.openaiHistory.length > 0 ? conversationState.openaiHistory : null
+            };
+
+            try {
+                const response = await fetch('/api/ai/follow-up', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                // Re-enable input
+                followupInput.disabled = false;
+                document.getElementById('followupBtn').disabled = false;
+                document.getElementById('followupBtn').textContent = 'Ask Follow-up';
+                document.getElementById('followupLoading').style.display = 'none';
+
+                if (!response.ok || !data.success) {
+                    // Rollback user message from histories
+                    if (conversationState.claudeHistory.length > 0) {
+                        conversationState.claudeHistory.pop();
+                    }
+                    if (conversationState.openaiHistory.length > 0) {
+                        conversationState.openaiHistory.pop();
+                    }
+                    alert('Follow-up failed: ' + (data.error || 'Unknown error'));
+                    return;
+                }
+
+                appendFollowupResults(data);
+
+            } catch (error) {
+                followupInput.disabled = false;
+                document.getElementById('followupBtn').disabled = false;
+                document.getElementById('followupBtn').textContent = 'Ask Follow-up';
+                document.getElementById('followupLoading').style.display = 'none';
+
+                // Rollback history
+                if (conversationState.claudeHistory.length > 0) {
+                    conversationState.claudeHistory.pop();
+                }
+                if (conversationState.openaiHistory.length > 0) {
+                    conversationState.openaiHistory.pop();
+                }
+                alert('Error sending follow-up: ' + error.message);
+            }
+        }
+
+        function appendUserMessage(question) {
+            // Append to Claude panel if active
+            const claudeBody = document.getElementById('claudeResult');
+            if (claudeBody && document.getElementById('claudePanel').style.display !== 'none') {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'ai-message ai-message-user';
+                msgDiv.innerHTML = '<div class="ai-message-label">You</div>' +
+                    '<div class="ai-message-content">' + escapeHtml(question) + '</div>';
+                claudeBody.appendChild(msgDiv);
+                claudeBody.scrollTop = claudeBody.scrollHeight;
+            }
+
+            // Append to OpenAI panel if active
+            const openaiBody = document.getElementById('openaiResult');
+            if (openaiBody && document.getElementById('openaiPanel').style.display !== 'none') {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'ai-message ai-message-user';
+                msgDiv.innerHTML = '<div class="ai-message-label">You</div>' +
+                    '<div class="ai-message-content">' + escapeHtml(question) + '</div>';
+                openaiBody.appendChild(msgDiv);
+                openaiBody.scrollTop = openaiBody.scrollHeight;
+            }
+        }
+
+        function appendFollowupResults(data) {
+            conversationState.turnCount++;
+            const followupNum = conversationState.turnCount - 1;
+
+            // Claude response
+            if (data.claude) {
+                const claudeBody = document.getElementById('claudeResult');
+                if (data.claude.success) {
+                    conversationState.claudeHistory.push({
+                        role: 'assistant',
+                        content: data.claude.analysis
+                    });
+
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = 'ai-message ai-message-assistant';
+                    msgDiv.innerHTML =
+                        '<div class="ai-message-label">Claude (Follow-up #' + followupNum + ')</div>' +
+                        '<div class="ai-message-content">' + marked.parse(data.claude.analysis) + '</div>';
+                    claudeBody.appendChild(msgDiv);
+
+                    // Update cumulative token usage
+                    if (data.claude.usage) {
+                        conversationState.claudeTotalUsage.input_tokens += data.claude.usage.input_tokens;
+                        conversationState.claudeTotalUsage.output_tokens += data.claude.usage.output_tokens;
+                    }
+                    const ct = conversationState.claudeTotalUsage;
+                    document.getElementById('claudeFooter').innerHTML =
+                        `Tokens: ${ct.input_tokens.toLocaleString()} in / ${ct.output_tokens.toLocaleString()} out ` +
+                        `<span class="ai-turn-count">(${conversationState.turnCount} turns)</span>`;
+
+                    claudeBody.scrollTop = claudeBody.scrollHeight;
+                } else {
+                    const errDiv = document.createElement('div');
+                    errDiv.className = 'ai-error';
+                    errDiv.textContent = data.claude.error;
+                    claudeBody.appendChild(errDiv);
+                    claudeBody.scrollTop = claudeBody.scrollHeight;
+                }
+            }
+
+            // OpenAI response
+            if (data.openai) {
+                const openaiBody = document.getElementById('openaiResult');
+                if (data.openai.success) {
+                    conversationState.openaiHistory.push({
+                        role: 'assistant',
+                        content: data.openai.analysis
+                    });
+
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = 'ai-message ai-message-assistant';
+                    msgDiv.innerHTML =
+                        '<div class="ai-message-label">OpenAI (Follow-up #' + followupNum + ')</div>' +
+                        '<div class="ai-message-content">' + marked.parse(data.openai.analysis) + '</div>';
+                    openaiBody.appendChild(msgDiv);
+
+                    // Update cumulative token usage
+                    if (data.openai.usage) {
+                        conversationState.openaiTotalUsage.prompt_tokens += data.openai.usage.prompt_tokens;
+                        conversationState.openaiTotalUsage.completion_tokens += data.openai.usage.completion_tokens;
+                    }
+                    const ot = conversationState.openaiTotalUsage;
+                    document.getElementById('openaiFooter').innerHTML =
+                        `Tokens: ${ot.prompt_tokens.toLocaleString()} in / ${ot.completion_tokens.toLocaleString()} out ` +
+                        `<span class="ai-turn-count">(${conversationState.turnCount} turns)</span>`;
+
+                    openaiBody.scrollTop = openaiBody.scrollHeight;
+                } else {
+                    const errDiv = document.createElement('div');
+                    errDiv.className = 'ai-error';
+                    errDiv.textContent = data.openai.error;
+                    openaiBody.appendChild(errDiv);
+                    openaiBody.scrollTop = openaiBody.scrollHeight;
+                }
+            }
+
+            // Scroll follow-up input into view
+            document.getElementById('followupSection').scrollIntoView({ behavior: 'smooth' });
         }
 
         // Helper: escape HTML
@@ -470,6 +746,14 @@
                 azConfig.tenantId ? 'Azure IIS: Configured' : 'Azure IIS: Not configured';
             document.getElementById('azureStatus').className =
                 'data-source-badge ' + (azConfig.tenantId ? 'badge-success' : 'badge-warning');
+
+            // Enter key submits follow-up (Shift+Enter for newlines)
+            document.getElementById('followupInput').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendFollowup();
+                }
+            });
         });
     </script>
 </body>

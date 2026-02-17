@@ -5,7 +5,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from newrelic_service import NewRelicService
 from azure_service import AzureLogAnalyticsService
-from ai_service import ClaudeService, OpenAIService, run_parallel_analysis, build_system_prompt, build_user_message
+from ai_service import ClaudeService, OpenAIService, run_parallel_analysis, run_parallel_followup, build_system_prompt, build_user_message
 import os
 import json
 from dotenv import load_dotenv
@@ -1021,8 +1021,60 @@ def ai_analyze():
             'newrelic': bool(newrelic_data),
             'iis_logs': bool(iis_data)
         },
+        'system_prompt': system_prompt,
+        'user_message': user_message,
         'prompt_preview': user_message[:2000] + '...' if len(user_message) > 2000 else user_message
     })
+
+
+@app.route('/api/ai/follow-up', methods=['POST'])
+def ai_followup():
+    """Handle follow-up questions in an existing AI analysis conversation"""
+    data = request.get_json()
+
+    providers = data.get('providers', [])
+    system_prompt = data.get('system_prompt', '')
+
+    if not providers:
+        return jsonify({'success': False, 'error': 'At least one AI provider must be selected'}), 400
+
+    if not system_prompt:
+        return jsonify({'success': False, 'error': 'System prompt is required'}), 400
+
+    claude_svc = None
+    openai_svc = None
+    claude_messages = data.get('claude_history')
+    openai_messages = data.get('openai_history')
+
+    if 'claude' in providers and data.get('claude_api_key') and claude_messages:
+        claude_svc = ClaudeService(
+            api_key=data['claude_api_key'],
+            model=data.get('claude_model', 'claude-sonnet-4-20250514')
+        )
+
+    if 'openai' in providers and data.get('openai_api_key') and openai_messages:
+        openai_svc = OpenAIService(
+            api_key=data['openai_api_key'],
+            model=data.get('openai_model', 'gpt-4o')
+        )
+
+    if not claude_svc and not openai_svc:
+        return jsonify({'success': False, 'error': 'No valid provider configuration found'}), 400
+
+    try:
+        ai_results = run_parallel_followup(
+            claude_svc, openai_svc, system_prompt,
+            claude_messages, openai_messages
+        )
+
+        return jsonify({
+            'success': True,
+            'claude': ai_results.get('claude'),
+            'openai': ai_results.get('openai')
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Follow-up analysis failed: {str(e)}'}), 500
 
 
 def _parse_time_range_to_minutes(time_range):
