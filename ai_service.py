@@ -308,7 +308,8 @@ Actionable steps to improve performance, ordered by expected impact. Be specific
 ## Anomalies
 Any unusual patterns, spikes, or inconsistencies in the data that warrant investigation.
 
-Use markdown formatting. Be concise but thorough. Reference specific numbers from the data."""
+Use markdown formatting. Be concise but thorough. Reference specific numbers from the data.
+Do NOT start your response with a title or header that repeats the URL — begin directly with the ## Summary section."""
 
 
 def build_user_message(url, time_range, newrelic_data, iis_data):

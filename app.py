@@ -994,7 +994,7 @@ def ai_analyze():
         },
         'system_prompt': system_prompt,
         'user_message': user_message,
-        'prompt_preview': user_message[:2000] + '...' if len(user_message) > 2000 else user_message
+        'prompt_preview': user_message
     })
 
 
