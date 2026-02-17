@@ -2379,6 +2379,18 @@ body.light-mode .construction-section p {
     margin-top: 20px;
 }
 
+.metrics-table-container .results-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.metrics-table-container .results-table td.truncate-cell {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Infrastructure Section */
 .infrastructure-section {
     background: #1a1f2e;

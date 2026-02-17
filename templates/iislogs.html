@@ -578,8 +578,8 @@
                 <tr>
                     <td>${time}</td>
                     <td>${log.csMethod || '--'}</td>
-                    <td><code>${escapeHtml(log.csUriStem || '--')}</code></td>
-                    <td>${escapeHtml(log.csUriQuery || '--')}</td>
+                    <td class="truncate-cell" title="${escapeHtml(log.csUriStem || '--')}"><code>${escapeHtml(log.csUriStem || '--')}</code></td>
+                    <td class="truncate-cell" title="${escapeHtml(log.csUriQuery || '--')}">${escapeHtml(log.csUriQuery || '--')}</td>
                     <td><span class="${statusClass}">${log.scStatus || '--'}</span></td>
                     <td>${log.TimeTaken != null ? Number(log.TimeTaken).toLocaleString() : '--'}</td>
                     <td>${log.cIP || '--'}</td>
