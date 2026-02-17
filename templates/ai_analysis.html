@@ -112,6 +112,13 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="aiSiteFilter">IIS Site</label>
+                    <select id="aiSiteFilter">
+                        <option value="">All Sites</option>
+                    </select>
+                    <span id="aiSiteLoading" class="site-loading" style="display: none;">Loading sites...</span>
+                </div>
+                <div class="form-group">
                     <label>AI Providers</label>
                     <div class="provider-checkboxes">
                         <label class="checkbox-label">
@@ -222,6 +229,53 @@
             } catch (e) { return {}; }
         }
 
+        // ==================== IIS Site Selector ====================
+
+        async function loadAiSiteList() {
+            const azConfig = getAzureConfig();
+            if (!azConfig.tenantId || !azConfig.clientId || !azConfig.clientSecret || !azConfig.workspaceId) {
+                return; // Azure not configured, skip loading sites
+            }
+
+            const indicator = document.getElementById('aiSiteLoading');
+            indicator.style.display = 'inline';
+
+            try {
+                const response = await fetch('/api/azure/list-sites', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tenant_id: azConfig.tenantId,
+                        client_id: azConfig.clientId,
+                        client_secret: azConfig.clientSecret,
+                        workspace_id: azConfig.workspaceId
+                    })
+                });
+
+                const data = await response.json();
+                indicator.style.display = 'none';
+
+                if (data.success && data.sites && data.sites.length > 0) {
+                    const select = document.getElementById('aiSiteFilter');
+                    select.innerHTML = '<option value="">All Sites</option>';
+                    data.sites.forEach(site => {
+                        const opt = document.createElement('option');
+                        opt.value = site;
+                        opt.textContent = site;
+                        select.appendChild(opt);
+                    });
+
+                    // Restore previously selected site from IIS Logs page config
+                    if (azConfig.selectedSite) {
+                        select.value = azConfig.selectedSite;
+                    }
+                }
+            } catch (error) {
+                indicator.style.display = 'none';
+                console.error('Error loading site list:', error);
+            }
+        }
+
         // ==================== Run Analysis ====================
 
         async function runAnalysis() {
@@ -273,7 +327,7 @@
                 azure_client_id: azConfig.clientId || null,
                 azure_client_secret: azConfig.clientSecret || null,
                 azure_workspace_id: azConfig.workspaceId || null,
-                azure_site_name: azConfig.selectedSite || null,
+                azure_site_name: document.getElementById('aiSiteFilter').value || null,
                 // AI keys
                 claude_api_key: useClaude ? aiConfig.claudeApiKey : null,
                 claude_model: aiConfig.claudeModel,
@@ -391,6 +445,7 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             loadAiConfig();
+            loadAiSiteList();
 
             // Show data source status badges
             const nrConfig = getNrConfig();
