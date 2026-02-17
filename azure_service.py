@@ -183,12 +183,10 @@ class AzureLogAnalyticsService:
 
         if status_code:
             if len(status_code) == 1:
-                # Filter by status class (e.g., '4' matches 400-499)
-                low = int(status_code) * 100
-                high = low + 99
-                filters.append(f"scStatus >= {low} and scStatus <= {high}")
+                # Filter by status class (e.g., '4' matches 4xx)
+                filters.append(f"scStatus startswith '{status_code}'")
             else:
-                filters.append(f"scStatus == {status_code}")
+                filters.append(f"scStatus == '{status_code}'")
 
         where_clause = '\n| where '.join(filters)
 
@@ -240,8 +238,8 @@ class AzureLogAnalyticsService:
 | where {static_filter}
 | summarize
     TotalRequests = count(),
-    ErrorCount4xx = countif(scStatus >= 400 and scStatus < 500),
-    ErrorCount5xx = countif(scStatus >= 500),
+    ErrorCount4xx = countif(scStatus startswith "4"),
+    ErrorCount5xx = countif(scStatus startswith "5"),
     AvgTimeTaken = avg(TimeTaken),
     P50TimeTaken = percentile(TimeTaken, 50),
     P90TimeTaken = percentile(TimeTaken, 90),

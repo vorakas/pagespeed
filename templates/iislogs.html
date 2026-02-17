@@ -615,7 +615,7 @@
         const kqlSamples = {
             errors5xx: `W3CIISLog
 | where TimeGenerated > ago(1h)
-| where scStatus >= 500
+| where scStatus startswith "5"
 | project TimeGenerated, csMethod, csUriStem, csUriQuery, scStatus, TimeTaken, cIP, sSiteName
 | order by TimeGenerated desc
 | take 100`,
