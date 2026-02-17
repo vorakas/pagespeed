@@ -758,7 +758,8 @@ def search_azure_logs():
         url_filter=data.get('url_filter'),
         status_code=data.get('status_code'),
         site_name=data.get('site_name'),
-        limit=data.get('limit', 100)
+        limit=data.get('limit', 100),
+        exact_url=True
     )
 
     if isinstance(result, dict) and 'error' in result:

@@ -2389,6 +2389,46 @@ body.light-mode .construction-section p {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    position: relative;
+    cursor: pointer;
+}
+
+.metrics-table-container .results-table td.truncate-cell:hover {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-all;
+    z-index: 10;
+}
+
+.metrics-table-container .results-table td.truncate-cell:hover .cell-full-value {
+    display: block;
+}
+
+.cell-full-value {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    min-width: 300px;
+    max-width: 500px;
+    padding: 10px 12px;
+    background: #1f2937;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    white-space: normal;
+    word-break: break-all;
+    z-index: 100;
+    font-size: 0.85em;
+    line-height: 1.5;
+    color: #e3e8ee;
+}
+
+body.light-mode .cell-full-value {
+    background: white;
+    border-color: #d1d5db;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    color: #1f2937;
 }
 
 /* Infrastructure Section */
