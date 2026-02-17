@@ -749,6 +749,7 @@ def search_azure_logs():
         end_date=data['end_date'],
         url_filter=data.get('url_filter'),
         status_code=data.get('status_code'),
+        site_name=data.get('site_name'),
         limit=data.get('limit', 100)
     )
 
@@ -777,13 +778,46 @@ def azure_dashboard_summary():
 
     result = service.get_dashboard_summary(
         start_date=data['start_date'],
-        end_date=data['end_date']
+        end_date=data['end_date'],
+        site_name=data.get('site_name')
     )
 
     if isinstance(result, dict) and 'error' in result:
         return jsonify({'success': False, 'error': result['error']}), 500
 
     return jsonify(result)
+
+
+@app.route('/api/azure/list-sites', methods=['POST'])
+def azure_list_sites():
+    """Get distinct IIS site names from Log Analytics workspace"""
+    data = request.get_json()
+
+    required_fields = ['tenant_id', 'client_id', 'client_secret', 'workspace_id']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
+
+    service = AzureLogAnalyticsService(
+        tenant_id=data['tenant_id'],
+        client_id=data['client_id'],
+        client_secret=data['client_secret'],
+        workspace_id=data['workspace_id']
+    )
+
+    query = 'W3CIISLog | distinct sSiteName | order by sSiteName asc'
+    response = service.execute_query(query, timespan='P7D')
+
+    if isinstance(response, dict) and 'error' in response:
+        return jsonify({'success': False, 'error': response['error']}), 500
+
+    rows = service._parse_table_response(response)
+    sites = [row.get('sSiteName', '') for row in rows if row.get('sSiteName')]
+
+    return jsonify({
+        'success': True,
+        'sites': sites
+    })
 
 
 @app.route('/api/azure/execute-query', methods=['POST'])

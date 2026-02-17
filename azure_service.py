@@ -149,7 +149,7 @@ class AzureLogAnalyticsService:
                 'message': 'Connected to workspace. W3CIISLog table exists but no recent data found.'
             }
 
-    def search_logs(self, start_date, end_date, url_filter=None, status_code=None, limit=100):
+    def search_logs(self, start_date, end_date, url_filter=None, status_code=None, site_name=None, limit=100):
         """
         Search and filter IIS logs
 
@@ -158,6 +158,7 @@ class AzureLogAnalyticsService:
             end_date (str): End datetime in ISO format
             url_filter (str): Optional URL path filter (contains match)
             status_code (str): Optional status code filter (e.g., '4' for 4xx, '200' for exact)
+            site_name (str): Optional IIS site name filter
             limit (int): Max number of rows to return
 
         Returns:
@@ -187,6 +188,9 @@ class AzureLogAnalyticsService:
                 filters.append(f"scStatus startswith '{status_code}'")
             else:
                 filters.append(f"scStatus == '{status_code}'")
+
+        if site_name:
+            filters.append(f"sSiteName == '{site_name}'")
 
         where_clause = '\n| where '.join(filters)
 
@@ -218,23 +222,26 @@ class AzureLogAnalyticsService:
             }
         }
 
-    def get_dashboard_summary(self, start_date, end_date):
+    def get_dashboard_summary(self, start_date, end_date, site_name=None):
         """
         Get aggregated dashboard summary stats
 
         Args:
             start_date (str): Start datetime in ISO format
             end_date (str): End datetime in ISO format
+            site_name (str): Optional IIS site name filter
 
         Returns:
             dict: Summary stats, top pages, and status code distribution
         """
         time_filter = f"TimeGenerated between (datetime('{start_date}') .. datetime('{end_date}'))"
+        site_filter = f'| where sSiteName == "{site_name}"' if site_name else ''
         static_filter = """csUriStem !endswith ".css" and csUriStem !endswith ".js" and csUriStem !endswith ".png" and csUriStem !endswith ".jpg" and csUriStem !endswith ".gif" and csUriStem !endswith ".ico" and csUriStem !endswith ".woff" and csUriStem !endswith ".woff2" and csUriStem !endswith ".svg" and csUriStem !endswith ".map" """
 
         # Query 1: Summary stats
         summary_query = f"""W3CIISLog
 | where {time_filter}
+{site_filter}
 | where {static_filter}
 | summarize
     TotalRequests = count(),
@@ -249,6 +256,7 @@ class AzureLogAnalyticsService:
         # Query 2: Top pages
         top_pages_query = f"""W3CIISLog
 | where {time_filter}
+{site_filter}
 | where {static_filter}
 | summarize RequestCount = count(), AvgTimeTaken = avg(TimeTaken) by csUriStem
 | order by RequestCount desc
@@ -257,6 +265,7 @@ class AzureLogAnalyticsService:
         # Query 3: Status code distribution
         status_query = f"""W3CIISLog
 | where {time_filter}
+{site_filter}
 | summarize Count = count() by scStatus
 | order by Count desc
 | take 20"""

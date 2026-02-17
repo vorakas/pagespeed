@@ -77,6 +77,15 @@
             </div>
             <div id="secretExpirationWarning" class="secret-expiration-warning" style="display: none;"></div>
             <div id="azureConnectionStatus" class="connection-status" style="display: none;"></div>
+
+            <!-- Site Selector (appears after successful connection) -->
+            <div id="azureSiteSelector" class="site-selector" style="display: none;">
+                <label for="azureSiteFilter">IIS Site:</label>
+                <select id="azureSiteFilter" onchange="onSiteFilterChange()">
+                    <option value="">All Sites</option>
+                </select>
+                <span id="siteLoadingIndicator" class="site-loading" style="display: none;">Loading sites...</span>
+            </div>
         </section>
 
         <!-- Search & Filter Section -->
@@ -313,7 +322,8 @@
             clientId: null,
             clientSecret: null,
             workspaceId: '25e8966e-de87-423b-bb3f-94ceed33a16b',
-            secretExpiration: null
+            secretExpiration: null,
+            selectedSite: null
         };
 
         // Save config to localStorage
@@ -323,6 +333,7 @@
             azureConfig.clientSecret = document.getElementById('azureClientSecret').value.trim();
             azureConfig.workspaceId = document.getElementById('azureWorkspaceId').value.trim();
             azureConfig.secretExpiration = document.getElementById('azureSecretExpiration').value;
+            azureConfig.selectedSite = document.getElementById('azureSiteFilter').value || null;
 
             localStorage.setItem('azureConfig', JSON.stringify(azureConfig));
             checkSecretExpiration();
@@ -345,6 +356,7 @@
                     document.getElementById('azureClientSecret').value = azureConfig.clientSecret || '';
                     document.getElementById('azureWorkspaceId').value = azureConfig.workspaceId || '25e8966e-de87-423b-bb3f-94ceed33a16b';
                     document.getElementById('azureSecretExpiration').value = azureConfig.secretExpiration || '';
+                    // selectedSite will be restored after site list loads
                 } catch (e) {
                     console.error('Error loading Azure config:', e);
                 }
@@ -418,6 +430,9 @@
                     document.getElementById('iisSearchSection').style.display = 'block';
                     document.getElementById('iisDashboardSection').style.display = 'block';
                     document.getElementById('kqlQuerySection').style.display = 'block';
+                    // Show site selector and load available sites
+                    document.getElementById('azureSiteSelector').style.display = 'flex';
+                    loadSiteList();
                 } else {
                     status.className = 'connection-status error';
                     status.textContent = data.message || 'Connection failed.';
@@ -436,6 +451,54 @@
                 client_secret: azureConfig.clientSecret,
                 workspace_id: azureConfig.workspaceId
             };
+        }
+
+        // Load available IIS site names
+        async function loadSiteList() {
+            const indicator = document.getElementById('siteLoadingIndicator');
+            indicator.style.display = 'inline';
+
+            try {
+                const response = await fetch('/api/azure/list-sites', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(getAzureAuthPayload())
+                });
+
+                const data = await response.json();
+                indicator.style.display = 'none';
+
+                if (data.success && data.sites && data.sites.length > 0) {
+                    const select = document.getElementById('azureSiteFilter');
+                    // Clear existing options (keep "All Sites")
+                    select.innerHTML = '<option value="">All Sites</option>';
+                    data.sites.forEach(site => {
+                        const opt = document.createElement('option');
+                        opt.value = site;
+                        opt.textContent = site;
+                        select.appendChild(opt);
+                    });
+
+                    // Restore previously selected site
+                    if (azureConfig.selectedSite) {
+                        select.value = azureConfig.selectedSite;
+                    }
+                }
+            } catch (error) {
+                indicator.style.display = 'none';
+                console.error('Error loading site list:', error);
+            }
+        }
+
+        // Handle site selector change
+        function onSiteFilterChange() {
+            azureConfig.selectedSite = document.getElementById('azureSiteFilter').value || null;
+            localStorage.setItem('azureConfig', JSON.stringify(azureConfig));
+        }
+
+        // Get the selected site filter (for adding to queries)
+        function getSelectedSite() {
+            return document.getElementById('azureSiteFilter').value || null;
         }
 
         // Search IIS logs
@@ -458,6 +521,7 @@
                     end_date: new Date(endDate).toISOString(),
                     url_filter: document.getElementById('iisUrlFilter').value.trim() || null,
                     status_code: document.getElementById('iisStatusFilter').value || null,
+                    site_name: getSelectedSite(),
                     limit: parseInt(document.getElementById('iisLimit').value)
                 };
 
@@ -521,7 +585,8 @@
                 const payload = {
                     ...getAzureAuthPayload(),
                     start_date: new Date(startDate).toISOString(),
-                    end_date: new Date(endDate).toISOString()
+                    end_date: new Date(endDate).toISOString(),
+                    site_name: getSelectedSite()
                 };
 
                 const response = await fetch('/api/azure/dashboard-summary', {
