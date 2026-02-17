@@ -1,120 +1,148 @@
-# Side Navigation Implementation
+# PageSpeed Insights Monitor
 
-## Overview
-This update adds a side navigation menu to the PageSpeed Insights Monitor and restructures the application into separate pages.
+A comprehensive web performance monitoring dashboard for LampsPlus, built with Python/Flask and deployed on Railway. Integrates Google PageSpeed Insights, New Relic APM, Azure Log Analytics (IIS logs), and AI-powered analysis via Claude and OpenAI.
 
-## Files Included
-1. **index.html** - Main dashboard page (removed Setup section)
-2. **setup.html** - Site/URL Setup page (contains only the Setup section)
-3. **style.css** - Updated styles with side navigation
-4. **app.js** - Unchanged JavaScript functionality
-5. **app.py** - Updated Flask routes with /setup endpoint
-6. **README.md** - This file
+## Features
 
-## Key Changes
+### Dashboard & Testing
+- **Site/URL Management** -- Add sites and URLs to monitor
+- **PageSpeed Testing** -- Run Google PageSpeed Insights tests (mobile & desktop) on demand or via daily scheduled jobs
+- **Core Web Vitals Reference** -- Built-in reference guide for LCP, FID, CLS thresholds
+- **Historical Performance** -- Track Lighthouse scores and metrics over time with comparison charts
+- **Dark/Light Mode** -- Full theme support across all pages
 
-### 1. Side Navigation Menu
-- Fixed left sidebar (280px wide)
-- Dark theme styling matching the rest of the app
-- "Menu" header in white
-- Currently has one link: "Site/URL Setup"
-- Highlights active page with green accent
-- Responsive hover states
+### New Relic Integration
+- Connect to New Relic via NerdGraph GraphQL API
+- Core Web Vitals monitoring (LCP, FID, CLS, INP, TTFB)
+- APM metrics (transactions, database, external calls, errors)
+- Performance overview with current vs. previous period comparison
+- Custom NRQL query execution
 
-### 2. Layout Structure
-```
-┌──────────────┬─────────────────────────────────┐
-│              │                                 │
-│   Side Nav   │      Main Content              │
-│   (280px)    │      (Flexible width)          │
-│              │                                 │
-└──────────────┴─────────────────────────────────┘
-```
+### IIS Logs (Azure Log Analytics)
+- Connect to Azure Log Analytics workspace via OAuth2
+- Search and filter W3CIISLog entries by date, status code, URL, and method
+- Dashboard summary with request counts, error rates, and response times
+- Status code distribution and top pages analysis
+- **KQL Query Mode** -- Write custom KQL queries with presets, saved queries, and syntax reference
+- **Site selector** -- Filter logs by IIS site name
+- **CSV/ZIP export** -- Download KQL query results with file size estimation
 
-### 3. Page Structure
-- **/** (index.html) - Main dashboard with all sections except Setup
-  - Run Tests
-  - Core Web Vitals Reference
-  - Understanding Lighthouse Scores
-  - Latest Results
-  - Page Comparison
-  - Historical Performance
+### AI Analysis
+- Enter a URL path and the system automatically gathers relevant New Relic and IIS log data
+- Sends collected performance data to **Claude** and **OpenAI** APIs in parallel
+- Side-by-side comparison of AI analyses with markdown rendering
+- **Follow-up questions** -- Continue the conversation with full context preservation
+- Cumulative token usage tracking across conversation turns
+- Configurable models (Claude Sonnet 4 / Opus 4, GPT-4o / GPT-4o Mini)
+- Experimental feature disclaimer
 
-- **/setup** (setup.html) - Site/URL Setup page
-  - Add Site form
-  - Add URL form
+## Tech Stack
 
-## Changes to app.py
+- **Backend:** Python 3.11, Flask, Gunicorn
+- **Database:** PostgreSQL (production on Railway), SQLite (local development)
+- **Frontend:** Vanilla HTML/CSS/JS, marked.js (markdown), JSZip (exports)
+- **APIs:** Google PageSpeed Insights, New Relic NerdGraph, Azure Log Analytics REST API, Anthropic Claude, OpenAI
+- **Deployment:** Railway (Docker-based with Nixpacks)
+- **Scheduling:** APScheduler for daily automated tests
 
-Added a new route for the setup page:
-
-```python
-@app.route('/setup')
-def setup():
-    """Site/URL Setup page"""
-    sites = db.get_sites()
-    return render_template('setup.html', sites=sites)
-```
-
-**No changes needed to:**
-- models.py
-- pagespeed_service.py
-
-These files remain exactly as they were.
-
-## File Structure in Your Flask App
+## Project Structure
 
 ```
-your-app/
-├── app.py (UPDATED)
-├── models.py (no changes)
-├── pagespeed_service.py (no changes)
+pagespeed-monitor/
+├── app.py                  # Flask app, routes, API endpoints
+├── models.py               # Database abstraction (SQLite/PostgreSQL)
+├── pagespeed_service.py    # Google PageSpeed Insights API client
+├── newrelic_service.py     # New Relic NerdGraph API client
+├── azure_service.py        # Azure Log Analytics API client
+├── ai_service.py           # Claude & OpenAI service classes
+├── requirements.txt        # Python dependencies
+├── Dockerfile              # Container configuration
+├── Procfile                # Gunicorn process definition
+├── railway.json            # Railway deployment config
 ├── templates/
-│   ├── index.html (NEW VERSION)
-│   └── setup.html (NEW FILE)
-├── static/
-│   ├── css/
-│   │   └── style.css (UPDATED)
-│   └── js/
-│       └── app.js (no changes)
+│   ├── index.html          # Dashboard home
+│   ├── setup.html          # Site/URL configuration
+│   ├── test.html           # URL testing interface
+│   ├── metrics.html        # Performance metrics view
+│   ├── newrelic.html       # New Relic integration
+│   ├── iislogs.html        # IIS logs & KQL queries
+│   └── ai_analysis.html    # AI-powered analysis
+└── static/
+    ├── css/style.css       # All styles (dark + light mode)
+    ├── js/app.js           # Shared JavaScript
+    ├── favicon.ico
+    └── images/             # Logos and icons
 ```
 
-## Installation Steps
+## Configuration
 
-1. **Back up your current files** (always a good practice!)
+All API credentials are stored client-side in localStorage and sent with each request. No server-side credential storage.
 
-2. **Extract the zip file** and copy files to your project:
-   - Copy `index.html` and `setup.html` to `templates/` folder
-   - Copy `style.css` to `static/css/` folder
-   - Copy `app.js` to `static/js/` folder (if you've made local changes, you can skip this)
-   - Copy `app.py` to your root directory (or merge the new `/setup` route into your existing app.py)
+| Config Key | Page | Contents |
+|---|---|---|
+| `nrConfig` | New Relic | API key, Account ID, App Name |
+| `azureConfig` | IIS Logs | Tenant ID, Client ID, Client Secret, Workspace ID, Selected Site |
+| `aiConfig` | AI Analysis | Claude API Key/Model, OpenAI API Key/Model |
 
-3. **Test locally** before deploying:
-   ```bash
-   python app.py
-   ```
-   - Visit http://localhost:5000 to see the main dashboard
-   - Visit http://localhost:5000/setup to see the setup page
-   - Test the theme toggle on both pages
+## Local Development
 
-4. **Deploy to Railway**:
-   - Commit all changes to your Git repository
-   - Push to GitHub
-   - Railway will automatically rebuild and deploy
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-## Light Mode Support
-The side navigation fully supports light mode toggling:
-- Dark mode: Dark gray background (#111827)
-- Light mode: White background with gray text
-- Active link changes color based on theme (green in dark, purple in light)
+# Run locally (uses SQLite)
+python app.py
 
-## Next Steps
-You mentioned adding more links to the menu one at a time. When you're ready for the next link, just let me know:
-- What should it be called?
-- What sections from the current dashboard should it include?
+# Visit http://localhost:5000
+```
 
-## Notes
-- All existing API endpoints remain unchanged
-- Database models remain unchanged
-- The PageSpeed service remains unchanged
-- Only the routing and template structure has been modified
+## Deployment (Railway)
+
+The app deploys automatically from GitHub to Railway on push to `master`. Railway uses the Dockerfile for builds.
+
+```bash
+# Manual redeploy via CLI
+npx @railway/cli redeploy --yes
+
+# Check deployment status
+npx @railway/cli deployment list
+
+# View logs
+npx @railway/cli logs --lines 50
+```
+
+### Environment Variables (Railway)
+
+- `DATABASE_URL` -- PostgreSQL connection string (set automatically by Railway)
+- `PORT` -- Server port (set automatically by Railway)
+
+## API Endpoints
+
+### Pages
+| Route | Description |
+|---|---|
+| `/` | Dashboard home |
+| `/setup` | Site/URL configuration |
+| `/test` | Run PageSpeed tests |
+| `/metrics` | View performance metrics |
+| `/newrelic` | New Relic integration |
+| `/iislogs` | IIS log analysis |
+| `/ai-analysis` | AI-powered analysis |
+
+### Key API Routes
+| Method | Route | Description |
+|---|---|---|
+| GET | `/api/sites` | List all sites |
+| POST | `/api/sites` | Add a new site |
+| POST | `/api/test-url` | Test a single URL |
+| POST | `/api/test-all` | Test all URLs |
+| POST | `/api/newrelic/test-connection` | Test New Relic API connection |
+| POST | `/api/newrelic/core-web-vitals` | Fetch Core Web Vitals |
+| POST | `/api/newrelic/apm-metrics` | Fetch APM metrics |
+| POST | `/api/azure/test-connection` | Test Azure connection |
+| POST | `/api/azure/search` | Search IIS logs |
+| POST | `/api/azure/dashboard-summary` | Get IIS dashboard data |
+| POST | `/api/azure/execute-query` | Execute custom KQL |
+| POST | `/api/azure/list-sites` | List available IIS sites |
+| POST | `/api/ai/analyze` | Run AI performance analysis |
+| POST | `/api/ai/follow-up` | Send follow-up question |
