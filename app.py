@@ -912,27 +912,9 @@ def ai_analyze():
                 if cwv_result.get('success'):
                     newrelic_data['core_web_vitals'] = cwv_result.get('metrics', {})
 
-            # Performance Overview
-            perf_result = nr_service.get_performance_overview(
-                int(nr_account_id), nr_app_name, time_range
-            )
-            if perf_result.get('success'):
-                newrelic_data['performance_overview'] = {
-                    'current': perf_result.get('current', {}),
-                    'previous': perf_result.get('previous', {})
-                }
-
-            # APM Metrics
-            apm_result = nr_service.get_apm_metrics(
-                int(nr_account_id), nr_app_name, time_range
-            )
-            if apm_result.get('success'):
-                newrelic_data['apm_metrics'] = {
-                    'transactions': apm_result.get('transactions', [])[:10],
-                    'database': apm_result.get('database', [])[:10],
-                    'external': apm_result.get('external', [])[:10],
-                    'errors': apm_result.get('errors', [])[:10]
-                }
+            # Note: performance_overview and apm_metrics are app-wide (not URL-filtered)
+            # so they are intentionally excluded from AI analysis to avoid referencing
+            # unrelated pages. Only core_web_vitals (URL-filtered) is included.
         except Exception as e:
             print(f"Error gathering New Relic data: {e}")
 

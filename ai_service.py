@@ -336,17 +336,8 @@ def build_user_message(url, time_range, newrelic_data, iis_data):
         sections.append(json.dumps(newrelic_data['core_web_vitals'], indent=2, default=str))
         sections.append("")
 
-    # New Relic Performance Overview
-    if newrelic_data.get('performance_overview'):
-        sections.append("## New Relic: Performance Overview")
-        sections.append(json.dumps(newrelic_data['performance_overview'], indent=2, default=str))
-        sections.append("")
-
-    # New Relic APM Metrics
-    if newrelic_data.get('apm_metrics'):
-        sections.append("## New Relic: APM Metrics (Top Transactions, Database, External, Errors)")
-        sections.append(json.dumps(newrelic_data['apm_metrics'], indent=2, default=str))
-        sections.append("")
+    # Note: performance_overview and apm_metrics are excluded from AI analysis
+    # because they are app-wide data not filtered to the specific URL.
 
     # IIS Log data (filtered for the specific URL only)
     if iis_data.get('slow_requests'):
