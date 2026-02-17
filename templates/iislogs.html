@@ -154,29 +154,25 @@
                 <div class="editor-header">
                     <h3>Query Editor</h3>
                     <div class="query-actions">
-                        <button onclick="loadKqlSample('errors5xx')" class="btn-secondary">5xx Errors</button>
-                        <button onclick="loadKqlSample('slowPages')" class="btn-secondary">Slow Pages</button>
-                        <button onclick="loadKqlSample('requestVolume')" class="btn-secondary">Request Volume</button>
-                        <button onclick="loadKqlSample('statusDist')" class="btn-secondary">Status Dist</button>
-                        <button onclick="loadKqlSample('topUrls')" class="btn-secondary">Top URLs</button>
+                        <select id="kqlQueryPicker" onchange="onQueryPickerChange()" class="kql-query-picker">
+                            <option value="">-- Load a query --</option>
+                            <optgroup label="Presets" id="kqlPresetsGroup">
+                                <option value="preset:errors5xx">5xx Errors (last 1h)</option>
+                                <option value="preset:slowPages">Slow Pages (last 1h)</option>
+                                <option value="preset:requestVolume">Request Volume (24h)</option>
+                                <option value="preset:statusDist">Status Distribution (1h)</option>
+                                <option value="preset:topUrls">Top URLs (1h)</option>
+                            </optgroup>
+                            <optgroup label="Saved Queries" id="kqlSavedGroup">
+                            </optgroup>
+                        </select>
+                        <input type="text" id="kqlQueryName" placeholder="Query name..." class="save-query-input">
+                        <button onclick="saveKqlQuery()" class="btn-secondary save-query-btn">Save</button>
+                        <button onclick="deleteSelectedQuery()" class="btn-secondary btn-danger save-query-btn" id="kqlDeleteBtn" style="display: none;">Delete</button>
                         <button onclick="runKqlQuery()" class="btn-primary">Run Query</button>
                     </div>
                 </div>
                 <textarea id="kqlQuery" rows="6" placeholder="W3CIISLog&#10;| where TimeGenerated > ago(1h)&#10;| take 100"></textarea>
-
-                <!-- Saved Queries Bar -->
-                <div class="kql-saved-queries">
-                    <div class="saved-queries-header">
-                        <h4>Saved Queries</h4>
-                        <div class="save-query-form">
-                            <input type="text" id="kqlQueryName" placeholder="Query name..." class="save-query-input">
-                            <button onclick="saveKqlQuery()" class="btn-primary save-query-btn">Save Current</button>
-                        </div>
-                    </div>
-                    <div id="kqlSavedQueriesList" class="saved-queries-list">
-                        <p class="no-saved-queries">No saved queries yet</p>
-                    </div>
-                </div>
 
                 <!-- Loading Indicator -->
                 <div id="kqlLoading" class="loading-indicator" style="display: none;">
@@ -645,11 +641,50 @@
 | take 20`
         };
 
-        function loadKqlSample(sampleKey) {
-            const query = kqlSamples[sampleKey];
-            if (query) {
-                document.getElementById('kqlQuery').value = query;
+        function onQueryPickerChange() {
+            const picker = document.getElementById('kqlQueryPicker');
+            const val = picker.value;
+            const deleteBtn = document.getElementById('kqlDeleteBtn');
+
+            if (!val) {
+                deleteBtn.style.display = 'none';
+                return;
             }
+
+            if (val.startsWith('preset:')) {
+                const key = val.replace('preset:', '');
+                if (kqlSamples[key]) {
+                    document.getElementById('kqlQuery').value = kqlSamples[key];
+                }
+                deleteBtn.style.display = 'none';
+            } else if (val.startsWith('saved:')) {
+                const index = parseInt(val.replace('saved:', ''));
+                const queries = getSavedKqlQueries();
+                if (queries[index]) {
+                    document.getElementById('kqlQuery').value = queries[index].query;
+                    document.getElementById('kqlQueryName').value = queries[index].name;
+                }
+                deleteBtn.style.display = 'inline-block';
+            }
+        }
+
+        function deleteSelectedQuery() {
+            const picker = document.getElementById('kqlQueryPicker');
+            const val = picker.value;
+            if (!val.startsWith('saved:')) return;
+
+            const index = parseInt(val.replace('saved:', ''));
+            const queries = getSavedKqlQueries();
+            if (!queries[index]) return;
+
+            if (!confirm(`Delete saved query "${queries[index].name}"?`)) return;
+
+            queries.splice(index, 1);
+            localStorage.setItem(KQL_STORAGE_KEY, JSON.stringify(queries));
+            picker.value = '';
+            document.getElementById('kqlDeleteBtn').style.display = 'none';
+            document.getElementById('kqlQueryName').value = '';
+            renderSavedKqlQueries();
         }
 
         async function runKqlQuery() {
@@ -803,46 +838,25 @@
             localStorage.setItem(KQL_STORAGE_KEY, JSON.stringify(queries));
             document.getElementById('kqlQueryName').value = '';
             renderSavedKqlQueries();
-        }
 
-        function loadKqlQuery(index) {
-            const queries = getSavedKqlQueries();
-            if (queries[index]) {
-                document.getElementById('kqlQuery').value = queries[index].query;
-            }
-        }
-
-        function deleteKqlQuery(index) {
-            const queries = getSavedKqlQueries();
-            if (!queries[index]) return;
-
-            if (!confirm(`Delete saved query "${queries[index].name}"?`)) {
-                return;
-            }
-
-            queries.splice(index, 1);
-            localStorage.setItem(KQL_STORAGE_KEY, JSON.stringify(queries));
-            renderSavedKqlQueries();
+            // Select the newly saved query in the picker
+            const newIndex = queries.findIndex(q => q.name === name);
+            document.getElementById('kqlQueryPicker').value = `saved:${newIndex}`;
+            document.getElementById('kqlDeleteBtn').style.display = 'inline-block';
         }
 
         function renderSavedKqlQueries() {
-            const container = document.getElementById('kqlSavedQueriesList');
+            const group = document.getElementById('kqlSavedGroup');
             const queries = getSavedKqlQueries();
 
             if (queries.length === 0) {
-                container.innerHTML = '<p class="no-saved-queries">No saved queries yet</p>';
+                group.innerHTML = '<option value="" disabled>No saved queries</option>';
                 return;
             }
 
-            container.innerHTML = queries.map((q, i) => `
-                <div class="saved-query-item">
-                    <span class="saved-query-name" title="${escapeHtml(q.query)}">${escapeHtml(q.name)}</span>
-                    <div class="saved-query-actions">
-                        <button onclick="loadKqlQuery(${i})" class="btn-secondary btn-sm">Load</button>
-                        <button onclick="deleteKqlQuery(${i})" class="btn-secondary btn-sm btn-danger">Delete</button>
-                    </div>
-                </div>
-            `).join('');
+            group.innerHTML = queries.map((q, i) =>
+                `<option value="saved:${i}">${escapeHtml(q.name)}</option>`
+            ).join('');
         }
 
         // Set default date range (last 24 hours)

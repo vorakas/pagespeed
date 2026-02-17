@@ -3625,35 +3625,25 @@ body.light-mode .results-count {
     border-color: #10b981;
 }
 
-/* Saved Queries */
-.kql-saved-queries {
-    margin-top: 15px;
-    border-top: 1px solid #374151;
-    padding-top: 15px;
+/* Query Picker Dropdown */
+.kql-query-picker {
+    padding: 8px 12px;
+    background: #1a1f2e;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #e3e8ee;
+    font-size: 0.85em;
+    min-width: 200px;
+    cursor: pointer;
 }
 
-.saved-queries-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.saved-queries-header h4 {
-    color: #10b981;
-    margin: 0;
-}
-
-.save-query-form {
-    display: flex;
-    gap: 8px;
-    align-items: center;
+.kql-query-picker:focus {
+    outline: none;
+    border-color: #10b981;
 }
 
 .save-query-input {
-    width: 200px;
+    width: 160px;
     padding: 8px 12px;
     background: #1a1f2e;
     border: 1px solid #374151;
@@ -3671,49 +3661,6 @@ body.light-mode .results-count {
     width: auto;
     padding: 8px 16px;
     font-size: 0.85em;
-}
-
-.saved-queries-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.no-saved-queries {
-    color: #9ca3af;
-    font-size: 0.9em;
-    font-style: italic;
-}
-
-.saved-query-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: #1a1f2e;
-    border: 1px solid #374151;
-    border-radius: 6px;
-    padding: 6px 12px;
-}
-
-.saved-query-name {
-    color: #e3e8ee;
-    font-size: 0.85em;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.saved-query-actions {
-    display: flex;
-    gap: 4px;
-}
-
-.btn-sm {
-    width: auto;
-    padding: 4px 10px;
-    font-size: 0.75em;
-    margin-bottom: 0;
 }
 
 .btn-danger {
@@ -3789,12 +3736,17 @@ body.light-mode .kql-editor {
 }
 
 body.light-mode .kql-editor .editor-header h3,
-body.light-mode .saved-queries-header h4,
 body.light-mode .kql-results-header h4 {
     color: #667eea;
 }
 
 body.light-mode #kqlQuery {
+    background: white;
+    border-color: #e5e7eb;
+    color: #1f2937;
+}
+
+body.light-mode .kql-query-picker {
     background: white;
     border-color: #e5e7eb;
     color: #1f2937;
@@ -3806,22 +3758,9 @@ body.light-mode .save-query-input {
     color: #1f2937;
 }
 
-body.light-mode .saved-query-item {
-    background: white;
-    border-color: #e5e7eb;
-}
-
-body.light-mode .saved-query-name {
-    color: #1f2937;
-}
-
 body.light-mode .kql-json-view pre {
     background: white;
     border-color: #e5e7eb;
     color: #1f2937;
-}
-
-body.light-mode .kql-saved-queries {
-    border-top-color: #e5e7eb;
 }
 
