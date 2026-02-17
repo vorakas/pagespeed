@@ -2431,6 +2431,50 @@ body.light-mode .cell-full-value {
     color: #1f2937;
 }
 
+/* ==================== Resizable Table Columns ==================== */
+
+.resizable-table th {
+    position: relative;
+}
+
+.resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 5;
+}
+
+.resize-handle:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.resize-handle.active {
+    background: rgba(16, 185, 129, 0.6);
+}
+
+.resizable-table.resizing {
+    cursor: col-resize;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.resizable-table.resizing td,
+.resizable-table.resizing th {
+    cursor: col-resize;
+}
+
+body.light-mode .resize-handle:hover {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+body.light-mode .resize-handle.active {
+    background: rgba(102, 126, 234, 0.5);
+}
+
 /* Infrastructure Section */
 .infrastructure-section {
     background: #1a1f2e;

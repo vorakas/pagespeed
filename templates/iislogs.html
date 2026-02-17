@@ -137,16 +137,16 @@
             <div id="iisSearchResults" style="display: none;">
                 <p class="results-count" id="iisResultsCount"></p>
                 <div class="metrics-table-container">
-                    <table class="results-table">
+                    <table class="results-table resizable-table" id="iisLogsResultsTable">
                         <thead>
                             <tr>
-                                <th>Time</th>
-                                <th>Method</th>
-                                <th>URL Path</th>
-                                <th>Query String</th>
-                                <th>Status</th>
-                                <th>Time Taken (ms)</th>
-                                <th>Client IP</th>
+                                <th style="width: 160px">Time<div class="resize-handle"></div></th>
+                                <th style="width: 70px">Method<div class="resize-handle"></div></th>
+                                <th style="width: 200px">URL Path<div class="resize-handle"></div></th>
+                                <th style="width: 200px">Query String<div class="resize-handle"></div></th>
+                                <th style="width: 70px">Status<div class="resize-handle"></div></th>
+                                <th style="width: 110px">Time Taken (ms)<div class="resize-handle"></div></th>
+                                <th style="width: 120px">Client IP<div class="resize-handle"></div></th>
                                 <th>Site</th>
                             </tr>
                         </thead>
@@ -1030,11 +1030,51 @@
             document.getElementById('iisEndDate').value = formatDate(now);
         }
 
+        // ==================== Resizable Table Columns ====================
+
+        function initColumnResize() {
+            const table = document.getElementById('iisLogsResultsTable');
+            if (!table) return;
+
+            const handles = table.querySelectorAll('.resize-handle');
+
+            handles.forEach(handle => {
+                handle.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const th = handle.parentElement;
+                    const startX = e.pageX;
+                    const startWidth = th.offsetWidth;
+
+                    handle.classList.add('active');
+                    table.classList.add('resizing');
+
+                    function onMouseMove(e) {
+                        const delta = e.pageX - startX;
+                        const newWidth = Math.max(50, startWidth + delta);
+                        th.style.width = newWidth + 'px';
+                    }
+
+                    function onMouseUp() {
+                        handle.classList.remove('active');
+                        table.classList.remove('resizing');
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                    }
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+            });
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadAzureConfig();
             setDefaultDateRange();
             renderSavedKqlQueries();
+            initColumnResize();
         });
     </script>
 </body>
