@@ -149,17 +149,18 @@ class AzureLogAnalyticsService:
                 'message': 'Connected to workspace. W3CIISLog table exists but no recent data found.'
             }
 
-    def search_logs(self, start_date, end_date, url_filter=None, status_code=None, site_name=None, limit=100):
+    def search_logs(self, start_date, end_date, url_filter=None, status_code=None, site_name=None, limit=100, exact_url=False):
         """
         Search and filter IIS logs
 
         Args:
             start_date (str): Start datetime in ISO format
             end_date (str): End datetime in ISO format
-            url_filter (str): Optional URL path filter (contains match)
+            url_filter (str): Optional URL path filter (contains match by default)
             status_code (str): Optional status code filter (e.g., '4' for 4xx, '200' for exact)
             site_name (str): Optional IIS site name filter
             limit (int): Max number of rows to return
+            exact_url (bool): If True, use exact match for url_filter instead of contains
 
         Returns:
             dict: Search results with parsed log entries
@@ -180,7 +181,10 @@ class AzureLogAnalyticsService:
         ]
 
         if url_filter:
-            filters.append(f"csUriStem contains '{url_filter}'")
+            if exact_url:
+                filters.append(f"csUriStem == '{url_filter}'")
+            else:
+                filters.append(f"csUriStem contains '{url_filter}'")
 
         if status_code:
             if len(status_code) == 1:

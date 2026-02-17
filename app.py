@@ -942,13 +942,14 @@ def ai_analyze():
 
             site_name = data.get('azure_site_name')
 
-            # IIS log requests for this specific URL only
+            # IIS log requests for this specific URL only (exact match)
             slow_result = az_service.search_logs(
                 start_date=start_date,
                 end_date=end_date,
                 url_filter=url_path,
                 site_name=site_name,
-                limit=20
+                limit=20,
+                exact_url=True
             )
             if isinstance(slow_result, dict) and slow_result.get('success'):
                 iis_data['slow_requests'] = slow_result.get('logs', [])
