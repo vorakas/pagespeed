@@ -147,6 +147,69 @@
             </div>
         </section>
 
+        <!-- KQL Query Mode Section -->
+        <section class="kql-section" id="kqlQuerySection" style="display: none;">
+            <h2>KQL Query Mode</h2>
+            <div class="kql-editor">
+                <div class="editor-header">
+                    <h3>Query Editor</h3>
+                    <div class="query-actions">
+                        <button onclick="loadKqlSample('errors5xx')" class="btn-secondary">5xx Errors</button>
+                        <button onclick="loadKqlSample('slowPages')" class="btn-secondary">Slow Pages</button>
+                        <button onclick="loadKqlSample('requestVolume')" class="btn-secondary">Request Volume</button>
+                        <button onclick="loadKqlSample('statusDist')" class="btn-secondary">Status Dist</button>
+                        <button onclick="loadKqlSample('topUrls')" class="btn-secondary">Top URLs</button>
+                        <button onclick="runKqlQuery()" class="btn-primary">Run Query</button>
+                    </div>
+                </div>
+                <textarea id="kqlQuery" rows="6" placeholder="W3CIISLog&#10;| where TimeGenerated > ago(1h)&#10;| take 100"></textarea>
+
+                <!-- Saved Queries Bar -->
+                <div class="kql-saved-queries">
+                    <div class="saved-queries-header">
+                        <h4>Saved Queries</h4>
+                        <div class="save-query-form">
+                            <input type="text" id="kqlQueryName" placeholder="Query name..." class="save-query-input">
+                            <button onclick="saveKqlQuery()" class="btn-primary save-query-btn">Save Current</button>
+                        </div>
+                    </div>
+                    <div id="kqlSavedQueriesList" class="saved-queries-list">
+                        <p class="no-saved-queries">No saved queries yet</p>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="kqlLoading" class="loading-indicator" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p>Executing KQL query...</p>
+                </div>
+
+                <!-- Results Area -->
+                <div id="kqlResults" class="query-results" style="display: none;">
+                    <div class="kql-results-header">
+                        <h4>Results (<span id="kqlResultCount">0</span> rows)</h4>
+                        <div class="kql-results-toggle">
+                            <button id="kqlTableViewBtn" onclick="switchKqlView('table')" class="btn-secondary active">Table View</button>
+                            <button id="kqlJsonViewBtn" onclick="switchKqlView('json')" class="btn-secondary">Raw JSON</button>
+                        </div>
+                    </div>
+                    <!-- Table View -->
+                    <div id="kqlTableView" class="kql-table-view">
+                        <div class="metrics-table-container">
+                            <table class="results-table">
+                                <thead id="kqlTableHead"></thead>
+                                <tbody id="kqlTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- JSON View -->
+                    <div id="kqlJsonView" class="kql-json-view" style="display: none;">
+                        <pre id="kqlJsonContent"></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Dashboard Summary Section -->
         <section class="iis-dashboard-section" id="iisDashboardSection" style="display: none;">
             <h2>Dashboard Summary</h2>
@@ -358,6 +421,7 @@
                     // Show search and dashboard sections
                     document.getElementById('iisSearchSection').style.display = 'block';
                     document.getElementById('iisDashboardSection').style.display = 'block';
+                    document.getElementById('kqlQuerySection').style.display = 'block';
                 } else {
                     status.className = 'connection-status error';
                     status.textContent = data.message || 'Connection failed.';
@@ -550,6 +614,237 @@
             return div.innerHTML;
         }
 
+        // ==================== KQL Query Mode ====================
+
+        const kqlSamples = {
+            errors5xx: `W3CIISLog
+| where TimeGenerated > ago(1h)
+| where scStatus >= 500
+| project TimeGenerated, csMethod, csUriStem, csUriQuery, scStatus, TimeTaken, cIP, sSiteName
+| order by TimeGenerated desc
+| take 100`,
+            slowPages: `W3CIISLog
+| where TimeGenerated > ago(1h)
+| where TimeTaken > 5000
+| project TimeGenerated, csMethod, csUriStem, scStatus, TimeTaken, cIP
+| order by TimeTaken desc
+| take 50`,
+            requestVolume: `W3CIISLog
+| where TimeGenerated > ago(24h)
+| summarize RequestCount = count() by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc`,
+            statusDist: `W3CIISLog
+| where TimeGenerated > ago(1h)
+| summarize Count = count() by scStatus
+| order by Count desc`,
+            topUrls: `W3CIISLog
+| where TimeGenerated > ago(1h)
+| where csUriStem !endswith ".css" and csUriStem !endswith ".js" and csUriStem !endswith ".png" and csUriStem !endswith ".jpg" and csUriStem !endswith ".ico"
+| summarize Requests = count(), AvgTime = avg(TimeTaken), P95Time = percentile(TimeTaken, 95) by csUriStem
+| order by Requests desc
+| take 20`
+        };
+
+        function loadKqlSample(sampleKey) {
+            const query = kqlSamples[sampleKey];
+            if (query) {
+                document.getElementById('kqlQuery').value = query;
+            }
+        }
+
+        async function runKqlQuery() {
+            const query = document.getElementById('kqlQuery').value.trim();
+            if (!query) {
+                alert('Please enter a KQL query.');
+                return;
+            }
+
+            if (!azureConfig.tenantId || !azureConfig.clientId || !azureConfig.clientSecret || !azureConfig.workspaceId) {
+                alert('Please configure Azure credentials first.');
+                return;
+            }
+
+            document.getElementById('kqlLoading').style.display = 'flex';
+            document.getElementById('kqlResults').style.display = 'none';
+
+            try {
+                const payload = {
+                    ...getAzureAuthPayload(),
+                    query: query
+                };
+
+                const response = await fetch('/api/azure/execute-query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                document.getElementById('kqlLoading').style.display = 'none';
+
+                if (!response.ok || !data.success) {
+                    document.getElementById('kqlResults').style.display = 'block';
+                    document.getElementById('kqlResultCount').textContent = '0';
+                    document.getElementById('kqlTableHead').innerHTML = '';
+                    document.getElementById('kqlTableBody').innerHTML =
+                        `<tr><td style="color: #ef4444; padding: 20px;">Error: ${escapeHtml(data.error || 'Unknown error')}</td></tr>`;
+                    document.getElementById('kqlJsonContent').textContent = JSON.stringify(data, null, 2);
+                    return;
+                }
+
+                displayKqlResults(data);
+
+            } catch (error) {
+                document.getElementById('kqlLoading').style.display = 'none';
+                alert('Error executing query: ' + error.message);
+            }
+        }
+
+        function displayKqlResults(data) {
+            document.getElementById('kqlResults').style.display = 'block';
+            document.getElementById('kqlResultCount').textContent = data.count;
+
+            // Build dynamic table header from columns
+            const thead = document.getElementById('kqlTableHead');
+            if (data.columns && data.columns.length > 0) {
+                thead.innerHTML = '<tr>' + data.columns.map(col => `<th>${escapeHtml(col)}</th>`).join('') + '</tr>';
+            } else {
+                thead.innerHTML = '';
+            }
+
+            // Build table body
+            const tbody = document.getElementById('kqlTableBody');
+            if (!data.rows || data.rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="' + (data.columns ? data.columns.length : 1) + '" style="text-align: center; padding: 40px; color: #9ca3af;">No results returned</td></tr>';
+            } else {
+                tbody.innerHTML = data.rows.map(row => {
+                    return '<tr>' + data.columns.map(col => {
+                        let val = row[col];
+                        // Format dates
+                        if (col === 'TimeGenerated' && val) {
+                            val = new Date(val).toLocaleString();
+                        }
+                        // Format numbers
+                        if (typeof val === 'number') {
+                            val = Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        }
+                        // Status code coloring
+                        if (col === 'scStatus' && val) {
+                            const statusClass = getStatusClass(val);
+                            return `<td><span class="${statusClass}">${escapeHtml(String(val))}</span></td>`;
+                        }
+                        return `<td>${escapeHtml(String(val ?? '--'))}</td>`;
+                    }).join('') + '</tr>';
+                }).join('');
+            }
+
+            // Populate raw JSON view
+            document.getElementById('kqlJsonContent').textContent = JSON.stringify(data.raw, null, 2);
+
+            // Ensure table view is shown by default
+            switchKqlView('table');
+        }
+
+        function switchKqlView(view) {
+            const tableView = document.getElementById('kqlTableView');
+            const jsonView = document.getElementById('kqlJsonView');
+            const tableBtn = document.getElementById('kqlTableViewBtn');
+            const jsonBtn = document.getElementById('kqlJsonViewBtn');
+
+            if (view === 'table') {
+                tableView.style.display = 'block';
+                jsonView.style.display = 'none';
+                tableBtn.classList.add('active');
+                jsonBtn.classList.remove('active');
+            } else {
+                tableView.style.display = 'none';
+                jsonView.style.display = 'block';
+                tableBtn.classList.remove('active');
+                jsonBtn.classList.add('active');
+            }
+        }
+
+        // ==================== Saved Queries ====================
+
+        const KQL_STORAGE_KEY = 'kqlSavedQueries';
+
+        function getSavedKqlQueries() {
+            try {
+                return JSON.parse(localStorage.getItem(KQL_STORAGE_KEY)) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveKqlQuery() {
+            const name = document.getElementById('kqlQueryName').value.trim();
+            const query = document.getElementById('kqlQuery').value.trim();
+
+            if (!name) {
+                alert('Please enter a name for this query.');
+                return;
+            }
+            if (!query) {
+                alert('Please enter a KQL query to save.');
+                return;
+            }
+
+            const queries = getSavedKqlQueries();
+            const existingIndex = queries.findIndex(q => q.name === name);
+            if (existingIndex >= 0) {
+                if (!confirm(`A query named "${name}" already exists. Overwrite it?`)) {
+                    return;
+                }
+                queries[existingIndex].query = query;
+            } else {
+                queries.push({ name: name, query: query });
+            }
+
+            localStorage.setItem(KQL_STORAGE_KEY, JSON.stringify(queries));
+            document.getElementById('kqlQueryName').value = '';
+            renderSavedKqlQueries();
+        }
+
+        function loadKqlQuery(index) {
+            const queries = getSavedKqlQueries();
+            if (queries[index]) {
+                document.getElementById('kqlQuery').value = queries[index].query;
+            }
+        }
+
+        function deleteKqlQuery(index) {
+            const queries = getSavedKqlQueries();
+            if (!queries[index]) return;
+
+            if (!confirm(`Delete saved query "${queries[index].name}"?`)) {
+                return;
+            }
+
+            queries.splice(index, 1);
+            localStorage.setItem(KQL_STORAGE_KEY, JSON.stringify(queries));
+            renderSavedKqlQueries();
+        }
+
+        function renderSavedKqlQueries() {
+            const container = document.getElementById('kqlSavedQueriesList');
+            const queries = getSavedKqlQueries();
+
+            if (queries.length === 0) {
+                container.innerHTML = '<p class="no-saved-queries">No saved queries yet</p>';
+                return;
+            }
+
+            container.innerHTML = queries.map((q, i) => `
+                <div class="saved-query-item">
+                    <span class="saved-query-name" title="${escapeHtml(q.query)}">${escapeHtml(q.name)}</span>
+                    <div class="saved-query-actions">
+                        <button onclick="loadKqlQuery(${i})" class="btn-secondary btn-sm">Load</button>
+                        <button onclick="deleteKqlQuery(${i})" class="btn-secondary btn-sm btn-danger">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
         // Set default date range (last 24 hours)
         function setDefaultDateRange() {
             const now = new Date();
@@ -572,6 +867,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadAzureConfig();
             setDefaultDateRange();
+            renderSavedKqlQueries();
         });
     </script>
 </body>

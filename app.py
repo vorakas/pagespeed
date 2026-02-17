@@ -786,6 +786,51 @@ def azure_dashboard_summary():
     return jsonify(result)
 
 
+@app.route('/api/azure/execute-query', methods=['POST'])
+def azure_execute_query():
+    """Execute a raw KQL query against Azure Log Analytics"""
+    data = request.get_json()
+
+    required_fields = ['tenant_id', 'client_id', 'client_secret', 'workspace_id', 'query']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
+
+    query = data['query'].strip()
+    if not query:
+        return jsonify({'success': False, 'error': 'Query cannot be empty'}), 400
+
+    service = AzureLogAnalyticsService(
+        tenant_id=data['tenant_id'],
+        client_id=data['client_id'],
+        client_secret=data['client_secret'],
+        workspace_id=data['workspace_id']
+    )
+
+    timespan = data.get('timespan')
+    response = service.execute_query(query, timespan=timespan)
+
+    if isinstance(response, dict) and 'error' in response:
+        return jsonify({'success': False, 'error': response['error']}), 500
+
+    # Parse into rows for table display
+    rows = service._parse_table_response(response)
+
+    # Extract column metadata from raw response
+    columns = []
+    tables = response.get('tables', [])
+    if tables:
+        columns = [col['name'] for col in tables[0].get('columns', [])]
+
+    return jsonify({
+        'success': True,
+        'columns': columns,
+        'rows': rows,
+        'count': len(rows),
+        'raw': response
+    })
+
+
 if __name__ == '__main__':
     # Create some sample data if database is empty
     sites = db.get_sites()
