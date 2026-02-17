@@ -91,15 +91,20 @@
                 <span id="azureStatus" class="data-source-badge"></span>
             </div>
 
-            <div class="ai-input-grid">
+            <!-- URL inputs (full width, stacked) -->
+            <div class="ai-url-inputs">
                 <div class="form-group">
-                    <label for="aiUrlPath">URL Path to Analyze</label>
+                    <label for="aiUrlPath">URL Path to Analyze (for IIS Logs)</label>
                     <input type="text" id="aiUrlPath" placeholder="/products/ceiling-fans">
                 </div>
                 <div class="form-group">
                     <label for="aiPageUrl">Full Page URL (for Core Web Vitals)</label>
                     <input type="text" id="aiPageUrl" placeholder="https://www.lampsplus.com/products/ceiling-fans/">
                 </div>
+            </div>
+
+            <!-- Options row -->
+            <div class="ai-input-grid">
                 <div class="form-group">
                     <label for="aiTimeRange">Time Range</label>
                     <select id="aiTimeRange">
