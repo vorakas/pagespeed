@@ -193,9 +193,16 @@
                 <div id="kqlResults" class="query-results" style="display: none;">
                     <div class="kql-results-header">
                         <h4>Results (<span id="kqlResultCount">0</span> rows)</h4>
-                        <div class="kql-results-toggle">
-                            <button id="kqlTableViewBtn" onclick="switchKqlView('table')" class="btn-secondary active">Table View</button>
-                            <button id="kqlJsonViewBtn" onclick="switchKqlView('json')" class="btn-secondary">Raw JSON</button>
+                        <div class="kql-results-actions">
+                            <div class="kql-export-info" id="kqlExportInfo" style="display: none;">
+                                <span id="kqlCsvSize" class="export-size-label"></span>
+                                <button onclick="downloadKqlCsv()" class="btn-secondary export-btn">⬇ CSV</button>
+                                <button onclick="downloadKqlZip()" class="btn-secondary export-btn">⬇ ZIP</button>
+                            </div>
+                            <div class="kql-results-toggle">
+                                <button id="kqlTableViewBtn" onclick="switchKqlView('table')" class="btn-secondary active">Table View</button>
+                                <button id="kqlJsonViewBtn" onclick="switchKqlView('json')" class="btn-secondary">Raw JSON</button>
+                            </div>
                         </div>
                     </div>
                     <!-- Table View -->
@@ -314,6 +321,7 @@
         </section>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script>
         // Azure config object
@@ -677,6 +685,9 @@
 
         // ==================== KQL Query Mode ====================
 
+        // Store last query results for export
+        let lastKqlResult = null;
+
         const kqlSamples = {
             errors5xx: `W3CIISLog
 | where TimeGenerated > ago(1h)
@@ -801,8 +812,19 @@
         }
 
         function displayKqlResults(data) {
+            lastKqlResult = data;
             document.getElementById('kqlResults').style.display = 'block';
             document.getElementById('kqlResultCount').textContent = data.count;
+
+            // Show export info with estimated CSV size
+            if (data.rows && data.rows.length > 0 && data.columns && data.columns.length > 0) {
+                const csvContent = buildCsvContent(data.columns, data.rows);
+                const sizeBytes = new Blob([csvContent]).size;
+                document.getElementById('kqlCsvSize').textContent = formatFileSize(sizeBytes);
+                document.getElementById('kqlExportInfo').style.display = 'flex';
+            } else {
+                document.getElementById('kqlExportInfo').style.display = 'none';
+            }
 
             // Build dynamic table header from columns
             const thead = document.getElementById('kqlTableHead');
@@ -862,6 +884,71 @@
                 tableBtn.classList.remove('active');
                 jsonBtn.classList.add('active');
             }
+        }
+
+        // ==================== CSV / ZIP Export ====================
+
+        function buildCsvContent(columns, rows) {
+            // Escape CSV field: wrap in quotes if it contains comma, quote, or newline
+            const escCsv = (val) => {
+                if (val == null) return '';
+                const str = String(val);
+                if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+                    return '"' + str.replace(/"/g, '""') + '"';
+                }
+                return str;
+            };
+
+            const header = columns.map(escCsv).join(',');
+            const body = rows.map(row =>
+                columns.map(col => escCsv(row[col] ?? '')).join(',')
+            ).join('\n');
+
+            return header + '\n' + body;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function downloadKqlCsv() {
+            if (!lastKqlResult || !lastKqlResult.rows || !lastKqlResult.columns) return;
+
+            const csv = buildCsvContent(lastKqlResult.columns, lastKqlResult.rows);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'kql-results-' + new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-') + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function downloadKqlZip() {
+            if (!lastKqlResult || !lastKqlResult.rows || !lastKqlResult.columns) return;
+
+            const csv = buildCsvContent(lastKqlResult.columns, lastKqlResult.rows);
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+            const csvFilename = 'kql-results-' + timestamp + '.csv';
+
+            const zip = new JSZip();
+            zip.file(csvFilename, csv);
+
+            const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'kql-results-' + timestamp + '.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         // ==================== Saved Queries ====================

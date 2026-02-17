@@ -3776,6 +3776,32 @@ body.light-mode .site-selector select {
     word-wrap: break-word;
 }
 
+/* KQL Export */
+.kql-results-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.kql-export-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.export-size-label {
+    color: #9ca3af;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.export-btn {
+    width: auto !important;
+    padding: 5px 12px !important;
+    font-size: 0.82em !important;
+    margin-bottom: 0 !important;
+}
+
 /* KQL Light Mode Overrides */
 body.light-mode .kql-section {
     background: white;
@@ -3819,5 +3845,9 @@ body.light-mode .kql-json-view pre {
     background: white;
     border-color: #e5e7eb;
     color: #1f2937;
+}
+
+body.light-mode .export-size-label {
+    color: #6b7280;
 }
 
