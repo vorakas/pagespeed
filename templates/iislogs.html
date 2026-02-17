@@ -42,16 +42,537 @@
             </div>
         </header>
 
-        <!-- Under Construction Section -->
-        <section class="construction-section">
-            <div class="construction-content">
-                <div class="construction-icon">🚧</div>
-                <h2>Under Construction</h2>
-                <p>IIS Logs analysis coming soon!</p>
+        <!-- Azure Configuration Section -->
+        <section class="azure-config-section">
+            <h2>Azure Log Analytics Configuration</h2>
+            <div class="config-grid">
+                <div class="config-card">
+                    <h3>Azure AD Authentication</h3>
+                    <div class="form-group">
+                        <label for="azureTenantId">Tenant ID</label>
+                        <input type="text" id="azureTenantId" placeholder="Enter your Directory (Tenant) ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="azureClientId">Client ID</label>
+                        <input type="text" id="azureClientId" placeholder="Enter your Application (Client) ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="azureClientSecret">Client Secret</label>
+                        <input type="password" id="azureClientSecret" placeholder="Enter your Client Secret Value">
+                    </div>
+                    <button onclick="saveAzureConfig()" class="btn-primary">Save Configuration</button>
+                </div>
+                <div class="config-card">
+                    <h3>Workspace Settings</h3>
+                    <div class="form-group">
+                        <label for="azureWorkspaceId">Workspace ID</label>
+                        <input type="text" id="azureWorkspaceId" placeholder="Enter your Log Analytics Workspace ID" value="25e8966e-de87-423b-bb3f-94ceed33a16b">
+                    </div>
+                    <div class="form-group">
+                        <label for="azureSecretExpiration">Secret Expiration Date</label>
+                        <input type="date" id="azureSecretExpiration">
+                    </div>
+                    <button onclick="testAzureConnection()" class="btn-secondary">Test Connection</button>
+                </div>
+            </div>
+            <div id="secretExpirationWarning" class="secret-expiration-warning" style="display: none;"></div>
+            <div id="azureConnectionStatus" class="connection-status" style="display: none;"></div>
+        </section>
+
+        <!-- Search & Filter Section -->
+        <section class="iis-search-section" id="iisSearchSection" style="display: none;">
+            <h2>Search & Filter IIS Logs</h2>
+            <div class="search-filters">
+                <div class="form-group">
+                    <label for="iisStartDate">Start Date</label>
+                    <input type="datetime-local" id="iisStartDate">
+                </div>
+                <div class="form-group">
+                    <label for="iisEndDate">End Date</label>
+                    <input type="datetime-local" id="iisEndDate">
+                </div>
+                <div class="form-group">
+                    <label for="iisUrlFilter">URL Path Filter</label>
+                    <input type="text" id="iisUrlFilter" placeholder="e.g. /products">
+                </div>
+                <div class="form-group">
+                    <label for="iisStatusFilter">Status Code</label>
+                    <select id="iisStatusFilter">
+                        <option value="">All</option>
+                        <option value="2">2xx Success</option>
+                        <option value="3">3xx Redirect</option>
+                        <option value="4">4xx Client Error</option>
+                        <option value="5">5xx Server Error</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="iisLimit">Limit</label>
+                    <select id="iisLimit">
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                        <option value="250">250</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+                <div class="form-group" style="align-self: end;">
+                    <button onclick="searchIISLogs()" class="btn-primary">Search Logs</button>
+                </div>
+            </div>
+
+            <div id="iisSearchLoading" class="loading-indicator" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Searching IIS logs...</p>
+            </div>
+
+            <div id="iisSearchResults" style="display: none;">
+                <p class="results-count" id="iisResultsCount"></p>
+                <div class="metrics-table-container">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Method</th>
+                                <th>URL Path</th>
+                                <th>Query String</th>
+                                <th>Status</th>
+                                <th>Time Taken (ms)</th>
+                                <th>Client IP</th>
+                                <th>Site</th>
+                            </tr>
+                        </thead>
+                        <tbody id="iisLogsTable">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Summary Section -->
+        <section class="iis-dashboard-section" id="iisDashboardSection" style="display: none;">
+            <h2>Dashboard Summary</h2>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Requests</div>
+                        <div class="stat-value" id="iisTotalRequests">--</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⚠️</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Client Errors (4xx)</div>
+                        <div class="stat-value" id="iisErrors4xx">--</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔴</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Server Errors (5xx)</div>
+                        <div class="stat-value" id="iisErrors5xx">--</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg Response Time</div>
+                        <div class="stat-value" id="iisAvgTime">-- ms</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Response Time Breakdown -->
+            <div class="breakdown-section">
+                <h3>Response Time Breakdown</h3>
+                <div class="breakdown-grid">
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">P50 (Median)</span>
+                        <span class="breakdown-value" id="iisP50">-- ms</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">P90</span>
+                        <span class="breakdown-value" id="iisP90">-- ms</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">P99</span>
+                        <span class="breakdown-value" id="iisP99">-- ms</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">Max</span>
+                        <span class="breakdown-value" id="iisMax">-- ms</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Pages & Status Distribution side by side -->
+            <div class="iis-tables-grid">
+                <div>
+                    <h3>Top Pages by Request Count</h3>
+                    <div class="metrics-table-container">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>URL Path</th>
+                                    <th>Requests</th>
+                                    <th>Avg Time (ms)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="iisTopPagesTable">
+                                <tr><td colspan="3" style="text-align: center; padding: 20px; color: #9ca3af;">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <h3>Status Code Distribution</h3>
+                    <div class="metrics-table-container">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>Status Code</th>
+                                    <th>Count</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody id="iisStatusTable">
+                                <tr><td colspan="3" style="text-align: center; padding: 20px; color: #9ca3af;">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // Azure config object
+        let azureConfig = {
+            tenantId: null,
+            clientId: null,
+            clientSecret: null,
+            workspaceId: '25e8966e-de87-423b-bb3f-94ceed33a16b',
+            secretExpiration: null
+        };
+
+        // Save config to localStorage
+        function saveAzureConfig() {
+            azureConfig.tenantId = document.getElementById('azureTenantId').value.trim();
+            azureConfig.clientId = document.getElementById('azureClientId').value.trim();
+            azureConfig.clientSecret = document.getElementById('azureClientSecret').value.trim();
+            azureConfig.workspaceId = document.getElementById('azureWorkspaceId').value.trim();
+            azureConfig.secretExpiration = document.getElementById('azureSecretExpiration').value;
+
+            localStorage.setItem('azureConfig', JSON.stringify(azureConfig));
+            checkSecretExpiration();
+
+            const status = document.getElementById('azureConnectionStatus');
+            status.style.display = 'block';
+            status.className = 'connection-status success';
+            status.textContent = 'Configuration saved.';
+            setTimeout(() => { status.style.display = 'none'; }, 3000);
+        }
+
+        // Load config from localStorage
+        function loadAzureConfig() {
+            const saved = localStorage.getItem('azureConfig');
+            if (saved) {
+                try {
+                    azureConfig = JSON.parse(saved);
+                    document.getElementById('azureTenantId').value = azureConfig.tenantId || '';
+                    document.getElementById('azureClientId').value = azureConfig.clientId || '';
+                    document.getElementById('azureClientSecret').value = azureConfig.clientSecret || '';
+                    document.getElementById('azureWorkspaceId').value = azureConfig.workspaceId || '25e8966e-de87-423b-bb3f-94ceed33a16b';
+                    document.getElementById('azureSecretExpiration').value = azureConfig.secretExpiration || '';
+                } catch (e) {
+                    console.error('Error loading Azure config:', e);
+                }
+            }
+            checkSecretExpiration();
+        }
+
+        // Check and display secret expiration warning
+        function checkSecretExpiration() {
+            const warningEl = document.getElementById('secretExpirationWarning');
+            const expDate = azureConfig.secretExpiration;
+
+            if (!expDate) {
+                warningEl.style.display = 'none';
+                return;
+            }
+
+            const expiration = new Date(expDate);
+            const now = new Date();
+            const daysUntilExpiry = Math.ceil((expiration - now) / (1000 * 60 * 60 * 24));
+
+            if (daysUntilExpiry < 0) {
+                warningEl.style.display = 'block';
+                warningEl.className = 'secret-expiration-warning expired';
+                warningEl.textContent = `CLIENT SECRET HAS EXPIRED (${expDate}). Please generate a new secret in the Azure Portal.`;
+            } else if (daysUntilExpiry <= 30) {
+                warningEl.style.display = 'block';
+                warningEl.className = 'secret-expiration-warning warning';
+                warningEl.textContent = `Client secret expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''} (${expDate}). Please plan to rotate it.`;
+            } else {
+                warningEl.style.display = 'none';
+            }
+        }
+
+        // Test connection to Azure
+        async function testAzureConnection() {
+            // Save first
+            saveAzureConfig();
+
+            if (!azureConfig.tenantId || !azureConfig.clientId || !azureConfig.clientSecret || !azureConfig.workspaceId) {
+                const status = document.getElementById('azureConnectionStatus');
+                status.style.display = 'block';
+                status.className = 'connection-status error';
+                status.textContent = 'Please fill in all configuration fields.';
+                return;
+            }
+
+            const status = document.getElementById('azureConnectionStatus');
+            status.style.display = 'block';
+            status.className = 'connection-status';
+            status.textContent = 'Testing connection...';
+
+            try {
+                const response = await fetch('/api/azure/test-connection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tenant_id: azureConfig.tenantId,
+                        client_id: azureConfig.clientId,
+                        client_secret: azureConfig.clientSecret,
+                        workspace_id: azureConfig.workspaceId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    status.className = data.warning ? 'connection-status warning' : 'connection-status success';
+                    status.textContent = data.message;
+                    // Show search and dashboard sections
+                    document.getElementById('iisSearchSection').style.display = 'block';
+                    document.getElementById('iisDashboardSection').style.display = 'block';
+                } else {
+                    status.className = 'connection-status error';
+                    status.textContent = data.message || 'Connection failed.';
+                }
+            } catch (error) {
+                status.className = 'connection-status error';
+                status.textContent = 'Error testing connection: ' + error.message;
+            }
+        }
+
+        // Get auth payload for API calls
+        function getAzureAuthPayload() {
+            return {
+                tenant_id: azureConfig.tenantId,
+                client_id: azureConfig.clientId,
+                client_secret: azureConfig.clientSecret,
+                workspace_id: azureConfig.workspaceId
+            };
+        }
+
+        // Search IIS logs
+        async function searchIISLogs() {
+            const startDate = document.getElementById('iisStartDate').value;
+            const endDate = document.getElementById('iisEndDate').value;
+
+            if (!startDate || !endDate) {
+                alert('Please select start and end dates.');
+                return;
+            }
+
+            document.getElementById('iisSearchLoading').style.display = 'flex';
+            document.getElementById('iisSearchResults').style.display = 'none';
+
+            try {
+                const payload = {
+                    ...getAzureAuthPayload(),
+                    start_date: new Date(startDate).toISOString(),
+                    end_date: new Date(endDate).toISOString(),
+                    url_filter: document.getElementById('iisUrlFilter').value.trim() || null,
+                    status_code: document.getElementById('iisStatusFilter').value || null,
+                    limit: parseInt(document.getElementById('iisLimit').value)
+                };
+
+                const response = await fetch('/api/azure/search-logs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                document.getElementById('iisSearchLoading').style.display = 'none';
+
+                if (!response.ok || !data.success) {
+                    document.getElementById('iisSearchResults').style.display = 'block';
+                    document.getElementById('iisResultsCount').textContent = 'Error: ' + (data.error || 'Unknown error');
+                    document.getElementById('iisLogsTable').innerHTML = '';
+                    return;
+                }
+
+                document.getElementById('iisSearchResults').style.display = 'block';
+                document.getElementById('iisResultsCount').textContent = `Found ${data.count} log entries`;
+                populateLogsTable(data.logs);
+
+                // Also load dashboard with same date range
+                loadDashboardSummary(startDate, endDate);
+
+            } catch (error) {
+                document.getElementById('iisSearchLoading').style.display = 'none';
+                console.error('Error searching logs:', error);
+            }
+        }
+
+        function populateLogsTable(logs) {
+            const tbody = document.getElementById('iisLogsTable');
+            if (!logs || logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #9ca3af;">No log entries found for this filter</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = logs.map(log => {
+                const time = log.TimeGenerated ? new Date(log.TimeGenerated).toLocaleString() : '--';
+                const statusClass = getStatusClass(log.scStatus);
+                return `
+                <tr>
+                    <td>${time}</td>
+                    <td>${log.csMethod || '--'}</td>
+                    <td><code>${escapeHtml(log.csUriStem || '--')}</code></td>
+                    <td>${escapeHtml(log.csUriQuery || '--')}</td>
+                    <td><span class="${statusClass}">${log.scStatus || '--'}</span></td>
+                    <td>${log.TimeTaken != null ? Number(log.TimeTaken).toLocaleString() : '--'}</td>
+                    <td>${log.cIP || '--'}</td>
+                    <td>${log.sSiteName || '--'}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Dashboard summary
+        async function loadDashboardSummary(startDate, endDate) {
+            try {
+                const payload = {
+                    ...getAzureAuthPayload(),
+                    start_date: new Date(startDate).toISOString(),
+                    end_date: new Date(endDate).toISOString()
+                };
+
+                const response = await fetch('/api/azure/dashboard-summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    console.error('Dashboard error:', data.error);
+                    return;
+                }
+
+                populateDashboard(data);
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        function populateDashboard(data) {
+            const s = data.summary;
+
+            // Stat cards
+            document.getElementById('iisTotalRequests').textContent = Number(s.totalRequests).toLocaleString();
+
+            const err4xx = document.getElementById('iisErrors4xx');
+            err4xx.textContent = Number(s.errorCount4xx).toLocaleString();
+            err4xx.style.color = s.errorCount4xx > 0 ? '#f59e0b' : '';
+
+            const err5xx = document.getElementById('iisErrors5xx');
+            err5xx.textContent = Number(s.errorCount5xx).toLocaleString();
+            err5xx.style.color = s.errorCount5xx > 0 ? '#ef4444' : '';
+
+            document.getElementById('iisAvgTime').textContent = s.avgTimeTaken + ' ms';
+
+            // Response time breakdown
+            document.getElementById('iisP50').textContent = s.p50TimeTaken + ' ms';
+            document.getElementById('iisP90').textContent = s.p90TimeTaken + ' ms';
+            document.getElementById('iisP99').textContent = s.p99TimeTaken + ' ms';
+            document.getElementById('iisMax').textContent = Number(s.maxTimeTaken).toLocaleString() + ' ms';
+
+            // Top pages
+            const topPagesBody = document.getElementById('iisTopPagesTable');
+            if (data.topPages && data.topPages.length > 0) {
+                topPagesBody.innerHTML = data.topPages.map(p => `
+                    <tr>
+                        <td><code>${escapeHtml(p.url)}</code></td>
+                        <td>${Number(p.requestCount).toLocaleString()}</td>
+                        <td>${p.avgTimeTaken}</td>
+                    </tr>
+                `).join('');
+            }
+
+            // Status distribution
+            const statusBody = document.getElementById('iisStatusTable');
+            if (data.statusDistribution && data.statusDistribution.length > 0) {
+                statusBody.innerHTML = data.statusDistribution.map(s => `
+                    <tr>
+                        <td><span class="${getStatusClass(s.statusCode)}">${s.statusCode}</span></td>
+                        <td>${Number(s.count).toLocaleString()}</td>
+                        <td>${s.percentage}%</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Helper: get CSS class for status code
+        function getStatusClass(code) {
+            if (!code) return '';
+            const c = parseInt(code);
+            if (c >= 500) return 'status-5xx';
+            if (c >= 400) return 'status-4xx';
+            if (c >= 300) return 'status-3xx';
+            if (c >= 200) return 'status-2xx';
+            return '';
+        }
+
+        // Helper: escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Set default date range (last 24 hours)
+        function setDefaultDateRange() {
+            const now = new Date();
+            const yesterday = new Date(now - 24 * 60 * 60 * 1000);
+
+            // Format for datetime-local input (YYYY-MM-DDThh:mm)
+            const formatDate = (d) => {
+                return d.getFullYear() + '-' +
+                    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(d.getDate()).padStart(2, '0') + 'T' +
+                    String(d.getHours()).padStart(2, '0') + ':' +
+                    String(d.getMinutes()).padStart(2, '0');
+            };
+
+            document.getElementById('iisStartDate').value = formatDate(yesterday);
+            document.getElementById('iisEndDate').value = formatDate(now);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAzureConfig();
+            setDefaultDateRange();
+        });
+    </script>
 </body>
 </html>

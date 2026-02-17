@@ -4,6 +4,7 @@ from pagespeed_service import PageSpeedService
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 from newrelic_service import NewRelicService
+from azure_service import AzureLogAnalyticsService
 import os
 import json
 from dotenv import load_dotenv
@@ -701,6 +702,88 @@ def execute_custom_query():
         'success': True,
         'data': result
     })
+
+
+# ==================== Azure Log Analytics Routes ====================
+
+@app.route('/api/azure/test-connection', methods=['POST'])
+def test_azure_connection():
+    """Test connection to Azure Log Analytics workspace"""
+    data = request.get_json()
+
+    required_fields = ['tenant_id', 'client_id', 'client_secret', 'workspace_id']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
+
+    service = AzureLogAnalyticsService(
+        tenant_id=data['tenant_id'],
+        client_id=data['client_id'],
+        client_secret=data['client_secret'],
+        workspace_id=data['workspace_id']
+    )
+
+    result = service.test_connection()
+    return jsonify(result)
+
+
+@app.route('/api/azure/search-logs', methods=['POST'])
+def search_azure_logs():
+    """Search and filter IIS logs from Azure Log Analytics"""
+    data = request.get_json()
+
+    required_fields = ['tenant_id', 'client_id', 'client_secret', 'workspace_id', 'start_date', 'end_date']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
+
+    service = AzureLogAnalyticsService(
+        tenant_id=data['tenant_id'],
+        client_id=data['client_id'],
+        client_secret=data['client_secret'],
+        workspace_id=data['workspace_id']
+    )
+
+    result = service.search_logs(
+        start_date=data['start_date'],
+        end_date=data['end_date'],
+        url_filter=data.get('url_filter'),
+        status_code=data.get('status_code'),
+        limit=data.get('limit', 100)
+    )
+
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify({'success': False, 'error': result['error']}), 500
+
+    return jsonify(result)
+
+
+@app.route('/api/azure/dashboard-summary', methods=['POST'])
+def azure_dashboard_summary():
+    """Get aggregated IIS log dashboard summary"""
+    data = request.get_json()
+
+    required_fields = ['tenant_id', 'client_id', 'client_secret', 'workspace_id', 'start_date', 'end_date']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
+
+    service = AzureLogAnalyticsService(
+        tenant_id=data['tenant_id'],
+        client_id=data['client_id'],
+        client_secret=data['client_secret'],
+        workspace_id=data['workspace_id']
+    )
+
+    result = service.get_dashboard_summary(
+        start_date=data['start_date'],
+        end_date=data['end_date']
+    )
+
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify({'success': False, 'error': result['error']}), 500
+
+    return jsonify(result)
 
 
 if __name__ == '__main__':
