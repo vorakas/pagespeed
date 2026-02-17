@@ -2,9 +2,10 @@ from flask import Flask, render_template, request, jsonify
 from models import Database
 from pagespeed_service import PageSpeedService
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
+from datetime import datetime, timedelta
 from newrelic_service import NewRelicService
 from azure_service import AzureLogAnalyticsService
+from ai_service import ClaudeService, OpenAIService, run_parallel_analysis, build_system_prompt, build_user_message
 import os
 import json
 from dotenv import load_dotenv
@@ -85,6 +86,13 @@ def iislogs():
     """IIS Logs page"""
     sites = db.get_sites()
     return render_template('iislogs.html', sites=sites)
+
+
+@app.route('/ai-analysis')
+def ai_analysis():
+    """AI Performance Analysis page"""
+    sites = db.get_sites()
+    return render_template('ai_analysis.html', sites=sites)
 
 
 @app.route('/api/sites', methods=['GET', 'POST'])
@@ -863,6 +871,175 @@ def azure_execute_query():
         'count': len(rows),
         'raw': response
     })
+
+
+# ==================== AI Analysis Routes ====================
+
+@app.route('/api/ai/analyze', methods=['POST'])
+def ai_analyze():
+    """Orchestrate data gathering and parallel AI analysis"""
+    data = request.get_json()
+
+    url_path = data.get('url')
+    page_url = data.get('page_url')
+    time_range = data.get('time_range', '1 hour ago')
+    providers = data.get('providers', [])
+
+    if not url_path:
+        return jsonify({'success': False, 'error': 'URL path is required'}), 400
+
+    if not providers:
+        return jsonify({'success': False, 'error': 'At least one AI provider must be selected'}), 400
+
+    # ---- Step 1: Gather New Relic data ----
+    newrelic_data = {}
+    nr_api_key = data.get('nr_api_key')
+    nr_account_id = data.get('nr_account_id')
+    nr_app_name = data.get('nr_app_name')
+
+    if nr_api_key and nr_account_id and nr_app_name:
+        try:
+            nr_service = NewRelicService(api_key=nr_api_key)
+
+            # Core Web Vitals (needs full page URL)
+            if page_url:
+                cwv_result = nr_service.get_core_web_vitals(
+                    account_id=int(nr_account_id),
+                    app_name=nr_app_name,
+                    page_url=page_url,
+                    time_range=time_range
+                )
+                if cwv_result.get('success'):
+                    newrelic_data['core_web_vitals'] = cwv_result.get('metrics', {})
+
+            # Performance Overview
+            perf_result = nr_service.get_performance_overview(
+                int(nr_account_id), nr_app_name, time_range
+            )
+            if perf_result.get('success'):
+                newrelic_data['performance_overview'] = {
+                    'current': perf_result.get('current', {}),
+                    'previous': perf_result.get('previous', {})
+                }
+
+            # APM Metrics
+            apm_result = nr_service.get_apm_metrics(
+                int(nr_account_id), nr_app_name, time_range
+            )
+            if apm_result.get('success'):
+                newrelic_data['apm_metrics'] = {
+                    'transactions': apm_result.get('transactions', [])[:10],
+                    'database': apm_result.get('database', [])[:10],
+                    'external': apm_result.get('external', [])[:10],
+                    'errors': apm_result.get('errors', [])[:10]
+                }
+        except Exception as e:
+            print(f"Error gathering New Relic data: {e}")
+
+    # ---- Step 2: Gather IIS log data ----
+    iis_data = {}
+    az_tenant = data.get('azure_tenant_id')
+    az_client = data.get('azure_client_id')
+    az_secret = data.get('azure_client_secret')
+    az_workspace = data.get('azure_workspace_id')
+
+    if az_tenant and az_client and az_secret and az_workspace:
+        try:
+            az_service = AzureLogAnalyticsService(
+                tenant_id=az_tenant,
+                client_id=az_client,
+                client_secret=az_secret,
+                workspace_id=az_workspace
+            )
+
+            # Calculate date range from time_range string
+            now = datetime.utcnow()
+            minutes = _parse_time_range_to_minutes(time_range)
+            start_date = (now - timedelta(minutes=minutes)).isoformat() + 'Z'
+            end_date = now.isoformat() + 'Z'
+
+            site_name = data.get('azure_site_name')
+
+            # Dashboard summary
+            summary_result = az_service.get_dashboard_summary(
+                start_date=start_date,
+                end_date=end_date,
+                site_name=site_name
+            )
+            if isinstance(summary_result, dict) and summary_result.get('success'):
+                iis_data['summary'] = summary_result.get('summary', {})
+                iis_data['status_distribution'] = summary_result.get('statusDistribution', [])
+                iis_data['top_pages'] = summary_result.get('topPages', [])
+
+            # Slow requests for this specific URL
+            slow_result = az_service.search_logs(
+                start_date=start_date,
+                end_date=end_date,
+                url_filter=url_path,
+                site_name=site_name,
+                limit=20
+            )
+            if isinstance(slow_result, dict) and slow_result.get('success'):
+                iis_data['slow_requests'] = slow_result.get('logs', [])
+        except Exception as e:
+            print(f"Error gathering IIS log data: {e}")
+
+    # ---- Step 3: Check we have some data ----
+    if not newrelic_data and not iis_data:
+        return jsonify({
+            'success': False,
+            'error': 'No data could be retrieved. Check that New Relic and/or Azure credentials are configured on their respective pages.'
+        }), 400
+
+    # ---- Step 4: Build prompt and run AI analysis in parallel ----
+    system_prompt = build_system_prompt()
+    user_message = build_user_message(url_path, time_range, newrelic_data, iis_data)
+
+    claude_svc = None
+    openai_svc = None
+
+    if 'claude' in providers and data.get('claude_api_key'):
+        claude_svc = ClaudeService(
+            api_key=data['claude_api_key'],
+            model=data.get('claude_model', 'claude-sonnet-4-20250514')
+        )
+
+    if 'openai' in providers and data.get('openai_api_key'):
+        openai_svc = OpenAIService(
+            api_key=data['openai_api_key'],
+            model=data.get('openai_model', 'gpt-4o')
+        )
+
+    ai_results = run_parallel_analysis(claude_svc, openai_svc, system_prompt, user_message)
+
+    # ---- Step 5: Return results ----
+    return jsonify({
+        'success': True,
+        'claude': ai_results.get('claude'),
+        'openai': ai_results.get('openai'),
+        'data_sources': {
+            'newrelic': bool(newrelic_data),
+            'iis_logs': bool(iis_data)
+        },
+        'prompt_preview': user_message[:2000] + '...' if len(user_message) > 2000 else user_message
+    })
+
+
+def _parse_time_range_to_minutes(time_range):
+    """Convert NRQL-style time range string to minutes."""
+    try:
+        parts = time_range.lower().split()
+        value = int(parts[0])
+        unit = parts[1]
+        if 'hour' in unit:
+            return value * 60
+        elif 'minute' in unit:
+            return value
+        elif 'day' in unit:
+            return value * 1440
+    except (IndexError, ValueError):
+        pass
+    return 60  # default 1 hour
 
 
 if __name__ == '__main__':

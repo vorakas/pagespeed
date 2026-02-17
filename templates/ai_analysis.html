@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Analysis - PageSpeed Insights Monitor</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <!-- Side Navigation -->
+    <nav class="side-nav">
+        <div class="side-nav-header">
+            <h2>Menu</h2>
+        </div>
+        <ul class="side-nav-list">
+            <li><a href="/" class="side-nav-link">&larr; Back</a></li>
+            <li><a href="/setup" class="side-nav-link">Site/URL Setup</a></li>
+            <li><a href="/test" class="side-nav-link">Test URLs</a></li>
+            <li><a href="/metrics" class="side-nav-link">Page Performance Metrics</a></li>
+            <li><a href="/newrelic" class="side-nav-link">New Relic Metrics</a></li>
+            <li><a href="/iislogs" class="side-nav-link">IIS Logs</a></li>
+            <li><a href="/ai-analysis" class="side-nav-link active">AI Analysis</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <header>
+            <div class="header-content">
+                <div class="header-text">
+                    <h1>
+                        <img src="{{ url_for('static', filename='images/DarkModeLogo.png') }}" alt="Lamps Plus" class="header-logo header-logo-dark">
+                        <img src="{{ url_for('static', filename='images/LightModeLogo.png') }}" alt="Lamps Plus" class="header-logo header-logo-light">
+                        PageSpeed Insights Monitor
+                    </h1>
+                    <p>AI-Powered Performance Analysis</p>
+                </div>
+                <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()">
+                    <span class="theme-icon">&#9728;&#65039;</span>
+                    <span class="theme-label">Light Mode</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- AI API Configuration Section -->
+        <section class="ai-config-section">
+            <h2>AI API Configuration</h2>
+            <div class="config-grid">
+                <div class="config-card">
+                    <h3>Claude (Anthropic)</h3>
+                    <div class="form-group">
+                        <label for="claudeApiKey">API Key</label>
+                        <input type="password" id="claudeApiKey" placeholder="sk-ant-api03-...">
+                    </div>
+                    <div class="form-group">
+                        <label for="claudeModel">Model</label>
+                        <select id="claudeModel">
+                            <option value="claude-sonnet-4-20250514" selected>Claude Sonnet 4</option>
+                            <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="config-card">
+                    <h3>OpenAI</h3>
+                    <div class="form-group">
+                        <label for="openaiApiKey">API Key</label>
+                        <input type="password" id="openaiApiKey" placeholder="sk-...">
+                    </div>
+                    <div class="form-group">
+                        <label for="openaiModel">Model</label>
+                        <select id="openaiModel">
+                            <option value="gpt-4o" selected>GPT-4o</option>
+                            <option value="gpt-4o-mini">GPT-4o Mini</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <button onclick="saveAiConfig()" class="btn-primary" style="width: auto; margin-top: 10px;">Save AI Configuration</button>
+            <div id="aiConfigStatus" class="connection-status" style="display: none;"></div>
+        </section>
+
+        <!-- Analysis Input Section -->
+        <section class="ai-input-section">
+            <h2>Performance Analysis</h2>
+
+            <!-- Data source status badges -->
+            <div id="dataSourceStatus" class="ai-data-sources" style="display: none;">
+                <span id="nrStatus" class="data-source-badge"></span>
+                <span id="azureStatus" class="data-source-badge"></span>
+            </div>
+
+            <div class="ai-input-grid">
+                <div class="form-group">
+                    <label for="aiUrlPath">URL Path to Analyze</label>
+                    <input type="text" id="aiUrlPath" placeholder="/products/ceiling-fans">
+                </div>
+                <div class="form-group">
+                    <label for="aiPageUrl">Full Page URL (for Core Web Vitals)</label>
+                    <input type="text" id="aiPageUrl" placeholder="https://www.lampsplus.com/products/ceiling-fans/">
+                </div>
+                <div class="form-group">
+                    <label for="aiTimeRange">Time Range</label>
+                    <select id="aiTimeRange">
+                        <option value="30 minutes ago">Last 30 minutes</option>
+                        <option value="1 hour ago" selected>Last 1 hour</option>
+                        <option value="3 hours ago">Last 3 hours</option>
+                        <option value="6 hours ago">Last 6 hours</option>
+                        <option value="12 hours ago">Last 12 hours</option>
+                        <option value="24 hours ago">Last 24 hours</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>AI Providers</label>
+                    <div class="provider-checkboxes">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="useClaude" checked> Claude
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="useOpenai" checked> OpenAI
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group" style="align-self: end;">
+                    <button onclick="runAnalysis()" class="btn-primary" id="analyzeBtn">Analyze</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading Indicator -->
+        <div id="aiLoadingIndicator" class="loading-indicator" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p id="aiLoadingText">Gathering performance data and running AI analysis...</p>
+        </div>
+
+        <!-- Results Section: Side by Side -->
+        <div id="aiResultsSection" class="ai-results-section" style="display: none;">
+            <h2>Analysis Results</h2>
+            <div class="ai-results-grid" id="aiResultsGrid">
+                <!-- Claude Results -->
+                <div class="ai-result-panel" id="claudePanel" style="display: none;">
+                    <div class="ai-result-header claude-header">
+                        <h3>Claude Analysis</h3>
+                        <span class="ai-model-badge" id="claudeModelBadge"></span>
+                    </div>
+                    <div class="ai-result-body" id="claudeResult"></div>
+                    <div class="ai-result-footer" id="claudeFooter"></div>
+                </div>
+
+                <!-- OpenAI Results -->
+                <div class="ai-result-panel" id="openaiPanel" style="display: none;">
+                    <div class="ai-result-header openai-header">
+                        <h3>OpenAI Analysis</h3>
+                        <span class="ai-model-badge" id="openaiModelBadge"></span>
+                    </div>
+                    <div class="ai-result-body" id="openaiResult"></div>
+                    <div class="ai-result-footer" id="openaiFooter"></div>
+                </div>
+            </div>
+
+            <!-- Prompt Preview (collapsible) -->
+            <details class="ai-prompt-preview">
+                <summary>View Data Sent to AI</summary>
+                <pre id="promptPreview"></pre>
+            </details>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // ==================== AI Config Management ====================
+
+        let aiConfig = {
+            claudeApiKey: null,
+            claudeModel: 'claude-sonnet-4-20250514',
+            openaiApiKey: null,
+            openaiModel: 'gpt-4o'
+        };
+
+        function saveAiConfig() {
+            aiConfig.claudeApiKey = document.getElementById('claudeApiKey').value.trim();
+            aiConfig.claudeModel = document.getElementById('claudeModel').value;
+            aiConfig.openaiApiKey = document.getElementById('openaiApiKey').value.trim();
+            aiConfig.openaiModel = document.getElementById('openaiModel').value;
+
+            localStorage.setItem('aiConfig', JSON.stringify(aiConfig));
+
+            const status = document.getElementById('aiConfigStatus');
+            status.style.display = 'block';
+            status.className = 'connection-status success';
+            status.textContent = 'AI configuration saved.';
+            setTimeout(() => { status.style.display = 'none'; }, 3000);
+        }
+
+        function loadAiConfig() {
+            const saved = localStorage.getItem('aiConfig');
+            if (saved) {
+                try {
+                    aiConfig = JSON.parse(saved);
+                    document.getElementById('claudeApiKey').value = aiConfig.claudeApiKey || '';
+                    document.getElementById('claudeModel').value = aiConfig.claudeModel || 'claude-sonnet-4-20250514';
+                    document.getElementById('openaiApiKey').value = aiConfig.openaiApiKey || '';
+                    document.getElementById('openaiModel').value = aiConfig.openaiModel || 'gpt-4o';
+                } catch (e) {
+                    console.error('Error loading AI config:', e);
+                }
+            }
+        }
+
+        // ==================== Load NR & Azure configs from their pages ====================
+
+        function getNrConfig() {
+            try {
+                return JSON.parse(localStorage.getItem('nrConfig')) || {};
+            } catch (e) { return {}; }
+        }
+
+        function getAzureConfig() {
+            try {
+                return JSON.parse(localStorage.getItem('azureConfig')) || {};
+            } catch (e) { return {}; }
+        }
+
+        // ==================== Run Analysis ====================
+
+        async function runAnalysis() {
+            const urlPath = document.getElementById('aiUrlPath').value.trim();
+            const pageUrl = document.getElementById('aiPageUrl').value.trim();
+            const timeRange = document.getElementById('aiTimeRange').value;
+            const useClaude = document.getElementById('useClaude').checked;
+            const useOpenai = document.getElementById('useOpenai').checked;
+
+            if (!urlPath) {
+                alert('Please enter a URL path to analyze.');
+                return;
+            }
+
+            if (!useClaude && !useOpenai) {
+                alert('Please select at least one AI provider.');
+                return;
+            }
+
+            // Validate API keys for selected providers
+            if (useClaude && !aiConfig.claudeApiKey) {
+                alert('Please configure your Claude API key first.');
+                return;
+            }
+            if (useOpenai && !aiConfig.openaiApiKey) {
+                alert('Please configure your OpenAI API key first.');
+                return;
+            }
+
+            const nrConfig = getNrConfig();
+            const azConfig = getAzureConfig();
+
+            // Build request payload
+            const providers = [];
+            if (useClaude) providers.push('claude');
+            if (useOpenai) providers.push('openai');
+
+            const payload = {
+                url: urlPath,
+                page_url: pageUrl || null,
+                time_range: timeRange,
+                providers: providers,
+                // NR credentials (from NR page localStorage)
+                nr_api_key: nrConfig.apiKey || null,
+                nr_account_id: nrConfig.accountId || null,
+                nr_app_name: nrConfig.appName || null,
+                // Azure credentials (from IIS page localStorage)
+                azure_tenant_id: azConfig.tenantId || null,
+                azure_client_id: azConfig.clientId || null,
+                azure_client_secret: azConfig.clientSecret || null,
+                azure_workspace_id: azConfig.workspaceId || null,
+                azure_site_name: azConfig.selectedSite || null,
+                // AI keys
+                claude_api_key: useClaude ? aiConfig.claudeApiKey : null,
+                claude_model: aiConfig.claudeModel,
+                openai_api_key: useOpenai ? aiConfig.openaiApiKey : null,
+                openai_model: aiConfig.openaiModel
+            };
+
+            // Show loading
+            document.getElementById('aiLoadingIndicator').style.display = 'flex';
+            document.getElementById('aiResultsSection').style.display = 'none';
+            document.getElementById('analyzeBtn').disabled = true;
+            document.getElementById('analyzeBtn').textContent = 'Analyzing...';
+
+            try {
+                const response = await fetch('/api/ai/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                document.getElementById('aiLoadingIndicator').style.display = 'none';
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('analyzeBtn').textContent = 'Analyze';
+
+                if (!response.ok || !data.success) {
+                    alert('Analysis failed: ' + (data.error || 'Unknown error'));
+                    return;
+                }
+
+                displayResults(data);
+
+            } catch (error) {
+                document.getElementById('aiLoadingIndicator').style.display = 'none';
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('analyzeBtn').textContent = 'Analyze';
+                alert('Error running analysis: ' + error.message);
+            }
+        }
+
+        // ==================== Display Results ====================
+
+        function displayResults(data) {
+            document.getElementById('aiResultsSection').style.display = 'block';
+
+            // Update data source badges
+            document.getElementById('nrStatus').textContent =
+                data.data_sources.newrelic ? 'New Relic: Connected' : 'New Relic: No data';
+            document.getElementById('nrStatus').className =
+                'data-source-badge ' + (data.data_sources.newrelic ? 'badge-success' : 'badge-warning');
+            document.getElementById('azureStatus').textContent =
+                data.data_sources.iis_logs ? 'IIS Logs: Connected' : 'IIS Logs: No data';
+            document.getElementById('azureStatus').className =
+                'data-source-badge ' + (data.data_sources.iis_logs ? 'badge-success' : 'badge-warning');
+
+            // Claude panel
+            const claudePanel = document.getElementById('claudePanel');
+            if (data.claude) {
+                claudePanel.style.display = 'block';
+                if (data.claude.success) {
+                    document.getElementById('claudeResult').innerHTML = marked.parse(data.claude.analysis);
+                    document.getElementById('claudeModelBadge').textContent = data.claude.model;
+                    if (data.claude.usage) {
+                        document.getElementById('claudeFooter').textContent =
+                            `Tokens: ${data.claude.usage.input_tokens.toLocaleString()} in / ${data.claude.usage.output_tokens.toLocaleString()} out`;
+                    }
+                } else {
+                    document.getElementById('claudeResult').innerHTML =
+                        '<div class="ai-error">' + escapeHtml(data.claude.error) + '</div>';
+                    document.getElementById('claudeModelBadge').textContent = '';
+                    document.getElementById('claudeFooter').textContent = '';
+                }
+            } else {
+                claudePanel.style.display = 'none';
+            }
+
+            // OpenAI panel
+            const openaiPanel = document.getElementById('openaiPanel');
+            if (data.openai) {
+                openaiPanel.style.display = 'block';
+                if (data.openai.success) {
+                    document.getElementById('openaiResult').innerHTML = marked.parse(data.openai.analysis);
+                    document.getElementById('openaiModelBadge').textContent = data.openai.model;
+                    if (data.openai.usage) {
+                        document.getElementById('openaiFooter').textContent =
+                            `Tokens: ${data.openai.usage.prompt_tokens.toLocaleString()} in / ${data.openai.usage.completion_tokens.toLocaleString()} out`;
+                    }
+                } else {
+                    document.getElementById('openaiResult').innerHTML =
+                        '<div class="ai-error">' + escapeHtml(data.openai.error) + '</div>';
+                    document.getElementById('openaiModelBadge').textContent = '';
+                    document.getElementById('openaiFooter').textContent = '';
+                }
+            } else {
+                openaiPanel.style.display = 'none';
+            }
+
+            // Prompt preview
+            document.getElementById('promptPreview').textContent = data.prompt_preview || '';
+
+            // Scroll to results
+            document.getElementById('aiResultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Helper: escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ==================== Initialize ====================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAiConfig();
+
+            // Show data source status badges
+            const nrConfig = getNrConfig();
+            const azConfig = getAzureConfig();
+
+            const dsStatus = document.getElementById('dataSourceStatus');
+            dsStatus.style.display = 'flex';
+            document.getElementById('nrStatus').textContent =
+                nrConfig.apiKey ? 'New Relic: Configured' : 'New Relic: Not configured';
+            document.getElementById('nrStatus').className =
+                'data-source-badge ' + (nrConfig.apiKey ? 'badge-success' : 'badge-warning');
+            document.getElementById('azureStatus').textContent =
+                azConfig.tenantId ? 'Azure IIS: Configured' : 'Azure IIS: Not configured';
+            document.getElementById('azureStatus').className =
+                'data-source-badge ' + (azConfig.tenantId ? 'badge-success' : 'badge-warning');
+        });
+    </script>
+</body>
+</html>
