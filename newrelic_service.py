@@ -63,22 +63,15 @@ class NewRelicService:
         Returns:
             dict: Metrics data including LCP, CLS, Page Load, etc.
         """
-        # Extract the targetGroupedUrl from the full URL
-        # For https://www.lampsplus.com/ -> www.lampsplus.com:443/
-        from urllib.parse import urlparse
-        parsed = urlparse(page_url)
-        port = parsed.port if parsed.port else (443 if parsed.scheme == 'https' else 80)
-        target_grouped_url = f"{parsed.netloc}:{port}{parsed.path}"
-
         print(
-            f"DEBUG: Querying for app_name='{app_name}', target_grouped_url='{target_grouped_url}', page_url='{page_url}'")
+            f"DEBUG: Querying for app_name='{app_name}', page_url='{page_url}'")
 
         query = f"""
         {{
           actor {{
             account(id: {account_id}) {{
-              lcp: nrql(query: "FROM PageViewTiming SELECT percentile(largestContentfulPaint * 1000, 50, 75, 90) AS LCP_ms WHERE appName = '{app_name}' AND targetGroupedUrl = '{target_grouped_url}' AND timingName = 'largestContentfulPaint' SINCE {time_range}") {{ results }}
-              cls: nrql(query: "FROM PageViewTiming SELECT percentile(cumulativeLayoutShift, 50, 75, 90) AS CLS WHERE appName = '{app_name}' AND targetGroupedUrl = '{target_grouped_url}' AND timingName = 'windowLoad' SINCE {time_range}") {{ results }}
+              lcp: nrql(query: "FROM PageViewTiming SELECT percentile(largestContentfulPaint, 50, 75, 90) AS LCP_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' AND timingName = 'largestContentfulPaint' SINCE {time_range}") {{ results }}
+              cls: nrql(query: "FROM PageViewTiming SELECT percentile(cumulativeLayoutShift, 50, 75, 90) AS CLS WHERE appName = '{app_name}' AND pageUrl = '{page_url}' AND cumulativeLayoutShift IS NOT NULL SINCE {time_range}") {{ results }}
               pageLoad: nrql(query: "FROM PageView SELECT percentile(duration, 50, 75, 90) AS PageLoad_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               backend: nrql(query: "FROM PageView SELECT percentile(backendDuration, 50, 75, 90) AS Backend_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               frontend: nrql(query: "FROM PageView SELECT percentile(domProcessingDuration + pageRenderingDuration, 50, 75, 90) AS Frontend_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
