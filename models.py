@@ -70,16 +70,18 @@ class Database:
                     ttfb REAL,
                     total_byte_weight REAL,
                     raw_data TEXT,
+                    strategy TEXT DEFAULT 'desktop',
                     tested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (url_id) REFERENCES urls (id)
                 )
             ''')
-            
+
             # Add new columns if they don't exist (for existing databases)
             try:
                 cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS inp REAL")
                 cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS ttfb REAL")
                 cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS total_byte_weight REAL")
+                cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS strategy TEXT DEFAULT 'desktop'")
             except:
                 pass  # Columns already exist or other error
         else:
@@ -121,11 +123,12 @@ class Database:
                     ttfb REAL,
                     total_byte_weight REAL,
                     raw_data TEXT,
+                    strategy TEXT DEFAULT 'desktop',
                     tested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (url_id) REFERENCES urls (id)
                 )
             ''')
-            
+
             # Add new columns if they don't exist (for existing databases)
             try:
                 cursor.execute("ALTER TABLE test_results ADD COLUMN inp REAL")
@@ -137,6 +140,10 @@ class Database:
                 pass
             try:
                 cursor.execute("ALTER TABLE test_results ADD COLUMN total_byte_weight REAL")
+            except:
+                pass
+            try:
+                cursor.execute("ALTER TABLE test_results ADD COLUMN strategy TEXT DEFAULT 'desktop'")
             except:
                 pass
         
@@ -207,25 +214,25 @@ class Database:
         conn.close()
         return urls
     
-    def save_test_result(self, url_id, result_data):
+    def save_test_result(self, url_id, result_data, strategy='desktop'):
         """Save a test result"""
         conn = self.get_connection()
         cursor = conn.cursor()
-        
+
         query = '''
             INSERT INTO test_results (
-                url_id, performance_score, accessibility_score, 
-                best_practices_score, seo_score, fcp, lcp, cls, 
-                tti, tbt, speed_index, inp, ttfb, total_byte_weight, raw_data
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                url_id, performance_score, accessibility_score,
+                best_practices_score, seo_score, fcp, lcp, cls,
+                tti, tbt, speed_index, inp, ttfb, total_byte_weight, raw_data, strategy
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''' if self.is_postgres else '''
             INSERT INTO test_results (
-                url_id, performance_score, accessibility_score, 
-                best_practices_score, seo_score, fcp, lcp, cls, 
-                tti, tbt, speed_index, inp, ttfb, total_byte_weight, raw_data
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                url_id, performance_score, accessibility_score,
+                best_practices_score, seo_score, fcp, lcp, cls,
+                tti, tbt, speed_index, inp, ttfb, total_byte_weight, raw_data, strategy
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
-        
+
         cursor.execute(query, (
             url_id,
             result_data.get('performance_score'),
@@ -241,7 +248,8 @@ class Database:
             result_data.get('inp'),
             result_data.get('ttfb'),
             result_data.get('total_byte_weight'),
-            json.dumps(result_data.get('raw_data', {}))
+            json.dumps(result_data.get('raw_data', {})),
+            strategy
         ))
         
         conn.commit()
@@ -252,13 +260,13 @@ class Database:
         conn.close()
         return result_id
     
-    def get_latest_results(self, site_id):
-        """Get the latest test results for all URLs in a site"""
+    def get_latest_results(self, site_id, strategy='desktop'):
+        """Get the latest test results for all URLs in a site, filtered by strategy"""
         conn = self.get_connection()
         cursor = conn.cursor()
-        
+
         query = '''
-            SELECT 
+            SELECT
                 u.id as url_id,
                 u.url,
                 tr.performance_score,
@@ -271,18 +279,21 @@ class Database:
                 tr.inp,
                 tr.ttfb,
                 tr.total_byte_weight,
-                tr.tested_at
+                tr.tested_at,
+                COALESCE(tr.strategy, 'desktop') as strategy
             FROM urls u
             LEFT JOIN (
                 SELECT url_id, MAX(tested_at) as max_date
                 FROM test_results
+                WHERE COALESCE(strategy, 'desktop') = %s
                 GROUP BY url_id
             ) latest ON u.id = latest.url_id
             LEFT JOIN test_results tr ON u.id = tr.url_id AND tr.tested_at = latest.max_date
+                AND COALESCE(tr.strategy, 'desktop') = %s
             WHERE u.site_id = %s
             ORDER BY u.url
         ''' if self.is_postgres else '''
-            SELECT 
+            SELECT
                 u.id as url_id,
                 u.url,
                 tr.performance_score,
@@ -295,19 +306,22 @@ class Database:
                 tr.inp,
                 tr.ttfb,
                 tr.total_byte_weight,
-                tr.tested_at
+                tr.tested_at,
+                COALESCE(tr.strategy, 'desktop') as strategy
             FROM urls u
             LEFT JOIN (
                 SELECT url_id, MAX(tested_at) as max_date
                 FROM test_results
+                WHERE COALESCE(strategy, 'desktop') = ?
                 GROUP BY url_id
             ) latest ON u.id = latest.url_id
             LEFT JOIN test_results tr ON u.id = tr.url_id AND tr.tested_at = latest.max_date
+                AND COALESCE(tr.strategy, 'desktop') = ?
             WHERE u.site_id = ?
             ORDER BY u.url
         '''
-        
-        cursor.execute(query, (site_id,))
+
+        cursor.execute(query, (strategy, strategy, site_id))
         
         if self.is_postgres:
             results = []
@@ -319,13 +333,13 @@ class Database:
         conn.close()
         return results
     
-    def get_historical_data(self, url_id, days=30):
-        """Get historical test data for a URL"""
+    def get_historical_data(self, url_id, days=30, strategy='desktop'):
+        """Get historical test data for a URL, filtered by strategy"""
         conn = self.get_connection()
         cursor = conn.cursor()
-        
+
         query = '''
-            SELECT 
+            SELECT
                 performance_score,
                 accessibility_score,
                 best_practices_score,
@@ -337,9 +351,10 @@ class Database:
             FROM test_results
             WHERE url_id = %s
             AND tested_at >= NOW() - INTERVAL '%s days'
+            AND COALESCE(strategy, 'desktop') = %s
             ORDER BY tested_at ASC
         ''' if self.is_postgres else '''
-            SELECT 
+            SELECT
                 performance_score,
                 accessibility_score,
                 best_practices_score,
@@ -351,10 +366,11 @@ class Database:
             FROM test_results
             WHERE url_id = ?
             AND tested_at >= datetime('now', '-' || ? || ' days')
+            AND COALESCE(strategy, 'desktop') = ?
             ORDER BY tested_at ASC
         '''
-        
-        cursor.execute(query, (url_id, days))
+
+        cursor.execute(query, (url_id, days, strategy))
         
         if self.is_postgres:
             results = []

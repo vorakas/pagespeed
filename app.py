@@ -31,9 +31,9 @@ def run_daily_tests():
     all_urls = db.get_all_urls()
 
     for i, url_data in enumerate(all_urls):
-        result = pagespeed.test_url(url_data['url'])
+        result = pagespeed.test_url(url_data['url'], strategy='desktop')
         if result:
-            db.save_test_result(url_data['id'], result)
+            db.save_test_result(url_data['id'], result, strategy='desktop')
             print(f"Saved result for {url_data['url']}")
 
         # Add 2-second delay between requests (except after the last one)
@@ -126,7 +126,8 @@ def site_urls(site_id):
 @app.route('/api/sites/<int:site_id>/latest-results')
 def latest_results(site_id):
     """Get latest test results for a site"""
-    results = db.get_latest_results(site_id)
+    strategy = request.args.get('strategy', 'desktop')
+    results = db.get_latest_results(site_id, strategy=strategy)
     return jsonify(results)
 
 
@@ -134,7 +135,8 @@ def latest_results(site_id):
 def url_history(url_id):
     """Get historical data for a URL"""
     days = request.args.get('days', 30, type=int)
-    history = db.get_historical_data(url_id, days)
+    strategy = request.args.get('strategy', 'desktop')
+    history = db.get_historical_data(url_id, days, strategy=strategy)
     return jsonify(history)
 
 
@@ -144,6 +146,7 @@ def test_url_async():
     data = request.get_json()
     url_id = data.get('url_id')
     url_text = data.get('url')
+    strategy = data.get('strategy', 'desktop')
 
     if not url_text:
         return jsonify({'success': False, 'error': 'URL is required'}), 400
@@ -151,9 +154,9 @@ def test_url_async():
     # Start test in background thread
     import threading
     def run_test():
-        result = pagespeed.test_url(url_text)
+        result = pagespeed.test_url(url_text, strategy=strategy)
         if result and url_id:
-            db.save_test_result(url_id, result)
+            db.save_test_result(url_id, result, strategy=strategy)
 
     thread = threading.Thread(target=run_test)
     thread.daemon = True
@@ -168,14 +171,15 @@ def test_url():
     data = request.get_json()
     url_id = data.get('url_id')
     url_text = data.get('url')
+    strategy = data.get('strategy', 'desktop')
 
     if not url_text:
         return jsonify({'success': False, 'error': 'URL is required'}), 400
 
-    result = pagespeed.test_url(url_text)
+    result = pagespeed.test_url(url_text, strategy=strategy)
 
     if result and url_id:
-        db.save_test_result(url_id, result)
+        db.save_test_result(url_id, result, strategy=strategy)
         return jsonify({'success': True, 'result': result})
     elif result:
         return jsonify({'success': True, 'result': result})
@@ -187,13 +191,15 @@ def test_url():
 def test_site(site_id):
     """Run tests for all URLs in a site"""
     import time
+    data = request.get_json() or {}
+    strategy = data.get('strategy', 'desktop')
     urls = db.get_urls_by_site(site_id)
 
     results = []
     for i, url_data in enumerate(urls):
-        result = pagespeed.test_url(url_data['url'])
+        result = pagespeed.test_url(url_data['url'], strategy=strategy)
         if result:
-            db.save_test_result(url_data['id'], result)
+            db.save_test_result(url_data['id'], result, strategy=strategy)
             results.append({
                 'url': url_data['url'],
                 'success': True,
@@ -216,13 +222,15 @@ def test_site(site_id):
 def test_all():
     """Run tests for all URLs in all sites"""
     import time
+    data = request.get_json() or {}
+    strategy = data.get('strategy', 'desktop')
     all_urls = db.get_all_urls()
 
     results = []
     for i, url_data in enumerate(all_urls):
-        result = pagespeed.test_url(url_data['url'])
+        result = pagespeed.test_url(url_data['url'], strategy=strategy)
         if result:
-            db.save_test_result(url_data['id'], result)
+            db.save_test_result(url_data['id'], result, strategy=strategy)
             results.append({
                 'url': url_data['url'],
                 'site': url_data['site_name'],
@@ -338,8 +346,9 @@ def comparison():
     if not site1_id or not site2_id:
         return jsonify({'error': 'Both site1 and site2 parameters are required'}), 400
 
-    site1_results = db.get_latest_results(site1_id)
-    site2_results = db.get_latest_results(site2_id)
+    strategy = request.args.get('strategy', 'desktop')
+    site1_results = db.get_latest_results(site1_id, strategy=strategy)
+    site2_results = db.get_latest_results(site2_id, strategy=strategy)
 
     return jsonify({
         'site1': site1_results,

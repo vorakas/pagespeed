@@ -6,7 +6,7 @@ class PageSpeedService:
         self.api_key = api_key
         self.base_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
     
-    def test_url(self, url, strategy='mobile'):
+    def test_url(self, url, strategy='desktop'):
         """
         Test a URL using PageSpeed Insights API
         
@@ -139,7 +139,7 @@ class PageSpeedService:
             print(f"Error parsing results: {str(e)}")
             return None
     
-    def test_multiple_urls(self, urls, strategy='mobile', delay=1):
+    def test_multiple_urls(self, urls, strategy='desktop', delay=1):
         """
         Test multiple URLs with a delay between requests
         

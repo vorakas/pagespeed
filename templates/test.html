@@ -47,6 +47,19 @@
         <!-- Testing Section -->
         <section class="testing-section">
             <h2>Run Tests</h2>
+            <div class="strategy-toggle">
+                <span class="strategy-label">Test Strategy:</span>
+                <div class="strategy-options">
+                    <label class="strategy-option">
+                        <input type="radio" name="testStrategy" value="desktop" checked>
+                        <span class="strategy-btn">🖥️ Desktop</span>
+                    </label>
+                    <label class="strategy-option">
+                        <input type="radio" name="testStrategy" value="mobile">
+                        <span class="strategy-btn">📱 Mobile</span>
+                    </label>
+                </div>
+            </div>
             <div class="button-group">
                 <button onclick="testAllSites()" class="btn-primary">🚀 Test All URLs</button>
                 <button onclick="loadDashboard()" class="btn-secondary">🔄 Refresh Dashboard</button>

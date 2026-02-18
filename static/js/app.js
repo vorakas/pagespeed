@@ -1,6 +1,12 @@
 let sites = [];
 let currentChart = null;
 
+// Get selected test strategy from radio buttons (defaults to 'desktop')
+function getSelectedStrategy() {
+    const selected = document.querySelector('input[name="testStrategy"]:checked');
+    return selected ? selected.value : 'desktop';
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadSites();
@@ -20,6 +26,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (chartSiteSelect) {
         chartSiteSelect.addEventListener('change', updateUrlsForChart);
     }
+
+    // When strategy toggle changes, refresh the dashboard to show results for selected strategy
+    const strategyRadios = document.querySelectorAll('input[name="testStrategy"]');
+    strategyRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            loadDashboard();
+        });
+    });
 });
 
 // Load all sites
@@ -201,7 +215,8 @@ async function loadSiteResults(siteId) {
     currentSiteIdForSorting = siteId;
     
     try {
-        const response = await fetch(`/api/sites/${siteId}/latest-results`);
+        const strategy = getSelectedStrategy();
+        const response = await fetch(`/api/sites/${siteId}/latest-results?strategy=${strategy}`);
         const results = await response.json();
         
         if (results.length === 0) {
@@ -227,7 +242,8 @@ async function testAllSites() {
     const progressCount = document.getElementById('progressCount');
     const progressBar = document.getElementById('progressBar');
     const progressDetails = document.getElementById('progressDetails');
-    
+    const strategy = getSelectedStrategy();
+
     // Get all URLs first
     let allUrls = [];
     try {
@@ -258,7 +274,8 @@ async function testAllSites() {
     
     // Show progress container
     progressContainer.classList.add('show');
-    progressText.textContent = 'Preparing to test... (Please stay on this page)';
+    const strategyLabel = strategy === 'mobile' ? '📱 Mobile' : '🖥️ Desktop';
+    progressText.textContent = `Preparing to test (${strategyLabel})... (Please stay on this page)`;
     progressCount.textContent = `0 / ${allUrls.length}`;
     progressBar.style.width = '0%';
     progressDetails.innerHTML = '';
@@ -285,7 +302,8 @@ async function testAllSites() {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     url_id: urlData.id,
-                    url: urlData.url
+                    url: urlData.url,
+                    strategy: strategy
                 })
             });
             
@@ -533,7 +551,8 @@ async function loadHistoricalChart() {
     }
     
     try {
-        const response = await fetch(`/api/urls/${urlId}/history?days=30`);
+        const strategy = getSelectedStrategy();
+        const response = await fetch(`/api/urls/${urlId}/history?days=30&strategy=${strategy}`);
         const history = await response.json();
         
         if (history.length === 0) {
@@ -910,21 +929,24 @@ async function retestUrl(urlId, urlText) {
     const progressCount = document.getElementById('progressCount');
     const progressBar = document.getElementById('progressBar');
     const progressDetails = document.getElementById('progressDetails');
-    
+    const strategy = getSelectedStrategy();
+
     // Show progress container
     progressContainer.classList.add('show');
-    progressText.textContent = 'Retesting URL...';
+    const strategyLabel = strategy === 'mobile' ? '📱 Mobile' : '🖥️ Desktop';
+    progressText.textContent = `Retesting URL (${strategyLabel})...`;
     progressCount.textContent = '0 / 1';
     progressBar.style.width = '0%';
     progressDetails.innerHTML = `<div class="testing-url">🔄 ${urlText}</div>`;
-    
+
     try {
         const response = await fetch('/api/test-url', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 url_id: urlId,
-                url: urlText
+                url: urlText,
+                strategy: strategy
             })
         });
         

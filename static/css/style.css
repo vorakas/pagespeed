@@ -4547,3 +4547,91 @@ body.light-mode .ai-turn-count {
     color: #9ca3af;
 }
 
+/* ==================== Strategy Toggle ==================== */
+.strategy-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.strategy-label {
+    color: #9ca3af;
+    font-size: 0.95em;
+    font-weight: 500;
+}
+
+.strategy-options {
+    display: flex;
+    gap: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #374151;
+}
+
+.strategy-option {
+    cursor: pointer;
+    margin: 0;
+}
+
+.strategy-option input[type="radio"] {
+    display: none;
+}
+
+.strategy-btn {
+    display: inline-block;
+    padding: 8px 20px;
+    font-size: 0.9em;
+    font-weight: 500;
+    color: #9ca3af;
+    background: #1f2937;
+    transition: all 0.2s ease;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.strategy-option input[type="radio"]:checked + .strategy-btn {
+    background: #667eea;
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(102, 126, 234, 0.3);
+}
+
+.strategy-btn:hover {
+    background: #374151;
+    color: #e3e8ee;
+}
+
+.strategy-option input[type="radio"]:checked + .strategy-btn:hover {
+    background: #5a6fd6;
+    color: #ffffff;
+}
+
+/* Light mode */
+body.light-mode .strategy-label {
+    color: #6b7280;
+}
+
+body.light-mode .strategy-options {
+    border-color: #d1d5db;
+}
+
+body.light-mode .strategy-btn {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn {
+    background: #667eea;
+    color: #ffffff;
+}
+
+body.light-mode .strategy-btn:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hover {
+    background: #5a6fd6;
+    color: #ffffff;
+}
+
