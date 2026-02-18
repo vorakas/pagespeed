@@ -390,7 +390,7 @@
             const now = new Date();
             const daysUntilExpiry = Math.ceil((expiration - now) / (1000 * 60 * 60 * 24));
 
-            if (daysUntilExpiry < 0) {
+            if (daysUntilExpiry <= 0) {
                 warningEl.style.display = 'block';
                 warningEl.className = 'secret-expiration-warning expired';
                 warningEl.textContent = `CLIENT SECRET HAS EXPIRED (${expDate}). Please generate a new secret in the Azure Portal.`;
