@@ -335,6 +335,9 @@
             selectedSite: null
         };
 
+        // Timer ID for save config auto-hide (so testAzureConnection can cancel it)
+        let saveConfigTimer = null;
+
         // Save config to localStorage
         function saveAzureConfig() {
             azureConfig.tenantId = document.getElementById('azureTenantId').value.trim();
@@ -351,7 +354,7 @@
             status.style.display = 'block';
             status.className = 'connection-status success';
             status.textContent = 'Configuration saved.';
-            setTimeout(() => { status.style.display = 'none'; }, 3000);
+            saveConfigTimer = setTimeout(() => { status.style.display = 'none'; }, 3000);
         }
 
         // Load config from localStorage
@@ -404,12 +407,14 @@
         async function testAzureConnection() {
             // Save first
             saveAzureConfig();
+            // Cancel the save-config auto-hide so it doesn't wipe the test result
+            clearTimeout(saveConfigTimer);
 
             if (!azureConfig.tenantId || !azureConfig.clientId || !azureConfig.clientSecret || !azureConfig.workspaceId) {
                 const status = document.getElementById('azureConnectionStatus');
                 status.style.display = 'block';
                 status.className = 'connection-status error';
-                status.textContent = 'Please fill in all configuration fields.';
+                status.innerHTML = '<span>Please fill in all configuration fields.</span><button class="dismiss-btn" onclick="this.parentElement.style.display=\'none\'" title="Dismiss">&times;</button>';
                 return;
             }
 
@@ -434,7 +439,7 @@
 
                 if (data.success) {
                     status.className = data.warning ? 'connection-status warning' : 'connection-status success';
-                    status.textContent = data.message;
+                    status.innerHTML = `<span>${data.message}</span><button class="dismiss-btn" onclick="this.parentElement.style.display='none'" title="Dismiss">&times;</button>`;
                     // Show search and dashboard sections
                     document.getElementById('iisSearchSection').style.display = 'block';
                     document.getElementById('iisDashboardSection').style.display = 'block';
@@ -444,11 +449,12 @@
                     loadSiteList();
                 } else {
                     status.className = 'connection-status error';
-                    status.textContent = data.message || 'Connection failed.';
+                    const msg = data.message || 'Connection failed.';
+                    status.innerHTML = `<span>${msg}</span><button class="dismiss-btn" onclick="this.parentElement.style.display='none'" title="Dismiss">&times;</button>`;
                 }
             } catch (error) {
                 status.className = 'connection-status error';
-                status.textContent = 'Error testing connection: ' + error.message;
+                status.innerHTML = `<span>Error testing connection: ${error.message}</span><button class="dismiss-btn" onclick="this.parentElement.style.display='none'" title="Dismiss">&times;</button>`;
             }
         }
 

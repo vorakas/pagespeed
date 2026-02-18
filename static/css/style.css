@@ -2248,10 +2248,32 @@ body.light-mode .construction-section p {
 }
 
 .connection-status {
-    padding: 15px 20px;
+    padding: 15px 40px 15px 20px;
     border-radius: 8px;
     margin-top: 20px;
     font-weight: 500;
+    position: relative;
+}
+
+.connection-status .dismiss-btn {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 1.3em;
+    cursor: pointer;
+    opacity: 0.7;
+    padding: 2px 6px;
+    line-height: 1;
+    width: auto;
+    margin: 0;
+}
+
+.connection-status .dismiss-btn:hover {
+    opacity: 1;
 }
 
 .connection-status.testing {
