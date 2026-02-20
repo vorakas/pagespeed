@@ -210,7 +210,7 @@
                     <!-- Table View -->
                     <div id="kqlTableView" class="kql-table-view">
                         <div class="metrics-table-container">
-                            <table class="results-table">
+                            <table class="results-table resizable-table" id="kqlResultsTable">
                                 <thead id="kqlTableHead"></thead>
                                 <tbody id="kqlTableBody"></tbody>
                             </table>
@@ -753,6 +753,8 @@
                 resultsEl.style.display = 'block';
                 if (tab.resultsHtml) {
                     resultsEl.innerHTML = tab.resultsHtml;
+                    // Re-initialize resize handles on the restored KQL table
+                    initTableResize(document.getElementById('kqlResultsTable'));
                 } else if (tab.results) {
                     displayKqlResults(tab.results);
                 }
@@ -1006,10 +1008,15 @@
                 document.getElementById('kqlExportInfo').style.display = 'none';
             }
 
-            // Build dynamic table header from columns
+            // Build dynamic table header from columns (with resize handles)
             const thead = document.getElementById('kqlTableHead');
             if (data.columns && data.columns.length > 0) {
-                thead.innerHTML = '<tr>' + data.columns.map(col => `<th>${escapeHtml(col)}</th>`).join('') + '</tr>';
+                thead.innerHTML = '<tr>' + data.columns.map((col, i) => {
+                    const handle = i < data.columns.length - 1 ? '<div class="resize-handle"></div>' : '';
+                    return `<th>${escapeHtml(col)}${handle}</th>`;
+                }).join('') + '</tr>';
+                // Initialize column resizing for the KQL results table
+                initTableResize(document.getElementById('kqlResultsTable'));
             } else {
                 thead.innerHTML = '';
             }
@@ -1218,14 +1225,16 @@
 
         // ==================== Resizable Table Columns ====================
 
-        function initColumnResize() {
-            const table = document.getElementById('iisLogsResultsTable');
+        function initTableResize(table) {
             if (!table) return;
 
             const handles = table.querySelectorAll('.resize-handle');
-            let columnsConverted = false;
+            if (handles.length === 0) return;
 
-            // Convert all percentage widths to pixel widths so resizing works with table-layout: fixed
+            // Store whether we've converted to pixel widths on this table
+            let columnsConverted = table.dataset.resizeInit === 'true';
+
+            // Convert all percentage/auto widths to pixel widths so resizing works with table-layout: fixed
             function convertToPixelWidths() {
                 if (columnsConverted) return;
                 const ths = table.querySelectorAll('thead th');
@@ -1233,6 +1242,7 @@
                     th.style.width = th.offsetWidth + 'px';
                 });
                 columnsConverted = true;
+                table.dataset.resizeInit = 'true';
             }
 
             handles.forEach(handle => {
@@ -1281,18 +1291,32 @@
                     document.addEventListener('mouseup', onMouseUp);
                 });
 
-                // Double-click to reset all columns to default percentages
+                // Double-click to reset columns to equal widths
                 handle.addEventListener('dblclick', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
                     const ths = table.querySelectorAll('thead th');
-                    const defaults = ['6%', '3%', '24%', '40%', '5%', '7%', '7%', '8%'];
-                    ths.forEach((th, i) => {
-                        if (defaults[i]) th.style.width = defaults[i];
-                    });
+                    // Check if this table has stored default widths
+                    const defaults = table.dataset.defaultWidths ? table.dataset.defaultWidths.split(',') : null;
+                    if (defaults && defaults.length === ths.length) {
+                        ths.forEach((th, i) => { th.style.width = defaults[i]; });
+                    } else {
+                        // Equal distribution for dynamic tables
+                        const equalWidth = (100 / ths.length).toFixed(1) + '%';
+                        ths.forEach(th => { th.style.width = equalWidth; });
+                    }
                     columnsConverted = false;
+                    table.dataset.resizeInit = 'false';
                 });
             });
+        }
+
+        function initColumnResize() {
+            const table = document.getElementById('iisLogsResultsTable');
+            if (!table) return;
+            // Store default widths for double-click reset
+            table.dataset.defaultWidths = '6%,3%,24%,40%,5%,7%,7%,8%';
+            initTableResize(table);
         }
 
         // Initialize on page load
