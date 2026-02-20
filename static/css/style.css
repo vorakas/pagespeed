@@ -2406,8 +2406,19 @@ body.light-mode .construction-section p {
     width: 100%;
 }
 
+.metrics-table-container .results-table th {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.metrics-table-container .results-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .metrics-table-container .results-table td.truncate-cell {
-    max-width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2419,6 +2430,7 @@ body.light-mode .construction-section p {
     word-break: break-all;
     white-space: normal;
     overflow-wrap: break-word;
+    max-width: 0;
 }
 
 .metrics-table-container .results-table td.truncate-cell:hover {
