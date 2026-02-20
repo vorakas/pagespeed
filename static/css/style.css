@@ -3773,6 +3773,91 @@ body.light-mode .site-selector select {
     margin-bottom: 20px;
 }
 
+/* KQL Query Tabs */
+.kql-query-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 8px 0;
+    background: #0f1419;
+    border: 1px solid #374151;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    flex-wrap: wrap;
+}
+
+.kql-tab {
+    padding: 8px 28px 8px 14px;
+    background: #1a1f2e;
+    color: #9ca3af;
+    border: 1px solid #374151;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+    position: relative;
+}
+
+.kql-tab:hover:not(.active) {
+    background: #252b3b;
+    color: #e3e8ee;
+}
+
+.kql-tab.active {
+    background: #0f1419;
+    color: #10b981;
+    border-color: #374151;
+    font-weight: 600;
+}
+
+.kql-tab-close {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #6b7280;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0 2px;
+    width: auto;
+    margin: 0;
+    line-height: 1;
+}
+
+.kql-tab-close:hover {
+    color: #ef4444;
+}
+
+.kql-tab-add {
+    padding: 8px 14px;
+    background: transparent;
+    color: #6b7280;
+    border: 1px dashed #374151;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    width: auto;
+    margin: 0;
+}
+
+.kql-tab-add:hover {
+    background: #1a1f2e;
+    color: #10b981;
+    border-color: #10b981;
+}
+
+.kql-query-tabs + .kql-editor {
+    border-radius: 0 0 8px 8px;
+    border-top: none;
+}
+
 .kql-editor {
     background: #0f1419;
     border: 1px solid #374151;
@@ -3967,6 +4052,46 @@ body.light-mode .kql-json-view pre {
 
 body.light-mode .export-size-label {
     color: #6b7280;
+}
+
+body.light-mode .kql-query-tabs {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .kql-tab {
+    background: #e5e7eb;
+    color: #6b7280;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .kql-tab:hover:not(.active) {
+    background: #d1d5db;
+    color: #1f2937;
+}
+
+body.light-mode .kql-tab.active {
+    background: #f9fafb;
+    color: #667eea;
+    border-color: #e5e7eb;
+}
+
+body.light-mode .kql-tab-close {
+    color: #9ca3af;
+}
+
+body.light-mode .kql-tab-close:hover {
+    color: #ef4444;
+}
+
+body.light-mode .kql-tab-add {
+    color: #9ca3af;
+    border-color: #d1d5db;
+}
+
+body.light-mode .kql-tab-add:hover {
+    color: #667eea;
+    border-color: #667eea;
 }
 
 /* ==================== AI Analysis Page ==================== */

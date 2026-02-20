@@ -160,6 +160,7 @@
         <!-- KQL Query Mode Section -->
         <section class="kql-section" id="kqlQuerySection" style="display: none;">
             <h2>KQL Query Mode</h2>
+            <div class="kql-query-tabs" id="kqlQueryTabs"></div>
             <div class="kql-editor">
                 <div class="editor-header">
                     <h3>Query Editor</h3>
@@ -692,8 +693,146 @@
 
         // ==================== KQL Query Mode ====================
 
-        // Store last query results for export
-        let lastKqlResult = null;
+        // Tab state management
+        let kqlTabs = [];
+        let activeKqlTabId = null;
+        let kqlTabCounter = 0;
+
+        function createKqlTab() {
+            kqlTabCounter++;
+            const tab = {
+                id: kqlTabCounter,
+                name: `Query ${kqlTabCounter}`,
+                query: '',
+                results: null,
+                isLoading: false,
+                activeView: 'table',
+                pickerValue: '',
+                queryName: ''
+            };
+            kqlTabs.push(tab);
+            return tab;
+        }
+
+        function getActiveKqlTab() {
+            return kqlTabs.find(t => t.id === activeKqlTabId);
+        }
+
+        function saveKqlTabState() {
+            const tab = getActiveKqlTab();
+            if (!tab) return;
+            tab.query = document.getElementById('kqlQuery').value;
+            tab.pickerValue = document.getElementById('kqlQueryPicker').value;
+            tab.queryName = document.getElementById('kqlQueryName').value;
+            // Save current results HTML so we can restore it
+            const resultsEl = document.getElementById('kqlResults');
+            if (resultsEl.style.display !== 'none') {
+                tab.resultsHtml = resultsEl.innerHTML;
+            }
+        }
+
+        function restoreKqlTabState(tab) {
+            // Restore query text
+            document.getElementById('kqlQuery').value = tab.query || '';
+            document.getElementById('kqlQueryPicker').value = tab.pickerValue || '';
+            document.getElementById('kqlQueryName').value = tab.queryName || '';
+
+            // Restore delete button visibility
+            const deleteBtn = document.getElementById('kqlDeleteBtn');
+            deleteBtn.style.display = (tab.pickerValue && tab.pickerValue.startsWith('saved:')) ? 'inline-block' : 'none';
+
+            // Restore loading/results state
+            const loadingEl = document.getElementById('kqlLoading');
+            const resultsEl = document.getElementById('kqlResults');
+
+            if (tab.isLoading) {
+                loadingEl.style.display = 'flex';
+                resultsEl.style.display = 'none';
+            } else if (tab.results || tab.resultsHtml) {
+                loadingEl.style.display = 'none';
+                resultsEl.style.display = 'block';
+                if (tab.resultsHtml) {
+                    resultsEl.innerHTML = tab.resultsHtml;
+                } else if (tab.results) {
+                    displayKqlResults(tab.results);
+                }
+            } else {
+                loadingEl.style.display = 'none';
+                resultsEl.style.display = 'none';
+            }
+        }
+
+        function renderKqlTabs() {
+            const container = document.getElementById('kqlQueryTabs');
+            const showClose = kqlTabs.length > 1;
+
+            let html = '';
+            kqlTabs.forEach(tab => {
+                const isActive = tab.id === activeKqlTabId;
+                html += `<div class="kql-tab ${isActive ? 'active' : ''}" onclick="switchKqlTab(${tab.id})" ondblclick="renameKqlTab(${tab.id})">`;
+                html += `<span class="kql-tab-name">${escapeHtml(tab.name)}</span>`;
+                if (showClose) {
+                    html += `<button class="kql-tab-close" onclick="closeKqlTab(${tab.id}, event)" title="Close tab">&times;</button>`;
+                }
+                html += '</div>';
+            });
+            html += `<button class="kql-tab-add" onclick="addKqlTab()" title="New query tab">+</button>`;
+            container.innerHTML = html;
+        }
+
+        function switchKqlTab(tabId) {
+            if (tabId === activeKqlTabId) return;
+
+            // Save current tab state
+            saveKqlTabState();
+
+            // Switch to new tab
+            activeKqlTabId = tabId;
+            const tab = getActiveKqlTab();
+            if (tab) {
+                restoreKqlTabState(tab);
+            }
+            renderKqlTabs();
+        }
+
+        function addKqlTab() {
+            // Save current tab state before creating new one
+            saveKqlTabState();
+
+            const tab = createKqlTab();
+            activeKqlTabId = tab.id;
+            restoreKqlTabState(tab);
+            renderKqlTabs();
+        }
+
+        function closeKqlTab(tabId, event) {
+            event.stopPropagation();
+            if (kqlTabs.length <= 1) return;
+
+            const tabIndex = kqlTabs.findIndex(t => t.id === tabId);
+            if (tabIndex === -1) return;
+
+            // If closing active tab, switch to adjacent tab first
+            if (tabId === activeKqlTabId) {
+                const nextTab = kqlTabs[tabIndex + 1] || kqlTabs[tabIndex - 1];
+                activeKqlTabId = nextTab.id;
+                restoreKqlTabState(nextTab);
+            }
+
+            kqlTabs.splice(tabIndex, 1);
+            renderKqlTabs();
+        }
+
+        function renameKqlTab(tabId) {
+            const tab = kqlTabs.find(t => t.id === tabId);
+            if (!tab) return;
+
+            const newName = prompt('Rename query tab:', tab.name);
+            if (newName && newName.trim()) {
+                tab.name = newName.trim();
+                renderKqlTabs();
+            }
+        }
 
         const kqlSamples = {
             errors5xx: `W3CIISLog
@@ -782,6 +921,12 @@
                 return;
             }
 
+            const tab = getActiveKqlTab();
+            const tabId = tab.id;
+            tab.isLoading = true;
+            tab.results = null;
+            tab.resultsHtml = null;
+
             document.getElementById('kqlLoading').style.display = 'flex';
             document.getElementById('kqlResults').style.display = 'none';
 
@@ -798,6 +943,26 @@
                 });
 
                 const data = await response.json();
+
+                // Find the tab that initiated this query (it may no longer be active)
+                const originTab = kqlTabs.find(t => t.id === tabId);
+                if (originTab) {
+                    originTab.isLoading = false;
+                }
+
+                // Only update DOM if this tab is still the active one
+                if (activeKqlTabId !== tabId) {
+                    // Tab was switched away — store results silently
+                    if (originTab) {
+                        if (!response.ok || !data.success) {
+                            originTab.results = data;
+                        } else {
+                            originTab.results = data;
+                        }
+                    }
+                    return;
+                }
+
                 document.getElementById('kqlLoading').style.display = 'none';
 
                 if (!response.ok || !data.success) {
@@ -807,19 +972,27 @@
                     document.getElementById('kqlTableBody').innerHTML =
                         `<tr><td style="color: #ef4444; padding: 20px;">Error: ${escapeHtml(data.error || 'Unknown error')}</td></tr>`;
                     document.getElementById('kqlJsonContent').textContent = JSON.stringify(data, null, 2);
+                    document.getElementById('kqlExportInfo').style.display = 'none';
+                    if (originTab) originTab.results = data;
                     return;
                 }
 
                 displayKqlResults(data);
 
             } catch (error) {
-                document.getElementById('kqlLoading').style.display = 'none';
-                alert('Error executing query: ' + error.message);
+                const originTab = kqlTabs.find(t => t.id === tabId);
+                if (originTab) originTab.isLoading = false;
+
+                if (activeKqlTabId === tabId) {
+                    document.getElementById('kqlLoading').style.display = 'none';
+                    alert('Error executing query: ' + error.message);
+                }
             }
         }
 
         function displayKqlResults(data) {
-            lastKqlResult = data;
+            const tab = getActiveKqlTab();
+            if (tab) tab.results = data;
             document.getElementById('kqlResults').style.display = 'block';
             document.getElementById('kqlResultCount').textContent = data.count;
 
@@ -875,6 +1048,9 @@
         }
 
         function switchKqlView(view) {
+            const tab = getActiveKqlTab();
+            if (tab) tab.activeView = view;
+
             const tableView = document.getElementById('kqlTableView');
             const jsonView = document.getElementById('kqlJsonView');
             const tableBtn = document.getElementById('kqlTableViewBtn');
@@ -921,9 +1097,11 @@
         }
 
         function downloadKqlCsv() {
-            if (!lastKqlResult || !lastKqlResult.rows || !lastKqlResult.columns) return;
+            const tab = getActiveKqlTab();
+            const tabResult = tab ? tab.results : null;
+            if (!tabResult || !tabResult.rows || !tabResult.columns) return;
 
-            const csv = buildCsvContent(lastKqlResult.columns, lastKqlResult.rows);
+            const csv = buildCsvContent(tabResult.columns, tabResult.rows);
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
 
@@ -937,9 +1115,11 @@
         }
 
         async function downloadKqlZip() {
-            if (!lastKqlResult || !lastKqlResult.rows || !lastKqlResult.columns) return;
+            const tab = getActiveKqlTab();
+            const tabResult = tab ? tab.results : null;
+            if (!tabResult || !tabResult.rows || !tabResult.columns) return;
 
-            const csv = buildCsvContent(lastKqlResult.columns, lastKqlResult.rows);
+            const csv = buildCsvContent(tabResult.columns, tabResult.rows);
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
             const csvFilename = 'kql-results-' + timestamp + '.csv';
 
@@ -1081,6 +1261,11 @@
             setDefaultDateRange();
             renderSavedKqlQueries();
             initColumnResize();
+
+            // Initialize KQL query tabs with one default tab
+            const initialTab = createKqlTab();
+            activeKqlTabId = initialTab.id;
+            renderKqlTabs();
         });
     </script>
 </body>
