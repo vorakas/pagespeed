@@ -1223,23 +1223,51 @@
             if (!table) return;
 
             const handles = table.querySelectorAll('.resize-handle');
+            let columnsConverted = false;
+
+            // Convert all percentage widths to pixel widths so resizing works with table-layout: fixed
+            function convertToPixelWidths() {
+                if (columnsConverted) return;
+                const ths = table.querySelectorAll('thead th');
+                ths.forEach(th => {
+                    th.style.width = th.offsetWidth + 'px';
+                });
+                columnsConverted = true;
+            }
 
             handles.forEach(handle => {
                 handle.addEventListener('mousedown', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
 
+                    convertToPixelWidths();
+
                     const th = handle.parentElement;
+                    const ths = Array.from(table.querySelectorAll('thead th'));
+                    const colIndex = ths.indexOf(th);
+                    const nextTh = ths[colIndex + 1] || null;
+
                     const startX = e.pageX;
                     const startWidth = th.offsetWidth;
+                    const nextStartWidth = nextTh ? nextTh.offsetWidth : 0;
+                    const minWidth = 40;
 
                     handle.classList.add('active');
                     table.classList.add('resizing');
 
                     function onMouseMove(e) {
                         const delta = e.pageX - startX;
-                        const newWidth = Math.max(50, startWidth + delta);
+                        const newWidth = Math.max(minWidth, startWidth + delta);
+                        const actualDelta = newWidth - startWidth;
+
+                        // Resize this column
                         th.style.width = newWidth + 'px';
+
+                        // Compensate by adjusting the next column (keeps total width stable)
+                        if (nextTh) {
+                            const nextWidth = Math.max(minWidth, nextStartWidth - actualDelta);
+                            nextTh.style.width = nextWidth + 'px';
+                        }
                     }
 
                     function onMouseUp() {
@@ -1251,6 +1279,18 @@
 
                     document.addEventListener('mousemove', onMouseMove);
                     document.addEventListener('mouseup', onMouseUp);
+                });
+
+                // Double-click to reset all columns to default percentages
+                handle.addEventListener('dblclick', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const ths = table.querySelectorAll('thead th');
+                    const defaults = ['6%', '3%', '24%', '40%', '5%', '7%', '7%', '8%'];
+                    ths.forEach((th, i) => {
+                        if (defaults[i]) th.style.width = defaults[i];
+                    });
+                    columnsConverted = false;
                 });
             });
         }

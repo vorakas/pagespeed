@@ -2480,20 +2480,40 @@ body.light-mode .cell-full-value {
 .resize-handle {
     position: absolute;
     top: 0;
-    right: 0;
-    width: 5px;
+    right: -3px;
+    width: 7px;
     height: 100%;
     cursor: col-resize;
     background: transparent;
     z-index: 5;
+    transition: background 0.15s;
+}
+
+.resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 25%;
+    right: 3px;
+    width: 1px;
+    height: 50%;
+    background: #4b5563;
 }
 
 .resize-handle:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(16, 185, 129, 0.3);
+}
+
+.resize-handle:hover::after {
+    background: #10b981;
 }
 
 .resize-handle.active {
-    background: rgba(16, 185, 129, 0.6);
+    background: rgba(16, 185, 129, 0.5);
+}
+
+.resize-handle.active::after {
+    background: #10b981;
+    width: 2px;
 }
 
 .resizable-table.resizing {
@@ -2507,12 +2527,24 @@ body.light-mode .cell-full-value {
     cursor: col-resize;
 }
 
+body.light-mode .resize-handle::after {
+    background: #d1d5db;
+}
+
 body.light-mode .resize-handle:hover {
-    background: rgba(0, 0, 0, 0.15);
+    background: rgba(102, 126, 234, 0.2);
+}
+
+body.light-mode .resize-handle:hover::after {
+    background: #667eea;
 }
 
 body.light-mode .resize-handle.active {
-    background: rgba(102, 126, 234, 0.5);
+    background: rgba(102, 126, 234, 0.4);
+}
+
+body.light-mode .resize-handle.active::after {
+    background: #667eea;
 }
 
 /* Infrastructure Section */
