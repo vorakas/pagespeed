@@ -2415,6 +2415,12 @@ body.light-mode .construction-section p {
     cursor: pointer;
 }
 
+.metrics-table-container .results-table td.wrap-cell {
+    word-break: break-all;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
 .metrics-table-container .results-table td.truncate-cell:hover {
     overflow: visible;
     white-space: normal;

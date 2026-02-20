@@ -140,14 +140,14 @@
                     <table class="results-table resizable-table" id="iisLogsResultsTable">
                         <thead>
                             <tr>
-                                <th style="width: 12%">Time<div class="resize-handle"></div></th>
-                                <th style="width: 5%">Method<div class="resize-handle"></div></th>
+                                <th style="width: 10%">Time<div class="resize-handle"></div></th>
+                                <th style="width: 4%">Method<div class="resize-handle"></div></th>
                                 <th style="width: 25%">URL Path<div class="resize-handle"></div></th>
-                                <th style="width: 22%">Query String<div class="resize-handle"></div></th>
+                                <th style="width: 28%">Query String<div class="resize-handle"></div></th>
                                 <th style="width: 5%">Status<div class="resize-handle"></div></th>
                                 <th style="width: 9%">Time Taken (ms)<div class="resize-handle"></div></th>
-                                <th style="width: 10%">Client IP<div class="resize-handle"></div></th>
-                                <th style="width: 12%">Site</th>
+                                <th style="width: 8%">Client IP<div class="resize-handle"></div></th>
+                                <th style="width: 11%">Site</th>
                             </tr>
                         </thead>
                         <tbody id="iisLogsTable">
@@ -586,7 +586,7 @@
                     <td>${time}</td>
                     <td>${log.csMethod || '--'}</td>
                     <td class="truncate-cell"><code>${escapeHtml(log.csUriStem || '--')}</code><span class="cell-full-value">${escapeHtml(log.csUriStem || '--')}</span></td>
-                    <td class="truncate-cell">${escapeHtml(log.csUriQuery || '--')}<span class="cell-full-value">${escapeHtml(log.csUriQuery || '--')}</span></td>
+                    <td class="wrap-cell">${escapeHtml(log.csUriQuery || '--')}</td>
                     <td><span class="${statusClass}">${log.scStatus || '--'}</span></td>
                     <td>${log.TimeTaken != null ? Number(log.TimeTaken).toLocaleString() : '--'}</td>
                     <td>${log.cIP || '--'}</td>
