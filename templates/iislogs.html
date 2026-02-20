@@ -160,7 +160,6 @@
         <!-- KQL Query Mode Section -->
         <section class="kql-section" id="kqlQuerySection" style="display: none;">
             <h2>KQL Query Mode</h2>
-            <div class="kql-query-tabs" id="kqlQueryTabs"></div>
             <div class="kql-editor">
                 <div class="editor-header">
                     <h3>Query Editor</h3>
@@ -183,6 +182,7 @@
                         <button onclick="runKqlQuery()" class="btn-primary">Run Query</button>
                     </div>
                 </div>
+                <div class="kql-query-tabs" id="kqlQueryTabs"></div>
                 <textarea id="kqlQuery" rows="6" placeholder="W3CIISLog&#10;| where TimeGenerated > ago(1h)&#10;| take 100"></textarea>
 
                 <!-- Loading Indicator -->

@@ -3779,11 +3779,12 @@ body.light-mode .site-selector select {
     align-items: center;
     gap: 4px;
     padding: 8px 8px 0;
-    background: #0f1419;
-    border: 1px solid #374151;
+    background: transparent;
+    border: none;
     border-bottom: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: 0;
     flex-wrap: wrap;
+    margin-bottom: 0;
 }
 
 .kql-tab {
@@ -3807,7 +3808,7 @@ body.light-mode .site-selector select {
 }
 
 .kql-tab.active {
-    background: #0f1419;
+    background: #1a1f2e;
     color: #10b981;
     border-color: #374151;
     font-weight: 600;
@@ -3853,8 +3854,8 @@ body.light-mode .site-selector select {
     border-color: #10b981;
 }
 
-.kql-query-tabs + .kql-editor {
-    border-radius: 0 0 8px 8px;
+.kql-query-tabs + #kqlQuery {
+    border-radius: 0 0 6px 6px;
     border-top: none;
 }
 
@@ -4055,8 +4056,7 @@ body.light-mode .export-size-label {
 }
 
 body.light-mode .kql-query-tabs {
-    background: #f9fafb;
-    border-color: #e5e7eb;
+    background: transparent;
 }
 
 body.light-mode .kql-tab {
@@ -4071,7 +4071,7 @@ body.light-mode .kql-tab:hover:not(.active) {
 }
 
 body.light-mode .kql-tab.active {
-    background: #f9fafb;
+    background: white;
     color: #667eea;
     border-color: #e5e7eb;
 }
