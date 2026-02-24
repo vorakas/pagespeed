@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 * {
     margin: 0;
     padding: 0;
@@ -5,7 +7,7 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background: #0a0f1a;
     min-height: 100vh;
     margin: 0;
@@ -49,13 +51,34 @@ body {
 }
 
 .side-nav-link {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 12px 20px;
     color: #9ca3af;
     text-decoration: none;
     font-size: 1em;
     transition: all 0.2s;
     border-left: 3px solid transparent;
+}
+
+.nav-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .side-nav-link:hover {
@@ -167,6 +190,7 @@ section h2 {
     border: 2px solid #e0e0e0;
     border-radius: 8px;
     background: #f9f9f9;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .setup-card h3 {
@@ -1870,6 +1894,7 @@ body:not(.light-mode) .setup-section select:focus {
     border: 1px solid #374151;
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .site-urls-card h3 {
@@ -1961,7 +1986,7 @@ body:not(.light-mode) .setup-section select:focus {
 
 .site-urls-card .url-text {
     color: #e3e8ee;
-    font-family: 'Courier New', monospace;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
     font-size: 0.9em;
     flex: 1;
 }
@@ -1994,6 +2019,7 @@ body.light-mode .sites-urls-section h2 {
 body.light-mode .site-urls-card {
     background: #f9fafb;
     border-color: #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 body.light-mode .site-urls-card h3 {
@@ -2089,6 +2115,7 @@ body:not(.light-mode) .setup-card {
     border: 1px solid #374151;
     padding: 20px;
     border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 body:not(.light-mode) .setup-card h3 {
@@ -2286,6 +2313,7 @@ body.light-mode .construction-section p {
     border: 1px solid #374151;
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .config-card h3 {
@@ -2379,6 +2407,7 @@ body.light-mode .construction-section p {
     border: 1px solid #374151;
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
     display: flex;
     align-items: center;
     gap: 15px;
@@ -2632,12 +2661,14 @@ body.light-mode .resize-handle.active::after {
     border: 1px solid #374151;
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
     transition: all 0.3s;
 }
 
 .infra-card:hover {
     border-color: #10b981;
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }
 
 .infra-card h3 {
@@ -2722,12 +2753,14 @@ body.light-mode .resize-handle.active::after {
     border: 1px solid #374151;
     border-radius: 8px;
     padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
     transition: all 0.3s;
 }
 
 .browser-metric-card:hover {
     border-color: #10b981;
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }
 
 .browser-metric-card h3 {
@@ -2823,7 +2856,7 @@ body.light-mode .resize-handle.active::after {
     border-radius: 6px;
     padding: 15px;
     color: #e3e8ee;
-    font-family: 'Courier New', monospace;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
     font-size: 0.95em;
     resize: vertical;
     min-height: 100px;
@@ -2860,7 +2893,7 @@ body.light-mode .resize-handle.active::after {
     padding: 2px 6px;
     border-radius: 4px;
     color: #fbbf24;
-    font-family: 'Courier New', monospace;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
 }
 
 .loading {
@@ -2984,6 +3017,7 @@ body.light-mode .nrql-editor,
 body.light-mode .alert-item {
     background: #f9fafb;
     border-color: #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 body.light-mode .config-card h3,
@@ -3142,6 +3176,7 @@ body.light-mode .browser-metric-card:hover {
     border: 2px solid #374151;
     border-radius: 12px;
     padding: 25px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
     transition: all 0.3s;
 }
 
@@ -3394,7 +3429,7 @@ body.light-mode .browser-metric-card:hover {
     overflow: auto; /* Scrollbar when content exceeds height */
     font-size: 0.85em;
     line-height: 1.5;
-    font-family: 'Courier New', monospace;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
     white-space: pre-wrap;
     word-wrap: break-word;
     flex: 1;
@@ -3498,6 +3533,7 @@ body.light-mode .loading-indicator p {
 body.light-mode .cwv-metric-card {
     background: #f9fafb;
     border-color: #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 body.light-mode .cwv-metric-card:hover {
@@ -3982,7 +4018,7 @@ body.light-mode .site-selector select {
     border-radius: 6px;
     padding: 15px;
     color: #e3e8ee;
-    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
     font-size: 0.95em;
     resize: vertical;
     min-height: 120px;
@@ -4080,7 +4116,7 @@ body.light-mode .site-selector select {
     border-radius: 6px;
     padding: 15px;
     color: #e3e8ee;
-    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
     font-size: 0.85em;
     overflow-x: auto;
     max-height: 500px;
@@ -5085,3 +5121,132 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     color: #ffffff;
 }
 
+/* ==================== Toast Notifications ==================== */
+
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    padding: 14px 20px;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 0.9em;
+    font-weight: 500;
+    max-width: 400px;
+    min-width: 250px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: toastSlideIn 0.3s ease forwards;
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.toast.removing {
+    animation: toastSlideOut 0.3s ease forwards;
+}
+
+.toast-success {
+    background: #065f46;
+    border-left: 4px solid #10b981;
+}
+
+.toast-error {
+    background: #7f1d1d;
+    border-left: 4px solid #ef4444;
+}
+
+.toast-info {
+    background: #1e3a5f;
+    border-left: 4px solid #3b82f6;
+}
+
+.toast-warning {
+    background: #78350f;
+    border-left: 4px solid #f59e0b;
+}
+
+.toast-dismiss {
+    margin-left: auto;
+    background: none !important;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    font-size: 1.1em;
+    padding: 0 0 0 10px !important;
+    width: auto !important;
+    min-width: 0;
+    margin-bottom: 0 !important;
+}
+
+.toast-dismiss:hover {
+    color: #ffffff;
+    transform: none;
+    box-shadow: none;
+    background: none !important;
+}
+
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes toastSlideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+/* Toast Light Mode */
+body.light-mode .toast-success {
+    background: #d1fae5;
+    color: #065f46;
+    border-left-color: #10b981;
+}
+
+body.light-mode .toast-error {
+    background: #fee2e2;
+    color: #7f1d1d;
+    border-left-color: #ef4444;
+}
+
+body.light-mode .toast-info {
+    background: #dbeafe;
+    color: #1e3a5f;
+    border-left-color: #3b82f6;
+}
+
+body.light-mode .toast-warning {
+    background: #fef3c7;
+    color: #78350f;
+    border-left-color: #f59e0b;
+}
+
+body.light-mode .toast-dismiss {
+    color: rgba(0, 0, 0, 0.5);
+}
+
+body.light-mode .toast-dismiss:hover {
+    color: rgba(0, 0, 0, 0.8);
+}

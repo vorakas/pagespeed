@@ -1,6 +1,32 @@
 let sites = [];
 let currentChart = null;
 
+// ==================== Toast Notifications ====================
+function showToast(message, type = 'info', duration = 4000) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span>${message}</span>
+        <button class="toast-dismiss" onclick="this.parentElement.classList.add('removing'); setTimeout(() => this.parentElement.remove(), 300);">&times;</button>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.classList.add('removing');
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, duration);
+}
+
 // Get selected test strategy from radio buttons (defaults to 'desktop')
 function getSelectedStrategy() {
     const selected = document.querySelector('input[name="testStrategy"]:checked');
@@ -88,11 +114,11 @@ async function addSite(e) {
             loadSites();
             showMessage('Site added successfully!');
         } else {
-            alert(result.error);
+            showToast(result.error, 'error');
         }
     } catch (error) {
         console.error('Error adding site:', error);
-        alert('Failed to add site');
+        showToast('Failed to add site', 'error');
     }
 }
 
@@ -103,7 +129,7 @@ async function addUrl(e) {
     const url = document.getElementById('urlInput').value;
     
     if (!siteId) {
-        alert('Please select a site');
+        showToast('Please select a site', 'warning');
         return;
     }
     
@@ -121,11 +147,11 @@ async function addUrl(e) {
             showMessage('URL added successfully!');
             loadDashboard();
         } else {
-            alert(result.error);
+            showToast(result.error, 'error');
         }
     } catch (error) {
         console.error('Error adding URL:', error);
-        alert('Failed to add URL');
+        showToast('Failed to add URL', 'error');
     }
 }
 
@@ -263,12 +289,12 @@ async function testAllSites() {
         }
     } catch (error) {
         console.error('Error fetching URLs:', error);
-        alert('Failed to fetch URLs');
+        showToast('Failed to fetch URLs', 'error');
         return;
     }
     
     if (allUrls.length === 0) {
-        alert('No URLs to test. Please add some URLs first.');
+        showToast('No URLs to test. Please add some URLs first.', 'warning');
         return;
     }
     
@@ -390,7 +416,7 @@ async function loadComparison() {
     const resultsDiv = document.getElementById('comparisonResults');
     
     if (!url1Id || !url2Id) {
-        alert('Please select URLs from both sites to compare');
+        showToast('Please select URLs from both sites to compare', 'warning');
         return;
     }
     
@@ -546,7 +572,7 @@ async function loadHistoricalChart() {
     const urlId = document.getElementById('chartUrlSelect').value;
     
     if (!urlId) {
-        alert('Please select a URL');
+        showToast('Please select a URL', 'warning');
         return;
     }
     
@@ -556,7 +582,7 @@ async function loadHistoricalChart() {
         const history = await response.json();
         
         if (history.length === 0) {
-            alert('No historical data available for this URL');
+            showToast('No historical data available for this URL', 'info');
             return;
         }
         
@@ -628,7 +654,7 @@ async function loadHistoricalChart() {
         
     } catch (error) {
         console.error('Error loading historical data:', error);
-        alert('Failed to load historical data');
+        showToast('Failed to load historical data', 'error');
     }
 }
 
@@ -639,7 +665,7 @@ async function showDetails(urlId) {
         const data = await response.json();
         
         if (!data || !data.raw_data) {
-            alert('No detailed data available for this URL. Please run a test first.');
+            showToast('No detailed data available for this URL. Please run a test first.', 'info');
             return;
         }
         
@@ -731,7 +757,7 @@ async function showDetails(urlId) {
         
     } catch (error) {
         console.error('Error loading details:', error);
-        alert('Failed to load detailed data');
+        showToast('Failed to load detailed data', 'error');
     }
 }
 
@@ -990,7 +1016,7 @@ async function renameSite(siteId, currentName) {
     }
     
     if (newName.trim() === '') {
-        alert('Site name cannot be empty');
+        showToast('Site name cannot be empty', 'warning');
         return;
     }
     
@@ -1007,11 +1033,11 @@ async function renameSite(siteId, currentName) {
             showMessage('Site renamed successfully!');
             loadSites();
         } else {
-            alert('Failed to rename site: ' + result.error);
+            showToast('Failed to rename site: ' + result.error, 'error');
         }
     } catch (error) {
         console.error('Error renaming site:', error);
-        alert('Failed to rename site');
+        showToast('Failed to rename site', 'error');
     }
 }
 
@@ -1032,11 +1058,11 @@ async function deleteUrl(urlId, urlText) {
             showMessage('URL deleted successfully!');
             loadDashboard();
         } else {
-            alert('Failed to delete URL: ' + result.error);
+            showToast('Failed to delete URL: ' + result.error, 'error');
         }
     } catch (error) {
         console.error('Error deleting URL:', error);
-        alert('Failed to delete URL');
+        showToast('Failed to delete URL', 'error');
     }
 }
 
@@ -1057,11 +1083,11 @@ async function deleteSite(siteId, siteName) {
             showMessage('Site deleted successfully!');
             loadSites();
         } else {
-            alert('Failed to delete site: ' + result.error);
+            showToast('Failed to delete site: ' + result.error, 'error');
         }
     } catch (error) {
         console.error('Error deleting site:', error);
-        alert('Failed to delete site');
+        showToast('Failed to delete site', 'error');
     }
 }
 
@@ -1164,10 +1190,7 @@ function average(arr) {
 }
 
 function showMessage(message) {
-    const progressDiv = document.getElementById('testProgress');
-    progressDiv.textContent = message;
-    progressDiv.classList.add('show');
-    setTimeout(() => progressDiv.classList.remove('show'), 3000);
+    showToast(message, 'success');
 }
 
 
@@ -1296,11 +1319,11 @@ async function deleteUrl(urlId, siteId) {
             loadSitesAndUrls(); // Reload the list
             loadSites(); // Also reload sites for the dropdowns
         } else {
-            alert('Error deleting URL: ' + (result.error || 'Unknown error'));
+            showToast('Error deleting URL: ' + (result.error || 'Unknown error'), 'error');
         }
     } catch (error) {
         console.error('Error deleting URL:', error);
-        alert('Error deleting URL');
+        showToast('Error deleting URL', 'error');
     }
 }
 
@@ -1320,11 +1343,11 @@ async function deleteSiteFromList(siteId) {
             loadSitesAndUrls(); // Reload the list
             loadSites(); // Also reload sites for the dropdowns
         } else {
-            alert('Error deleting site: ' + (result.error || 'Unknown error'));
+            showToast('Error deleting site: ' + (result.error || 'Unknown error'), 'error');
         }
     } catch (error) {
         console.error('Error deleting site:', error);
-        alert('Error deleting site');
+        showToast('Error deleting site', 'error');
     }
 }
 

@@ -15,13 +15,13 @@
             <h2>Menu</h2>
         </div>
         <ul class="side-nav-list">
-            <li><a href="/" class="side-nav-link">&larr; Back</a></li>
-            <li><a href="/setup" class="side-nav-link">Site/URL Setup</a></li>
-            <li><a href="/test" class="side-nav-link">Test URLs</a></li>
-            <li><a href="/metrics" class="side-nav-link">Page Performance Metrics</a></li>
-            <li><a href="/newrelic" class="side-nav-link">New Relic Metrics</a></li>
-            <li><a href="/iislogs" class="side-nav-link">IIS Logs</a></li>
-            <li><a href="/ai-analysis" class="side-nav-link active">AI Analysis</a></li>
+            <li><a href="/" class="side-nav-link"><span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>Dashboard</a></li>
+            <li><a href="/setup" class="side-nav-link"><span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>Site/URL Setup</a></li>
+            <li><a href="/test" class="side-nav-link"><span class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>Test URLs</a></li>
+            <li><a href="/metrics" class="side-nav-link"><span class="nav-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>Page Performance Metrics</a></li>
+            <li><a href="/newrelic" class="side-nav-link"><span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>New Relic Metrics</a></li>
+            <li><a href="/iislogs" class="side-nav-link"><span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span>IIS Logs</a></li>
+            <li><a href="/ai-analysis" class="side-nav-link active"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1-3-3v-1a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/><path d="M9.5 13a3.5 3.5 0 0 0 5 0"/></svg></span>AI Analysis</a></li>
         </ul>
     </nav>
 
@@ -344,22 +344,22 @@
             const useOpenai = document.getElementById('useOpenai').checked;
 
             if (!urlPath) {
-                alert('Please enter a URL path to analyze.');
+                showToast('Please enter a URL path to analyze.', 'warning');
                 return;
             }
 
             if (!useClaude && !useOpenai) {
-                alert('Please select at least one AI provider.');
+                showToast('Please select at least one AI provider.', 'warning');
                 return;
             }
 
             // Validate API keys for selected providers
             if (useClaude && !aiConfig.claudeApiKey) {
-                alert('Please configure your Claude API key first.');
+                showToast('Please configure your Claude API key first.', 'warning');
                 return;
             }
             if (useOpenai && !aiConfig.openaiApiKey) {
-                alert('Please configure your OpenAI API key first.');
+                showToast('Please configure your OpenAI API key first.', 'warning');
                 return;
             }
 
@@ -413,7 +413,7 @@
                 document.getElementById('analyzeBtn').textContent = 'Analyze';
 
                 if (!response.ok || !data.success) {
-                    alert('Analysis failed: ' + (data.error || 'Unknown error'));
+                    showToast('Analysis failed: ' + (data.error || 'Unknown error'), 'error');
                     return;
                 }
 
@@ -448,7 +448,7 @@
                 document.getElementById('aiLoadingIndicator').style.display = 'none';
                 document.getElementById('analyzeBtn').disabled = false;
                 document.getElementById('analyzeBtn').textContent = 'Analyze';
-                alert('Error running analysis: ' + error.message);
+                showToast('Error running analysis: ' + error.message, 'error');
             }
         }
 
@@ -531,12 +531,12 @@
             const question = followupInput.value.trim();
 
             if (!question) {
-                alert('Please enter a follow-up question.');
+                showToast('Please enter a follow-up question.', 'warning');
                 return;
             }
 
             if (!conversationState.active) {
-                alert('No active analysis. Please run an initial analysis first.');
+                showToast('No active analysis. Please run an initial analysis first.', 'warning');
                 return;
             }
 
@@ -593,7 +593,7 @@
                     if (conversationState.openaiHistory.length > 0) {
                         conversationState.openaiHistory.pop();
                     }
-                    alert('Follow-up failed: ' + (data.error || 'Unknown error'));
+                    showToast('Follow-up failed: ' + (data.error || 'Unknown error'), 'error');
                     return;
                 }
 
@@ -612,7 +612,7 @@
                 if (conversationState.openaiHistory.length > 0) {
                     conversationState.openaiHistory.pop();
                 }
-                alert('Error sending follow-up: ' + error.message);
+                showToast('Error sending follow-up: ' + error.message, 'error');
             }
         }
 
