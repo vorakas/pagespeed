@@ -1232,7 +1232,7 @@ async function loadSitesAndUrls() {
             
             const siteCard = document.createElement('div');
             siteCard.className = 'site-urls-card';
-            
+
             let urlsHtml = '';
             if (urls.length === 0) {
                 urlsHtml = '<div class="no-urls">No URLs added yet</div>';
@@ -1250,21 +1250,34 @@ async function loadSitesAndUrls() {
                 });
                 urlsHtml += '</ul>';
             }
-            
+
+            const urlCount = urls.length;
             siteCard.innerHTML = `
-                <h3>
-                    ${site.name}
-                    <button class="btn-delete" onclick="deleteSiteFromList(${site.id})" title="Delete Site">×</button>
+                <h3 onclick="toggleSiteDrawer(this)">
+                    <span class="drawer-toggle">
+                        <span class="drawer-chevron"></span>
+                        ${site.name}
+                        <span class="drawer-url-count">(${urlCount} URL${urlCount !== 1 ? 's' : ''})</span>
+                    </span>
+                    <button class="btn-delete" onclick="event.stopPropagation(); deleteSiteFromList(${site.id})" title="Delete Site">×</button>
                 </h3>
-                ${urlsHtml}
+                <div class="url-drawer">
+                    ${urlsHtml}
+                </div>
             `;
-            
+
             container.appendChild(siteCard);
         }
     } catch (error) {
         console.error('Error loading sites and URLs:', error);
         container.innerHTML = '<p style="color: #f87171; text-align: center; padding: 30px;">Error loading sites and URLs</p>';
     }
+}
+
+// Toggle site URL drawer open/closed
+function toggleSiteDrawer(headerEl) {
+    const card = headerEl.closest('.site-urls-card');
+    if (card) card.classList.toggle('open');
 }
 
 // Delete a URL from the list
