@@ -1118,6 +1118,82 @@ button:disabled {
     color: #667eea;
 }
 
+/* ==================== Empty State Component ==================== */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+}
+
+.empty-state-icon {
+    width: 48px;
+    height: 48px;
+    color: #4b5563;
+    margin-bottom: 16px;
+}
+
+.empty-state-icon svg {
+    width: 48px;
+    height: 48px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.empty-state-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #e3e8ee;
+    margin-bottom: 8px;
+}
+
+.empty-state-description {
+    font-size: 0.9em;
+    color: #9ca3af;
+    max-width: 360px;
+    line-height: 1.5;
+    margin-bottom: 0;
+}
+
+.empty-state-action {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 8px 20px;
+    font-size: 0.85em;
+    font-weight: 500;
+    color: #ffffff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 6px;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.empty-state-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Compact variant for dashboard widgets */
+.empty-state-sm {
+    padding: 20px 16px;
+}
+
+.empty-state-sm .empty-state-icon {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 12px;
+}
+
+.empty-state-sm .empty-state-icon svg {
+    width: 36px;
+    height: 36px;
+}
+
 @media (max-width: 768px) {
     .comparison-grid {
         grid-template-columns: 1fr;
@@ -2033,6 +2109,12 @@ body:not(.light-mode) .setup-section select:focus {
     background: #1a1f2e;
     border-radius: 6px;
     border: 1px dashed #374151;
+}
+
+.site-urls-card .no-urls:has(.empty-state) {
+    padding: 0;
+    font-style: normal;
+    background: transparent;
 }
 
 /* Light mode for sites and URLs section */
@@ -3187,6 +3269,16 @@ body.light-mode .browser-metric-card:hover {
     font-size: 1.1em;
 }
 
+.loading-spinner-sm {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #374151;
+    border-top-color: #10b981;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
 /* Core Web Vitals Metrics Container */
 #cwvMetricsContainer {
     animation: fadeIn 0.5s;
@@ -3556,6 +3648,23 @@ body.light-mode .loading-spinner {
 }
 
 body.light-mode .loading-indicator p {
+    color: #6b7280;
+}
+
+body.light-mode .loading-spinner-sm {
+    border-color: #e5e7eb;
+    border-top-color: #667eea;
+}
+
+body.light-mode .empty-state-icon {
+    color: #9ca3af;
+}
+
+body.light-mode .empty-state-title {
+    color: #1f2937;
+}
+
+body.light-mode .empty-state-description {
     color: #6b7280;
 }
 

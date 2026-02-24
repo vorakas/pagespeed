@@ -27,6 +27,40 @@ function showToast(message, type = 'info', duration = 4000) {
     }, duration);
 }
 
+// ==================== Empty State Component ====================
+function createEmptyState(options) {
+    const { icon, title, description, actionText, actionHref } = options;
+    let html = '<div class="empty-state">';
+    if (icon) {
+        html += '<div class="empty-state-icon">' + icon + '</div>';
+    }
+    if (title) {
+        html += '<div class="empty-state-title">' + title + '</div>';
+    }
+    if (description) {
+        html += '<div class="empty-state-description">' + description + '</div>';
+    }
+    if (actionText && actionHref) {
+        html += '<a href="' + actionHref + '" class="empty-state-action">' + actionText + '</a>';
+    }
+    html += '</div>';
+    return html;
+}
+
+// SVG icons for empty states (Feather-style, matching nav icons)
+const EMPTY_ICONS = {
+    gridPlus: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="17.5" y1="14" x2="17.5" y2="21"/><line x1="14" y1="17.5" x2="21" y2="17.5"/></svg>',
+    barChart: '<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    folderPlus: '<svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>',
+    filePlus: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>',
+    gitCompare: '<svg viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>',
+    key: '<svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+    server: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>',
+    search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+    cpu: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>'
+};
+
 // Get selected test strategy from radio buttons (defaults to 'desktop')
 function getSelectedStrategy() {
     const selected = document.querySelector('input[name="testStrategy"]:checked');
@@ -221,7 +255,13 @@ async function loadDashboard() {
     if (!siteContent) return; // Not on a page with dashboard
     
     if (sites.length === 0) {
-        siteContent.innerHTML = '<div class="no-data">No sites configured. Add sites and URLs to get started.</div>';
+        siteContent.innerHTML = createEmptyState({
+            icon: EMPTY_ICONS.gridPlus,
+            title: 'No Sites Configured',
+            description: 'Add your first site and URLs to start monitoring performance.',
+            actionText: 'Go to Setup',
+            actionHref: '/setup'
+        });
         return;
     }
     
@@ -232,7 +272,7 @@ async function loadDashboard() {
 // Load results for a specific site
 async function loadSiteResults(siteId) {
     const contentDiv = document.getElementById('siteContent');
-    contentDiv.innerHTML = '<div class="loading">Loading results...</div>';
+    contentDiv.innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div><p>Loading results...</p></div>';
     
     // Reset sorting state when loading new site
     currentSortColumn = null;
@@ -246,7 +286,13 @@ async function loadSiteResults(siteId) {
         const results = await response.json();
         
         if (results.length === 0) {
-            contentDiv.innerHTML = '<div class="no-data">No test results yet. Click "Test All URLs" to run your first test.</div>';
+            contentDiv.innerHTML = createEmptyState({
+                icon: EMPTY_ICONS.barChart,
+                title: 'No Test Results Yet',
+                description: 'Run your first PageSpeed test to see performance scores here.',
+                actionText: 'Go to Test URLs',
+                actionHref: '/test'
+            });
             currentResults = [];
             return;
         }
@@ -420,14 +466,20 @@ async function loadComparison() {
         return;
     }
     
-    resultsDiv.innerHTML = '<div class="loading">Loading comparison...</div>';
+    resultsDiv.innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div><p>Loading comparison...</p></div>';
     
     try {
         const response = await fetch(`/api/comparison/urls?url1=${url1Id}&url2=${url2Id}`);
         const data = await response.json();
         
         if (!data.url1 || !data.url2) {
-            resultsDiv.innerHTML = '<div class="no-data">No test results available for one or both URLs</div>';
+            resultsDiv.innerHTML = createEmptyState({
+                icon: EMPTY_ICONS.gitCompare,
+                title: 'No Comparison Data',
+                description: 'No test results available for one or both selected URLs. Run tests first.',
+                actionText: 'Go to Test URLs',
+                actionHref: '/test'
+            });
             return;
         }
         
@@ -1238,11 +1290,17 @@ async function loadSitesAndUrls() {
     if (!container) return; // Not on setup page
     
     try {
+        container.innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div><p>Loading sites...</p></div>';
+
         const response = await fetch('/api/sites');
         const sites = await response.json();
-        
+
         if (sites.length === 0) {
-            container.innerHTML = '<p style="color: #9ca3af; text-align: center; padding: 30px;">No sites created yet. Use the form above to add your first site.</p>';
+            container.innerHTML = createEmptyState({
+                icon: EMPTY_ICONS.folderPlus,
+                title: 'No Sites Created Yet',
+                description: 'Use the form above to add your first site and start tracking URLs.'
+            });
             return;
         }
         
@@ -1258,7 +1316,11 @@ async function loadSitesAndUrls() {
 
             let urlsHtml = '';
             if (urls.length === 0) {
-                urlsHtml = '<div class="no-urls">No URLs added yet</div>';
+                urlsHtml = '<div class="no-urls">' + createEmptyState({
+                    icon: EMPTY_ICONS.filePlus,
+                    title: 'No URLs Added',
+                    description: 'Add URLs to this site to start monitoring.'
+                }) + '</div>';
             } else {
                 urlsHtml = '<ul class="url-list">';
                 urls.forEach(url => {

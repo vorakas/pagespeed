@@ -339,11 +339,13 @@
                             </tr>
                         </thead>
                         <tbody id="transactionsTable">
-                            <tr>
-                                <td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">
-                                    Configure New Relic API to load transaction data
-                                </td>
-                            </tr>
+                            <tr><td colspan="5">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div>
+                                    <div class="empty-state-title">API Not Configured</div>
+                                    <div class="empty-state-description">Configure your New Relic API key above to load transaction data.</div>
+                                </div>
+                            </td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -362,11 +364,13 @@
                             </tr>
                         </thead>
                         <tbody id="databaseTable">
-                            <tr>
-                                <td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">
-                                    Configure New Relic API to load database metrics
-                                </td>
-                            </tr>
+                            <tr><td colspan="5">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div>
+                                    <div class="empty-state-title">API Not Configured</div>
+                                    <div class="empty-state-description">Configure your New Relic API key above to load database metrics.</div>
+                                </div>
+                            </td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -385,11 +389,13 @@
                             </tr>
                         </thead>
                         <tbody id="externalTable">
-                            <tr>
-                                <td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">
-                                    Configure New Relic API to load external service data
-                                </td>
-                            </tr>
+                            <tr><td colspan="5">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div>
+                                    <div class="empty-state-title">API Not Configured</div>
+                                    <div class="empty-state-description">Configure your New Relic API key above to load external service data.</div>
+                                </div>
+                            </td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -408,11 +414,13 @@
                             </tr>
                         </thead>
                         <tbody id="errorsTable">
-                            <tr>
-                                <td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">
-                                    Configure New Relic API to load error data
-                                </td>
-                            </tr>
+                            <tr><td colspan="5">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div>
+                                    <div class="empty-state-title">API Not Configured</div>
+                                    <div class="empty-state-description">Configure your New Relic API key above to load error data.</div>
+                                </div>
+                            </td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -834,7 +842,7 @@
         function populateTransactionsTable(transactions) {
             const tbody = document.getElementById('transactionsTable');
             if (!transactions || transactions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">No transaction data found for this time range</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5">' + createEmptyState({ icon: EMPTY_ICONS.calendar, title: 'No Transaction Data', description: 'No transactions found for this time range. Try a wider date range.' }) + '</td></tr>';
                 return;
             }
             tbody.innerHTML = transactions.map(t => `
@@ -851,7 +859,7 @@
         function populateDatabaseTable(database) {
             const tbody = document.getElementById('databaseTable');
             if (!database || database.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">No database data found for this time range</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5">' + createEmptyState({ icon: EMPTY_ICONS.calendar, title: 'No Database Data', description: 'No database operations found for this time range. Try a wider date range.' }) + '</td></tr>';
                 return;
             }
             tbody.innerHTML = database.map(d => `
@@ -868,7 +876,7 @@
         function populateExternalTable(external) {
             const tbody = document.getElementById('externalTable');
             if (!external || external.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">No external service data found for this time range</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5">' + createEmptyState({ icon: EMPTY_ICONS.calendar, title: 'No External Service Data', description: 'No external service calls found for this time range. Try a wider date range.' }) + '</td></tr>';
                 return;
             }
             tbody.innerHTML = external.map(e => `
@@ -885,7 +893,7 @@
         function populateErrorsTable(errors) {
             const tbody = document.getElementById('errorsTable');
             if (!errors || errors.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #9ca3af;">No errors found for this time range 🎉</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5">' + createEmptyState({ icon: EMPTY_ICONS.calendar, title: 'No Errors Found', description: 'No errors found for this time range. Looking good!' }) + '</td></tr>';
                 return;
             }
             tbody.innerHTML = errors.map(e => {

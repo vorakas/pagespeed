@@ -338,7 +338,10 @@
                                 </tr>
                             </thead>
                             <tbody id="iisTopPagesTable">
-                                <tr><td colspan="3" style="text-align: center; padding: 20px; color: #9ca3af;">No data</td></tr>
+                                <tr><td colspan="3"><div class="empty-state empty-state-sm">
+                                    <div class="empty-state-icon"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>
+                                    <div class="empty-state-description">Connect to Azure to load dashboard data</div>
+                                </div></td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -355,7 +358,10 @@
                                 </tr>
                             </thead>
                             <tbody id="iisStatusTable">
-                                <tr><td colspan="3" style="text-align: center; padding: 20px; color: #9ca3af;">No data</td></tr>
+                                <tr><td colspan="3"><div class="empty-state empty-state-sm">
+                                    <div class="empty-state-icon"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>
+                                    <div class="empty-state-description">Connect to Azure to load dashboard data</div>
+                                </div></td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -615,7 +621,7 @@
         function populateLogsTable(logs) {
             const tbody = document.getElementById('iisLogsTable');
             if (!logs || logs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #9ca3af;">No log entries found for this filter</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8">' + createEmptyState({ icon: EMPTY_ICONS.search, title: 'No Log Entries Found', description: 'No log entries matched this filter. Try adjusting your search criteria.' }) + '</td></tr>';
                 return;
             }
 
@@ -1069,7 +1075,7 @@
             // Build table body
             const tbody = document.getElementById('kqlTableBody');
             if (!data.rows || data.rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="' + (data.columns ? data.columns.length : 1) + '" style="text-align: center; padding: 40px; color: #9ca3af;">No results returned</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="' + (data.columns ? data.columns.length : 1) + '">' + createEmptyState({ icon: EMPTY_ICONS.search, title: 'No Results Returned', description: 'The query returned no data. Try modifying your KQL query.' }) + '</td></tr>';
             } else {
                 tbody.innerHTML = data.rows.map(row => {
                     return '<tr>' + data.columns.map(col => {
