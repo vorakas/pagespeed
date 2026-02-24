@@ -39,7 +39,7 @@ This file documents the full project state so a new session can pick up where we
 
 ```
 ├── app.py                    # Flask app, all routes (~1087 lines)
-├── models.py                 # Database layer, SQLite/PostgreSQL (~406 lines)
+├── models.py                 # Database layer, SQLite/PostgreSQL (~405 lines)
 ├── pagespeed_service.py      # Google PageSpeed API client (~164 lines)
 ├── newrelic_service.py       # New Relic NerdGraph client (~510 lines)
 ├── azure_service.py          # Azure Log Analytics client (~150 lines)
@@ -54,15 +54,15 @@ This file documents the full project state so a new session can pick up where we
 ├── .gitignore
 ├── templates/
 │   ├── index.html            # Dashboard home, CWV reference guide
-│   ├── setup.html            # Site/URL management
+│   ├── setup.html            # Site/URL management with collapsible drawers
 │   ├── test.html             # PageSpeed testing with desktop/mobile toggle
 │   ├── metrics.html          # Performance metrics charts
 │   ├── newrelic.html         # New Relic integration page
-│   ├── iislogs.html          # IIS logs + KQL queries (~1337 lines, heavy inline JS)
+│   ├── iislogs.html          # IIS logs + KQL queries + profiles (~1624 lines, heavy inline JS)
 │   └── ai_analysis.html      # AI analysis with parallel Claude + OpenAI
 ├── static/
-│   ├── css/style.css         # All styles, dark+light mode (~4700 lines)
-│   ├── js/app.js             # Shared frontend JS (~1320 lines)
+│   ├── css/style.css         # All styles, dark+light mode (~5390 lines)
+│   ├── js/app.js             # Shared frontend JS (~1436 lines)
 │   ├── favicon.ico
 │   └── images/               # Logo variants (light/dark, LampsPlus)
 ```
@@ -107,6 +107,7 @@ All API credentials are stored **client-side in localStorage** (not on the serve
 - `nrConfig` — New Relic API key, Account ID, App Name
 - `azureConfig` — Azure Tenant ID, Client ID, Client Secret, Workspace ID, Secret Expiration Date, Site
 - `aiConfig` — Claude API Key/Model, OpenAI API Key/Model
+- `kqlProfiles` — Per-user KQL query profiles with saved queries (migrated from legacy `kqlSavedQueries`)
 
 Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API_KEY` (optional).
 
@@ -136,6 +137,7 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 - **KQL Query Mode:**
   - Tabbed interface (in-memory, not persisted across page reload)
   - 5 preset queries + save/load/delete custom queries (localStorage)
+  - **KQL Profiles:** Per-user named profiles with private saved queries and share/copy between profiles
   - Table View + Raw JSON View toggle
   - CSV/ZIP export (JSZip)
   - Tab bar positioned inside `.kql-editor`, directly above `<textarea>`
@@ -160,7 +162,16 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 
 ### UI/UX
 - Dark mode (default) + Light mode with localStorage persistence
-- Side navigation (7 pages)
+- **Inter web font** with system font fallback stack (`@import` from Google Fonts)
+- **Nav icons** — Inline SVG Feather-style icons on all 7 navigation links (stroke: currentColor for theme inheritance)
+- **Card shadows** — Subtle resting shadows on `.setup-card`, `.site-urls-card`, `.stat-card`, `.browser-metric-card`, `.cwv-metric-card`, `.config-card`, `.infra-card`
+- **Toast notifications** — `showToast(message, type, duration)` replaces all `alert()` calls; 4 types (success/error/info/warning) with auto-dismiss
+- **Zebra striping** — `tbody tr:nth-child(even)` alternating backgrounds on `.results-table` and `.reference-table`
+- **Sticky table headers** — `position: sticky; top: 0; z-index: 2` on all table headers
+- **Enhanced empty states** — `createEmptyState()` helper + `EMPTY_ICONS` SVG constants; icon, title, description, and action button
+- **Consistent loading spinners** — `.loading-indicator` with `.loading-spinner` across all data-loading sections
+- **Collapsible site drawers** — URL lists in Setup page cards expand/collapse with chevron toggle
+- Side navigation (7 pages) with active state indicator
 - Responsive design with media queries
 - Theme toggle button in header
 
@@ -169,6 +180,14 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 ## Recent Commit History (newest first)
 
 ```
+43b127b Add enhanced empty states with icons and consistent loading spinners
+eb6c84a Add zebra striping and sticky table headers for improved readability
+6ee3b70 Add visual polish: Inter font, card shadows, nav icons, toast notifications
+fdc5d18 Tighten spacing between URLs in site cards on Setup page
+7b57c7a Add collapsible drawers to site cards on Setup page
+babeffe Change secondary button color from pink to blue
+d5f4903 Add KQL query profiles with per-user saved queries and sharing
+bd67173 Add CLAUDE.md with comprehensive project context documentation
 25d425a Add manual column resizing to KQL results table
 f50abc1 Improve column resize to allow manual width adjustment in IIS Logs table
 bf9bbb0 Drastically reduce column widths to fix query string overflow in IIS Logs table
@@ -186,19 +205,6 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 58e7fca Use exact URL match for IIS logs in AI analysis
 9b19096 Remove report title header from Claude + show full data in preview
 5ca8109 Fix markdown list rendering in AI analysis results
-e1a9134 Remove app-wide NR data from AI analysis prompt
-0fbe2f9 Restrict AI analysis IIS data to the specific URL only
-d962eb6 Fix LCP and CLS queries returning empty results
-9a2f713 Fix follow-up input layout: textarea crushed and button oversized
-db295a0 Update README with comprehensive project documentation
-64eb040 Add follow-up question support to AI Analysis page
-c016c5c Add experimental AI disclaimer to AI Analysis page
-2a44577 Improve AI Analysis input layout and rename URL field
-a472ead Add IIS site selector to AI Analysis page
-a7e1ad8 Add AI Analysis page with parallel Claude and OpenAI integration
-a49e09a Add CSV and ZIP export for KQL query results
-298e10d Change default search limit from 100 to 50
-c57a5d6 Add IIS site selector dropdown for filtering logs by site name
 ```
 
 ---
@@ -206,34 +212,41 @@ c57a5d6 Add IIS site selector dropdown for filtering logs by site name
 ## Known Patterns & Conventions
 
 - **No test suite** — no automated tests exist; all testing is manual
-- **Inline JS in iislogs.html** — ~1000 lines of inline `<script>` (tab management, Azure config, KQL queries, column resize, etc.)
-- **Shared JS in app.js** — dashboard functionality, site management, testing, charting, theme toggle
-- **CSS organization:** Major sections separated by comment headers, light mode overrides grouped at end of each section
+- **Inline JS in iislogs.html** — ~1200 lines of inline `<script>` (tab management, Azure config, KQL queries, column resize, profiles, etc.)
+- **Shared JS in app.js** — dashboard functionality, site management, testing, charting, theme toggle, `showToast()`, `createEmptyState()`
+- **CSS organization:** Major sections separated by `/* ==================== */` comment headers, light mode overrides grouped at end of each section
 - **localStorage for config** — all API credentials stored client-side, passed to server in request bodies
 - **`escapeHtml()` utility** — defined in iislogs.html inline script, used for all user-facing data rendering
 - **Status code coloring:** `.status-2xx` (green), `.status-3xx` (blue), `.status-4xx` (yellow), `.status-5xx` (red)
 - **Score coloring:** `.score-good` (90+, green), `.score-average` (50-89, yellow), `.score-poor` (0-49, red)
+- **Inline SVG icons** — Nav icons and empty state icons use Feather-style stroke SVGs with `currentColor` for automatic theme inheritance
+- **Toast notifications** — `showToast(message, type, duration)` in app.js; types: 'success', 'error', 'info', 'warning'
+- **Empty states** — `createEmptyState({icon, title, description, actionText, actionHref})` in app.js; `EMPTY_ICONS` object has 10 reusable SVG constants
 - **Commit messages:** Always include `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`
 
 ---
 
-## CSS Key Locations (style.css ~4700 lines)
+## CSS Key Locations (style.css ~5390 lines)
 
-- **Side nav:** ~17-72
+- **Side nav + nav icons:** ~17-95
 - **Buttons:** ~206-330
-- **Results table:** ~335-458
-- **Modal:** ~460-739
-- **Score badges:** ~741-780
-- **Progress bar:** ~780-854
-- **Table fixed layout + overflow:** ~2404-2434
-- **Resizable columns:** ~2474-2550
-- **New Relic styles:** ~2201-3406
-- **IIS Logs styles:** ~3575-3809
-- **KQL Query Mode:** ~3809-4059
-- **AI Analysis styles:** ~4147-4702
+- **Results table + zebra striping + sticky headers:** ~335-475
+- **Modal:** ~477-756
+- **Score badges:** ~758-797
+- **Progress bar:** ~797-871
+- **Empty state component:** ~1121-1200
+- **Collapsible drawers:** ~2015-2055
+- **Table fixed layout + overflow:** ~2480-2510
+- **Resizable columns:** ~2550-2625
+- **Loading indicator + spinner:** ~3160-3205
+- **New Relic styles:** ~2280-3500
+- **IIS Logs styles:** ~3808-4040
+- **KQL Query Mode + profiles:** ~4042-4290
+- **AI Analysis styles:** ~4574-5000
+- **Toast notifications:** ~5262-5390
 
 ---
 
 ## Current State
 
-All features are implemented and deployed. The most recent work focused on **IIS Logs table usability** — column widths, overflow handling, manual column resizing for both the IIS search results table and the KQL results table. No pending tasks or known bugs at time of writing.
+All features are implemented and deployed. Recent work focused on **UI/UX polish**: Inter web font, card shadows, nav icons, toast notifications, zebra striping, sticky table headers, enhanced empty states with SVG icons and action buttons, and consistent loading spinners across all pages. No pending tasks or known bugs at time of writing.

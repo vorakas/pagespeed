@@ -5,7 +5,7 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 ## Features
 
 ### Dashboard & Testing
-- **Site/URL Management** -- Add sites and URLs to monitor
+- **Site/URL Management** -- Add sites and URLs to monitor, with collapsible drawer cards
 - **PageSpeed Testing** -- Run Google PageSpeed Insights tests (mobile & desktop) on demand or via daily scheduled jobs
 - **Core Web Vitals Reference** -- Built-in reference guide for LCP, FID, CLS thresholds
 - **Historical Performance** -- Track Lighthouse scores and metrics over time with comparison charts
@@ -14,7 +14,7 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 ### New Relic Integration
 - Connect to New Relic via NerdGraph GraphQL API
 - Core Web Vitals monitoring (LCP, FID, CLS, INP, TTFB)
-- APM metrics (transactions, database, external calls, errors)
+- APM metrics (transactions, database ops, external calls, errors)
 - Performance overview with current vs. previous period comparison
 - Custom NRQL query execution
 
@@ -24,6 +24,7 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 - Dashboard summary with request counts, error rates, and response times
 - Status code distribution and top pages analysis
 - **KQL Query Mode** -- Write custom KQL queries with presets, saved queries, and syntax reference
+- **KQL Profiles** -- Per-user query profiles with sharing/copying between profiles
 - **Site selector** -- Filter logs by IIS site name
 - **CSV/ZIP export** -- Download KQL query results with file size estimation
 
@@ -36,11 +37,22 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 - Configurable models (Claude Sonnet 4 / Opus 4, GPT-4o / GPT-4o Mini)
 - Experimental feature disclaimer
 
+### UI/UX Polish
+- **Inter web font** with system font fallback stack
+- **Nav icons** -- Inline SVG Feather-style icons on all navigation links
+- **Card shadows** -- Subtle depth on all card components (dark + light mode)
+- **Toast notifications** -- Non-blocking slide-in toasts replacing browser `alert()` dialogs
+- **Zebra striping** -- Alternating row backgrounds on all data tables
+- **Sticky table headers** -- Headers remain visible when scrolling long tables
+- **Enhanced empty states** -- SVG icons, descriptive text, and action buttons when no data exists
+- **Consistent loading spinners** -- Uniform spinner indicators across all pages
+- **Collapsible site drawers** -- URL lists collapse/expand on the Setup page
+
 ## Tech Stack
 
 - **Backend:** Python 3.11, Flask, Gunicorn
 - **Database:** PostgreSQL (production on Railway), SQLite (local development)
-- **Frontend:** Vanilla HTML/CSS/JS, marked.js (markdown), JSZip (exports)
+- **Frontend:** Vanilla HTML/CSS/JS, Chart.js, marked.js (markdown), JSZip (exports)
 - **APIs:** Google PageSpeed Insights, New Relic NerdGraph, Azure Log Analytics REST API, Anthropic Claude, OpenAI
 - **Deployment:** Railway (Docker-based with Nixpacks)
 - **Scheduling:** APScheduler for daily automated tests
@@ -68,8 +80,8 @@ pagespeed-monitor/
 │   ├── iislogs.html        # IIS logs & KQL queries
 │   └── ai_analysis.html    # AI-powered analysis
 └── static/
-    ├── css/style.css       # All styles (dark + light mode)
-    ├── js/app.js           # Shared JavaScript
+    ├── css/style.css       # All styles (dark + light mode, ~5400 lines)
+    ├── js/app.js           # Shared JavaScript (~1440 lines)
     ├── favicon.ico
     └── images/             # Logos and icons
 ```
@@ -83,6 +95,7 @@ All API credentials are stored client-side in localStorage and sent with each re
 | `nrConfig` | New Relic | API key, Account ID, App Name |
 | `azureConfig` | IIS Logs | Tenant ID, Client ID, Client Secret, Workspace ID, Selected Site |
 | `aiConfig` | AI Analysis | Claude API Key/Model, OpenAI API Key/Model |
+| `kqlProfiles` | IIS Logs | Per-user KQL query profiles with saved queries |
 
 ## Local Development
 
