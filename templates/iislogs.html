@@ -160,6 +160,22 @@
         <!-- KQL Query Mode Section -->
         <section class="kql-section" id="kqlQuerySection" style="display: none;">
             <h2>KQL Query Mode</h2>
+
+            <!-- Profile Switcher Bar -->
+            <div class="kql-profile-bar">
+                <div class="profile-selector">
+                    <label for="kqlProfilePicker">Profile:</label>
+                    <select id="kqlProfilePicker" onchange="onProfileChange()">
+                    </select>
+                </div>
+                <div class="profile-actions">
+                    <button onclick="createProfile()" class="btn-secondary profile-action-btn" title="New Profile">+ New</button>
+                    <button onclick="renameCurrentProfile()" class="btn-secondary profile-action-btn" title="Rename Profile">Rename</button>
+                    <button onclick="deleteCurrentProfile()" class="btn-secondary btn-danger profile-action-btn" id="kqlDeleteProfileBtn" title="Delete Profile">Delete</button>
+                    <button onclick="openShareDialog()" class="btn-secondary profile-action-btn" id="kqlShareBtn" title="Share Query to Another Profile">Share Query</button>
+                </div>
+            </div>
+
             <div class="kql-editor">
                 <div class="editor-header">
                     <h3>Query Editor</h3>
@@ -219,6 +235,31 @@
                     <!-- JSON View -->
                     <div id="kqlJsonView" class="kql-json-view" style="display: none;">
                         <pre id="kqlJsonContent"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Share Query Modal -->
+            <div class="modal-overlay" id="shareQueryModal" style="display: none;" onclick="closeShareModal(event)">
+                <div class="modal-content share-modal-content" onclick="event.stopPropagation()">
+                    <div class="modal-header share-modal-header">
+                        <h2>Share Query to Profile</h2>
+                        <button class="modal-close" onclick="closeShareModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="shareQuerySelect">Select Query to Share</label>
+                            <select id="shareQuerySelect"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="shareTargetProfile">Target Profile</label>
+                            <select id="shareTargetProfile"></select>
+                        </div>
+                        <div id="shareStatus" class="share-status" style="display: none;"></div>
+                        <div class="share-modal-actions">
+                            <button onclick="executeShare()" class="btn-primary share-confirm-btn">Copy Query</button>
+                            <button onclick="closeShareModal()" class="btn-secondary share-cancel-btn">Cancel</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -898,17 +939,21 @@
             if (!val.startsWith('saved:')) return;
 
             const index = parseInt(val.replace('saved:', ''));
-            const queries = getSavedKqlQueries();
-            if (!queries[index]) return;
+            const data = getProfilesData();
+            const profile = data.profiles.find(p => p.name === currentProfileName);
+            if (!profile || !profile.queries[index]) return;
 
-            if (!confirm(`Delete saved query "${queries[index].name}"?`)) return;
+            if (!confirm(`Delete saved query "${profile.queries[index].name}"?`)) return;
 
-            queries.splice(index, 1);
-            localStorage.setItem(KQL_STORAGE_KEY, JSON.stringify(queries));
+            profile.queries.splice(index, 1);
+            saveProfilesData(data);
             picker.value = '';
             document.getElementById('kqlDeleteBtn').style.display = 'none';
             document.getElementById('kqlQueryName').value = '';
             renderSavedKqlQueries();
+
+            // Update share button state (may no longer have queries)
+            renderProfilePicker();
         }
 
         async function runKqlQuery() {
@@ -1145,16 +1190,240 @@
             URL.revokeObjectURL(url);
         }
 
-        // ==================== Saved Queries ====================
+        // ==================== Profiles & Saved Queries ====================
 
-        const KQL_STORAGE_KEY = 'kqlSavedQueries';
+        const KQL_PROFILES_KEY = 'kqlProfiles';
+        const KQL_LEGACY_KEY = 'kqlSavedQueries';
+        let currentProfileName = 'Default';
 
-        function getSavedKqlQueries() {
-            try {
-                return JSON.parse(localStorage.getItem(KQL_STORAGE_KEY)) || [];
-            } catch (e) {
-                return [];
+        // --- Migration from old flat format ---
+        function migrateKqlProfiles() {
+            const existing = localStorage.getItem(KQL_PROFILES_KEY);
+            if (existing) {
+                try {
+                    const parsed = JSON.parse(existing);
+                    if (parsed.profiles && Array.isArray(parsed.profiles)) return;
+                } catch (e) { /* fall through to migration */ }
             }
+
+            let legacyQueries = [];
+            try {
+                legacyQueries = JSON.parse(localStorage.getItem(KQL_LEGACY_KEY)) || [];
+            } catch (e) {
+                legacyQueries = [];
+            }
+
+            const newData = {
+                activeProfile: 'Default',
+                profiles: [{ name: 'Default', queries: legacyQueries }]
+            };
+
+            localStorage.setItem(KQL_PROFILES_KEY, JSON.stringify(newData));
+            localStorage.removeItem(KQL_LEGACY_KEY);
+        }
+
+        // --- Profile data access ---
+        function getProfilesData() {
+            try {
+                const data = JSON.parse(localStorage.getItem(KQL_PROFILES_KEY));
+                if (data && data.profiles && Array.isArray(data.profiles)) return data;
+            } catch (e) { /* fall through */ }
+            return { activeProfile: 'Default', profiles: [{ name: 'Default', queries: [] }] };
+        }
+
+        function saveProfilesData(data) {
+            localStorage.setItem(KQL_PROFILES_KEY, JSON.stringify(data));
+        }
+
+        function getCurrentProfile() {
+            const data = getProfilesData();
+            return data.profiles.find(p => p.name === currentProfileName)
+                || data.profiles[0]
+                || { name: 'Default', queries: [] };
+        }
+
+        // --- Profile UI ---
+        function renderProfilePicker() {
+            const data = getProfilesData();
+            const picker = document.getElementById('kqlProfilePicker');
+            picker.innerHTML = data.profiles.map(p =>
+                `<option value="${escapeHtml(p.name)}" ${p.name === currentProfileName ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+            ).join('');
+
+            const deleteBtn = document.getElementById('kqlDeleteProfileBtn');
+            if (deleteBtn) deleteBtn.disabled = data.profiles.length <= 1;
+
+            const shareBtn = document.getElementById('kqlShareBtn');
+            if (shareBtn) {
+                const profile = getCurrentProfile();
+                shareBtn.disabled = (profile.queries.length === 0 || data.profiles.length <= 1);
+            }
+        }
+
+        function onProfileChange() {
+            const picker = document.getElementById('kqlProfilePicker');
+            currentProfileName = picker.value;
+
+            const data = getProfilesData();
+            data.activeProfile = currentProfileName;
+            saveProfilesData(data);
+
+            renderSavedKqlQueries();
+            document.getElementById('kqlQueryPicker').value = '';
+            document.getElementById('kqlDeleteBtn').style.display = 'none';
+            document.getElementById('kqlQueryName').value = '';
+            renderProfilePicker();
+        }
+
+        function createProfile() {
+            const name = prompt('Enter a name for the new profile:');
+            if (!name || !name.trim()) return;
+
+            const trimmed = name.trim();
+            const data = getProfilesData();
+
+            if (data.profiles.some(p => p.name === trimmed)) {
+                alert(`A profile named "${trimmed}" already exists.`);
+                return;
+            }
+
+            data.profiles.push({ name: trimmed, queries: [] });
+            data.activeProfile = trimmed;
+            saveProfilesData(data);
+
+            currentProfileName = trimmed;
+            renderProfilePicker();
+            renderSavedKqlQueries();
+            document.getElementById('kqlQueryPicker').value = '';
+            document.getElementById('kqlDeleteBtn').style.display = 'none';
+            document.getElementById('kqlQueryName').value = '';
+        }
+
+        function renameCurrentProfile() {
+            const newName = prompt('Rename profile:', currentProfileName);
+            if (!newName || !newName.trim() || newName.trim() === currentProfileName) return;
+
+            const trimmed = newName.trim();
+            const data = getProfilesData();
+
+            if (data.profiles.some(p => p.name === trimmed)) {
+                alert(`A profile named "${trimmed}" already exists.`);
+                return;
+            }
+
+            const profile = data.profiles.find(p => p.name === currentProfileName);
+            if (!profile) return;
+
+            profile.name = trimmed;
+            data.activeProfile = trimmed;
+            saveProfilesData(data);
+
+            currentProfileName = trimmed;
+            renderProfilePicker();
+        }
+
+        function deleteCurrentProfile() {
+            const data = getProfilesData();
+            if (data.profiles.length <= 1) {
+                alert('Cannot delete the last profile.');
+                return;
+            }
+
+            const profile = getCurrentProfile();
+            const queryCount = profile.queries.length;
+            const msg = queryCount > 0
+                ? `Delete profile "${currentProfileName}" and its ${queryCount} saved quer${queryCount !== 1 ? 'ies' : 'y'}? This cannot be undone.`
+                : `Delete profile "${currentProfileName}"?`;
+
+            if (!confirm(msg)) return;
+
+            const index = data.profiles.findIndex(p => p.name === currentProfileName);
+            data.profiles.splice(index, 1);
+            currentProfileName = data.profiles[0].name;
+            data.activeProfile = currentProfileName;
+            saveProfilesData(data);
+
+            renderProfilePicker();
+            renderSavedKqlQueries();
+            document.getElementById('kqlQueryPicker').value = '';
+            document.getElementById('kqlDeleteBtn').style.display = 'none';
+            document.getElementById('kqlQueryName').value = '';
+        }
+
+        // --- Share dialog ---
+        function openShareDialog() {
+            const data = getProfilesData();
+            const profile = getCurrentProfile();
+
+            if (profile.queries.length === 0) {
+                alert('No saved queries to share.');
+                return;
+            }
+            if (data.profiles.length <= 1) {
+                alert('Create another profile first to share queries.');
+                return;
+            }
+
+            const querySelect = document.getElementById('shareQuerySelect');
+            querySelect.innerHTML = profile.queries.map((q, i) =>
+                `<option value="${i}">${escapeHtml(q.name)}</option>`
+            ).join('');
+
+            const targetSelect = document.getElementById('shareTargetProfile');
+            targetSelect.innerHTML = data.profiles
+                .filter(p => p.name !== currentProfileName)
+                .map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`)
+                .join('');
+
+            document.getElementById('shareStatus').style.display = 'none';
+            document.getElementById('shareQueryModal').style.display = 'flex';
+        }
+
+        function closeShareModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('shareQueryModal').style.display = 'none';
+        }
+
+        function executeShare() {
+            const queryIndex = parseInt(document.getElementById('shareQuerySelect').value);
+            const targetProfileName = document.getElementById('shareTargetProfile').value;
+
+            const data = getProfilesData();
+            const sourceProfile = data.profiles.find(p => p.name === currentProfileName);
+            const targetProfile = data.profiles.find(p => p.name === targetProfileName);
+
+            if (!sourceProfile || !targetProfile) return;
+            const sourceQuery = sourceProfile.queries[queryIndex];
+            if (!sourceQuery) return;
+
+            let copyName = sourceQuery.name;
+            if (targetProfile.queries.some(q => q.name === copyName)) {
+                copyName = sourceQuery.name + ' (copy)';
+                let counter = 2;
+                while (targetProfile.queries.some(q => q.name === copyName)) {
+                    copyName = sourceQuery.name + ` (copy ${counter})`;
+                    counter++;
+                }
+            }
+
+            targetProfile.queries.push({ name: copyName, query: sourceQuery.query });
+            saveProfilesData(data);
+
+            const status = document.getElementById('shareStatus');
+            status.style.display = 'block';
+            status.className = 'share-status success';
+            status.textContent = `Copied "${sourceQuery.name}" to profile "${targetProfileName}" as "${copyName}".`;
+
+            // Update share button state
+            renderProfilePicker();
+
+            setTimeout(() => { closeShareModal(); }, 2000);
+        }
+
+        // --- Saved queries (profile-scoped) ---
+        function getSavedKqlQueries() {
+            const profile = getCurrentProfile();
+            return profile.queries || [];
         }
 
         function saveKqlQuery() {
@@ -1170,25 +1439,31 @@
                 return;
             }
 
-            const queries = getSavedKqlQueries();
-            const existingIndex = queries.findIndex(q => q.name === name);
+            const data = getProfilesData();
+            const profile = data.profiles.find(p => p.name === currentProfileName);
+            if (!profile) return;
+
+            const existingIndex = profile.queries.findIndex(q => q.name === name);
             if (existingIndex >= 0) {
                 if (!confirm(`A query named "${name}" already exists. Overwrite it?`)) {
                     return;
                 }
-                queries[existingIndex].query = query;
+                profile.queries[existingIndex].query = query;
             } else {
-                queries.push({ name: name, query: query });
+                profile.queries.push({ name: name, query: query });
             }
 
-            localStorage.setItem(KQL_STORAGE_KEY, JSON.stringify(queries));
+            saveProfilesData(data);
             document.getElementById('kqlQueryName').value = '';
             renderSavedKqlQueries();
 
             // Select the newly saved query in the picker
-            const newIndex = queries.findIndex(q => q.name === name);
+            const newIndex = profile.queries.findIndex(q => q.name === name);
             document.getElementById('kqlQueryPicker').value = `saved:${newIndex}`;
             document.getElementById('kqlDeleteBtn').style.display = 'inline-block';
+
+            // Update share button state (may now have queries to share)
+            renderProfilePicker();
         }
 
         function renderSavedKqlQueries() {
@@ -1323,6 +1598,13 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadAzureConfig();
             setDefaultDateRange();
+
+            // Initialize profiles (migrate from old format if needed)
+            migrateKqlProfiles();
+            const profilesData = getProfilesData();
+            currentProfileName = profilesData.activeProfile || profilesData.profiles[0]?.name || 'Default';
+            renderProfilePicker();
+
             renderSavedKqlQueries();
             initColumnResize();
 
