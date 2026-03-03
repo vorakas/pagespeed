@@ -126,6 +126,57 @@ class TestResultRepository:
             result["raw_data"] = json.loads(result["raw_data"])
         return result
 
+    def get_worst_performing(
+        self, limit: int = 5, strategy: str = Strategy.DESKTOP,
+    ) -> list[dict]:
+        """Return the worst-performing URLs across all sites.
+
+        Retrieves the latest test result per URL (filtered by strategy),
+        orders by performance_score ascending, and returns the bottom *limit*
+        results.  Each row includes the parent site name so callers can
+        identify which site a URL belongs to.
+
+        Design decision — **Single Responsibility**: this query lives in the
+        repository because it is purely data retrieval with no business rules
+        beyond filtering and ordering.
+
+        Args:
+            limit:    Maximum number of results to return.
+            strategy: Test strategy filter (``desktop`` or ``mobile``).
+
+        Returns:
+            List of result dicts, worst score first.
+        """
+        ph = self._cm._placeholder()
+        query = f"""
+            SELECT
+                u.id AS url_id, u.url,
+                s.name AS site_name,
+                tr.performance_score, tr.accessibility_score,
+                tr.best_practices_score, tr.seo_score,
+                tr.fcp, tr.lcp, tr.cls, tr.inp, tr.ttfb,
+                tr.total_byte_weight, tr.tested_at,
+                COALESCE(tr.strategy, 'desktop') AS strategy
+            FROM urls u
+            JOIN sites s ON u.site_id = s.id
+            LEFT JOIN (
+                SELECT url_id, MAX(tested_at) AS max_date
+                FROM test_results
+                WHERE COALESCE(strategy, 'desktop') = {ph}
+                GROUP BY url_id
+            ) latest ON u.id = latest.url_id
+            LEFT JOIN test_results tr
+                ON u.id = tr.url_id AND tr.tested_at = latest.max_date
+                AND COALESCE(tr.strategy, 'desktop') = {ph}
+            WHERE tr.performance_score IS NOT NULL
+            ORDER BY tr.performance_score ASC
+            LIMIT {ph}
+        """
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (strategy, strategy, limit))
+            return self._cm._rows_to_dicts(cursor)
+
     def get_url_comparison(self, url1_id: int, url2_id: int) -> dict:
         """Side-by-side latest results for two URLs."""
         ph = self._cm._placeholder()

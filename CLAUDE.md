@@ -71,7 +71,7 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── connection.py         # DB connection manager, schema init, dialect helpers (~256 lines)
 │   ├── site_repository.py    # Sites table CRUD (~97 lines)
 │   ├── url_repository.py     # URLs table CRUD (~80 lines)
-│   └── test_result_repository.py  # Test results queries (~150 lines)
+│   └── test_result_repository.py  # Test results queries (~200 lines)
 ├── services/
 │   ├── __init__.py           # Re-exports all services and clients
 │   ├── site_service.py       # Site/URL business logic + validation (~128 lines)
@@ -89,7 +89,7 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── pages.py              # Page rendering routes (~52 lines)
 │   ├── sites_api.py          # Site/URL CRUD API (~56 lines)
 │   ├── testing_api.py        # PageSpeed testing API (~83 lines)
-│   ├── metrics_api.py        # Test results query API (~63 lines)
+│   ├── metrics_api.py        # Test results query API (~69 lines)
 │   ├── newrelic_api.py       # New Relic proxy API (~78 lines)
 │   ├── azure_api.py          # Azure Log Analytics proxy API (~107 lines)
 │   └── ai_api.py             # AI analysis API (~159 lines)
@@ -102,7 +102,7 @@ ConnectionManager → Repositories → Services → Blueprints
 ├── CLAUDE.md                 # This file — project context for Claude sessions
 ├── .gitignore
 ├── templates/
-│   ├── index.html            # Dashboard home, CWV reference guide
+│   ├── index.html            # Dashboard home, worst performers, CWV reference guide
 │   ├── setup.html            # Site/URL management with collapsible drawers
 │   ├── test.html             # PageSpeed testing with desktop/mobile toggle
 │   ├── metrics.html          # Performance metrics charts
@@ -140,7 +140,7 @@ Routes are split across 7 Flask Blueprints in `routes/`, each created via a fact
 
 **Testing** (`routes/testing_api.py`): `POST /api/test-url`, `POST /api/test-url-async`, `POST /api/test-site/<id>`, `POST /api/test-all` — all accept `strategy` param (default: 'desktop')
 
-**Results** (`routes/metrics_api.py`): `GET /api/sites/<id>/latest-results`, `GET /api/urls/<id>/history`, `GET /api/test-details/<id>`, `GET /api/comparison`, `GET /api/comparison/urls` — all accept `strategy` query param
+**Results** (`routes/metrics_api.py`): `GET /api/sites/<id>/latest-results`, `GET /api/urls/<id>/history`, `GET /api/test-details/<id>`, `GET /api/worst-performing`, `GET /api/comparison`, `GET /api/comparison/urls` — all accept `strategy` query param
 
 **New Relic** (`routes/newrelic_api.py`): `POST /api/newrelic/test-connection`, `POST /api/newrelic/core-web-vitals`, `POST /api/newrelic/performance-overview`, `POST /api/newrelic/apm-metrics`, `POST /api/newrelic/custom-query`
 
@@ -165,6 +165,13 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 ---
 
 ## Key Features Implemented
+
+### Dashboard (index.html, app.js)
+- **Worst Performing URLs** — Top 5 lowest-scoring URLs across all configured sites, displayed in a 14-column table (Site + same 13 columns as Test URLs page)
+- Desktop/Mobile strategy toggle to switch between test strategies
+- Detail button (📊) opens Lighthouse breakdown modal
+- Empty state shown when no test results exist
+- Auto-loads on page visit via `loadWorstPerformers()` function
 
 ### PageSpeed Testing (test.html, app.js)
 - Desktop/Mobile strategy toggle (radio buttons)
@@ -231,6 +238,8 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 ## Recent Commit History (newest first)
 
 ```
+PENDING  Add worst performing URLs section to Dashboard page
+83aa2cd Refactor backend into 3-layer architecture with dependency injection
 43b127b Add enhanced empty states with icons and consistent loading spinners
 eb6c84a Add zebra striping and sticky table headers for improved readability
 6ee3b70 Add visual polish: Inter font, card shadows, nav icons, toast notifications
@@ -291,7 +300,7 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ---
 
-## CSS Key Locations (style.css ~5390 lines)
+## CSS Key Locations (style.css ~5430 lines)
 
 - **Side nav + nav icons:** ~17-95
 - **Buttons:** ~206-330
@@ -300,7 +309,8 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 - **Score badges:** ~758-797
 - **Progress bar:** ~797-871
 - **Empty state component:** ~1121-1200
-- **Collapsible drawers:** ~2015-2055
+- **Worst performers section:** ~1216-1248
+- **Collapsible drawers:** ~2050-2090
 - **Table fixed layout + overflow:** ~2480-2510
 - **Resizable columns:** ~2550-2625
 - **Loading indicator + spinner:** ~3160-3205
@@ -390,4 +400,4 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ## Current State
 
-All features are implemented and deployed. The backend has been fully refactored from a monolithic `app.py` + root-level service files into a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The deprecated root-level files (`models.py`, `pagespeed_service.py`, `newrelic_service.py`, `azure_service.py`, `ai_service.py`) have been removed. No pending tasks or known bugs at time of writing.
+All features are implemented and deployed. The backend uses a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The Dashboard now includes a "Worst Performing URLs" section showing the 5 lowest-scoring URLs across all sites with a desktop/mobile strategy toggle. No pending tasks or known bugs at time of writing.

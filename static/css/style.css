@@ -1213,6 +1213,40 @@ button:disabled {
     }
 }
 
+/* Worst Performing URLs Section */
+.worst-performers-section {
+    border-left: 5px solid #ef4444;
+}
+
+.worst-performers-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.worst-performers-header h2 {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 4px;
+}
+
+.worst-performers-description {
+    color: #9ca3af;
+    font-size: 0.95em;
+    margin-bottom: 0;
+}
+
+.worst-performers-section .strategy-toggle {
+    margin-bottom: 0;
+}
+
+body.light-mode .worst-performers-description {
+    color: #6b7280;
+}
+
 /* Web Vitals Reference Section */
 .reference-section {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -2163,6 +2197,10 @@ body.light-mode .site-urls-card .no-urls {
     background: white;
     border-color: #d1d5db;
     color: #6b7280;
+}
+
+body:not(.light-mode) .worst-performers-section {
+    border-left-color: #dc2626;
 }
 
 body:not(.light-mode) .reference-section {

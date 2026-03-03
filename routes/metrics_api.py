@@ -38,6 +38,12 @@ def create_metrics_blueprint(test_result_repo: TestResultRepository) -> Blueprin
             return jsonify({"error": "No test results found"}), 404
         return jsonify(result)
 
+    @bp.route("/api/worst-performing")
+    def worst_performing():
+        strategy = request.args.get("strategy", "desktop")
+        limit = request.args.get("limit", 5, type=int)
+        return jsonify(test_result_repo.get_worst_performing(limit=limit, strategy=strategy))
+
     @bp.route("/api/comparison")
     def comparison():
         site1_id = request.args.get("site1", type=int)

@@ -44,6 +44,31 @@
             </div>
         </header>
 
+        <!-- Worst Performing URLs Section -->
+        <section class="worst-performers-section">
+            <div class="worst-performers-header">
+                <div>
+                    <h2>Worst Performing URLs</h2>
+                    <p class="worst-performers-description">Bottom 5 URLs by performance score across all configured sites</p>
+                </div>
+                <div class="strategy-toggle">
+                    <div class="strategy-options">
+                        <label class="strategy-option">
+                            <input type="radio" name="dashboardStrategy" value="desktop" checked>
+                            <span class="strategy-btn">Desktop</span>
+                        </label>
+                        <label class="strategy-option">
+                            <input type="radio" name="dashboardStrategy" value="mobile">
+                            <span class="strategy-btn">Mobile</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div id="worstPerformers">
+                <div class="loading-indicator"><div class="loading-spinner"></div><p>Loading results...</p></div>
+            </div>
+        </section>
+
         <!-- Web Vitals Reference Section -->
         <section class="reference-section">
             <h2>📖 Core Web Vitals Reference</h2>

@@ -5,6 +5,7 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 ## Features
 
 ### Dashboard & Testing
+- **Worst Performing URLs** -- Dashboard shows the 5 lowest-scoring URLs across all sites with desktop/mobile toggle
 - **Site/URL Management** -- Add sites and URLs to monitor, with collapsible drawer cards
 - **PageSpeed Testing** -- Run Google PageSpeed Insights tests (mobile & desktop) on demand or via daily scheduled jobs
 - **Core Web Vitals Reference** -- Built-in reference guide for LCP, FID, CLS thresholds
@@ -94,7 +95,7 @@ pagespeed-monitor/
 │   ├── azure_api.py        # Azure Log Analytics proxy API
 │   └── ai_api.py           # AI analysis API
 ├── templates/
-│   ├── index.html          # Dashboard home
+│   ├── index.html          # Dashboard home (worst performers, CWV reference)
 │   ├── setup.html          # Site/URL configuration
 │   ├── test.html           # URL testing interface
 │   ├── metrics.html        # Performance metrics view
@@ -167,6 +168,7 @@ npx @railway/cli logs --lines 50
 ### Key API Routes
 | Method | Route | Description |
 |---|---|---|
+| GET | `/api/worst-performing` | Get worst performing URLs across all sites |
 | GET | `/api/sites` | List all sites |
 | POST | `/api/sites` | Add a new site |
 | POST | `/api/test-url` | Test a single URL |

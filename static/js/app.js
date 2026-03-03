@@ -67,6 +67,12 @@ function getSelectedStrategy() {
     return selected ? selected.value : 'desktop';
 }
 
+// Get selected strategy for the dashboard page (separate radio group)
+function getDashboardStrategy() {
+    const selected = document.querySelector('input[name="dashboardStrategy"]:checked');
+    return selected ? selected.value : 'desktop';
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadSites();
@@ -94,6 +100,19 @@ document.addEventListener('DOMContentLoaded', function() {
             loadDashboard();
         });
     });
+
+    // Dashboard page: load worst performers and wire strategy toggle
+    const worstPerformersContainer = document.getElementById('worstPerformers');
+    if (worstPerformersContainer) {
+        loadWorstPerformers();
+
+        const dashboardStrategyRadios = document.querySelectorAll('input[name="dashboardStrategy"]');
+        dashboardStrategyRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                loadWorstPerformers();
+            });
+        });
+    }
 });
 
 // Load all sites
@@ -267,6 +286,82 @@ async function loadDashboard() {
     
     // Load results for the first site by default
     loadSiteResults(sites[0].id);
+}
+
+// ==================== Worst Performing URLs (Dashboard) ====================
+
+// Fetch and display the worst performing URLs across all sites
+async function loadWorstPerformers() {
+    const container = document.getElementById('worstPerformers');
+    if (!container) return;
+
+    container.innerHTML = '<div class="loading-indicator"><div class="loading-spinner"></div><p>Loading results...</p></div>';
+
+    try {
+        const strategy = getDashboardStrategy();
+        const response = await fetch(`/api/worst-performing?strategy=${strategy}&limit=5`);
+        const results = await response.json();
+
+        if (results.length === 0) {
+            container.innerHTML = createEmptyState({
+                icon: EMPTY_ICONS.barChart,
+                title: 'No Test Results Yet',
+                description: 'Run PageSpeed tests on your configured URLs to see the worst performers here.',
+                actionText: 'Go to Test URLs',
+                actionHref: '/test'
+            });
+            return;
+        }
+
+        renderWorstPerformersTable(results, container);
+    } catch (error) {
+        console.error('Error loading worst performers:', error);
+        container.innerHTML = '<div class="no-data">Failed to load results</div>';
+    }
+}
+
+// Render the worst performers table with the same columns as the Test URLs page
+function renderWorstPerformersTable(results, container) {
+    let html = '<table class="results-table"><thead><tr>';
+    html += '<th>Site</th>';
+    html += '<th>URL</th>';
+    html += '<th>Performance</th>';
+    html += '<th>Accessibility</th>';
+    html += '<th>Best Practices</th>';
+    html += '<th>SEO</th>';
+    html += '<th>FCP (ms)</th>';
+    html += '<th>LCP (ms)</th>';
+    html += '<th>CLS</th>';
+    html += '<th>INP (ms)</th>';
+    html += '<th>TTFB (ms)</th>';
+    html += '<th>Page Size</th>';
+    html += '<th>Last Tested</th>';
+    html += '<th>Actions</th>';
+    html += '</tr></thead><tbody>';
+
+    results.forEach(result => {
+        html += '<tr>';
+        html += `<td>${result.site_name}</td>`;
+        html += `<td>${result.url}</td>`;
+        html += `<td>${formatScore(result.performance_score)}</td>`;
+        html += `<td>${formatScore(result.accessibility_score)}</td>`;
+        html += `<td>${formatScore(result.best_practices_score)}</td>`;
+        html += `<td>${formatScore(result.seo_score)}</td>`;
+        html += `<td>${formatFCP(result.fcp)}</td>`;
+        html += `<td>${formatLCP(result.lcp)}</td>`;
+        html += `<td>${formatCLS(result.cls)}</td>`;
+        html += `<td>${formatINP(result.inp)}</td>`;
+        html += `<td>${formatTTFB(result.ttfb)}</td>`;
+        html += `<td>${formatPageSize(result.total_byte_weight)}</td>`;
+        html += `<td>${formatDate(result.tested_at)}</td>`;
+        html += `<td class="action-buttons">
+                    <button class="btn-details" onclick="showDetails(${result.url_id})" title="View detailed breakdown">📊</button>
+                </td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
 }
 
 // Load results for a specific site
