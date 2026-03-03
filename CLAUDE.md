@@ -35,15 +35,64 @@ This file documents the full project state so a new session can pick up where we
 
 ---
 
+## Architecture
+
+The backend follows a **3-layer architecture** with dependency injection:
+
+```
+Routes (Flask Blueprints)  →  Services (Business Logic)  →  Data Access (Repositories)
+```
+
+- **Routes** (`routes/`) — Thin Flask blueprints. Handle HTTP request/response only. No SQL, no business logic. Created via factory functions that receive injected dependencies.
+- **Services** (`services/`) — Business logic and external API clients. Orchestrate repositories and clients. Raise domain-specific exceptions.
+- **Data Access** (`data_access/`) — Repository pattern. All SQL lives here. `ConnectionManager` abstracts PostgreSQL vs SQLite differences.
+
+**Cross-cutting modules:**
+- `config.py` — Centralized configuration constants (env vars, defaults, timeouts)
+- `enums.py` — Domain enums (`Strategy`, `PerformanceStatus`, `ScoreRating`) replacing magic strings
+- `exceptions.py` — Exception hierarchy (`AppError` → `ValidationError`, `DatabaseError`, `ExternalAPIError` → `PageSpeedError`, `NewRelicError`, etc.)
+
+**Dependency flow** (app.py wires everything):
+```python
+ConnectionManager → Repositories → Services → Blueprints
+```
+
+---
+
 ## File Structure
 
 ```
-├── app.py                    # Flask app, all routes (~1087 lines)
-├── models.py                 # Database layer, SQLite/PostgreSQL (~405 lines)
-├── pagespeed_service.py      # Google PageSpeed API client (~164 lines)
-├── newrelic_service.py       # New Relic NerdGraph client (~510 lines)
-├── azure_service.py          # Azure Log Analytics client (~150 lines)
-├── ai_service.py             # Claude + OpenAI parallel analysis (~353 lines)
+├── app.py                    # Application factory, DI wiring, error handlers (~82 lines)
+├── config.py                 # Centralized configuration constants (~82 lines)
+├── enums.py                  # Domain enums: Strategy, PerformanceStatus, ScoreRating (~76 lines)
+├── exceptions.py             # Custom exception hierarchy (~81 lines)
+├── data_access/
+│   ├── __init__.py           # Re-exports: ConnectionManager, *Repository
+│   ├── connection.py         # DB connection manager, schema init, dialect helpers (~256 lines)
+│   ├── site_repository.py    # Sites table CRUD (~97 lines)
+│   ├── url_repository.py     # URLs table CRUD (~80 lines)
+│   └── test_result_repository.py  # Test results queries (~150 lines)
+├── services/
+│   ├── __init__.py           # Re-exports all services and clients
+│   ├── site_service.py       # Site/URL business logic + validation (~128 lines)
+│   ├── testing_service.py    # PageSpeed test orchestration (~156 lines)
+│   ├── pagespeed_client.py   # Google PageSpeed Insights API client (~192 lines)
+│   ├── newrelic_client.py    # New Relic NerdGraph API client (~510 lines)
+│   ├── azure_client.py       # Azure Log Analytics API client (~400 lines)
+│   ├── ai_base.py            # Abstract base class for AI providers (~50 lines)
+│   ├── ai_claude.py          # Claude API client (~100 lines)
+│   ├── ai_openai.py          # OpenAI API client (~90 lines)
+│   ├── ai_orchestrator.py    # Parallel AI analysis orchestrator (~300 lines)
+│   └── validation.py         # Shared validation helpers (~50 lines)
+├── routes/
+│   ├── __init__.py           # register_blueprints() factory (~42 lines)
+│   ├── pages.py              # Page rendering routes (~52 lines)
+│   ├── sites_api.py          # Site/URL CRUD API (~56 lines)
+│   ├── testing_api.py        # PageSpeed testing API (~83 lines)
+│   ├── metrics_api.py        # Test results query API (~63 lines)
+│   ├── newrelic_api.py       # New Relic proxy API (~78 lines)
+│   ├── azure_api.py          # Azure Log Analytics proxy API (~107 lines)
+│   └── ai_api.py             # AI analysis API (~159 lines)
 ├── requirements.txt          # Python dependencies
 ├── Dockerfile                # Production container (python:3.11-slim)
 ├── Procfile                  # Gunicorn: 2 workers, 300s timeout
@@ -69,9 +118,9 @@ This file documents the full project state so a new session can pick up where we
 
 ---
 
-## Database Schema (models.py)
+## Database Schema (data_access/)
 
-Three tables: `sites`, `urls`, `test_results`
+Three tables managed by individual repositories in `data_access/`: `sites`, `urls`, `test_results`
 
 - **sites:** id, name (unique), created_at
 - **urls:** id, site_id (FK), url, created_at — unique constraint on (site_id, url)
@@ -81,21 +130,23 @@ The `strategy` column was added via ALTER TABLE migration with `COALESCE(strateg
 
 ---
 
-## API Routes (app.py)
+## API Routes (routes/)
 
-**Pages:** `/`, `/setup`, `/test`, `/metrics`, `/newrelic`, `/iislogs`, `/ai-analysis`
+Routes are split across 7 Flask Blueprints in `routes/`, each created via a factory function with injected dependencies.
 
-**Site/URL CRUD:** `POST/GET /api/sites`, `POST/GET /api/sites/<id>/urls`, `PUT/DELETE /api/sites/<id>`, `DELETE /api/urls/<id>`
+**Pages** (`routes/pages.py`): `/`, `/setup`, `/test`, `/metrics`, `/newrelic`, `/iislogs`, `/ai-analysis`
 
-**Testing:** `POST /api/test-url`, `POST /api/test-url-async`, `POST /api/test-site/<id>`, `POST /api/test-all` — all accept `strategy` param (default: 'desktop')
+**Site/URL CRUD** (`routes/sites_api.py`): `POST/GET /api/sites`, `POST/GET /api/sites/<id>/urls`, `PUT/DELETE /api/sites/<id>`, `DELETE /api/urls/<id>`
 
-**Results:** `GET /api/sites/<id>/latest-results`, `GET /api/urls/<id>/history`, `GET /api/test-details/<id>`, `GET /api/comparison`, `GET /api/comparison/urls` — all accept `strategy` query param
+**Testing** (`routes/testing_api.py`): `POST /api/test-url`, `POST /api/test-url-async`, `POST /api/test-site/<id>`, `POST /api/test-all` — all accept `strategy` param (default: 'desktop')
 
-**New Relic:** `POST /api/newrelic/test-connection`, `POST /api/newrelic/core-web-vitals`, `POST /api/newrelic/performance-overview`, `POST /api/newrelic/apm-metrics`, `POST /api/newrelic/custom-query`
+**Results** (`routes/metrics_api.py`): `GET /api/sites/<id>/latest-results`, `GET /api/urls/<id>/history`, `GET /api/test-details/<id>`, `GET /api/comparison`, `GET /api/comparison/urls` — all accept `strategy` query param
 
-**Azure:** `POST /api/azure/test-connection`, `POST /api/azure/search-logs`, `POST /api/azure/dashboard-summary`, `POST /api/azure/execute-query`, `POST /api/azure/list-sites`
+**New Relic** (`routes/newrelic_api.py`): `POST /api/newrelic/test-connection`, `POST /api/newrelic/core-web-vitals`, `POST /api/newrelic/performance-overview`, `POST /api/newrelic/apm-metrics`, `POST /api/newrelic/custom-query`
 
-**AI:** `POST /api/ai/analyze` (parallel Claude + OpenAI), `POST /api/ai/follow-up`
+**Azure** (`routes/azure_api.py`): `POST /api/azure/test-connection`, `POST /api/azure/search-logs`, `POST /api/azure/dashboard-summary`, `POST /api/azure/execute-query`, `POST /api/azure/list-sites`
+
+**AI** (`routes/ai_api.py`): `POST /api/ai/analyze` (parallel Claude + OpenAI), `POST /api/ai/follow-up`
 
 **Scheduled:** Daily tests at 2 AM UTC via APScheduler, strategy hardcoded to 'desktop'.
 
@@ -211,17 +262,31 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ## Known Patterns & Conventions
 
+### Backend Architecture
+- **3-layer architecture:** Routes → Services → Data Access. Dependencies always flow downward, never upward
+- **Dependency injection:** `app.py` wires `ConnectionManager → Repositories → Services → Blueprints` at startup
+- **Repository pattern:** All SQL lives in `data_access/` repositories. Services never touch SQL directly
+- **Blueprint factories:** Each route file exports a `create_*_blueprint()` function that receives its dependencies as arguments
+- **Custom exceptions:** Domain-specific exception hierarchy in `exceptions.py`; centralized error handlers in `app.py`
+- **Enums over magic strings:** `enums.py` provides `Strategy`, `PerformanceStatus`, `ScoreRating`
+- **Centralized config:** All env vars and defaults in `config.py`
 - **No test suite** — no automated tests exist; all testing is manual
+
+### Frontend Patterns
 - **Inline JS in iislogs.html** — ~1200 lines of inline `<script>` (tab management, Azure config, KQL queries, column resize, profiles, etc.)
 - **Shared JS in app.js** — dashboard functionality, site management, testing, charting, theme toggle, `showToast()`, `createEmptyState()`
 - **CSS organization:** Major sections separated by `/* ==================== */` comment headers, light mode overrides grouped at end of each section
 - **localStorage for config** — all API credentials stored client-side, passed to server in request bodies
 - **`escapeHtml()` utility** — defined in iislogs.html inline script, used for all user-facing data rendering
+
+### UI Conventions
 - **Status code coloring:** `.status-2xx` (green), `.status-3xx` (blue), `.status-4xx` (yellow), `.status-5xx` (red)
 - **Score coloring:** `.score-good` (90+, green), `.score-average` (50-89, yellow), `.score-poor` (0-49, red)
 - **Inline SVG icons** — Nav icons and empty state icons use Feather-style stroke SVGs with `currentColor` for automatic theme inheritance
 - **Toast notifications** — `showToast(message, type, duration)` in app.js; types: 'success', 'error', 'info', 'warning'
 - **Empty states** — `createEmptyState({icon, title, description, actionText, actionHref})` in app.js; `EMPTY_ICONS` object has 10 reusable SVG constants
+
+### Workflow
 - **Commit messages:** Always include `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`
 
 ---
@@ -247,6 +312,82 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ---
 
+## OOP Guidelines
+
+### Core Principles
+- When generating new classes, briefly explain which OOP principle guided the design decision before writing the code
+- Follow SOLID principles, especially Single Responsibility — each class should have one clear reason to exist and one reason to change
+- Favor composition over inheritance. Use inheritance only for true "is-a" relationships, not for code reuse
+- Keep classes focused and small. If a class exceeds ~200 lines, consider whether it's doing too much
+- Design to interfaces/abstractions, not concrete implementations. Use abstract base classes (Python) or interfaces (C#) to define contracts between components
+
+### Encapsulation and Access
+- Make fields private by default. Expose only what's necessary through properties or methods
+- Never expose mutable internal state directly — return copies or use read-only properties
+- Avoid public setters unless there's a genuine need for external mutation. Prefer construction-time initialization
+
+### Class Design
+- Every class must have a clear, single purpose described by its name — if you can't name it without "And" or "Manager", it's doing too much
+- Constructor parameters should be the minimum needed to create a valid object. No half-initialized objects
+- Use dependency injection to pass collaborators into a class rather than creating them internally
+- Prefer small, well-defined method signatures. If a method needs more than 3-4 parameters, consider a parameter object or rethink the design
+- Keep methods short and focused on one task. If a method exceeds ~30 lines, look for extraction opportunities
+
+### Patterns and Practices
+- Use the Repository pattern for database access — keep SQL/query logic out of business logic and UI classes
+- Use the Observer pattern or events for communication between loosely coupled components (e.g., UI reacting to data changes)
+- Avoid God objects and singletons unless absolutely justified. If something feels like it needs to be a singleton, it probably needs dependency injection instead
+- Use enums instead of magic strings or numbers
+- Use type hints (Python) and strong typing (C#) consistently on all method signatures and return types
+- Use complete words when naming variables. Variable names should accurately reflect what they are storing
+
+### Error Handling
+- Use custom exception classes for domain-specific errors rather than raising generic Exception
+- Handle exceptions at the appropriate level — don't catch exceptions in low-level code just to re-raise them
+- Fail fast and visibly. Validate inputs at class boundaries
+
+### Code Organization
+- One class per file as the default. Small, tightly related helper classes can share a file
+- Group related classes into modules/namespaces that reflect the domain, not the technical layer
+- Keep the dependency direction clean — UI depends on business logic, business logic depends on data access, never the reverse
+
+## Workflow Rules
+
+- When the user begins a message with "New Feature:", enter planning mode before writing any code. This means:
+  1. Summarize the feature request
+  2. Identify affected files and modules
+  3. Propose an implementation plan with steps
+  4. Wait for user approval before proceeding
+ 
+## Refactoring Rules
+- When begins a message with "Refactor:", always start by analyzing the current implementation and listing specific issues before changing code
+  1. Preserve all existing tests, if any, and verify they pass after changes
+  2. Refactor in small, testable increments — never rewrite entire modules in one pass
+  3. Performance refactors must include before/after benchmarks
+ 
+## Bug Fixing Rules
+- When begins a message with "Bug:", first reproduce and confirm the issue by reading the relevant code before making any changes
+  1. Identify the root cause, not just the symptom — explain why the bug exists before proposing a fix
+  2. Show the minimal fix first. Avoid refactoring or improving surrounding code during a bug fix unless directly related
+  3. If a fix could affect other parts of the app, list the potential side effects before implementing
+  4. Write or update a test that would have caught the bug
+  5. If you can't confidently identify the cause, say so and suggest diagnostic steps (add logging, isolate the condition, etc.) rather than guessing at a fix
+  6. Never silently swallow exceptions or errors to make a bug "go away"
+  7. After applying a fix, verify that existing tests, if any, still pass
+ 
+## Data Safety During Bug Fixes
+  1. Never modify audio file metadata or database records as part of debugging without explicit confirmation
+  2. When a bug involves file operations or database writes, test the fix against a copy of the data first
+  3. If a bug fix requires a database schema change, provide a migration path that preserves existing data
+ 
+## Commit Rules
+- When the user types "Update and Commit" do the following:
+  1. Update the CLAUDE.md
+  2. Update the README.md
+  3. Commit and push all recent changes to GitHub.
+
+---
+
 ## Current State
 
-All features are implemented and deployed. Recent work focused on **UI/UX polish**: Inter web font, card shadows, nav icons, toast notifications, zebra striping, sticky table headers, enhanced empty states with SVG icons and action buttons, and consistent loading spinners across all pages. No pending tasks or known bugs at time of writing.
+All features are implemented and deployed. The backend has been fully refactored from a monolithic `app.py` + root-level service files into a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The deprecated root-level files (`models.py`, `pagespeed_service.py`, `newrelic_service.py`, `azure_service.py`, `ai_service.py`) have been removed. No pending tasks or known bugs at time of writing.

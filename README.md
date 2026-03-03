@@ -59,18 +59,40 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 
 ## Project Structure
 
+The backend uses a **3-layer architecture** with dependency injection:
+
+**Routes** (Flask Blueprints) → **Services** (Business Logic) → **Data Access** (Repositories)
+
 ```
 pagespeed-monitor/
-├── app.py                  # Flask app, routes, API endpoints
-├── models.py               # Database abstraction (SQLite/PostgreSQL)
-├── pagespeed_service.py    # Google PageSpeed Insights API client
-├── newrelic_service.py     # New Relic NerdGraph API client
-├── azure_service.py        # Azure Log Analytics API client
-├── ai_service.py           # Claude & OpenAI service classes
-├── requirements.txt        # Python dependencies
-├── Dockerfile              # Container configuration
-├── Procfile                # Gunicorn process definition
-├── railway.json            # Railway deployment config
+├── app.py                  # Application factory, DI wiring, error handlers
+├── config.py               # Centralized configuration constants
+├── enums.py                # Domain enums (Strategy, PerformanceStatus, ScoreRating)
+├── exceptions.py           # Custom exception hierarchy
+├── data_access/            # Repository pattern — all SQL lives here
+│   ├── connection.py       # DB connection manager (PostgreSQL/SQLite)
+│   ├── site_repository.py  # Sites table CRUD
+│   ├── url_repository.py   # URLs table CRUD
+│   └── test_result_repository.py  # Test results queries
+├── services/               # Business logic & external API clients
+│   ├── site_service.py     # Site/URL orchestration + validation
+│   ├── testing_service.py  # PageSpeed test workflows
+│   ├── pagespeed_client.py # Google PageSpeed Insights API client
+│   ├── newrelic_client.py  # New Relic NerdGraph API client
+│   ├── azure_client.py     # Azure Log Analytics API client
+│   ├── ai_base.py          # Abstract base class for AI providers
+│   ├── ai_claude.py        # Claude API client
+│   ├── ai_openai.py        # OpenAI API client
+│   ├── ai_orchestrator.py  # Parallel AI analysis orchestrator
+│   └── validation.py       # Shared validation helpers
+├── routes/                 # Flask Blueprints (thin HTTP layer)
+│   ├── pages.py            # Page rendering routes
+│   ├── sites_api.py        # Site/URL CRUD API
+│   ├── testing_api.py      # PageSpeed testing API
+│   ├── metrics_api.py      # Test results query API
+│   ├── newrelic_api.py     # New Relic proxy API
+│   ├── azure_api.py        # Azure Log Analytics proxy API
+│   └── ai_api.py           # AI analysis API
 ├── templates/
 │   ├── index.html          # Dashboard home
 │   ├── setup.html          # Site/URL configuration
