@@ -60,7 +60,7 @@ class UrlRepository:
             raise DatabaseError(f"Failed to create URL: {exc}") from exc
 
     def delete(self, url_id: int) -> bool:
-        """Delete a URL and cascade-delete its test_results.
+        """Delete a URL and cascade-delete its test_results and trigger_urls.
 
         Returns ``True`` if the URL existed and was removed.
         """
@@ -68,6 +68,9 @@ class UrlRepository:
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
+                cursor.execute(
+                    f"DELETE FROM trigger_urls WHERE url_id = {ph}", (url_id,)
+                )
                 cursor.execute(
                     f"DELETE FROM test_results WHERE url_id = {ph}", (url_id,)
                 )

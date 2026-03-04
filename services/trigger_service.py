@@ -1,0 +1,423 @@
+"""Business logic for scheduled test triggers.
+
+Orchestrates trigger CRUD, APScheduler job management, and trigger
+execution.  Follows Single Responsibility: validation and scheduling
+logic lives here; persistence is delegated to ``TriggerRepository``;
+actual PageSpeed testing is delegated to ``TestingService``.
+"""
+
+from __future__ import annotations
+
+import time
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from config import (
+    REQUEST_DELAY_SECONDS,
+    SCHEDULE_PRESETS,
+    TRIGGER_JOB_PREFIX,
+)
+from data_access.trigger_repository import TriggerRepository
+from enums import TriggerStrategy
+from exceptions import SchedulerError, ValidationError
+
+if TYPE_CHECKING:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from services.testing_service import TestingService
+
+
+class TriggerService:
+    """Coordinates trigger lifecycle and APScheduler job synchronization.
+
+    Single Responsibility: owns the business rules around trigger
+    creation, validation, and scheduler integration.  Delegates
+    persistence to ``TriggerRepository`` and test execution to
+    ``TestingService``.
+
+    Args:
+        trigger_repo:    Repository for the ``scheduled_triggers`` table.
+        testing_service: Service that runs PageSpeed tests.
+        scheduler:       APScheduler ``BackgroundScheduler`` instance.
+    """
+
+    def __init__(
+        self,
+        trigger_repo: TriggerRepository,
+        testing_service: TestingService,
+        scheduler: BackgroundScheduler,
+    ) -> None:
+        self._triggers: TriggerRepository = trigger_repo
+        self._testing: TestingService = testing_service
+        self._scheduler: BackgroundScheduler = scheduler
+
+    # ------------------------------------------------------------------
+    # Read operations
+    # ------------------------------------------------------------------
+
+    def get_triggers(self) -> list[dict]:
+        """Return all triggers with schedule label and URL details."""
+        triggers = self._triggers.get_all()
+        for trigger in triggers:
+            trigger['schedule_label'] = self._get_schedule_label(
+                trigger['schedule_type'], trigger['schedule_value'],
+            )
+        return triggers
+
+    def get_trigger(self, trigger_id: int) -> dict | None:
+        """Return a single trigger by id, or ``None``."""
+        trigger = self._triggers.get_by_id(trigger_id)
+        if trigger:
+            trigger['schedule_label'] = self._get_schedule_label(
+                trigger['schedule_type'], trigger['schedule_value'],
+            )
+        return trigger
+
+    # ------------------------------------------------------------------
+    # Write operations
+    # ------------------------------------------------------------------
+
+    def create_trigger(
+        self,
+        name: str,
+        schedule_type: str,
+        schedule_value: str,
+        strategy: str,
+        url_ids: list[int],
+    ) -> int:
+        """Create a new trigger, persist it, and register a scheduler job.
+
+        Args:
+            name:           Unique display name for the trigger.
+            schedule_type:  ``'preset'`` or ``'custom'``.
+            schedule_value: Preset key or cron expression string.
+            strategy:       One of ``'desktop'``, ``'mobile'``, ``'both'``.
+            url_ids:        List of URL ids to include in this trigger.
+
+        Returns:
+            The auto-generated id of the new trigger.
+
+        Raises:
+            ValidationError: If any input is invalid or name is duplicate.
+        """
+        self._validate_trigger_input(name, schedule_type, schedule_value, strategy, url_ids)
+
+        trigger_id = self._triggers.create(
+            name, schedule_type, schedule_value, strategy, url_ids,
+        )
+        if trigger_id is None:
+            raise ValidationError(f"Trigger name '{name}' already exists")
+
+        # Register the APScheduler job (trigger is enabled by default)
+        trigger = self._triggers.get_by_id(trigger_id)
+        self._add_job(trigger)
+
+        return trigger_id
+
+    def update_trigger(
+        self,
+        trigger_id: int,
+        name: str,
+        schedule_type: str,
+        schedule_value: str,
+        strategy: str,
+        url_ids: list[int],
+    ) -> None:
+        """Update an existing trigger and reschedule its job.
+
+        Raises:
+            ValidationError: If trigger not found or input is invalid.
+        """
+        self._validate_trigger_input(name, schedule_type, schedule_value, strategy, url_ids)
+
+        success = self._triggers.update(
+            trigger_id, name, schedule_type, schedule_value, strategy, url_ids,
+        )
+        if not success:
+            raise ValidationError(f"Trigger {trigger_id} not found or name already exists")
+
+        # Reschedule: remove old job, add new one if still enabled
+        self._remove_job(trigger_id)
+        trigger = self._triggers.get_by_id(trigger_id)
+        if trigger and trigger['enabled']:
+            self._add_job(trigger)
+
+    def delete_trigger(self, trigger_id: int) -> None:
+        """Delete a trigger and remove its scheduler job.
+
+        Raises:
+            ValidationError: If trigger not found.
+        """
+        self._remove_job(trigger_id)
+        success = self._triggers.delete(trigger_id)
+        if not success:
+            raise ValidationError(f"Trigger {trigger_id} not found")
+
+    def toggle_trigger(self, trigger_id: int, enabled: bool) -> None:
+        """Enable or disable a trigger and add/remove its scheduler job.
+
+        Raises:
+            ValidationError: If trigger not found.
+        """
+        success = self._triggers.set_enabled(trigger_id, enabled)
+        if not success:
+            raise ValidationError(f"Trigger {trigger_id} not found")
+
+        if enabled:
+            trigger = self._triggers.get_by_id(trigger_id)
+            if trigger:
+                self._add_job(trigger)
+        else:
+            self._remove_job(trigger_id)
+
+    # ------------------------------------------------------------------
+    # Scheduler synchronization
+    # ------------------------------------------------------------------
+
+    def sync_all_jobs(self) -> None:
+        """Restore APScheduler jobs for all enabled triggers.
+
+        Called once during application startup (after ``scheduler.start()``)
+        to ensure every enabled trigger has a corresponding job.
+        """
+        enabled_triggers = self._triggers.get_all_enabled()
+        print(f"Syncing {len(enabled_triggers)} enabled trigger(s) to scheduler")
+
+        for trigger in enabled_triggers:
+            try:
+                self._add_job(trigger)
+            except SchedulerError as exc:
+                print(f"Warning: failed to sync trigger '{trigger['name']}': {exc}")
+
+    # ------------------------------------------------------------------
+    # Private — scheduler job management
+    # ------------------------------------------------------------------
+
+    def _add_job(self, trigger: dict) -> None:
+        """Register an APScheduler cron job for the given trigger."""
+        job_id = f"{TRIGGER_JOB_PREFIX}{trigger['id']}"
+
+        # Remove existing job if present (idempotent)
+        self._remove_job(trigger['id'])
+
+        try:
+            cron_kwargs = self._build_cron_kwargs(
+                trigger['schedule_type'], trigger['schedule_value'],
+            )
+            self._scheduler.add_job(
+                func=self._execute_trigger,
+                trigger='cron',
+                id=job_id,
+                args=[trigger['id']],
+                name=f"Trigger: {trigger['name']}",
+                **cron_kwargs,
+            )
+        except Exception as exc:
+            raise SchedulerError(
+                f"Failed to schedule trigger '{trigger['name']}': {exc}"
+            ) from exc
+
+    def _remove_job(self, trigger_id: int) -> None:
+        """Remove an APScheduler job by trigger id (no-op if not found)."""
+        job_id = f"{TRIGGER_JOB_PREFIX}{trigger_id}"
+        try:
+            self._scheduler.remove_job(job_id)
+        except Exception:
+            pass  # Job doesn't exist — that's fine
+
+    # ------------------------------------------------------------------
+    # Private — trigger execution (scheduler callback)
+    # ------------------------------------------------------------------
+
+    def _execute_trigger(self, trigger_id: int) -> None:
+        """Scheduler callback: test all URLs for a trigger.
+
+        Loads the trigger's URL ids and strategy from the database,
+        then runs PageSpeed tests with appropriate delays.
+        """
+        trigger = self._triggers.get_by_id(trigger_id)
+        if trigger is None:
+            print(f"Trigger {trigger_id} not found — skipping execution")
+            return
+
+        if not trigger['enabled']:
+            print(f"Trigger '{trigger['name']}' is disabled — skipping")
+            return
+
+        url_ids = trigger['url_ids']
+        if not url_ids:
+            print(f"Trigger '{trigger['name']}' has no URLs — skipping")
+            return
+
+        strategy = trigger['strategy']
+        strategies = (
+            ['desktop', 'mobile']
+            if strategy == TriggerStrategy.BOTH
+            else [strategy]
+        )
+
+        print(
+            f"Executing trigger '{trigger['name']}' "
+            f"({len(url_ids)} URLs, strategy={strategy}) "
+            f"at {datetime.now()}"
+        )
+
+        for current_strategy in strategies:
+            for index, url_id in enumerate(url_ids):
+                try:
+                    # We need the URL string; fetch it via a lightweight query
+                    from data_access import UrlRepository
+                    # The testing service already has url access through its _urls repo
+                    # So we use test_single_url which takes url string + url_id
+                    # We need to get the URL string from the url_id
+                    url_data = self._get_url_by_id(url_id)
+                    if url_data is None:
+                        print(f"  URL id {url_id} not found — skipping")
+                        continue
+
+                    self._testing.test_single_url(
+                        url=url_data['url'],
+                        url_id=url_id,
+                        strategy=current_strategy,
+                    )
+                    print(f"  Tested {url_data['url']} ({current_strategy})")
+                except Exception as exc:
+                    print(f"  Failed to test URL id {url_id}: {exc}")
+
+                # Rate-limit delay between tests
+                if index < len(url_ids) - 1:
+                    time.sleep(REQUEST_DELAY_SECONDS)
+
+            # Delay between strategy passes when running 'both'
+            if len(strategies) > 1 and current_strategy == 'desktop':
+                time.sleep(REQUEST_DELAY_SECONDS)
+
+    def _get_url_by_id(self, url_id: int) -> dict | None:
+        """Retrieve a URL record by id using the testing service's repository."""
+        # Access the URL repository through the testing service's injected dependency
+        urls_repo = self._testing._urls
+        ph = urls_repo._cm._placeholder()
+        with urls_repo._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT * FROM urls WHERE id = {ph}", (url_id,),
+            )
+            return urls_repo._cm._row_to_dict(cursor)
+
+    # ------------------------------------------------------------------
+    # Private — schedule helpers
+    # ------------------------------------------------------------------
+
+    def _build_cron_kwargs(
+        self, schedule_type: str, schedule_value: str,
+    ) -> dict:
+        """Convert schedule config to APScheduler cron trigger kwargs.
+
+        Args:
+            schedule_type:  ``'preset'`` or ``'custom'``.
+            schedule_value: Preset key or 5-field cron expression.
+
+        Returns:
+            Dict of APScheduler cron keyword arguments.
+
+        Raises:
+            ValidationError: If the schedule is invalid.
+        """
+        if schedule_type == 'preset':
+            preset = SCHEDULE_PRESETS.get(schedule_value)
+            if not preset:
+                raise ValidationError(f"Unknown schedule preset: {schedule_value}")
+            # Copy without the 'label' key
+            return {k: v for k, v in preset.items() if k != 'label'}
+
+        if schedule_type == 'custom':
+            return self._parse_cron_expression(schedule_value)
+
+        raise ValidationError(f"Unknown schedule type: {schedule_type}")
+
+    @staticmethod
+    def _parse_cron_expression(expression: str) -> dict:
+        """Parse a 5-field cron expression into APScheduler kwargs.
+
+        Format: ``minute hour day_of_month month day_of_week``
+
+        Examples:
+            ``0 2 * * *``   → daily at 2:00 AM
+            ``*/30 * * * *`` → every 30 minutes
+            ``0 6 * * 1``   → weekly on Monday at 6:00 AM
+
+        Returns:
+            Dict with keys: minute, hour, day, month, day_of_week.
+
+        Raises:
+            ValidationError: If the expression doesn't have 5 fields.
+        """
+        fields = expression.strip().split()
+        if len(fields) != 5:
+            raise ValidationError(
+                f"Cron expression must have 5 fields (minute hour day month weekday), "
+                f"got {len(fields)}: '{expression}'"
+            )
+
+        return {
+            'minute': fields[0],
+            'hour': fields[1],
+            'day': fields[2],
+            'month': fields[3],
+            'day_of_week': fields[4],
+        }
+
+    @staticmethod
+    def _get_schedule_label(schedule_type: str, schedule_value: str) -> str:
+        """Return a human-readable label for a schedule configuration."""
+        if schedule_type == 'preset':
+            preset = SCHEDULE_PRESETS.get(schedule_value)
+            if preset:
+                return preset['label']
+            return schedule_value
+        return f"Custom: {schedule_value}"
+
+    # ------------------------------------------------------------------
+    # Private — validation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _validate_trigger_input(
+        name: str,
+        schedule_type: str,
+        schedule_value: str,
+        strategy: str,
+        url_ids: list[int],
+    ) -> None:
+        """Validate all trigger creation/update inputs.
+
+        Raises:
+            ValidationError: If any input is invalid.
+        """
+        if not name or not name.strip():
+            raise ValidationError("Trigger name is required")
+
+        if schedule_type not in ('preset', 'custom'):
+            raise ValidationError("Schedule type must be 'preset' or 'custom'")
+
+        if not schedule_value or not schedule_value.strip():
+            raise ValidationError("Schedule value is required")
+
+        if schedule_type == 'preset' and schedule_value not in SCHEDULE_PRESETS:
+            raise ValidationError(f"Unknown schedule preset: {schedule_value}")
+
+        if schedule_type == 'custom':
+            fields = schedule_value.strip().split()
+            if len(fields) != 5:
+                raise ValidationError(
+                    "Custom cron expression must have 5 fields "
+                    "(minute hour day month weekday)"
+                )
+
+        valid_strategies = {s.value for s in TriggerStrategy}
+        if strategy not in valid_strategies:
+            raise ValidationError(
+                f"Strategy must be one of: {', '.join(valid_strategies)}"
+            )
+
+        if not url_ids:
+            raise ValidationError("At least one URL must be selected")

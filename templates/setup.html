@@ -74,6 +74,125 @@
                 <!-- Will be populated by JavaScript -->
             </div>
         </section>
+
+        <!-- Scheduled Test Triggers Section -->
+        <section class="trigger-section">
+            <div class="trigger-section-header">
+                <div>
+                    <h2>Scheduled Test Triggers</h2>
+                    <p class="trigger-section-description">Set up automatic PageSpeed testing on a schedule. Create multiple triggers with different schedules, strategies, and URL selections.</p>
+                </div>
+            </div>
+
+            <!-- Create/Edit Trigger Form -->
+            <div class="setup-card trigger-form-card">
+                <h3 id="triggerFormTitle">Create Trigger</h3>
+                <form id="triggerForm">
+                    <input type="hidden" id="triggerEditId" value="">
+
+                    <div class="trigger-form-grid">
+                        <div class="trigger-form-group">
+                            <label for="triggerName">Trigger Name</label>
+                            <input type="text" id="triggerName" placeholder="e.g., Daily Morning Test" required>
+                        </div>
+
+                        <div class="trigger-form-group">
+                            <label for="triggerScheduleType">Schedule</label>
+                            <select id="triggerScheduleType" onchange="toggleScheduleInput()">
+                                <option value="preset">Use a preset schedule</option>
+                                <option value="custom">Custom cron expression</option>
+                            </select>
+                        </div>
+
+                        <div class="trigger-form-group" id="presetGroup">
+                            <label for="triggerPreset">Preset</label>
+                            <select id="triggerPreset">
+                                <!-- Populated by JavaScript -->
+                            </select>
+                        </div>
+
+                        <div class="trigger-form-group" id="cronGroup" style="display: none;">
+                            <label for="triggerCron">Cron Expression</label>
+                            <input type="text" id="triggerCron" placeholder="0 2 * * *">
+                            <button type="button" class="cron-help-toggle" onclick="toggleCronReference()">
+                                Cron syntax reference ▾
+                            </button>
+                        </div>
+
+                        <div class="trigger-form-group">
+                            <label>Strategy</label>
+                            <div class="trigger-strategy-options">
+                                <label class="trigger-strategy-option">
+                                    <input type="radio" name="triggerStrategy" value="desktop" checked>
+                                    <span>Desktop</span>
+                                </label>
+                                <label class="trigger-strategy-option">
+                                    <input type="radio" name="triggerStrategy" value="mobile">
+                                    <span>Mobile</span>
+                                </label>
+                                <label class="trigger-strategy-option">
+                                    <input type="radio" name="triggerStrategy" value="both">
+                                    <span>Both</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cron Reference (hidden by default) -->
+                    <div id="cronReference" class="cron-reference" style="display: none;">
+                        <h4>Cron Expression Format</h4>
+                        <p class="cron-format"><code>minute  hour  day-of-month  month  day-of-week</code></p>
+                        <table class="cron-reference-table">
+                            <thead>
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Allowed Values</th>
+                                    <th>Special Characters</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Minute</td><td>0–59</td><td>* , - /</td></tr>
+                                <tr><td>Hour</td><td>0–23</td><td>* , - /</td></tr>
+                                <tr><td>Day of Month</td><td>1–31</td><td>* , - /</td></tr>
+                                <tr><td>Month</td><td>1–12</td><td>* , - /</td></tr>
+                                <tr><td>Day of Week</td><td>0–6 (Sun=0) or mon,tue...</td><td>* , - /</td></tr>
+                            </tbody>
+                        </table>
+                        <div class="cron-examples">
+                            <h4>Examples</h4>
+                            <ul>
+                                <li><code>0 2 * * *</code> — Daily at 2:00 AM</li>
+                                <li><code>*/30 * * * *</code> — Every 30 minutes</li>
+                                <li><code>0 6 * * 1</code> — Every Monday at 6:00 AM</li>
+                                <li><code>0 0 1 * *</code> — First day of every month at midnight</li>
+                                <li><code>0 */6 * * *</code> — Every 6 hours</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- URL Selection -->
+                    <div class="trigger-url-selection">
+                        <label>Select URLs to Test</label>
+                        <div id="triggerUrlCheckboxes" class="url-checkbox-grid">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="trigger-form-actions">
+                        <button type="submit" id="triggerSubmitBtn">Create Trigger</button>
+                        <button type="button" id="triggerCancelBtn" class="btn-secondary" onclick="cancelTriggerEdit()" style="display: none;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Existing Triggers List -->
+            <div class="trigger-list-header">
+                <h3>Active Triggers</h3>
+            </div>
+            <div id="triggersList" class="triggers-list">
+                <!-- Populated by JavaScript -->
+            </div>
+        </section>
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>

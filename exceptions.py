@@ -78,3 +78,7 @@ class AuthenticationError(ExternalAPIError):
 
     def __init__(self, message: str, provider: str | None = None) -> None:
         super().__init__(message, provider=provider)
+
+
+class SchedulerError(AppError):
+    """Failure related to APScheduler job management (add, remove, sync)."""

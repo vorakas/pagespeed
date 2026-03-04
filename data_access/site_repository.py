@@ -80,8 +80,11 @@ class SiteRepository:
                 )
                 url_ids = [row[0] for row in cursor.fetchall()]
 
-                # Cascade: test_results -> urls -> site
+                # Cascade: trigger_urls -> test_results -> urls -> site
                 for url_id in url_ids:
+                    cursor.execute(
+                        f"DELETE FROM trigger_urls WHERE url_id = {ph}", (url_id,)
+                    )
                     cursor.execute(
                         f"DELETE FROM test_results WHERE url_id = {ph}", (url_id,)
                     )

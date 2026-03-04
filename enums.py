@@ -73,3 +73,29 @@ class ScoreRating(str, Enum):
         if score >= 50:
             return ScoreRating.AVERAGE
         return ScoreRating.POOR
+
+
+class SchedulePreset(str, Enum):
+    """Named schedule presets for test triggers.
+
+    Each value maps to a key in ``config.SCHEDULE_PRESETS`` which holds
+    the corresponding APScheduler cron keyword arguments.
+    """
+
+    DAILY_2AM = 'daily_2am'
+    DAILY_6AM = 'daily_6am'
+    EVERY_6H = 'every_6h'
+    EVERY_12H = 'every_12h'
+    WEEKLY_MON_2AM = 'weekly_mon_2am'
+
+
+class TriggerStrategy(str, Enum):
+    """Lighthouse strategy option for a scheduled test trigger.
+
+    Extends the base ``Strategy`` enum with a ``BOTH`` option that runs
+    the test twice — once for desktop and once for mobile.
+    """
+
+    DESKTOP = 'desktop'
+    MOBILE = 'mobile'
+    BOTH = 'both'

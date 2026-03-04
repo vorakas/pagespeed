@@ -14,12 +14,14 @@ from services.ai_base import AIServiceBase
 from services.ai_claude import ClaudeClient
 from services.ai_openai import OpenAIClient
 from services.ai_orchestrator import AIOrchestrator
+from services.trigger_service import TriggerService
 
 __all__ = [
     "validate_required_fields",
     "parse_time_range_to_minutes",
     "SiteService",
     "TestingService",
+    "TriggerService",
     "PageSpeedClient",
     "NewRelicClient",
     "AzureLogAnalyticsClient",

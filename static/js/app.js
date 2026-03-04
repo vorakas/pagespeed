@@ -1536,19 +1536,396 @@ if (document.getElementById('sitesUrlsList')) {
     document.addEventListener('DOMContentLoaded', function() {
         loadSites();
         loadSitesAndUrls();
-        
+
         // Setup form handlers
         document.getElementById('addSiteForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             await addSite(e);
             loadSitesAndUrls(); // Refresh the list after adding a site
+            populateTriggerUrlCheckboxes(); // Refresh trigger URL checkboxes
         });
-        
+
         document.getElementById('addUrlForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             await addUrl(e);
             loadSitesAndUrls(); // Refresh the list after adding a URL
+            populateTriggerUrlCheckboxes(); // Refresh trigger URL checkboxes
         });
+
+        // Initialize trigger section if present
+        if (document.getElementById('triggersList')) {
+            loadTriggerPresets();
+            populateTriggerUrlCheckboxes();
+            loadTriggers();
+
+            const triggerForm = document.getElementById('triggerForm');
+            if (triggerForm) {
+                triggerForm.addEventListener('submit', saveTrigger);
+            }
+        }
     });
+}
+
+// ==================== Scheduled Test Triggers ====================
+
+// Load schedule presets into the dropdown
+async function loadTriggerPresets() {
+    const presetSelect = document.getElementById('triggerPreset');
+    if (!presetSelect) return;
+
+    try {
+        const response = await fetch('/api/triggers/presets');
+        const presets = await response.json();
+        presetSelect.innerHTML = '';
+        presets.forEach(preset => {
+            const option = document.createElement('option');
+            option.value = preset.value;
+            option.textContent = preset.label;
+            presetSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading trigger presets:', error);
+    }
+}
+
+// Populate URL checkboxes grouped by site
+async function populateTriggerUrlCheckboxes() {
+    const container = document.getElementById('triggerUrlCheckboxes');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/sites');
+        const allSites = await response.json();
+
+        if (allSites.length === 0) {
+            container.innerHTML = '<p class="trigger-no-urls">No sites configured yet. Add sites and URLs above first.</p>';
+            return;
+        }
+
+        let html = '';
+        for (const site of allSites) {
+            const urlsResponse = await fetch(`/api/sites/${site.id}/urls`);
+            const urls = await urlsResponse.json();
+
+            if (urls.length === 0) continue;
+
+            html += `<div class="url-checkbox-site-group">`;
+            html += `<label class="url-checkbox-site-header">`;
+            html += `<input type="checkbox" class="site-select-all" data-site-id="${site.id}" onchange="toggleSiteUrls(this, ${site.id})">`;
+            html += `<strong>${site.name}</strong> <span class="url-checkbox-count">(${urls.length} URLs)</span>`;
+            html += `</label>`;
+
+            urls.forEach(url => {
+                html += `<label class="url-checkbox-item" title="${url.url}">`;
+                html += `<input type="checkbox" name="triggerUrls" value="${url.id}" data-site-id="${site.id}" onchange="updateSiteSelectAll(${site.id})">`;
+                html += `<span class="url-checkbox-label">${url.url}</span>`;
+                html += `</label>`;
+            });
+
+            html += `</div>`;
+        }
+
+        if (!html) {
+            container.innerHTML = '<p class="trigger-no-urls">No URLs configured yet. Add URLs to your sites above first.</p>';
+            return;
+        }
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading trigger URLs:', error);
+        container.innerHTML = '<p class="trigger-no-urls">Error loading URLs</p>';
+    }
+}
+
+// Toggle all URL checkboxes for a site
+function toggleSiteUrls(selectAllCheckbox, siteId) {
+    const checkboxes = document.querySelectorAll(`input[name="triggerUrls"][data-site-id="${siteId}"]`);
+    checkboxes.forEach(cb => { cb.checked = selectAllCheckbox.checked; });
+}
+
+// Update the select-all checkbox state based on individual checkboxes
+function updateSiteSelectAll(siteId) {
+    const checkboxes = document.querySelectorAll(`input[name="triggerUrls"][data-site-id="${siteId}"]`);
+    const selectAll = document.querySelector(`.site-select-all[data-site-id="${siteId}"]`);
+    if (!selectAll) return;
+
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    const someChecked = Array.from(checkboxes).some(cb => cb.checked);
+    selectAll.checked = allChecked;
+    selectAll.indeterminate = someChecked && !allChecked;
+}
+
+// Toggle between preset and custom cron input
+function toggleScheduleInput() {
+    const scheduleType = document.getElementById('triggerScheduleType').value;
+    const presetGroup = document.getElementById('presetGroup');
+    const cronGroup = document.getElementById('cronGroup');
+
+    if (scheduleType === 'preset') {
+        presetGroup.style.display = '';
+        cronGroup.style.display = 'none';
+    } else {
+        presetGroup.style.display = 'none';
+        cronGroup.style.display = '';
+    }
+}
+
+// Toggle cron reference visibility
+function toggleCronReference() {
+    const ref = document.getElementById('cronReference');
+    if (!ref) return;
+    ref.style.display = ref.style.display === 'none' ? '' : 'none';
+}
+
+// Load and render all triggers
+async function loadTriggers() {
+    const container = document.getElementById('triggersList');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/triggers');
+        const triggers = await response.json();
+
+        if (triggers.length === 0) {
+            container.innerHTML = createEmptyState({
+                icon: EMPTY_ICONS.calendar,
+                title: 'No Triggers Created',
+                description: 'Create a trigger above to automate your PageSpeed testing.'
+            });
+            return;
+        }
+
+        let html = '';
+        triggers.forEach(trigger => {
+            html += renderTriggerCard(trigger);
+        });
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading triggers:', error);
+        container.innerHTML = '<p style="color: #f87171; text-align: center; padding: 30px;">Error loading triggers</p>';
+    }
+}
+
+// Render a single trigger card
+function renderTriggerCard(trigger) {
+    const enabledClass = trigger.enabled ? 'trigger-enabled' : 'trigger-disabled';
+    const toggleChecked = trigger.enabled ? 'checked' : '';
+    const strategyLabel = trigger.strategy === 'both' ? 'Desktop & Mobile' :
+                          trigger.strategy.charAt(0).toUpperCase() + trigger.strategy.slice(1);
+    const urlCount = trigger.url_ids ? trigger.url_ids.length : 0;
+
+    return `
+        <div class="trigger-card ${enabledClass}" data-trigger-id="${trigger.id}">
+            <div class="trigger-card-header">
+                <div class="trigger-card-info">
+                    <h4 class="trigger-card-name">${trigger.name}</h4>
+                    <div class="trigger-card-meta">
+                        <span class="trigger-meta-item" title="Schedule">
+                            <svg viewBox="0 0 24 24" class="trigger-meta-icon"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            ${trigger.schedule_label || trigger.schedule_value}
+                        </span>
+                        <span class="trigger-meta-item" title="Strategy">
+                            <svg viewBox="0 0 24 24" class="trigger-meta-icon"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                            ${strategyLabel}
+                        </span>
+                        <span class="trigger-meta-item" title="URLs">
+                            <svg viewBox="0 0 24 24" class="trigger-meta-icon"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            ${urlCount} URL${urlCount !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                </div>
+                <div class="trigger-card-actions">
+                    <label class="trigger-toggle" title="${trigger.enabled ? 'Enabled' : 'Disabled'}">
+                        <input type="checkbox" ${toggleChecked} onchange="toggleTrigger(${trigger.id}, this.checked)">
+                        <span class="trigger-toggle-slider"></span>
+                    </label>
+                    <button class="btn-trigger-edit" onclick="editTrigger(${trigger.id})" title="Edit">
+                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="btn-trigger-delete" onclick="deleteTrigger(${trigger.id})" title="Delete">
+                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Save (create or update) a trigger
+async function saveTrigger(e) {
+    e.preventDefault();
+
+    const editId = document.getElementById('triggerEditId').value;
+    const name = document.getElementById('triggerName').value.trim();
+    const scheduleType = document.getElementById('triggerScheduleType').value;
+    const scheduleValue = scheduleType === 'preset'
+        ? document.getElementById('triggerPreset').value
+        : document.getElementById('triggerCron').value.trim();
+    const strategy = document.querySelector('input[name="triggerStrategy"]:checked').value;
+
+    // Collect selected URL ids
+    const urlCheckboxes = document.querySelectorAll('input[name="triggerUrls"]:checked');
+    const urlIds = Array.from(urlCheckboxes).map(cb => parseInt(cb.value));
+
+    if (!name) {
+        showToast('Please enter a trigger name', 'warning');
+        return;
+    }
+    if (!scheduleValue) {
+        showToast('Please select or enter a schedule', 'warning');
+        return;
+    }
+    if (urlIds.length === 0) {
+        showToast('Please select at least one URL', 'warning');
+        return;
+    }
+
+    const payload = {
+        name: name,
+        schedule_type: scheduleType,
+        schedule_value: scheduleValue,
+        strategy: strategy,
+        url_ids: urlIds
+    };
+
+    try {
+        const url = editId ? `/api/triggers/${editId}` : '/api/triggers';
+        const method = editId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success !== false) {
+            showToast(editId ? 'Trigger updated successfully' : 'Trigger created successfully', 'success');
+            resetTriggerForm();
+            loadTriggers();
+        } else {
+            showToast('Error: ' + (result.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error saving trigger:', error);
+        showToast('Error saving trigger', 'error');
+    }
+}
+
+// Delete a trigger
+async function deleteTrigger(triggerId) {
+    if (!confirm('Are you sure you want to delete this trigger?')) return;
+
+    try {
+        const response = await fetch(`/api/triggers/${triggerId}`, { method: 'DELETE' });
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast('Trigger deleted', 'success');
+            loadTriggers();
+        } else {
+            showToast('Error: ' + (result.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting trigger:', error);
+        showToast('Error deleting trigger', 'error');
+    }
+}
+
+// Toggle trigger enabled/disabled
+async function toggleTrigger(triggerId, enabled) {
+    try {
+        const response = await fetch(`/api/triggers/${triggerId}/toggle`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast(`Trigger ${enabled ? 'enabled' : 'disabled'}`, 'success');
+            loadTriggers();
+        } else {
+            showToast('Error: ' + (result.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error toggling trigger:', error);
+        showToast('Error toggling trigger', 'error');
+    }
+}
+
+// Edit a trigger — populate form with existing data
+async function editTrigger(triggerId) {
+    try {
+        const response = await fetch('/api/triggers');
+        const triggers = await response.json();
+        const trigger = triggers.find(t => t.id === triggerId);
+
+        if (!trigger) {
+            showToast('Trigger not found', 'error');
+            return;
+        }
+
+        // Set form title and button text
+        document.getElementById('triggerFormTitle').textContent = 'Edit Trigger';
+        document.getElementById('triggerSubmitBtn').textContent = 'Update Trigger';
+        document.getElementById('triggerCancelBtn').style.display = '';
+        document.getElementById('triggerEditId').value = trigger.id;
+
+        // Fill form fields
+        document.getElementById('triggerName').value = trigger.name;
+        document.getElementById('triggerScheduleType').value = trigger.schedule_type;
+        toggleScheduleInput();
+
+        if (trigger.schedule_type === 'preset') {
+            document.getElementById('triggerPreset').value = trigger.schedule_value;
+        } else {
+            document.getElementById('triggerCron').value = trigger.schedule_value;
+        }
+
+        // Set strategy radio
+        const strategyRadio = document.querySelector(`input[name="triggerStrategy"][value="${trigger.strategy}"]`);
+        if (strategyRadio) strategyRadio.checked = true;
+
+        // Check the correct URL checkboxes
+        const allUrlCheckboxes = document.querySelectorAll('input[name="triggerUrls"]');
+        allUrlCheckboxes.forEach(cb => {
+            cb.checked = trigger.url_ids && trigger.url_ids.includes(parseInt(cb.value));
+        });
+
+        // Update select-all states
+        document.querySelectorAll('.site-select-all').forEach(selectAll => {
+            const siteId = parseInt(selectAll.dataset.siteId);
+            updateSiteSelectAll(siteId);
+        });
+
+        // Scroll to form
+        document.querySelector('.trigger-form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error) {
+        console.error('Error loading trigger for edit:', error);
+        showToast('Error loading trigger', 'error');
+    }
+}
+
+// Cancel editing — reset form to create mode
+function cancelTriggerEdit() {
+    resetTriggerForm();
+}
+
+// Reset the trigger form to its default create state
+function resetTriggerForm() {
+    document.getElementById('triggerFormTitle').textContent = 'Create Trigger';
+    document.getElementById('triggerSubmitBtn').textContent = 'Create Trigger';
+    document.getElementById('triggerCancelBtn').style.display = 'none';
+    document.getElementById('triggerEditId').value = '';
+    document.getElementById('triggerForm').reset();
+    document.getElementById('triggerScheduleType').value = 'preset';
+    toggleScheduleInput();
+
+    // Uncheck all URL checkboxes
+    document.querySelectorAll('input[name="triggerUrls"]').forEach(cb => { cb.checked = false; });
+    document.querySelectorAll('.site-select-all').forEach(cb => { cb.checked = false; cb.indeterminate = false; });
 }
 

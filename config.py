@@ -49,7 +49,44 @@ MAX_AI_TOKENS: int = 4096
 # ---------------------------------------------------------------------------
 
 DAILY_TEST_HOUR: int = 2
-"""UTC hour at which the daily scheduled PageSpeed test runs (via APScheduler)."""
+"""UTC hour at which the daily scheduled PageSpeed test runs (via APScheduler).
+
+.. deprecated::
+    Retained for backward compatibility. New triggers use ``SCHEDULE_PRESETS``.
+"""
+
+TRIGGER_JOB_PREFIX: str = 'trigger_'
+"""APScheduler job-id prefix for user-created triggers (e.g. ``trigger_7``)."""
+
+SCHEDULE_PRESETS: dict[str, dict] = {
+    'daily_2am': {
+        'label': 'Daily at 2:00 AM UTC',
+        'hour': 2,
+        'minute': 0,
+    },
+    'daily_6am': {
+        'label': 'Daily at 6:00 AM UTC',
+        'hour': 6,
+        'minute': 0,
+    },
+    'every_6h': {
+        'label': 'Every 6 hours',
+        'hour': '*/6',
+        'minute': 0,
+    },
+    'every_12h': {
+        'label': 'Every 12 hours',
+        'hour': '*/12',
+        'minute': 0,
+    },
+    'weekly_mon_2am': {
+        'label': 'Weekly on Monday at 2:00 AM UTC',
+        'day_of_week': 'mon',
+        'hour': 2,
+        'minute': 0,
+    },
+}
+"""Preset cron schedules mapping preset key → APScheduler cron kwargs + label."""
 
 # ---------------------------------------------------------------------------
 # New Relic defaults

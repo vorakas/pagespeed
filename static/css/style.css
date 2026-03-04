@@ -5352,6 +5352,597 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     color: #ffffff;
 }
 
+/* ==================== Scheduled Test Triggers ==================== */
+
+.trigger-section {
+    margin-top: 30px;
+}
+
+.trigger-section-header {
+    margin-bottom: 20px;
+}
+
+.trigger-section-header h2 {
+    color: #e3e8ee;
+    margin-bottom: 4px;
+}
+
+.trigger-section-description {
+    color: #9ca3af;
+    font-size: 0.9em;
+    margin: 0;
+}
+
+.trigger-form-card {
+    margin-bottom: 24px;
+}
+
+.trigger-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.trigger-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.trigger-form-group label {
+    color: #d1d5db;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.trigger-form-group select,
+.trigger-form-group input[type="text"] {
+    padding: 8px 12px;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #e3e8ee;
+    font-size: 0.9em;
+}
+
+.trigger-form-group select:focus,
+.trigger-form-group input[type="text"]:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.trigger-strategy-options {
+    display: flex;
+    gap: 12px;
+}
+
+.trigger-strategy-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: #d1d5db;
+    font-size: 0.9em;
+}
+
+.trigger-strategy-option input[type="radio"] {
+    accent-color: #667eea;
+}
+
+/* Cron help toggle button */
+.cron-help-toggle {
+    background: none !important;
+    border: none;
+    color: #667eea;
+    font-size: 0.8em;
+    cursor: pointer;
+    padding: 4px 0 !important;
+    text-align: left;
+    width: auto !important;
+    min-width: 0;
+    margin: 0 !important;
+}
+
+.cron-help-toggle:hover {
+    color: #8b9cf7;
+    text-decoration: underline;
+    transform: none;
+    box-shadow: none;
+    background: none !important;
+}
+
+/* Cron reference section */
+.cron-reference {
+    background: #1a2332;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.cron-reference h4 {
+    color: #e3e8ee;
+    margin: 0 0 8px 0;
+    font-size: 0.9em;
+}
+
+.cron-format {
+    color: #9ca3af;
+    font-size: 0.85em;
+    margin: 0 0 12px 0;
+}
+
+.cron-format code {
+    background: #111827;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: #667eea;
+    font-size: 0.95em;
+}
+
+.cron-reference-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12px;
+    font-size: 0.85em;
+}
+
+.cron-reference-table th {
+    text-align: left;
+    padding: 6px 10px;
+    color: #9ca3af;
+    border-bottom: 1px solid #374151;
+    font-weight: 500;
+}
+
+.cron-reference-table td {
+    padding: 5px 10px;
+    color: #d1d5db;
+    border-bottom: 1px solid #1f2937;
+}
+
+.cron-examples {
+    margin-top: 10px;
+}
+
+.cron-examples h4 {
+    margin-bottom: 6px;
+}
+
+.cron-examples ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.cron-examples li {
+    color: #9ca3af;
+    font-size: 0.85em;
+    padding: 3px 0;
+}
+
+.cron-examples code {
+    background: #111827;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #667eea;
+    font-size: 0.95em;
+    margin-right: 6px;
+}
+
+/* URL checkbox selection */
+.trigger-url-selection {
+    margin-bottom: 16px;
+}
+
+.trigger-url-selection > label {
+    display: block;
+    color: #d1d5db;
+    font-size: 0.85em;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.url-checkbox-grid {
+    background: #1a2332;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.url-checkbox-site-group {
+    margin-bottom: 12px;
+}
+
+.url-checkbox-site-group:last-child {
+    margin-bottom: 0;
+}
+
+.url-checkbox-site-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    cursor: pointer;
+    color: #e3e8ee;
+    font-size: 0.9em;
+    border-bottom: 1px solid #374151;
+    margin-bottom: 6px;
+}
+
+.url-checkbox-site-header input[type="checkbox"] {
+    accent-color: #667eea;
+}
+
+.url-checkbox-count {
+    color: #9ca3af;
+    font-weight: 400;
+    font-size: 0.85em;
+}
+
+.url-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 4px 20px;
+    cursor: pointer;
+    color: #d1d5db;
+    font-size: 0.85em;
+}
+
+.url-checkbox-item input[type="checkbox"] {
+    accent-color: #667eea;
+    flex-shrink: 0;
+}
+
+.url-checkbox-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trigger-no-urls {
+    color: #9ca3af;
+    font-size: 0.85em;
+    text-align: center;
+    padding: 12px;
+}
+
+/* Trigger form actions */
+.trigger-form-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.trigger-form-actions .btn-secondary {
+    background: #374151;
+    color: #d1d5db;
+}
+
+.trigger-form-actions .btn-secondary:hover {
+    background: #4b5563;
+}
+
+/* Trigger list */
+.trigger-list-header {
+    margin-bottom: 12px;
+}
+
+.trigger-list-header h3 {
+    color: #e3e8ee;
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.triggers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Trigger card */
+.trigger-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.trigger-card:hover {
+    border-color: #475569;
+}
+
+.trigger-card.trigger-disabled {
+    opacity: 0.55;
+}
+
+.trigger-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.trigger-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.trigger-card-name {
+    color: #e3e8ee;
+    margin: 0 0 6px 0;
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.trigger-card-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.trigger-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #9ca3af;
+    font-size: 0.82em;
+}
+
+.trigger-meta-icon {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}
+
+.trigger-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* Toggle switch */
+.trigger-toggle {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+}
+
+.trigger-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.trigger-toggle-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #4b5563;
+    border-radius: 24px;
+    transition: background-color 0.3s ease;
+}
+
+.trigger-toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #e3e8ee;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+}
+
+.trigger-toggle input:checked + .trigger-toggle-slider {
+    background-color: #10b981;
+}
+
+.trigger-toggle input:checked + .trigger-toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* Edit and Delete buttons on trigger cards */
+.btn-trigger-edit,
+.btn-trigger-delete {
+    background: none !important;
+    border: none;
+    cursor: pointer;
+    padding: 6px !important;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px !important;
+    min-width: 0;
+    height: 32px;
+    margin: 0 !important;
+}
+
+.btn-trigger-edit svg,
+.btn-trigger-delete svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: #9ca3af;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.btn-trigger-edit:hover {
+    background: rgba(102, 126, 234, 0.15) !important;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-trigger-edit:hover svg {
+    stroke: #667eea;
+}
+
+.btn-trigger-delete:hover {
+    background: rgba(239, 68, 68, 0.15) !important;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-trigger-delete:hover svg {
+    stroke: #ef4444;
+}
+
+/* Light mode trigger overrides */
+body.light-mode .trigger-section-header h2 {
+    color: #1f2937;
+}
+
+body.light-mode .trigger-section-description {
+    color: #6b7280;
+}
+
+body.light-mode .trigger-form-group label {
+    color: #374151;
+}
+
+body.light-mode .trigger-form-group select,
+body.light-mode .trigger-form-group input[type="text"] {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    color: #1f2937;
+}
+
+body.light-mode .trigger-strategy-option {
+    color: #374151;
+}
+
+body.light-mode .cron-help-toggle {
+    color: #667eea;
+}
+
+body.light-mode .cron-reference {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+body.light-mode .cron-reference h4 {
+    color: #1f2937;
+}
+
+body.light-mode .cron-format {
+    color: #6b7280;
+}
+
+body.light-mode .cron-format code {
+    background: #e5e7eb;
+    color: #4f46e5;
+}
+
+body.light-mode .cron-reference-table th {
+    color: #6b7280;
+    border-bottom-color: #d1d5db;
+}
+
+body.light-mode .cron-reference-table td {
+    color: #374151;
+    border-bottom-color: #e5e7eb;
+}
+
+body.light-mode .cron-examples li {
+    color: #6b7280;
+}
+
+body.light-mode .cron-examples code {
+    background: #e5e7eb;
+    color: #4f46e5;
+}
+
+body.light-mode .url-checkbox-grid {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+body.light-mode .url-checkbox-site-header {
+    color: #1f2937;
+    border-bottom-color: #d1d5db;
+}
+
+body.light-mode .url-checkbox-count {
+    color: #6b7280;
+}
+
+body.light-mode .url-checkbox-item {
+    color: #374151;
+}
+
+body.light-mode .trigger-no-urls {
+    color: #6b7280;
+}
+
+body.light-mode .trigger-form-actions .btn-secondary {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+body.light-mode .trigger-form-actions .btn-secondary:hover {
+    background: #d1d5db;
+}
+
+body.light-mode .trigger-list-header h3 {
+    color: #1f2937;
+}
+
+body.light-mode .trigger-card {
+    background: #ffffff;
+    border-color: #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+body.light-mode .trigger-card:hover {
+    border-color: #d1d5db;
+}
+
+body.light-mode .trigger-card-name {
+    color: #1f2937;
+}
+
+body.light-mode .trigger-meta-item {
+    color: #6b7280;
+}
+
+body.light-mode .trigger-toggle-slider {
+    background-color: #d1d5db;
+}
+
+body.light-mode .trigger-toggle-slider::before {
+    background-color: #ffffff;
+}
+
+body.light-mode .btn-trigger-edit svg,
+body.light-mode .btn-trigger-delete svg {
+    stroke: #6b7280;
+}
+
+body.light-mode .trigger-url-selection > label {
+    color: #374151;
+}
+
 /* ==================== Toast Notifications ==================== */
 
 .toast-container {

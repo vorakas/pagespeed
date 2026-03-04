@@ -8,10 +8,12 @@ from data_access.connection import ConnectionManager
 from data_access.site_repository import SiteRepository
 from data_access.url_repository import UrlRepository
 from data_access.test_result_repository import TestResultRepository
+from data_access.trigger_repository import TriggerRepository
 
 __all__ = [
     "ConnectionManager",
     "SiteRepository",
     "UrlRepository",
     "TestResultRepository",
+    "TriggerRepository",
 ]

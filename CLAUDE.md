@@ -49,8 +49,8 @@ Routes (Flask Blueprints)  →  Services (Business Logic)  →  Data Access (Rep
 
 **Cross-cutting modules:**
 - `config.py` — Centralized configuration constants (env vars, defaults, timeouts)
-- `enums.py` — Domain enums (`Strategy`, `PerformanceStatus`, `ScoreRating`) replacing magic strings
-- `exceptions.py` — Exception hierarchy (`AppError` → `ValidationError`, `DatabaseError`, `ExternalAPIError` → `PageSpeedError`, `NewRelicError`, etc.)
+- `enums.py` — Domain enums (`Strategy`, `PerformanceStatus`, `ScoreRating`, `SchedulePreset`, `TriggerStrategy`) replacing magic strings
+- `exceptions.py` — Exception hierarchy (`AppError` → `ValidationError`, `DatabaseError`, `ExternalAPIError` → `PageSpeedError`, `NewRelicError`, `SchedulerError`, etc.)
 
 **Dependency flow** (app.py wires everything):
 ```python
@@ -62,20 +62,22 @@ ConnectionManager → Repositories → Services → Blueprints
 ## File Structure
 
 ```
-├── app.py                    # Application factory, DI wiring, error handlers (~82 lines)
-├── config.py                 # Centralized configuration constants (~82 lines)
-├── enums.py                  # Domain enums: Strategy, PerformanceStatus, ScoreRating (~76 lines)
-├── exceptions.py             # Custom exception hierarchy (~81 lines)
+├── app.py                    # Application factory, DI wiring, error handlers (~95 lines)
+├── config.py                 # Centralized configuration constants (~100 lines)
+├── enums.py                  # Domain enums: Strategy, PerformanceStatus, ScoreRating, SchedulePreset, TriggerStrategy (~96 lines)
+├── exceptions.py             # Custom exception hierarchy (~86 lines)
 ├── data_access/
 │   ├── __init__.py           # Re-exports: ConnectionManager, *Repository
-│   ├── connection.py         # DB connection manager, schema init, dialect helpers (~256 lines)
-│   ├── site_repository.py    # Sites table CRUD (~97 lines)
-│   ├── url_repository.py     # URLs table CRUD (~80 lines)
+│   ├── connection.py         # DB connection manager, schema init, dialect helpers (~300 lines)
+│   ├── site_repository.py    # Sites table CRUD with cascade deletes (~105 lines)
+│   ├── url_repository.py     # URLs table CRUD with cascade deletes (~88 lines)
+│   ├── trigger_repository.py # Trigger + trigger_urls CRUD (~200 lines)
 │   └── test_result_repository.py  # Test results queries (~200 lines)
 ├── services/
 │   ├── __init__.py           # Re-exports all services and clients
 │   ├── site_service.py       # Site/URL business logic + validation (~128 lines)
 │   ├── testing_service.py    # PageSpeed test orchestration (~156 lines)
+│   ├── trigger_service.py    # Trigger CRUD, validation, APScheduler job sync (~424 lines)
 │   ├── pagespeed_client.py   # Google PageSpeed Insights API client (~192 lines)
 │   ├── newrelic_client.py    # New Relic NerdGraph API client (~510 lines)
 │   ├── azure_client.py       # Azure Log Analytics API client (~400 lines)
@@ -85,11 +87,12 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── ai_orchestrator.py    # Parallel AI analysis orchestrator (~300 lines)
 │   └── validation.py         # Shared validation helpers (~50 lines)
 ├── routes/
-│   ├── __init__.py           # register_blueprints() factory (~42 lines)
+│   ├── __init__.py           # register_blueprints() factory (~47 lines)
 │   ├── pages.py              # Page rendering routes (~52 lines)
 │   ├── sites_api.py          # Site/URL CRUD API (~56 lines)
 │   ├── testing_api.py        # PageSpeed testing API (~83 lines)
 │   ├── metrics_api.py        # Test results query API (~69 lines)
+│   ├── triggers_api.py       # Trigger CRUD + toggle + presets API (~81 lines)
 │   ├── newrelic_api.py       # New Relic proxy API (~78 lines)
 │   ├── azure_api.py          # Azure Log Analytics proxy API (~107 lines)
 │   └── ai_api.py             # AI analysis API (~159 lines)
@@ -103,15 +106,15 @@ ConnectionManager → Repositories → Services → Blueprints
 ├── .gitignore
 ├── templates/
 │   ├── index.html            # Dashboard home, worst performers, CWV reference guide
-│   ├── setup.html            # Site/URL management with collapsible drawers
+│   ├── setup.html            # Site/URL management + scheduled trigger configuration
 │   ├── test.html             # PageSpeed testing with desktop/mobile toggle
 │   ├── metrics.html          # Performance metrics charts
 │   ├── newrelic.html         # New Relic integration page
 │   ├── iislogs.html          # IIS logs + KQL queries + profiles (~1624 lines, heavy inline JS)
 │   └── ai_analysis.html      # AI analysis with parallel Claude + OpenAI
 ├── static/
-│   ├── css/style.css         # All styles, dark+light mode (~5390 lines)
-│   ├── js/app.js             # Shared frontend JS (~1436 lines)
+│   ├── css/style.css         # All styles, dark+light mode (~5830 lines)
+│   ├── js/app.js             # Shared frontend JS (~1740 lines)
 │   ├── favicon.ico
 │   └── images/               # Logo variants (light/dark, LampsPlus)
 ```
@@ -120,19 +123,23 @@ ConnectionManager → Repositories → Services → Blueprints
 
 ## Database Schema (data_access/)
 
-Three tables managed by individual repositories in `data_access/`: `sites`, `urls`, `test_results`
+Five tables managed by individual repositories in `data_access/`: `sites`, `urls`, `test_results`, `scheduled_triggers`, `trigger_urls`
 
 - **sites:** id, name (unique), created_at
 - **urls:** id, site_id (FK), url, created_at — unique constraint on (site_id, url)
 - **test_results:** id, url_id (FK), performance_score, accessibility_score, best_practices_score, seo_score, fcp, lcp, cls, inp, ttfb, tti, tbt, speed_index, total_byte_weight, raw_data (JSON), strategy (TEXT DEFAULT 'desktop'), tested_at
+- **scheduled_triggers:** id, name (unique), schedule_type, schedule_value, strategy (DEFAULT 'desktop'), enabled (DEFAULT 1), created_at, updated_at
+- **trigger_urls:** id, trigger_id (FK → scheduled_triggers), url_id (FK → urls), UNIQUE(trigger_id, url_id)
 
-The `strategy` column was added via ALTER TABLE migration with `COALESCE(strategy, 'desktop')` for backward compatibility.
+The `strategy` column on test_results was added via ALTER TABLE migration with `COALESCE(strategy, 'desktop')` for backward compatibility.
+
+Cascade deletes: deleting a URL cleans up `trigger_urls` and `test_results`; deleting a site cascades through its URLs.
 
 ---
 
 ## API Routes (routes/)
 
-Routes are split across 7 Flask Blueprints in `routes/`, each created via a factory function with injected dependencies.
+Routes are split across 8 Flask Blueprints in `routes/`, each created via a factory function with injected dependencies.
 
 **Pages** (`routes/pages.py`): `/`, `/setup`, `/test`, `/metrics`, `/newrelic`, `/iislogs`, `/ai-analysis`
 
@@ -148,7 +155,9 @@ Routes are split across 7 Flask Blueprints in `routes/`, each created via a fact
 
 **AI** (`routes/ai_api.py`): `POST /api/ai/analyze` (parallel Claude + OpenAI), `POST /api/ai/follow-up`
 
-**Scheduled:** Daily tests at 2 AM UTC via APScheduler, strategy hardcoded to 'desktop'.
+**Triggers** (`routes/triggers_api.py`): `GET /api/triggers`, `POST /api/triggers`, `PUT /api/triggers/<id>`, `DELETE /api/triggers/<id>`, `PATCH /api/triggers/<id>/toggle`, `GET /api/triggers/presets`
+
+**Scheduled:** User-configurable triggers via APScheduler, managed on the Setup page. Supports preset schedules (daily, every 6h/12h, weekly) and custom cron expressions. Each trigger has its own strategy (desktop/mobile/both) and URL selection. Jobs are synced from the database on startup via `trigger_service.sync_all_jobs()`.
 
 ---
 
@@ -220,6 +229,18 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 - Site availability notice
 - Markdown rendering (marked.js)
 
+### Scheduled Test Triggers (setup.html, app.js)
+- **User-configurable triggers** — Replace hardcoded daily 2 AM test with multiple named triggers on the Setup page
+- **Schedule presets** — Daily at 2 AM UTC, Daily at 6 AM UTC, Every 6 hours, Every 12 hours, Weekly on Monday at 2 AM UTC
+- **Custom cron expressions** — 5-field cron format (minute hour day month weekday) with collapsible syntax reference
+- **Per-trigger strategy** — Desktop, Mobile, or Both (runs two passes with delay between strategies)
+- **URL selection** — Checkbox grid grouped by site with select-all per site and indeterminate state
+- **Enable/disable toggle** — CSS-only toggle switch per trigger card; adds/removes APScheduler job in real-time
+- **Trigger cards** — Display name, schedule description, strategy, URL count, toggle, edit/delete buttons
+- **Startup sync** — `TriggerService.sync_all_jobs()` restores APScheduler jobs for all enabled triggers on app start
+- **Cascade deletes** — Deleting a URL or site cascades to `trigger_urls` junction table
+- **Rate limiting** — Configurable delay between tests via `REQUEST_DELAY_SECONDS`
+
 ### UI/UX
 - Dark mode (default) + Light mode with localStorage persistence
 - **Inter web font** with system font fallback stack (`@import` from Google Fonts)
@@ -240,7 +261,8 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 ## Recent Commit History (newest first)
 
 ```
-PENDING  Center column alignment on results tables and fix vertical alignment
+PENDING  Add scheduled test triggers with user-configurable schedules on Setup page
+98ad636 Center column alignment on results tables across Dashboard and Test URLs
 f6174f3 Show worst performing URLs per site with centered columns on Dashboard
 0c0f673 Add worst performing URLs section to Dashboard page
 83aa2cd Refactor backend into 3-layer architecture with dependency injection
@@ -281,7 +303,7 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 - **Repository pattern:** All SQL lives in `data_access/` repositories. Services never touch SQL directly
 - **Blueprint factories:** Each route file exports a `create_*_blueprint()` function that receives its dependencies as arguments
 - **Custom exceptions:** Domain-specific exception hierarchy in `exceptions.py`; centralized error handlers in `app.py`
-- **Enums over magic strings:** `enums.py` provides `Strategy`, `PerformanceStatus`, `ScoreRating`
+- **Enums over magic strings:** `enums.py` provides `Strategy`, `PerformanceStatus`, `ScoreRating`, `SchedulePreset`, `TriggerStrategy`
 - **Centralized config:** All env vars and defaults in `config.py`
 - **No test suite** — no automated tests exist; all testing is manual
 
@@ -304,7 +326,7 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ---
 
-## CSS Key Locations (style.css ~5430 lines)
+## CSS Key Locations (style.css ~5830 lines)
 
 - **Side nav + nav icons:** ~17-95
 - **Buttons:** ~206-330
@@ -314,15 +336,16 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 - **Progress bar:** ~797-871
 - **Empty state component:** ~1121-1200
 - **Worst performers section:** ~1216-1248
+- **Scheduled triggers section:** ~2092-2490 (form, cards, toggle switch, URL checkboxes, cron reference)
 - **Collapsible drawers:** ~2050-2090
-- **Table fixed layout + overflow:** ~2480-2510
-- **Resizable columns:** ~2550-2625
-- **Loading indicator + spinner:** ~3160-3205
-- **New Relic styles:** ~2280-3500
-- **IIS Logs styles:** ~3808-4040
-- **KQL Query Mode + profiles:** ~4042-4290
-- **AI Analysis styles:** ~4574-5000
-- **Toast notifications:** ~5262-5390
+- **Table fixed layout + overflow:** ~2880-2910
+- **Resizable columns:** ~2950-3025
+- **Loading indicator + spinner:** ~3560-3605
+- **New Relic styles:** ~2680-3900
+- **IIS Logs styles:** ~4208-4440
+- **KQL Query Mode + profiles:** ~4442-4690
+- **AI Analysis styles:** ~4974-5400
+- **Toast notifications:** ~5662-5790
 
 ---
 
@@ -404,4 +427,4 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ## Current State
 
-All features are implemented and deployed. The backend uses a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The Dashboard now includes a "Worst Performing URLs" section showing the 5 lowest-scoring URLs **per site** (each site gets its own table) with a desktop/mobile strategy toggle and centered column alignment. No pending tasks or known bugs at time of writing.
+All features are implemented and deployed. The backend uses a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The Dashboard includes a "Worst Performing URLs" section showing the 5 lowest-scoring URLs per site with a desktop/mobile strategy toggle. The Setup page now includes a "Scheduled Test Triggers" section allowing users to create multiple named triggers with preset/custom cron schedules, per-trigger strategy selection (Desktop/Mobile/Both), and URL checkboxes grouped by site. Triggers replace the old hardcoded daily 2 AM test job, with APScheduler jobs synced from the database on startup. No pending tasks or known bugs at time of writing.

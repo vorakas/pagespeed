@@ -7,7 +7,7 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 ### Dashboard & Testing
 - **Worst Performing URLs** -- Dashboard shows the 5 lowest-scoring URLs per site with desktop/mobile toggle
 - **Site/URL Management** -- Add sites and URLs to monitor, with collapsible drawer cards
-- **PageSpeed Testing** -- Run Google PageSpeed Insights tests (mobile & desktop) on demand or via daily scheduled jobs
+- **PageSpeed Testing** -- Run Google PageSpeed Insights tests (mobile & desktop) on demand or via user-configurable scheduled triggers
 - **Core Web Vitals Reference** -- Built-in reference guide for LCP, FID, CLS thresholds
 - **Historical Performance** -- Track Lighthouse scores and metrics over time with comparison charts
 - **Dark/Light Mode** -- Full theme support across all pages
@@ -38,6 +38,14 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 - Configurable models (Claude Sonnet 4 / Opus 4, GPT-4o / GPT-4o Mini)
 - Experimental feature disclaimer
 
+### Scheduled Test Triggers
+- **Multiple named triggers** -- Create and manage automated test schedules on the Setup page
+- **Schedule presets** -- Daily, every 6h/12h, weekly options plus custom 5-field cron expressions
+- **Per-trigger strategy** -- Choose Desktop, Mobile, or Both for each trigger
+- **URL selection** -- Checkbox grid grouped by site with select-all capability
+- **Enable/disable toggle** -- Toggle triggers on/off with real-time scheduler sync
+- **Collapsible cron reference** -- Built-in cron syntax guide for custom schedules
+
 ### UI/UX Polish
 - **Inter web font** with system font fallback stack
 - **Nav icons** -- Inline SVG Feather-style icons on all navigation links
@@ -56,7 +64,7 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 - **Frontend:** Vanilla HTML/CSS/JS, Chart.js, marked.js (markdown), JSZip (exports)
 - **APIs:** Google PageSpeed Insights, New Relic NerdGraph, Azure Log Analytics REST API, Anthropic Claude, OpenAI
 - **Deployment:** Railway (Docker-based with Nixpacks)
-- **Scheduling:** APScheduler for daily automated tests
+- **Scheduling:** APScheduler for user-configurable automated tests (preset + custom cron schedules)
 
 ## Project Structure
 
@@ -74,10 +82,12 @@ pagespeed-monitor/
 │   ├── connection.py       # DB connection manager (PostgreSQL/SQLite)
 │   ├── site_repository.py  # Sites table CRUD
 │   ├── url_repository.py   # URLs table CRUD
+│   ├── trigger_repository.py  # Trigger + trigger_urls CRUD
 │   └── test_result_repository.py  # Test results queries
 ├── services/               # Business logic & external API clients
 │   ├── site_service.py     # Site/URL orchestration + validation
 │   ├── testing_service.py  # PageSpeed test workflows
+│   ├── trigger_service.py  # Trigger CRUD + APScheduler job sync
 │   ├── pagespeed_client.py # Google PageSpeed Insights API client
 │   ├── newrelic_client.py  # New Relic NerdGraph API client
 │   ├── azure_client.py     # Azure Log Analytics API client
@@ -90,21 +100,22 @@ pagespeed-monitor/
 │   ├── pages.py            # Page rendering routes
 │   ├── sites_api.py        # Site/URL CRUD API
 │   ├── testing_api.py      # PageSpeed testing API
+│   ├── triggers_api.py     # Trigger CRUD + toggle + presets API
 │   ├── metrics_api.py      # Test results query API
 │   ├── newrelic_api.py     # New Relic proxy API
 │   ├── azure_api.py        # Azure Log Analytics proxy API
 │   └── ai_api.py           # AI analysis API
 ├── templates/
 │   ├── index.html          # Dashboard home (worst performers, CWV reference)
-│   ├── setup.html          # Site/URL configuration
+│   ├── setup.html          # Site/URL config + scheduled triggers
 │   ├── test.html           # URL testing interface
 │   ├── metrics.html        # Performance metrics view
 │   ├── newrelic.html       # New Relic integration
 │   ├── iislogs.html        # IIS logs & KQL queries
 │   └── ai_analysis.html    # AI-powered analysis
 └── static/
-    ├── css/style.css       # All styles (dark + light mode, ~5400 lines)
-    ├── js/app.js           # Shared JavaScript (~1440 lines)
+    ├── css/style.css       # All styles (dark + light mode, ~5830 lines)
+    ├── js/app.js           # Shared JavaScript (~1740 lines)
     ├── favicon.ico
     └── images/             # Logos and icons
 ```
@@ -173,6 +184,12 @@ npx @railway/cli logs --lines 50
 | POST | `/api/sites` | Add a new site |
 | POST | `/api/test-url` | Test a single URL |
 | POST | `/api/test-all` | Test all URLs |
+| GET | `/api/triggers` | List all scheduled triggers |
+| POST | `/api/triggers` | Create a new trigger |
+| PUT | `/api/triggers/<id>` | Update a trigger |
+| DELETE | `/api/triggers/<id>` | Delete a trigger |
+| PATCH | `/api/triggers/<id>/toggle` | Enable/disable a trigger |
+| GET | `/api/triggers/presets` | Get available schedule presets |
 | POST | `/api/newrelic/test-connection` | Test New Relic API connection |
 | POST | `/api/newrelic/core-web-vitals` | Fetch Core Web Vitals |
 | POST | `/api/newrelic/apm-metrics` | Fetch APM metrics |

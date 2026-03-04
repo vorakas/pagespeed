@@ -197,6 +197,30 @@ class ConnectionManager:
         cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS total_byte_weight REAL")
         cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS strategy TEXT DEFAULT 'desktop'")
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS scheduled_triggers (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                schedule_type TEXT NOT NULL,
+                schedule_value TEXT NOT NULL,
+                strategy TEXT NOT NULL DEFAULT 'desktop',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trigger_urls (
+                id SERIAL PRIMARY KEY,
+                trigger_id INTEGER NOT NULL,
+                url_id INTEGER NOT NULL,
+                FOREIGN KEY (trigger_id) REFERENCES scheduled_triggers (id),
+                FOREIGN KEY (url_id) REFERENCES urls (id),
+                UNIQUE(trigger_id, url_id)
+            )
+        """)
+
     def _init_sqlite_schema(self, cursor: Any) -> None:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sites (
@@ -238,6 +262,30 @@ class ConnectionManager:
                 strategy TEXT DEFAULT 'desktop',
                 tested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (url_id) REFERENCES urls (id)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS scheduled_triggers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                schedule_type TEXT NOT NULL,
+                schedule_value TEXT NOT NULL,
+                strategy TEXT NOT NULL DEFAULT 'desktop',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trigger_urls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trigger_id INTEGER NOT NULL,
+                url_id INTEGER NOT NULL,
+                FOREIGN KEY (trigger_id) REFERENCES scheduled_triggers (id),
+                FOREIGN KEY (url_id) REFERENCES urls (id),
+                UNIQUE(trigger_id, url_id)
             )
         """)
 
