@@ -390,7 +390,8 @@ class TriggerService:
         """Scheduler callback: test all URLs for a trigger.
 
         Loads the trigger's URL ids and strategy from the database,
-        then runs PageSpeed tests with appropriate delays.
+        then runs PageSpeed tests with appropriate delays.  Sets status
+        to ``'running'`` immediately so the frontend can poll progress.
         """
         trigger = self._triggers.get_by_id(trigger_id)
         if trigger is None:
@@ -417,41 +418,53 @@ class TriggerService:
         successes = 0
         failures = 0
 
+        # Mark as running immediately so the UI can show progress
+        self._triggers.set_last_run(trigger_id, 'running')
+
         print(
             f"Executing trigger '{trigger['name']}' "
-            f"({len(url_ids)} URLs, strategy={strategy}) "
-            f"at {datetime.now()}"
+            f"({len(url_ids)} URLs, strategy={strategy}, "
+            f"total_tests={total_tests}) at {datetime.utcnow()}"
         )
 
-        for current_strategy in strategies:
-            for index, url_id in enumerate(url_ids):
-                try:
-                    url_data = self._get_url_by_id(url_id)
-                    if url_data is None:
-                        print(f"  URL id {url_id} not found — skipping")
+        try:
+            for current_strategy in strategies:
+                for index, url_id in enumerate(url_ids):
+                    try:
+                        url_data = self._get_url_by_id(url_id)
+                        if url_data is None:
+                            print(f"  [{successes + failures + 1}/{total_tests}] "
+                                  f"URL id {url_id} not found — skipping")
+                            failures += 1
+                            continue
+
+                        self._testing.test_single_url(
+                            url=url_data['url'],
+                            url_id=url_id,
+                            strategy=current_strategy,
+                        )
+                        successes += 1
+                        print(f"  [{successes + failures}/{total_tests}] "
+                              f"✓ {url_data['url']} ({current_strategy})")
+                    except Exception as exc:
                         failures += 1
-                        continue
+                        print(f"  [{successes + failures}/{total_tests}] "
+                              f"✗ URL id {url_id}: {exc}")
 
-                    self._testing.test_single_url(
-                        url=url_data['url'],
-                        url_id=url_id,
-                        strategy=current_strategy,
-                    )
-                    print(f"  Tested {url_data['url']} ({current_strategy})")
-                    successes += 1
-                except Exception as exc:
-                    print(f"  Failed to test URL id {url_id}: {exc}")
-                    failures += 1
+                    # Rate-limit delay between tests
+                    if index < len(url_ids) - 1:
+                        time.sleep(REQUEST_DELAY_SECONDS)
 
-                # Rate-limit delay between tests
-                if index < len(url_ids) - 1:
+                # Delay between strategy passes when running 'both'
+                if len(strategies) > 1 and current_strategy == 'desktop':
                     time.sleep(REQUEST_DELAY_SECONDS)
 
-            # Delay between strategy passes when running 'both'
-            if len(strategies) > 1 and current_strategy == 'desktop':
-                time.sleep(REQUEST_DELAY_SECONDS)
+        except Exception as exc:
+            # Catch-all so the status is always updated even on crashes
+            print(f"  Trigger '{trigger['name']}' crashed: {exc}")
+            failures += max(1, total_tests - successes - failures)
 
-        # Record execution result
+        # Record final execution result
         if failures == 0:
             run_status = 'success'
         elif successes == 0:

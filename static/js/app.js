@@ -2061,7 +2061,7 @@ function renderTriggerCard(trigger) {
                         <input type="checkbox" ${toggleChecked} onchange="toggleTrigger(${trigger.id}, this.checked)">
                         <span class="trigger-toggle-slider"></span>
                     </label>
-                    <button class="btn-trigger-run" onclick="runTriggerNow(${trigger.id})" title="Run Now">
+                    <button class="btn-trigger-run ${trigger.last_run_status === 'running' ? 'btn-trigger-running' : ''}" onclick="runTriggerNow(${trigger.id})" title="Run Now" ${trigger.last_run_status === 'running' ? 'disabled' : ''}>
                         <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     </button>
                     <button class="btn-trigger-edit" onclick="editTrigger(${trigger.id})" title="Edit">
@@ -2089,6 +2089,7 @@ function buildLastRunHtml(trigger) {
         success: { label: '✓ Success', cssClass: 'last-run-success' },
         partial: { label: '⚠ Partial', cssClass: 'last-run-partial' },
         failed:  { label: '✗ Failed',  cssClass: 'last-run-failed' },
+        running: { label: '⟳ Running…', cssClass: 'last-run-running' },
     };
     const config = statusConfig[status] || { label: status, cssClass: 'last-run-never' };
 
@@ -2229,13 +2230,6 @@ async function toggleTrigger(triggerId, enabled) {
 // Manually execute a trigger immediately (Run Now)
 async function runTriggerNow(triggerId) {
     try {
-        // Disable the button to prevent double-clicks
-        const btn = document.querySelector(`.trigger-card[data-trigger-id="${triggerId}"] .btn-trigger-run`);
-        if (btn) {
-            btn.disabled = true;
-            btn.classList.add('btn-trigger-running');
-        }
-
         showToast('Trigger execution started — tests are running in the background', 'info', 6000);
 
         const response = await fetch(`/api/triggers/${triggerId}/run-now`, {
@@ -2246,22 +2240,62 @@ async function runTriggerNow(triggerId) {
 
         if (!response.ok || result.success === false) {
             showToast('Error: ' + (result.error || 'Unknown error'), 'error');
+            return;
         }
 
-        // Re-enable after a short delay (execution happens in background)
-        setTimeout(() => {
-            if (btn) {
-                btn.disabled = false;
-                btn.classList.remove('btn-trigger-running');
-            }
-            // Reload triggers to pick up last_run_at / last_run_status
-            loadTriggers();
-        }, 5000);
+        // Refresh immediately to show "Running…" state, then poll
+        await loadTriggers();
+        pollTriggerCompletion(triggerId);
 
     } catch (error) {
         console.error('Error running trigger:', error);
         showToast('Error running trigger', 'error');
     }
+}
+
+// Poll trigger status until it's no longer "running"
+function pollTriggerCompletion(triggerId, attempts = 0) {
+    const MAX_POLL_ATTEMPTS = 120;  // 10 minutes at 5-second intervals
+    const POLL_INTERVAL_MS = 5000;
+
+    if (attempts >= MAX_POLL_ATTEMPTS) {
+        showToast('Trigger is taking longer than expected — check back later', 'warning');
+        loadTriggers();
+        return;
+    }
+
+    setTimeout(async () => {
+        try {
+            const response = await fetch('/api/triggers');
+            const triggers = await response.json();
+            const trigger = triggers.find(t => t.id === triggerId);
+
+            if (!trigger || trigger.last_run_status !== 'running') {
+                // Execution finished — show final status
+                await loadTriggers();
+                if (trigger) {
+                    const statusLabels = {
+                        success: 'All tests completed successfully',
+                        partial: 'Some tests failed — check results',
+                        failed:  'All tests failed',
+                    };
+                    const statusTypes = { success: 'success', partial: 'warning', failed: 'error' };
+                    const label = statusLabels[trigger.last_run_status] || 'Trigger execution finished';
+                    const type = statusTypes[trigger.last_run_status] || 'info';
+                    showToast(label, type);
+                }
+                return;
+            }
+
+            // Still running — refresh the card and poll again
+            await loadTriggers();
+            pollTriggerCompletion(triggerId, attempts + 1);
+        } catch (error) {
+            console.error('Error polling trigger status:', error);
+            // Keep polling even on network errors
+            pollTriggerCompletion(triggerId, attempts + 1);
+        }
+    }, POLL_INTERVAL_MS);
 }
 
 // Edit a trigger — populate form with existing data

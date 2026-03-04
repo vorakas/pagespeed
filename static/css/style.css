@@ -5893,7 +5893,13 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
 .last-run-success { color: #34d399; }
 .last-run-partial { color: #fbbf24; }
 .last-run-failed  { color: #f87171; }
+.last-run-running { color: #60a5fa; animation: pulse-status 1.5s ease-in-out infinite; }
 .last-run-never   { color: #6b7280; font-style: italic; }
+
+@keyframes pulse-status {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
 
 .trigger-meta-item {
     display: flex;
@@ -6239,6 +6245,7 @@ body.light-mode .trigger-card-last-run {
 body.light-mode .last-run-success { color: #059669; }
 body.light-mode .last-run-partial { color: #d97706; }
 body.light-mode .last-run-failed  { color: #dc2626; }
+body.light-mode .last-run-running { color: #2563eb; }
 body.light-mode .last-run-never   { color: #9ca3af; }
 
 body.light-mode .trigger-toggle-slider {
