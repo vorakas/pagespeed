@@ -261,7 +261,8 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 ## Recent Commit History (newest first)
 
 ```
-PENDING  Add scheduled test triggers with user-configurable schedules on Setup page
+PENDING  Fix trigger URL checkboxes showing empty labels (global input width override)
+5cab6a1 Add scheduled test triggers with user-configurable schedules on Setup page
 98ad636 Center column alignment on results tables across Dashboard and Test URLs
 f6174f3 Show worst performing URLs per site with centered columns on Dashboard
 0c0f673 Add worst performing URLs section to Dashboard page
