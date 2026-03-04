@@ -5968,6 +5968,7 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
 }
 
 /* Edit and Delete buttons on trigger cards */
+.btn-trigger-run,
 .btn-trigger-edit,
 .btn-trigger-delete {
     background: none !important;
@@ -5982,8 +5983,10 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     min-width: 0;
     height: 32px;
     margin: 0 !important;
+    transition: background 0.15s, opacity 0.15s;
 }
 
+.btn-trigger-run svg,
 .btn-trigger-edit svg,
 .btn-trigger-delete svg {
     width: 16px;
@@ -5993,6 +5996,33 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+.btn-trigger-run:hover {
+    background: rgba(52, 211, 153, 0.15) !important;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-trigger-run:hover svg {
+    stroke: #34d399;
+    fill: #34d399;
+}
+
+.btn-trigger-run:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-trigger-running svg {
+    animation: pulse-run 1s ease-in-out infinite;
+    stroke: #34d399;
+    fill: #34d399;
+}
+
+@keyframes pulse-run {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
 }
 
 .btn-trigger-edit:hover {
@@ -6219,9 +6249,20 @@ body.light-mode .trigger-toggle-slider::before {
     background-color: #ffffff;
 }
 
+body.light-mode .btn-trigger-run svg,
 body.light-mode .btn-trigger-edit svg,
 body.light-mode .btn-trigger-delete svg {
     stroke: #6b7280;
+}
+
+body.light-mode .btn-trigger-run:hover svg {
+    stroke: #059669;
+    fill: #059669;
+}
+
+body.light-mode .btn-trigger-running svg {
+    stroke: #059669;
+    fill: #059669;
 }
 
 body.light-mode .trigger-url-selection > label {

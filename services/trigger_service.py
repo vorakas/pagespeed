@@ -8,6 +8,7 @@ actual PageSpeed testing is delegated to ``TestingService``.
 
 from __future__ import annotations
 
+import threading
 import time
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -299,6 +300,29 @@ class TriggerService:
                 self._add_job(trigger)
         else:
             self._remove_job(trigger_id)
+
+    def run_now(self, trigger_id: int) -> None:
+        """Manually execute a trigger immediately in a background thread.
+
+        Validates that the trigger exists, then spawns a daemon thread
+        to run the full execution pipeline without blocking the HTTP
+        response.  The background thread updates ``last_run_at`` and
+        ``last_run_status`` upon completion, just like a scheduled run.
+
+        Raises:
+            ValidationError: If the trigger does not exist.
+        """
+        trigger = self._triggers.get_by_id(trigger_id)
+        if trigger is None:
+            raise ValidationError(f"Trigger {trigger_id} not found")
+
+        thread = threading.Thread(
+            target=self._execute_trigger,
+            args=(trigger_id,),
+            daemon=True,
+            name=f"run-now-trigger-{trigger_id}",
+        )
+        thread.start()
 
     # ------------------------------------------------------------------
     # Scheduler synchronization

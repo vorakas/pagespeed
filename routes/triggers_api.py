@@ -67,6 +67,12 @@ def create_triggers_blueprint(trigger_service: TriggerService) -> Blueprint:
         trigger_service.toggle_trigger(trigger_id, enabled)
         return jsonify({"success": True})
 
+    @bp.route("/api/triggers/<int:trigger_id>/run-now", methods=["POST"])
+    def run_trigger_now(trigger_id):
+        """Manually execute a trigger immediately (for testing)."""
+        trigger_service.run_now(trigger_id)
+        return jsonify({"success": True, "message": "Trigger execution started"})
+
     @bp.route("/api/triggers/scheduler-status", methods=["GET"])
     def scheduler_status():
         """Diagnostic: show APScheduler state and registered jobs."""

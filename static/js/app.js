@@ -2061,6 +2061,9 @@ function renderTriggerCard(trigger) {
                         <input type="checkbox" ${toggleChecked} onchange="toggleTrigger(${trigger.id}, this.checked)">
                         <span class="trigger-toggle-slider"></span>
                     </label>
+                    <button class="btn-trigger-run" onclick="runTriggerNow(${trigger.id})" title="Run Now">
+                        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </button>
                     <button class="btn-trigger-edit" onclick="editTrigger(${trigger.id})" title="Edit">
                         <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
@@ -2220,6 +2223,44 @@ async function toggleTrigger(triggerId, enabled) {
     } catch (error) {
         console.error('Error toggling trigger:', error);
         showToast('Error toggling trigger', 'error');
+    }
+}
+
+// Manually execute a trigger immediately (Run Now)
+async function runTriggerNow(triggerId) {
+    try {
+        // Disable the button to prevent double-clicks
+        const btn = document.querySelector(`.trigger-card[data-trigger-id="${triggerId}"] .btn-trigger-run`);
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('btn-trigger-running');
+        }
+
+        showToast('Trigger execution started — tests are running in the background', 'info', 6000);
+
+        const response = await fetch(`/api/triggers/${triggerId}/run-now`, {
+            method: 'POST',
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || result.success === false) {
+            showToast('Error: ' + (result.error || 'Unknown error'), 'error');
+        }
+
+        // Re-enable after a short delay (execution happens in background)
+        setTimeout(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('btn-trigger-running');
+            }
+            // Reload triggers to pick up last_run_at / last_run_status
+            loadTriggers();
+        }, 5000);
+
+    } catch (error) {
+        console.error('Error running trigger:', error);
+        showToast('Error running trigger', 'error');
     }
 }
 
