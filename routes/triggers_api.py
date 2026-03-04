@@ -7,7 +7,6 @@ scheduler logic lives in the service layer.
 
 from flask import Blueprint, jsonify, request
 
-from config import SCHEDULE_PRESETS
 from services.trigger_service import TriggerService
 
 
@@ -70,11 +69,23 @@ def create_triggers_blueprint(trigger_service: TriggerService) -> Blueprint:
 
     @bp.route("/api/triggers/presets", methods=["GET"])
     def get_presets():
-        """Return available schedule presets for the frontend dropdown."""
-        presets = [
-            {"value": key, "label": config["label"]}
-            for key, config in SCHEDULE_PRESETS.items()
-        ]
-        return jsonify(presets)
+        """Return merged built-in and user-created schedule presets."""
+        return jsonify(trigger_service.get_all_presets())
+
+    @bp.route("/api/triggers/presets", methods=["POST"])
+    def create_preset():
+        """Create a new user schedule preset."""
+        data = request.get_json(force=True)
+        preset_id = trigger_service.create_preset(
+            name=data.get("name", ""),
+            cron_expression=data.get("cron_expression", ""),
+        )
+        return jsonify({"success": True, "id": preset_id}), 201
+
+    @bp.route("/api/triggers/presets/<int:preset_id>", methods=["DELETE"])
+    def delete_preset(preset_id):
+        """Delete a user-created schedule preset."""
+        trigger_service.delete_preset(preset_id)
+        return jsonify({"success": True})
 
     return bp

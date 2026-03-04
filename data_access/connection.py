@@ -221,6 +221,15 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS schedule_presets (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                cron_expression TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
     def _init_sqlite_schema(self, cursor: Any) -> None:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sites (
@@ -286,6 +295,15 @@ class ConnectionManager:
                 FOREIGN KEY (trigger_id) REFERENCES scheduled_triggers (id),
                 FOREIGN KEY (url_id) REFERENCES urls (id),
                 UNIQUE(trigger_id, url_id)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS schedule_presets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                cron_expression TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 

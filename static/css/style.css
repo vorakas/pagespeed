@@ -5453,6 +5453,120 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     background: none !important;
 }
 
+/* Preset select row — flex container for dropdown + delete button */
+.preset-select-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.preset-select-row select {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Delete preset button (trash icon) */
+.btn-preset-delete {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px !important;
+    height: 34px;
+    min-width: 34px;
+    padding: 0 !important;
+    background: rgba(239, 68, 68, 0.15) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    color: #ef4444;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin: 0 !important;
+}
+
+.btn-preset-delete:hover {
+    background: rgba(239, 68, 68, 0.3) !important;
+    border-color: #ef4444;
+    color: #f87171;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-preset-delete svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
+/* Cron actions row — reference toggle + save as preset */
+.cron-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Save preset dialog */
+.save-preset-dialog {
+    margin-top: 8px;
+    padding: 12px;
+    background: #1a2332;
+    border: 1px solid #374151;
+    border-radius: 8px;
+}
+
+.save-preset-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.save-preset-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #e3e8ee;
+    font-size: 0.9em;
+}
+
+.save-preset-row input[type="text"]:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.btn-preset-save {
+    padding: 8px 16px !important;
+    background: #667eea !important;
+    color: #fff !important;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85em;
+    cursor: pointer;
+    white-space: nowrap;
+    width: auto !important;
+    min-width: 0;
+    margin: 0 !important;
+}
+
+.btn-preset-save:hover {
+    background: #5a6fd6 !important;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-preset-cancel {
+    padding: 8px 16px !important;
+    font-size: 0.85em;
+    white-space: nowrap;
+    width: auto !important;
+    min-width: 0;
+    margin: 0 !important;
+}
+
 /* Cron reference section */
 .cron-reference {
     background: #1a2332;
@@ -5842,6 +5956,29 @@ body.light-mode .trigger-strategy-option {
 
 body.light-mode .cron-help-toggle {
     color: #667eea;
+}
+
+body.light-mode .btn-preset-delete {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #dc2626;
+}
+
+body.light-mode .btn-preset-delete:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    border-color: #dc2626;
+    color: #dc2626;
+}
+
+body.light-mode .save-preset-dialog {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+body.light-mode .save-preset-row input[type="text"] {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #1f2937;
 }
 
 body.light-mode .cron-reference {

@@ -17,6 +17,7 @@ from config import (
     SCHEDULE_PRESETS,
     TRIGGER_JOB_PREFIX,
 )
+from data_access.preset_repository import PresetRepository
 from data_access.trigger_repository import TriggerRepository
 from enums import TriggerStrategy
 from exceptions import SchedulerError, ValidationError
@@ -36,6 +37,7 @@ class TriggerService:
 
     Args:
         trigger_repo:    Repository for the ``scheduled_triggers`` table.
+        preset_repo:     Repository for the ``schedule_presets`` table.
         testing_service: Service that runs PageSpeed tests.
         scheduler:       APScheduler ``BackgroundScheduler`` instance.
     """
@@ -43,10 +45,12 @@ class TriggerService:
     def __init__(
         self,
         trigger_repo: TriggerRepository,
+        preset_repo: PresetRepository,
         testing_service: TestingService,
         scheduler: BackgroundScheduler,
     ) -> None:
         self._triggers: TriggerRepository = trigger_repo
+        self._presets: PresetRepository = preset_repo
         self._testing: TestingService = testing_service
         self._scheduler: BackgroundScheduler = scheduler
 
@@ -71,6 +75,112 @@ class TriggerService:
                 trigger['schedule_type'], trigger['schedule_value'],
             )
         return trigger
+
+    # ------------------------------------------------------------------
+    # Preset operations
+    # ------------------------------------------------------------------
+
+    def get_all_presets(self) -> list[dict]:
+        """Return merged list of built-in and user-created presets.
+
+        Each item has: ``value`` (cron expression), ``label``,
+        ``is_builtin`` (bool), and ``id`` (int or None for built-ins).
+        Built-in presets appear first, then user-created presets.
+        """
+        merged: list[dict] = []
+
+        # Built-in presets from config
+        for key, config in SCHEDULE_PRESETS.items():
+            cron_expression = self._preset_kwargs_to_cron(config)
+            merged.append({
+                'value': cron_expression,
+                'label': config['label'],
+                'is_builtin': True,
+                'id': None,
+            })
+
+        # User-created presets from database
+        user_presets = self._presets.get_all()
+        for preset in user_presets:
+            merged.append({
+                'value': preset['cron_expression'],
+                'label': preset['name'],
+                'is_builtin': False,
+                'id': preset['id'],
+            })
+
+        return merged
+
+    def create_preset(self, name: str, cron_expression: str) -> int:
+        """Create a new user schedule preset.
+
+        Args:
+            name:            Display name for the preset.
+            cron_expression: 5-field cron expression string.
+
+        Returns:
+            The auto-generated id of the new preset.
+
+        Raises:
+            ValidationError: If name is empty, cron is invalid, or name
+                             collides with a built-in preset label.
+        """
+        if not name or not name.strip():
+            raise ValidationError("Preset name is required")
+
+        name = name.strip()
+
+        # Validate cron expression (5 fields)
+        fields = cron_expression.strip().split()
+        if len(fields) != 5:
+            raise ValidationError(
+                "Cron expression must have 5 fields "
+                "(minute hour day month weekday)"
+            )
+
+        # Check collision with built-in preset labels
+        builtin_labels = {
+            config['label'].lower() for config in SCHEDULE_PRESETS.values()
+        }
+        if name.lower() in builtin_labels:
+            raise ValidationError(
+                f"Name '{name}' conflicts with a built-in preset"
+            )
+
+        preset_id = self._presets.create(name, cron_expression.strip())
+        if preset_id is None:
+            raise ValidationError(f"Preset name '{name}' already exists")
+
+        return preset_id
+
+    def delete_preset(self, preset_id: int) -> None:
+        """Delete a user-created preset.
+
+        Raises:
+            ValidationError: If preset not found.
+        """
+        success = self._presets.delete(preset_id)
+        if not success:
+            raise ValidationError(f"Preset {preset_id} not found")
+
+    @staticmethod
+    def _preset_kwargs_to_cron(config: dict) -> str:
+        """Convert APScheduler cron kwargs from a built-in preset to a
+        5-field cron expression string.
+
+        Args:
+            config: Preset dict from ``SCHEDULE_PRESETS`` with APScheduler
+                    kwargs (hour, minute, day_of_week, etc.) plus a label.
+
+        Returns:
+            5-field cron string: ``"minute hour day month day_of_week"``.
+        """
+        minute = str(config.get('minute', '*'))
+        hour = str(config.get('hour', '*'))
+        day = str(config.get('day', '*'))
+        month = str(config.get('month', '*'))
+        day_of_week = str(config.get('day_of_week', '*'))
+        return f"{minute} {hour} {day} {month} {day_of_week}"
 
     # ------------------------------------------------------------------
     # Write operations

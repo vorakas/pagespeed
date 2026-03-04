@@ -1568,7 +1568,7 @@ if (document.getElementById('sitesUrlsList')) {
 
 // ==================== Scheduled Test Triggers ====================
 
-// Load schedule presets into the dropdown
+// Load schedule presets into the dropdown (built-in + user-created)
 async function loadTriggerPresets() {
     const presetSelect = document.getElementById('triggerPreset');
     if (!presetSelect) return;
@@ -1577,14 +1577,150 @@ async function loadTriggerPresets() {
         const response = await fetch('/api/triggers/presets');
         const presets = await response.json();
         presetSelect.innerHTML = '';
-        presets.forEach(preset => {
+
+        const builtinPresets = presets.filter(p => p.is_builtin);
+        const customPresets = presets.filter(p => !p.is_builtin);
+
+        builtinPresets.forEach(preset => {
             const option = document.createElement('option');
             option.value = preset.value;
             option.textContent = preset.label;
+            option.dataset.isBuiltin = 'true';
+            option.dataset.presetId = '';
             presetSelect.appendChild(option);
         });
+
+        if (customPresets.length > 0) {
+            // Add separator
+            const separator = document.createElement('option');
+            separator.disabled = true;
+            separator.textContent = '── Custom Presets ──';
+            presetSelect.appendChild(separator);
+
+            customPresets.forEach(preset => {
+                const option = document.createElement('option');
+                option.value = preset.value;
+                option.textContent = preset.label;
+                option.dataset.isBuiltin = 'false';
+                option.dataset.presetId = preset.id;
+                presetSelect.appendChild(option);
+            });
+        }
+
+        // Update delete button visibility for the current selection
+        onPresetChange();
     } catch (error) {
         console.error('Error loading trigger presets:', error);
+    }
+}
+
+// Show/hide delete button based on selected preset type
+function onPresetChange() {
+    const presetSelect = document.getElementById('triggerPreset');
+    const deleteBtn = document.getElementById('deletePresetBtn');
+    if (!presetSelect || !deleteBtn) return;
+
+    const selectedOption = presetSelect.options[presetSelect.selectedIndex];
+    if (selectedOption && selectedOption.dataset.isBuiltin === 'false') {
+        deleteBtn.style.display = '';
+    } else {
+        deleteBtn.style.display = 'none';
+    }
+}
+
+// Show the save preset dialog
+function showSavePresetDialog() {
+    const cronInput = document.getElementById('triggerCron');
+    if (!cronInput || !cronInput.value.trim()) {
+        showToast('Enter a cron expression first', 'warning');
+        return;
+    }
+
+    const dialog = document.getElementById('savePresetDialog');
+    if (dialog) {
+        dialog.style.display = '';
+        document.getElementById('savePresetName').value = '';
+        document.getElementById('savePresetName').focus();
+    }
+}
+
+// Hide the save preset dialog
+function hideSavePresetDialog() {
+    const dialog = document.getElementById('savePresetDialog');
+    if (dialog) {
+        dialog.style.display = 'none';
+        document.getElementById('savePresetName').value = '';
+    }
+}
+
+// Save current cron expression as a named preset
+async function savePreset() {
+    const nameInput = document.getElementById('savePresetName');
+    const cronInput = document.getElementById('triggerCron');
+    const name = nameInput.value.trim();
+    const cronExpression = cronInput.value.trim();
+
+    if (!name) {
+        showToast('Please enter a preset name', 'warning');
+        nameInput.focus();
+        return;
+    }
+    if (!cronExpression) {
+        showToast('Enter a cron expression first', 'warning');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/triggers/presets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, cron_expression: cronExpression })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast(`Preset "${name}" saved`, 'success');
+            hideSavePresetDialog();
+            await loadTriggerPresets();
+        } else {
+            showToast('Error: ' + (result.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error saving preset:', error);
+        showToast('Error saving preset', 'error');
+    }
+}
+
+// Delete the currently selected custom preset
+async function deleteSelectedPreset() {
+    const presetSelect = document.getElementById('triggerPreset');
+    if (!presetSelect) return;
+
+    const selectedOption = presetSelect.options[presetSelect.selectedIndex];
+    if (!selectedOption || selectedOption.dataset.isBuiltin !== 'false') {
+        showToast('Only custom presets can be deleted', 'warning');
+        return;
+    }
+
+    const presetId = selectedOption.dataset.presetId;
+    const presetName = selectedOption.textContent;
+
+    if (!confirm(`Delete preset "${presetName}"? Existing triggers using this schedule will not be affected.`)) return;
+
+    try {
+        const response = await fetch(`/api/triggers/presets/${presetId}`, { method: 'DELETE' });
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast(`Preset "${presetName}" deleted`, 'success');
+            await loadTriggerPresets();
+        } else {
+            showToast('Error: ' + (result.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting preset:', error);
+        showToast('Error deleting preset', 'error');
     }
 }
 
@@ -1758,6 +1894,9 @@ async function saveTrigger(e) {
     const editId = document.getElementById('triggerEditId').value;
     const name = document.getElementById('triggerName').value.trim();
     const scheduleType = document.getElementById('triggerScheduleType').value;
+
+    // Always store the cron expression directly — presets are just a form convenience.
+    // When a preset is selected, its value is already a cron expression.
     const scheduleValue = scheduleType === 'preset'
         ? document.getElementById('triggerPreset').value
         : document.getElementById('triggerCron').value.trim();
@@ -1782,7 +1921,7 @@ async function saveTrigger(e) {
 
     const payload = {
         name: name,
-        schedule_type: scheduleType,
+        schedule_type: 'custom',
         schedule_value: scheduleValue,
         strategy: strategy,
         url_ids: urlIds
@@ -1876,14 +2015,14 @@ async function editTrigger(triggerId) {
 
         // Fill form fields
         document.getElementById('triggerName').value = trigger.name;
-        document.getElementById('triggerScheduleType').value = trigger.schedule_type;
-        toggleScheduleInput();
 
-        if (trigger.schedule_type === 'preset') {
-            document.getElementById('triggerPreset').value = trigger.schedule_value;
-        } else {
-            document.getElementById('triggerCron').value = trigger.schedule_value;
-        }
+        // Always populate in "custom cron" mode — the cron expression is the
+        // source of truth.  For old triggers with schedule_type='preset', the
+        // schedule_value is a preset key; we show it in the cron field and the
+        // user can re-save to convert it.
+        document.getElementById('triggerScheduleType').value = 'custom';
+        toggleScheduleInput();
+        document.getElementById('triggerCron').value = trigger.schedule_value;
 
         // Set strategy radio
         const strategyRadio = document.querySelector(`input[name="triggerStrategy"][value="${trigger.strategy}"]`);
@@ -1923,6 +2062,7 @@ function resetTriggerForm() {
     document.getElementById('triggerForm').reset();
     document.getElementById('triggerScheduleType').value = 'preset';
     toggleScheduleInput();
+    hideSavePresetDialog();
 
     // Uncheck all URL checkboxes
     document.querySelectorAll('input[name="triggerUrls"]').forEach(cb => { cb.checked = false; });

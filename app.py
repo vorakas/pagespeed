@@ -16,6 +16,7 @@ from data_access import (
     UrlRepository,
     TestResultRepository,
     TriggerRepository,
+    PresetRepository,
 )
 from exceptions import (
     AuthenticationError,
@@ -45,6 +46,7 @@ def create_app() -> Flask:
     url_repo = UrlRepository(conn_mgr)
     test_result_repo = TestResultRepository(conn_mgr)
     trigger_repo = TriggerRepository(conn_mgr)
+    preset_repo = PresetRepository(conn_mgr)
 
     pagespeed = PageSpeedClient(api_key=PAGESPEED_API_KEY)
 
@@ -55,7 +57,7 @@ def create_app() -> Flask:
     scheduler = BackgroundScheduler()
     scheduler.start()
 
-    trigger_service = TriggerService(trigger_repo, testing_service, scheduler)
+    trigger_service = TriggerService(trigger_repo, preset_repo, testing_service, scheduler)
     trigger_service.sync_all_jobs()
 
     # ---- Blueprints ----
