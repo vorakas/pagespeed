@@ -5,9 +5,22 @@ and sets up the APScheduler with user-configured triggers and centralized
 error handlers.
 """
 
+import logging
+import sys
+
 from flask import Flask, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
+
+# Configure logging so APScheduler errors are visible in Railway logs
+# (APScheduler catches job exceptions and logs them — without this config
+# those messages are silently dropped by Python's default NullHandler).
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s',
+)
+logging.getLogger('apscheduler').setLevel(logging.DEBUG)
 
 from config import PAGESPEED_API_KEY, PORT
 from data_access import (

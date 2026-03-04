@@ -58,6 +58,27 @@ class TriggerService:
     # Read operations
     # ------------------------------------------------------------------
 
+    def get_scheduler_status(self) -> dict:
+        """Return diagnostic information about the APScheduler state."""
+        scheduler = self._scheduler
+        jobs = scheduler.get_jobs()
+        job_info = []
+        for job in jobs:
+            job_info.append({
+                'id': job.id,
+                'name': job.name,
+                'next_run_time': str(job.next_run_time) if job.next_run_time else None,
+                'trigger': str(job.trigger),
+            })
+        return {
+            'scheduler_running': scheduler.running,
+            'scheduler_class': type(scheduler).__name__,
+            'timezone': str(getattr(scheduler, 'timezone', 'unknown')),
+            'job_count': len(jobs),
+            'jobs': job_info,
+            'server_time_utc': datetime.utcnow().isoformat(),
+        }
+
     def get_triggers(self) -> list[dict]:
         """Return all triggers with schedule label and URL details."""
         triggers = self._triggers.get_all()

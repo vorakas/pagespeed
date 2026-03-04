@@ -67,6 +67,11 @@ def create_triggers_blueprint(trigger_service: TriggerService) -> Blueprint:
         trigger_service.toggle_trigger(trigger_id, enabled)
         return jsonify({"success": True})
 
+    @bp.route("/api/triggers/scheduler-status", methods=["GET"])
+    def scheduler_status():
+        """Diagnostic: show APScheduler state and registered jobs."""
+        return jsonify(trigger_service.get_scheduler_status())
+
     @bp.route("/api/triggers/presets", methods=["GET"])
     def get_presets():
         """Return merged built-in and user-created schedule presets."""
