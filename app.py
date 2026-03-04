@@ -54,7 +54,9 @@ def create_app() -> Flask:
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
 
     # ---- Scheduler ----
-    scheduler = BackgroundScheduler()
+    # Explicit UTC timezone ensures cron expressions fire at the same time
+    # regardless of where the server is hosted (Railway, local dev, etc.).
+    scheduler = BackgroundScheduler(timezone='UTC')
     scheduler.start()
 
     trigger_service = TriggerService(trigger_repo, preset_repo, testing_service, scheduler)

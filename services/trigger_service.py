@@ -295,6 +295,9 @@ class TriggerService:
         for trigger in enabled_triggers:
             try:
                 self._add_job(trigger)
+                job = self._scheduler.get_job(f"{TRIGGER_JOB_PREFIX}{trigger['id']}")
+                next_run = job.next_run_time if job else 'unknown'
+                print(f"  → '{trigger['name']}' (cron: {trigger['schedule_value']}) next run: {next_run}")
             except SchedulerError as exc:
                 print(f"Warning: failed to sync trigger '{trigger['name']}': {exc}")
 
