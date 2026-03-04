@@ -114,6 +114,9 @@
                                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                                 </button>
                             </div>
+                            <button type="button" class="cron-help-toggle" onclick="showSavePresetFromPresetMode()">
+                                Create new preset ＋
+                            </button>
                         </div>
 
                         <div class="trigger-form-group" id="cronGroup" style="display: none;">
@@ -127,13 +130,15 @@
                                     Save as preset ＋
                                 </button>
                             </div>
-                            <!-- Save Preset Dialog (hidden by default) -->
-                            <div id="savePresetDialog" class="save-preset-dialog" style="display: none;">
-                                <div class="save-preset-row">
-                                    <input type="text" id="savePresetName" placeholder="Preset name (e.g., Twice daily 8am/8pm)">
-                                    <button type="button" class="btn-preset-save" onclick="savePreset()">Save</button>
-                                    <button type="button" class="btn-secondary btn-preset-cancel" onclick="hideSavePresetDialog()">Cancel</button>
-                                </div>
+                        </div>
+
+                        <!-- Save Preset Dialog (shared by both preset and cron modes) -->
+                        <div id="savePresetDialog" class="save-preset-dialog" style="display: none;">
+                            <div class="save-preset-row">
+                                <input type="text" id="savePresetCron" placeholder="Cron expression (e.g., 0 8,20 * * *)">
+                                <input type="text" id="savePresetName" placeholder="Preset name (e.g., Twice daily 8am/8pm)">
+                                <button type="button" class="btn-preset-save" onclick="savePreset()">Save</button>
+                                <button type="button" class="btn-secondary btn-preset-cancel" onclick="hideSavePresetDialog()">Cancel</button>
                             </div>
                         </div>
 

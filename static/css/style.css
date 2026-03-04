@@ -5508,17 +5508,19 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
 
 /* Save preset dialog */
 .save-preset-dialog {
-    margin-top: 8px;
-    padding: 12px;
+    margin-top: 12px;
+    padding: 16px;
     background: #1a2332;
     border: 1px solid #374151;
     border-radius: 8px;
+    grid-column: 1 / -1;
 }
 
 .save-preset-row {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .save-preset-row input[type="text"] {

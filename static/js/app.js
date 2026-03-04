@@ -1628,7 +1628,7 @@ function onPresetChange() {
     }
 }
 
-// Show the save preset dialog
+// Show the save preset dialog (from custom cron mode — pre-fills cron)
 function showSavePresetDialog() {
     const cronInput = document.getElementById('triggerCron');
     if (!cronInput || !cronInput.value.trim()) {
@@ -1639,8 +1639,24 @@ function showSavePresetDialog() {
     const dialog = document.getElementById('savePresetDialog');
     if (dialog) {
         dialog.style.display = '';
+        const cronField = document.getElementById('savePresetCron');
+        cronField.value = cronInput.value.trim();
+        cronField.style.display = 'none'; // Hide cron input — already filled from the form
         document.getElementById('savePresetName').value = '';
         document.getElementById('savePresetName').focus();
+    }
+}
+
+// Show the save preset dialog (from preset mode — needs cron input)
+function showSavePresetFromPresetMode() {
+    const dialog = document.getElementById('savePresetDialog');
+    if (dialog) {
+        dialog.style.display = '';
+        const cronField = document.getElementById('savePresetCron');
+        cronField.value = '';
+        cronField.style.display = ''; // Show cron input — user needs to enter it
+        document.getElementById('savePresetName').value = '';
+        cronField.focus();
     }
 }
 
@@ -1650,23 +1666,25 @@ function hideSavePresetDialog() {
     if (dialog) {
         dialog.style.display = 'none';
         document.getElementById('savePresetName').value = '';
+        document.getElementById('savePresetCron').value = '';
     }
 }
 
 // Save current cron expression as a named preset
 async function savePreset() {
     const nameInput = document.getElementById('savePresetName');
-    const cronInput = document.getElementById('triggerCron');
+    const cronField = document.getElementById('savePresetCron');
     const name = nameInput.value.trim();
-    const cronExpression = cronInput.value.trim();
+    const cronExpression = cronField.value.trim();
 
+    if (!cronExpression) {
+        showToast('Please enter a cron expression', 'warning');
+        cronField.focus();
+        return;
+    }
     if (!name) {
         showToast('Please enter a preset name', 'warning');
         nameInput.focus();
-        return;
-    }
-    if (!cronExpression) {
-        showToast('Enter a cron expression first', 'warning');
         return;
     }
 
