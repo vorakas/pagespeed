@@ -5874,6 +5874,16 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     flex-wrap: wrap;
 }
 
+.trigger-card-fire-time {
+    margin-top: 6px;
+    font-size: 0.8em;
+    color: #34d399;
+}
+
+.trigger-card-fire-time .cron-pst-note {
+    color: #9ca3af;
+}
+
 .trigger-meta-item {
     display: flex;
     align-items: center;
@@ -6170,6 +6180,14 @@ body.light-mode .trigger-card-name {
 }
 
 body.light-mode .trigger-meta-item {
+    color: #6b7280;
+}
+
+body.light-mode .trigger-card-fire-time {
+    color: #059669;
+}
+
+body.light-mode .trigger-card-fire-time .cron-pst-note {
     color: #6b7280;
 }
 

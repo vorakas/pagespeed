@@ -2023,6 +2023,14 @@ function renderTriggerCard(trigger) {
                           trigger.strategy.charAt(0).toUpperCase() + trigger.strategy.slice(1);
     const urlCount = trigger.url_ids ? trigger.url_ids.length : 0;
 
+    // Build human-readable fire time from the cron expression
+    const cronExpr = trigger.schedule_value || '';
+    const fireDesc = describeCronExpression(cronExpr);
+    const firePst = fireDesc ? describeCronPST(cronExpr) : '';
+    const fireTimeHtml = fireDesc
+        ? `<div class="trigger-card-fire-time">Runs: ${fireDesc} (UTC)${firePst ? `<span class="cron-pst-note">${firePst}</span>` : ''}</div>`
+        : '';
+
     return `
         <div class="trigger-card ${enabledClass}" data-trigger-id="${trigger.id}">
             <div class="trigger-card-header">
@@ -2042,6 +2050,7 @@ function renderTriggerCard(trigger) {
                             ${urlCount} URL${urlCount !== 1 ? 's' : ''}
                         </span>
                     </div>
+                    ${fireTimeHtml}
                 </div>
                 <div class="trigger-card-actions">
                     <label class="trigger-toggle" title="${trigger.enabled ? 'Enabled' : 'Disabled'}">
