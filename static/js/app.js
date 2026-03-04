@@ -1757,12 +1757,48 @@ function updateCronPreview() {
 
     const description = describeCronExpression(expression);
     if (description) {
-        preview.textContent = '→ ' + description;
+        const pstNote = describeCronPST(expression);
+        preview.innerHTML = '→ ' + description + ' (UTC)' + (pstNote ? `<span class="cron-pst-note">${pstNote}</span>` : '');
         preview.className = 'cron-preview cron-preview-valid';
     } else {
         preview.textContent = '⚠ Invalid — must be 5 fields: minute hour day month weekday';
         preview.className = 'cron-preview cron-preview-invalid';
     }
+}
+
+// Convert UTC hours in a cron expression to PST/PDT equivalent text
+function describeCronPST(expression) {
+    const fields = expression.trim().split(/\s+/);
+    if (fields.length !== 5) return null;
+    const [minute, hour] = fields;
+
+    // Only show PST conversion for specific hour values (not */N or *)
+    if (hour === '*' || hour.startsWith('*/')) return null;
+
+    // Determine current Pacific offset: -8 (PST) or -7 (PDT)
+    const now = new Date();
+    const jan = new Date(now.getFullYear(), 0, 1);
+    const jul = new Date(now.getFullYear(), 6, 1);
+    const stdOffset = Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset());
+    const isDST = now.getTimezoneOffset() < stdOffset;
+    const offset = isDST ? 7 : 8;
+    const label = isDST ? 'PDT' : 'PST';
+
+    const hours = hour.split(',');
+    const min = minute === '0' || minute === '00' ? '00' : minute;
+    const pstTimes = hours.map(h => {
+        const hNum = parseInt(h);
+        if (isNaN(hNum)) return null;
+        let pstH = hNum - offset;
+        let dayShift = '';
+        if (pstH < 0) { pstH += 24; dayShift = ' (prev day)'; }
+        const period = pstH >= 12 ? 'PM' : 'AM';
+        const h12 = pstH === 0 ? 12 : pstH > 12 ? pstH - 12 : pstH;
+        return `${h12}:${min.padStart(2, '0')} ${period}${dayShift}`;
+    }).filter(Boolean);
+
+    if (pstTimes.length === 0) return null;
+    return ` — ${pstTimes.join(' and ')} ${label}`;
 }
 
 // Translate a 5-field cron expression to a human-readable description

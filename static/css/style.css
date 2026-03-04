@@ -5583,6 +5583,16 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     color: #f87171;
 }
 
+.cron-pst-note {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.cron-tz-note {
+    color: #f59e0b;
+    font-style: italic;
+}
+
 /* Compact cron reference inside save dialog */
 .cron-quick-ref {
     margin-top: 10px;
@@ -6041,6 +6051,14 @@ body.light-mode .cron-preview-valid {
 
 body.light-mode .cron-preview-invalid {
     color: #dc2626;
+}
+
+body.light-mode .cron-pst-note {
+    color: #6b7280;
+}
+
+body.light-mode .cron-tz-note {
+    color: #d97706;
 }
 
 body.light-mode .cron-quick-ref {
