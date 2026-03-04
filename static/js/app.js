@@ -1742,6 +1742,125 @@ async function deleteSelectedPreset() {
     }
 }
 
+// Live cron expression preview — translates to human-readable text
+function updateCronPreview() {
+    const cronInput = document.getElementById('savePresetCron');
+    const preview = document.getElementById('cronPreview');
+    if (!cronInput || !preview) return;
+
+    const expression = cronInput.value.trim();
+    if (!expression) {
+        preview.textContent = '';
+        preview.className = 'cron-preview';
+        return;
+    }
+
+    const description = describeCronExpression(expression);
+    if (description) {
+        preview.textContent = '→ ' + description;
+        preview.className = 'cron-preview cron-preview-valid';
+    } else {
+        preview.textContent = '⚠ Invalid — must be 5 fields: minute hour day month weekday';
+        preview.className = 'cron-preview cron-preview-invalid';
+    }
+}
+
+// Translate a 5-field cron expression to a human-readable description
+function describeCronExpression(expression) {
+    const fields = expression.trim().split(/\s+/);
+    if (fields.length !== 5) return null;
+
+    const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
+
+    const dayNames = { '0': 'Sunday', '1': 'Monday', '2': 'Tuesday', '3': 'Wednesday',
+        '4': 'Thursday', '5': 'Friday', '6': 'Saturday', '7': 'Sunday',
+        'sun': 'Sunday', 'mon': 'Monday', 'tue': 'Tuesday', 'wed': 'Wednesday',
+        'thu': 'Thursday', 'fri': 'Friday', 'sat': 'Saturday' };
+
+    const monthNames = { '1': 'January', '2': 'February', '3': 'March', '4': 'April',
+        '5': 'May', '6': 'June', '7': 'July', '8': 'August',
+        '9': 'September', '10': 'October', '11': 'November', '12': 'December' };
+
+    let parts = [];
+
+    // Describe frequency / time
+    if (minute.startsWith('*/') && hour === '*') {
+        parts.push(`Every ${minute.slice(2)} minutes`);
+    } else if (hour.startsWith('*/') && minute !== '*') {
+        parts.push(`Every ${hour.slice(2)} hours at :${minute.padStart(2, '0')}`);
+    } else if (hour.startsWith('*/')) {
+        parts.push(`Every ${hour.slice(2)} hours`);
+    } else {
+        // Specific time(s)
+        const hours = hour.includes(',') ? hour.split(',') : [hour];
+        const timeStrings = hours.map(h => {
+            if (h === '*') return null;
+            const hNum = parseInt(h);
+            if (isNaN(hNum)) return h;
+            const period = hNum >= 12 ? 'PM' : 'AM';
+            const h12 = hNum === 0 ? 12 : hNum > 12 ? hNum - 12 : hNum;
+            const min = minute === '0' || minute === '00' ? '00' : minute;
+            return `${h12}:${min.padStart(2, '0')} ${period}`;
+        }).filter(Boolean);
+
+        if (timeStrings.length > 0) {
+            parts.push(`At ${timeStrings.join(' and ')}`);
+        } else if (minute !== '*') {
+            parts.push(`At minute ${minute} of every hour`);
+        }
+    }
+
+    // Day of week
+    if (dayOfWeek !== '*') {
+        if (dayOfWeek === '1-5' || dayOfWeek.toLowerCase() === 'mon-fri') {
+            parts.push('on weekdays');
+        } else if (dayOfWeek === '0,6' || dayOfWeek.toLowerCase() === 'sat,sun') {
+            parts.push('on weekends');
+        } else {
+            const days = dayOfWeek.split(',').map(d => dayNames[d.toLowerCase()] || d);
+            parts.push(`on ${days.join(', ')}`);
+        }
+    }
+
+    // Day of month
+    if (dayOfMonth !== '*') {
+        if (dayOfMonth.startsWith('*/')) {
+            parts.push(`every ${dayOfMonth.slice(2)} days`);
+        } else {
+            const suffix = (n) => {
+                const s = ['th','st','nd','rd'];
+                const v = n % 100;
+                return n + (s[(v-20)%10] || s[v] || s[0]);
+            };
+            const days = dayOfMonth.split(',').map(d => suffix(parseInt(d)));
+            parts.push(`on the ${days.join(', ')}`);
+        }
+    }
+
+    // Month
+    if (month !== '*') {
+        if (month.startsWith('*/')) {
+            parts.push(`every ${month.slice(2)} months`);
+        } else {
+            const months = month.split(',').map(m => monthNames[m] || m);
+            parts.push(`in ${months.join(', ')}`);
+        }
+    }
+
+    // If we have nothing useful, provide a generic description
+    if (parts.length === 0) {
+        parts.push('Every minute');
+    }
+
+    // Add "Daily" prefix if no day/week constraints
+    if (dayOfWeek === '*' && dayOfMonth === '*' && month === '*' &&
+        !parts[0].startsWith('Every')) {
+        parts.unshift('Daily');
+    }
+
+    return parts.join(' ').replace(/^Daily At/, 'Daily at');
+}
+
 // Populate URL checkboxes grouped by site
 async function populateTriggerUrlCheckboxes() {
     const container = document.getElementById('triggerUrlCheckboxes');

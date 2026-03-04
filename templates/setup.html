@@ -154,10 +154,22 @@
                     <!-- Save Preset Dialog (outside the grid so it doesn't disrupt layout) -->
                     <div id="savePresetDialog" class="save-preset-dialog" style="display: none;">
                         <div class="save-preset-row">
-                            <input type="text" id="savePresetCron" placeholder="Cron expression (e.g., 0 8,20 * * *)">
-                            <input type="text" id="savePresetName" placeholder="Preset name (e.g., Twice daily 8am/8pm)">
+                            <input type="text" id="savePresetCron" placeholder="Cron expression (e.g., 0 8,20 * * *)" oninput="updateCronPreview()">
+                            <input type="text" id="savePresetName" placeholder="Preset name">
                             <button type="button" class="btn-preset-save" onclick="savePreset()">Save</button>
                             <button type="button" class="btn-secondary btn-preset-cancel" onclick="hideSavePresetDialog()">Cancel</button>
+                        </div>
+                        <div id="cronPreview" class="cron-preview"></div>
+                        <div class="cron-quick-ref">
+                            <p class="cron-format"><code>minute  hour  day-of-month  month  day-of-week</code></p>
+                            <div class="cron-quick-ref-examples">
+                                <span><code>0 2 * * *</code> Daily 2 AM</span>
+                                <span><code>*/30 * * * *</code> Every 30 min</span>
+                                <span><code>0 6 * * 1</code> Mon 6 AM</span>
+                                <span><code>0 */6 * * *</code> Every 6 hrs</span>
+                                <span><code>0 9 * * 1-5</code> Weekdays 9 AM</span>
+                                <span><code>0 8,20 * * *</code> 8 AM &amp; 8 PM</span>
+                            </div>
                         </div>
                     </div>
 

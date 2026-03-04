@@ -5568,6 +5568,59 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     margin: 0 !important;
 }
 
+/* Live cron preview */
+.cron-preview {
+    margin-top: 8px;
+    font-size: 0.85em;
+    min-height: 1.3em;
+}
+
+.cron-preview-valid {
+    color: #34d399;
+}
+
+.cron-preview-invalid {
+    color: #f87171;
+}
+
+/* Compact cron reference inside save dialog */
+.cron-quick-ref {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #374151;
+}
+
+.cron-quick-ref .cron-format {
+    margin: 0 0 8px 0;
+    font-size: 0.8em;
+    color: #9ca3af;
+}
+
+.cron-quick-ref .cron-format code {
+    background: #1f2937;
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #a5b4fc;
+    font-size: 0.95em;
+}
+
+.cron-quick-ref-examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 0.78em;
+    color: #9ca3af;
+}
+
+.cron-quick-ref-examples code {
+    background: #1f2937;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #a5b4fc;
+    font-size: 0.95em;
+    margin-right: 4px;
+}
+
 /* Cron reference section */
 .cron-reference {
     background: #1a2332;
@@ -5980,6 +6033,36 @@ body.light-mode .save-preset-row input[type="text"] {
     background: #ffffff;
     border-color: #d1d5db;
     color: #1f2937;
+}
+
+body.light-mode .cron-preview-valid {
+    color: #059669;
+}
+
+body.light-mode .cron-preview-invalid {
+    color: #dc2626;
+}
+
+body.light-mode .cron-quick-ref {
+    border-top-color: #d1d5db;
+}
+
+body.light-mode .cron-quick-ref .cron-format {
+    color: #6b7280;
+}
+
+body.light-mode .cron-quick-ref .cron-format code {
+    background: #e5e7eb;
+    color: #4f46e5;
+}
+
+body.light-mode .cron-quick-ref-examples {
+    color: #6b7280;
+}
+
+body.light-mode .cron-quick-ref-examples code {
+    background: #e5e7eb;
+    color: #4f46e5;
 }
 
 body.light-mode .cron-reference {
