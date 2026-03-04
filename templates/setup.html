@@ -132,16 +132,6 @@
                             </div>
                         </div>
 
-                        <!-- Save Preset Dialog (shared by both preset and cron modes) -->
-                        <div id="savePresetDialog" class="save-preset-dialog" style="display: none;">
-                            <div class="save-preset-row">
-                                <input type="text" id="savePresetCron" placeholder="Cron expression (e.g., 0 8,20 * * *)">
-                                <input type="text" id="savePresetName" placeholder="Preset name (e.g., Twice daily 8am/8pm)">
-                                <button type="button" class="btn-preset-save" onclick="savePreset()">Save</button>
-                                <button type="button" class="btn-secondary btn-preset-cancel" onclick="hideSavePresetDialog()">Cancel</button>
-                            </div>
-                        </div>
-
                         <div class="trigger-form-group">
                             <label>Strategy</label>
                             <div class="trigger-strategy-options">
@@ -158,6 +148,16 @@
                                     <span>Both</span>
                                 </label>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Save Preset Dialog (outside the grid so it doesn't disrupt layout) -->
+                    <div id="savePresetDialog" class="save-preset-dialog" style="display: none;">
+                        <div class="save-preset-row">
+                            <input type="text" id="savePresetCron" placeholder="Cron expression (e.g., 0 8,20 * * *)">
+                            <input type="text" id="savePresetName" placeholder="Preset name (e.g., Twice daily 8am/8pm)">
+                            <button type="button" class="btn-preset-save" onclick="savePreset()">Save</button>
+                            <button type="button" class="btn-secondary btn-preset-cancel" onclick="hideSavePresetDialog()">Cancel</button>
                         </div>
                     </div>
 

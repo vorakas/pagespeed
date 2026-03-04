@@ -5513,7 +5513,6 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     background: #1a2332;
     border: 1px solid #374151;
     border-radius: 8px;
-    grid-column: 1 / -1;
 }
 
 .save-preset-row {
