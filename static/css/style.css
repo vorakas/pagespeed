@@ -1243,6 +1243,37 @@ button:disabled {
     margin-bottom: 0;
 }
 
+.worst-performers-site-group {
+    margin-bottom: 24px;
+}
+
+.worst-performers-site-group:last-child {
+    margin-bottom: 0;
+}
+
+.worst-performers-site-name {
+    font-size: 1.15em;
+    font-weight: 600;
+    color: #e3e8ee;
+    margin-bottom: 10px;
+    padding-left: 2px;
+}
+
+/* Center all headers and cells except the URL column */
+.worst-performers-table th,
+.worst-performers-table td {
+    text-align: center;
+}
+
+.worst-performers-table th.col-url,
+.worst-performers-table td.col-url {
+    text-align: left;
+}
+
+body.light-mode .worst-performers-site-name {
+    color: #1f2937;
+}
+
 body.light-mode .worst-performers-description {
     color: #6b7280;
 }

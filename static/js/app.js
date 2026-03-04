@@ -101,18 +101,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Dashboard page: load worst performers and wire strategy toggle
-    const worstPerformersContainer = document.getElementById('worstPerformers');
-    if (worstPerformersContainer) {
-        loadWorstPerformers();
-
-        const dashboardStrategyRadios = document.querySelectorAll('input[name="dashboardStrategy"]');
-        dashboardStrategyRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                loadWorstPerformers();
-            });
+    // Dashboard page: wire strategy toggle (actual load happens after loadSites completes)
+    const dashboardStrategyRadios = document.querySelectorAll('input[name="dashboardStrategy"]');
+    dashboardStrategyRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            loadWorstPerformers();
         });
-    }
+    });
 });
 
 // Load all sites
@@ -124,6 +119,7 @@ async function loadSites() {
         updateSiteSelects();
         createSiteTabs();
         loadDashboard();
+        loadWorstPerformers();
     } catch (error) {
         console.error('Error loading sites:', error);
     }
@@ -290,7 +286,7 @@ async function loadDashboard() {
 
 // ==================== Worst Performing URLs (Dashboard) ====================
 
-// Fetch and display the worst performing URLs across all sites
+// Fetch and display the worst performing URLs per site
 async function loadWorstPerformers() {
     const container = document.getElementById('worstPerformers');
     if (!container) return;
@@ -313,18 +309,46 @@ async function loadWorstPerformers() {
             return;
         }
 
-        renderWorstPerformersTable(results, container);
+        // Group results by site_name (preserving order from API)
+        const groupedBySite = groupResultsBySite(results);
+        renderWorstPerformersBySite(groupedBySite, container);
     } catch (error) {
         console.error('Error loading worst performers:', error);
         container.innerHTML = '<div class="no-data">Failed to load results</div>';
     }
 }
 
-// Render the worst performers table with the same columns as the Test URLs page
-function renderWorstPerformersTable(results, container) {
-    let html = '<table class="results-table"><thead><tr>';
-    html += '<th>Site</th>';
-    html += '<th>URL</th>';
+// Group a flat result list into an ordered map of site_name → results[]
+function groupResultsBySite(results) {
+    const grouped = new Map();
+    results.forEach(result => {
+        const siteName = result.site_name;
+        if (!grouped.has(siteName)) {
+            grouped.set(siteName, []);
+        }
+        grouped.get(siteName).push(result);
+    });
+    return grouped;
+}
+
+// Render a separate table for each site
+function renderWorstPerformersBySite(groupedBySite, container) {
+    let html = '';
+
+    groupedBySite.forEach((siteResults, siteName) => {
+        html += `<div class="worst-performers-site-group">`;
+        html += `<h3 class="worst-performers-site-name">${siteName}</h3>`;
+        html += buildWorstPerformersTable(siteResults);
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+// Build a single worst-performers table for one site
+function buildWorstPerformersTable(results) {
+    let html = '<table class="results-table worst-performers-table"><thead><tr>';
+    html += '<th class="col-url">URL</th>';
     html += '<th>Performance</th>';
     html += '<th>Accessibility</th>';
     html += '<th>Best Practices</th>';
@@ -341,8 +365,7 @@ function renderWorstPerformersTable(results, container) {
 
     results.forEach(result => {
         html += '<tr>';
-        html += `<td>${result.site_name}</td>`;
-        html += `<td>${result.url}</td>`;
+        html += `<td class="col-url">${result.url}</td>`;
         html += `<td>${formatScore(result.performance_score)}</td>`;
         html += `<td>${formatScore(result.accessibility_score)}</td>`;
         html += `<td>${formatScore(result.best_practices_score)}</td>`;
@@ -361,7 +384,7 @@ function renderWorstPerformersTable(results, container) {
     });
 
     html += '</tbody></table>';
-    container.innerHTML = html;
+    return html;
 }
 
 // Load results for a specific site

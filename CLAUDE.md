@@ -167,11 +167,13 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 ## Key Features Implemented
 
 ### Dashboard (index.html, app.js)
-- **Worst Performing URLs** — Top 5 lowest-scoring URLs across all configured sites, displayed in a 14-column table (Site + same 13 columns as Test URLs page)
+- **Worst Performing URLs** — Top 5 lowest-scoring URLs **per site**, each rendered as a separate table with a site name heading. Uses 13 columns matching the Test URLs page
 - Desktop/Mobile strategy toggle to switch between test strategies
+- All column headers and values centered except URL (left-aligned)
 - Detail button (📊) opens Lighthouse breakdown modal
 - Empty state shown when no test results exist
 - Auto-loads on page visit via `loadWorstPerformers()` function
+- Repository uses `ROW_NUMBER() OVER (PARTITION BY site)` window function for efficient per-site limiting in a single query
 
 ### PageSpeed Testing (test.html, app.js)
 - Desktop/Mobile strategy toggle (radio buttons)
@@ -238,7 +240,8 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 ## Recent Commit History (newest first)
 
 ```
-PENDING  Add worst performing URLs section to Dashboard page
+PENDING  Show worst performing URLs per site with centered columns on Dashboard
+0c0f673 Add worst performing URLs section to Dashboard page
 83aa2cd Refactor backend into 3-layer architecture with dependency injection
 43b127b Add enhanced empty states with icons and consistent loading spinners
 eb6c84a Add zebra striping and sticky table headers for improved readability
@@ -400,4 +403,4 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ## Current State
 
-All features are implemented and deployed. The backend uses a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The Dashboard now includes a "Worst Performing URLs" section showing the 5 lowest-scoring URLs across all sites with a desktop/mobile strategy toggle. No pending tasks or known bugs at time of writing.
+All features are implemented and deployed. The backend uses a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The Dashboard now includes a "Worst Performing URLs" section showing the 5 lowest-scoring URLs **per site** (each site gets its own table) with a desktop/mobile strategy toggle and centered column alignment. No pending tasks or known bugs at time of writing.

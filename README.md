@@ -5,7 +5,7 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 ## Features
 
 ### Dashboard & Testing
-- **Worst Performing URLs** -- Dashboard shows the 5 lowest-scoring URLs across all sites with desktop/mobile toggle
+- **Worst Performing URLs** -- Dashboard shows the 5 lowest-scoring URLs per site with desktop/mobile toggle
 - **Site/URL Management** -- Add sites and URLs to monitor, with collapsible drawer cards
 - **PageSpeed Testing** -- Run Google PageSpeed Insights tests (mobile & desktop) on demand or via daily scheduled jobs
 - **Core Web Vitals Reference** -- Built-in reference guide for LCP, FID, CLS thresholds
