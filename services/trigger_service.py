@@ -490,6 +490,10 @@ class TriggerService:
 
         Format: ``minute hour day_of_month month day_of_week``
 
+        Standard cron uses 0=Sunday for day_of_week, but APScheduler uses
+        0=Monday (ISO weekday).  This method converts automatically so
+        users can write standard cron expressions.
+
         Examples:
             ``0 2 * * *``   → daily at 2:00 AM
             ``*/30 * * * *`` → every 30 minutes
@@ -508,13 +512,54 @@ class TriggerService:
                 f"got {len(fields)}: '{expression}'"
             )
 
+        day_of_week = TriggerService._convert_cron_dow(fields[4])
+
         return {
             'minute': fields[0],
             'hour': fields[1],
             'day': fields[2],
             'month': fields[3],
-            'day_of_week': fields[4],
+            'day_of_week': day_of_week,
         }
+
+    @staticmethod
+    def _convert_cron_dow(field: str) -> str:
+        """Convert standard-cron day-of-week to APScheduler convention.
+
+        Standard cron: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun
+        APScheduler:   0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+
+        Handles wildcards (``*``), steps (``*/2``), ranges (``1-5``),
+        lists (``1,3,5``), and named days (``mon,wed`` — passed through).
+        """
+        if field == '*' or '/' in field:
+            # Wildcards and step expressions work the same in both systems
+            # for common patterns like */2. Pass through as-is.
+            return field
+
+        # Named days (mon, tue, etc.) — no conversion needed
+        if any(c.isalpha() for c in field):
+            return field
+
+        # Convert each number: standard (0=Sun) → APScheduler (0=Mon, 6=Sun)
+        # Formula: sun(0/7)→6, mon(1)→0, tue(2)→1, ... sat(6)→5
+        _CRON_TO_APSCHEDULER = {
+            '0': '6', '1': '0', '2': '1', '3': '2',
+            '4': '3', '5': '4', '6': '5', '7': '6',
+        }
+
+        parts = []
+        for segment in field.split(','):
+            if '-' in segment:
+                # Range like "1-5" → convert both ends
+                start, end = segment.split('-', 1)
+                start = _CRON_TO_APSCHEDULER.get(start, start)
+                end = _CRON_TO_APSCHEDULER.get(end, end)
+                parts.append(f"{start}-{end}")
+            else:
+                parts.append(_CRON_TO_APSCHEDULER.get(segment, segment))
+
+        return ','.join(parts)
 
     @staticmethod
     def _get_schedule_label(schedule_type: str, schedule_value: str) -> str:
