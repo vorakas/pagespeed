@@ -349,23 +349,23 @@ function renderWorstPerformersBySite(groupedBySite, container) {
 function buildWorstPerformersTable(results) {
     let html = '<table class="results-table worst-performers-table"><thead><tr>';
     html += '<th class="col-url">URL</th>';
-    html += '<th>Performance</th>';
-    html += '<th>Accessibility</th>';
-    html += '<th>Best Practices</th>';
-    html += '<th>SEO</th>';
-    html += '<th>FCP (ms)</th>';
-    html += '<th>LCP (ms)</th>';
-    html += '<th>CLS</th>';
-    html += '<th>INP (ms)</th>';
-    html += '<th>TTFB (ms)</th>';
-    html += '<th>Page Size</th>';
-    html += '<th>Last Tested</th>';
-    html += '<th>Actions</th>';
+    html += '<th class="col-perf">Performance</th>';
+    html += '<th class="col-a11y">Accessibility</th>';
+    html += '<th class="col-bp">Best Practices</th>';
+    html += '<th class="col-seo">SEO</th>';
+    html += '<th class="col-fcp">FCP (ms)</th>';
+    html += '<th class="col-lcp">LCP (ms)</th>';
+    html += '<th class="col-cls">CLS</th>';
+    html += '<th class="col-inp">INP (ms)</th>';
+    html += '<th class="col-ttfb">TTFB (ms)</th>';
+    html += '<th class="col-size">Page Size</th>';
+    html += '<th class="col-tested">Last Tested</th>';
+    html += '<th class="col-actions">Actions</th>';
     html += '</tr></thead><tbody>';
 
     results.forEach(result => {
         html += '<tr>';
-        html += `<td class="col-url">${result.url}</td>`;
+        html += `<td class="col-url" title="${result.url}">${result.url}</td>`;
         html += `<td>${formatScore(result.performance_score)}</td>`;
         html += `<td>${formatScore(result.accessibility_score)}</td>`;
         html += `<td>${formatScore(result.best_practices_score)}</td>`;
@@ -1051,7 +1051,7 @@ function renderTable(results) {
     const contentDiv = document.getElementById('siteContent');
     
     let html = '<table class="results-table"><thead><tr>';
-    html += '<th class="sortable" onclick="sortTable(\'url\')">URL <span class="sort-indicator"></span></th>';
+    html += '<th class="sortable col-url" onclick="sortTable(\'url\')">URL <span class="sort-indicator"></span></th>';
     html += '<th class="sortable" onclick="sortTable(\'performance_score\')">Performance <span class="sort-indicator"></span></th>';
     html += '<th class="sortable" onclick="sortTable(\'accessibility_score\')">Accessibility <span class="sort-indicator"></span></th>';
     html += '<th class="sortable" onclick="sortTable(\'best_practices_score\')">Best Practices <span class="sort-indicator"></span></th>';
@@ -1065,10 +1065,10 @@ function renderTable(results) {
     html += '<th class="sortable" onclick="sortTable(\'tested_at\')">Last Tested <span class="sort-indicator"></span></th>';
     html += '<th>Actions</th>';
     html += '</tr></thead><tbody>';
-    
+
     results.forEach(result => {
         html += '<tr>';
-        html += `<td>${result.url}</td>`;
+        html += `<td class="col-url">${result.url}</td>`;
         html += `<td>${formatScore(result.performance_score)}</td>`;
         html += `<td>${formatScore(result.accessibility_score)}</td>`;
         html += `<td>${formatScore(result.best_practices_score)}</td>`;

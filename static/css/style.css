@@ -367,7 +367,7 @@ button:disabled {
     background: #667eea;
     color: white;
     padding: 10px 8px;
-    text-align: left;
+    text-align: center;
     font-weight: 600;
     font-size: 0.9em;
     position: sticky;
@@ -408,6 +408,13 @@ button:disabled {
     padding: 10px 8px;
     border-bottom: 1px solid #e0e0e0;
     font-size: 0.9em;
+    text-align: center;
+}
+
+/* URL column stays left-aligned on all results tables */
+.results-table th.col-url,
+.results-table td.col-url {
+    text-align: left;
 }
 
 .results-table tr:hover {
@@ -1259,15 +1266,32 @@ button:disabled {
     padding-left: 2px;
 }
 
-/* Center all headers and cells except the URL column */
-.worst-performers-table th,
-.worst-performers-table td {
-    text-align: center;
+/* Fixed column widths so tables align vertically across sites */
+.worst-performers-table {
+    table-layout: fixed;
+    width: 100%;
 }
 
-.worst-performers-table th.col-url,
-.worst-performers-table td.col-url {
-    text-align: left;
+.worst-performers-table .col-url        { width: 28%; }
+.worst-performers-table .col-perf       { width: 6%; }
+.worst-performers-table .col-a11y       { width: 6%; }
+.worst-performers-table .col-bp         { width: 6%; }
+.worst-performers-table .col-seo        { width: 4%; }
+.worst-performers-table .col-fcp        { width: 6%; }
+.worst-performers-table .col-lcp        { width: 6%; }
+.worst-performers-table .col-cls        { width: 5%; }
+.worst-performers-table .col-inp        { width: 6%; }
+.worst-performers-table .col-ttfb       { width: 6%; }
+.worst-performers-table .col-size       { width: 6%; }
+.worst-performers-table .col-tested     { width: 11%; }
+.worst-performers-table .col-actions    { width: 4%; }
+
+/* Truncate overflowing cells in fixed-layout worst-performers tables */
+.worst-performers-table th,
+.worst-performers-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 body.light-mode .worst-performers-site-name {

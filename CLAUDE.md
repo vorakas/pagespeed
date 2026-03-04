@@ -240,7 +240,8 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 ## Recent Commit History (newest first)
 
 ```
-PENDING  Show worst performing URLs per site with centered columns on Dashboard
+PENDING  Center column alignment on results tables and fix vertical alignment
+f6174f3 Show worst performing URLs per site with centered columns on Dashboard
 0c0f673 Add worst performing URLs section to Dashboard page
 83aa2cd Refactor backend into 3-layer architecture with dependency injection
 43b127b Add enhanced empty states with icons and consistent loading spinners
@@ -307,7 +308,7 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 - **Side nav + nav icons:** ~17-95
 - **Buttons:** ~206-330
-- **Results table + zebra striping + sticky headers:** ~335-475
+- **Results table + zebra striping + sticky headers + centered columns:** ~335-475
 - **Modal:** ~477-756
 - **Score badges:** ~758-797
 - **Progress bar:** ~797-871
