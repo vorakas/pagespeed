@@ -5884,6 +5884,17 @@ body.light-mode .strategy-option input[type="radio"]:checked + .strategy-btn:hov
     color: #9ca3af;
 }
 
+.trigger-card-last-run {
+    margin-top: 4px;
+    font-size: 0.8em;
+    color: #9ca3af;
+}
+
+.last-run-success { color: #34d399; }
+.last-run-partial { color: #fbbf24; }
+.last-run-failed  { color: #f87171; }
+.last-run-never   { color: #6b7280; font-style: italic; }
+
 .trigger-meta-item {
     display: flex;
     align-items: center;
@@ -6190,6 +6201,15 @@ body.light-mode .trigger-card-fire-time {
 body.light-mode .trigger-card-fire-time .cron-pst-note {
     color: #6b7280;
 }
+
+body.light-mode .trigger-card-last-run {
+    color: #6b7280;
+}
+
+body.light-mode .last-run-success { color: #059669; }
+body.light-mode .last-run-partial { color: #d97706; }
+body.light-mode .last-run-failed  { color: #dc2626; }
+body.light-mode .last-run-never   { color: #9ca3af; }
 
 body.light-mode .trigger-toggle-slider {
     background-color: #d1d5db;

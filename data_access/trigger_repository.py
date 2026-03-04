@@ -201,6 +201,29 @@ class TriggerRepository:
                 f"Failed to toggle trigger {trigger_id}: {exc}"
             ) from exc
 
+    def set_last_run(self, trigger_id: int, status: str) -> bool:
+        """Record when a trigger last executed and its outcome.
+
+        *status* should be ``'success'``, ``'partial'``, or ``'failed'``.
+        Returns ``True`` if the trigger was found and updated.
+        """
+        ph = self._cm._placeholder()
+        now = datetime.utcnow().isoformat()
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"UPDATE scheduled_triggers "
+                    f"SET last_run_at = {ph}, last_run_status = {ph} "
+                    f"WHERE id = {ph}",
+                    (now, status, trigger_id),
+                )
+                return cursor.rowcount > 0
+        except Exception as exc:
+            raise DatabaseError(
+                f"Failed to update last run for trigger {trigger_id}: {exc}"
+            ) from exc
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------

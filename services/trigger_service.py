@@ -365,6 +365,10 @@ class TriggerService:
             else [strategy]
         )
 
+        total_tests = len(url_ids) * len(strategies)
+        successes = 0
+        failures = 0
+
         print(
             f"Executing trigger '{trigger['name']}' "
             f"({len(url_ids)} URLs, strategy={strategy}) "
@@ -374,14 +378,10 @@ class TriggerService:
         for current_strategy in strategies:
             for index, url_id in enumerate(url_ids):
                 try:
-                    # We need the URL string; fetch it via a lightweight query
-                    from data_access import UrlRepository
-                    # The testing service already has url access through its _urls repo
-                    # So we use test_single_url which takes url string + url_id
-                    # We need to get the URL string from the url_id
                     url_data = self._get_url_by_id(url_id)
                     if url_data is None:
                         print(f"  URL id {url_id} not found — skipping")
+                        failures += 1
                         continue
 
                     self._testing.test_single_url(
@@ -390,8 +390,10 @@ class TriggerService:
                         strategy=current_strategy,
                     )
                     print(f"  Tested {url_data['url']} ({current_strategy})")
+                    successes += 1
                 except Exception as exc:
                     print(f"  Failed to test URL id {url_id}: {exc}")
+                    failures += 1
 
                 # Rate-limit delay between tests
                 if index < len(url_ids) - 1:
@@ -400,6 +402,20 @@ class TriggerService:
             # Delay between strategy passes when running 'both'
             if len(strategies) > 1 and current_strategy == 'desktop':
                 time.sleep(REQUEST_DELAY_SECONDS)
+
+        # Record execution result
+        if failures == 0:
+            run_status = 'success'
+        elif successes == 0:
+            run_status = 'failed'
+        else:
+            run_status = 'partial'
+
+        self._triggers.set_last_run(trigger_id, run_status)
+        print(
+            f"Trigger '{trigger['name']}' completed: "
+            f"{successes}/{total_tests} succeeded — {run_status}"
+        )
 
     def _get_url_by_id(self, url_id: int) -> dict | None:
         """Retrieve a URL record by id using the testing service's repository."""

@@ -2031,6 +2031,9 @@ function renderTriggerCard(trigger) {
         ? `<div class="trigger-card-fire-time">Runs: ${fireDesc} (UTC)${firePst ? `<span class="cron-pst-note">${firePst}</span>` : ''}</div>`
         : '';
 
+    // Build last-run display
+    const lastRunHtml = buildLastRunHtml(trigger);
+
     return `
         <div class="trigger-card ${enabledClass}" data-trigger-id="${trigger.id}">
             <div class="trigger-card-header">
@@ -2051,6 +2054,7 @@ function renderTriggerCard(trigger) {
                         </span>
                     </div>
                     ${fireTimeHtml}
+                    ${lastRunHtml}
                 </div>
                 <div class="trigger-card-actions">
                     <label class="trigger-toggle" title="${trigger.enabled ? 'Enabled' : 'Disabled'}">
@@ -2067,6 +2071,48 @@ function renderTriggerCard(trigger) {
             </div>
         </div>
     `;
+}
+
+// Build the "Last run" HTML for a trigger card
+function buildLastRunHtml(trigger) {
+    if (!trigger.last_run_at) {
+        return '<div class="trigger-card-last-run last-run-never">Last run: Never</div>';
+    }
+
+    const relativeTime = formatRelativeTime(trigger.last_run_at);
+    const status = trigger.last_run_status || 'unknown';
+
+    const statusConfig = {
+        success: { label: '✓ Success', cssClass: 'last-run-success' },
+        partial: { label: '⚠ Partial', cssClass: 'last-run-partial' },
+        failed:  { label: '✗ Failed',  cssClass: 'last-run-failed' },
+    };
+    const config = statusConfig[status] || { label: status, cssClass: 'last-run-never' };
+
+    return `<div class="trigger-card-last-run">Last run: ${relativeTime} — <span class="${config.cssClass}">${config.label}</span></div>`;
+}
+
+// Format an ISO timestamp as a human-readable relative time
+function formatRelativeTime(isoString) {
+    // The backend stores UTC timestamps — append 'Z' if missing so the
+    // browser parses it as UTC rather than local time.
+    const normalized = isoString.endsWith('Z') ? isoString : isoString + 'Z';
+    const date = new Date(normalized);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHr / 24);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
+    if (diffHr < 24) return `${diffHr} hour${diffHr !== 1 ? 's' : ''} ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+
+    // Older than a week — show the date
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 // Save (create or update) a trigger

@@ -230,6 +230,10 @@ class ConnectionManager:
             )
         """)
 
+        # Migration: add trigger execution tracking columns
+        cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP")
+        cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_status TEXT")
+
     def _init_sqlite_schema(self, cursor: Any) -> None:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sites (
@@ -313,6 +317,8 @@ class ConnectionManager:
             "ALTER TABLE test_results ADD COLUMN ttfb REAL",
             "ALTER TABLE test_results ADD COLUMN total_byte_weight REAL",
             "ALTER TABLE test_results ADD COLUMN strategy TEXT DEFAULT 'desktop'",
+            "ALTER TABLE scheduled_triggers ADD COLUMN last_run_at TIMESTAMP",
+            "ALTER TABLE scheduled_triggers ADD COLUMN last_run_status TEXT",
         ]
         for statement in _SQLITE_MIGRATIONS:
             try:
