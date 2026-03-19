@@ -243,8 +243,10 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 
 ### UI/UX
 - Dark mode (default) + Light mode with localStorage persistence
+- **Design system tokens** — CSS custom properties in `:root` for colors, spacing, typography, shadows; `body.light-mode` overrides tokens for automatic theme switching
 - **Inter web font** with system font fallback stack (`@import` from Google Fonts)
-- **Nav icons** — Inline SVG Feather-style icons on all 7 navigation links (stroke: currentColor for theme inheritance)
+- **Modernized side navigation** — LampsPlus logo header (dark/light variants), links grouped into 3 sections (Monitoring / Integrations / Configuration), pill-shaped active indicator (`border-radius: var(--radius-lg)`), 22px icons, spacing-only section dividers (no lines)
+- **Nav icons** — Inline SVG Feather-style 22px icons on all 7 navigation links (stroke: currentColor for theme inheritance)
 - **Card shadows** — Subtle resting shadows on `.setup-card`, `.site-urls-card`, `.stat-card`, `.browser-metric-card`, `.cwv-metric-card`, `.config-card`, `.infra-card`
 - **Toast notifications** — `showToast(message, type, duration)` replaces all `alert()` calls; 4 types (success/error/info/warning) with auto-dismiss
 - **Zebra striping** — `tbody tr:nth-child(even)` alternating backgrounds on `.results-table` and `.reference-table`
@@ -252,7 +254,6 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 - **Enhanced empty states** — `createEmptyState()` helper + `EMPTY_ICONS` SVG constants; icon, title, description, and action button
 - **Consistent loading spinners** — `.loading-indicator` with `.loading-spinner` across all data-loading sections
 - **Collapsible site drawers** — URL lists in Setup page cards expand/collapse with chevron toggle
-- Side navigation (7 pages) with active state indicator
 - Responsive design with media queries
 - Theme toggle button in header
 
@@ -261,7 +262,13 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 ## Recent Commit History (newest first)
 
 ```
-PENDING  Fix trigger URL checkboxes showing empty labels (global input width override)
+PENDING  Modernize nav with logo, grouped sections, pill active state, design system tokens
+7d0fe59 Add real-time trigger execution tracking with running state and polling
+1e02813 Add Run Now button for manual trigger execution
+1ec2f76 Fix day-of-week mismatch between standard cron and APScheduler
+31085ff Add scheduler diagnostics and APScheduler logging
+bc12bc6 Fix triggers not firing: use single Gunicorn worker for APScheduler
+PREV     Fix trigger URL checkboxes showing empty labels (global input width override)
 5cab6a1 Add scheduled test triggers with user-configurable schedules on Setup page
 98ad636 Center column alignment on results tables across Dashboard and Test URLs
 f6174f3 Show worst performing URLs per site with centered columns on Dashboard
@@ -311,6 +318,7 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 ### Frontend Patterns
 - **Inline JS in iislogs.html** — ~1200 lines of inline `<script>` (tab management, Azure config, KQL queries, column resize, profiles, etc.)
 - **Shared JS in app.js** — dashboard functionality, site management, testing, charting, theme toggle, `showToast()`, `createEmptyState()`
+- **CSS design system** — All colors use CSS custom property tokens defined in `:root`; light mode overrides reassign tokens in `body.light-mode`, eliminating most per-selector light mode rules
 - **CSS organization:** Major sections separated by `/* ==================== */` comment headers, light mode overrides grouped at end of each section
 - **localStorage for config** — all API credentials stored client-side, passed to server in request bodies
 - **`escapeHtml()` utility** — defined in iislogs.html inline script, used for all user-facing data rendering
@@ -327,9 +335,11 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ---
 
-## CSS Key Locations (style.css ~5830 lines)
+## CSS Key Locations (style.css ~5668 lines)
 
-- **Side nav + nav icons:** ~17-95
+- **Design system tokens (`:root`):** ~6-130
+- **Light mode token overrides (`body.light-mode`):** ~1880-1920
+- **Side nav + nav icons + logo + section labels:** ~161-245
 - **Buttons:** ~206-330
 - **Results table + zebra striping + sticky headers + centered columns:** ~335-475
 - **Modal:** ~477-756
@@ -428,4 +438,4 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ## Current State
 
-All features are implemented and deployed. The backend uses a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The Dashboard includes a "Worst Performing URLs" section showing the 5 lowest-scoring URLs per site with a desktop/mobile strategy toggle. The Setup page now includes a "Scheduled Test Triggers" section allowing users to create multiple named triggers with preset/custom cron schedules, per-trigger strategy selection (Desktop/Mobile/Both), and URL checkboxes grouped by site. Triggers replace the old hardcoded daily 2 AM test job, with APScheduler jobs synced from the database on startup. No pending tasks or known bugs at time of writing.
+All features are implemented and deployed. The backend uses a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The CSS has been fully migrated to a **design system token architecture** — all colors reference CSS custom properties in `:root`, with `body.light-mode` overriding tokens for automatic theme switching. This reduced the stylesheet from ~6200 lines to ~5668 lines by eliminating hundreds of redundant light mode overrides. The **side navigation** has been modernized with a LampsPlus logo header, links grouped into 3 sections (Monitoring / Integrations / Configuration), pill-shaped active indicator, and 22px icons. No pending tasks or known bugs at time of writing.

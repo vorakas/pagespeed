@@ -47,8 +47,9 @@ A comprehensive web performance monitoring dashboard for LampsPlus, built with P
 - **Collapsible cron reference** -- Built-in cron syntax guide for custom schedules
 
 ### UI/UX Polish
+- **Design system tokens** -- CSS custom properties for colors, spacing, typography; automatic dark/light mode switching via token reassignment
+- **Modernized navigation** -- LampsPlus logo header, grouped sections (Monitoring/Integrations/Configuration), pill-shaped active indicator, 22px icons
 - **Inter web font** with system font fallback stack
-- **Nav icons** -- Inline SVG Feather-style icons on all navigation links
 - **Card shadows** -- Subtle depth on all card components (dark + light mode)
 - **Toast notifications** -- Non-blocking slide-in toasts replacing browser `alert()` dialogs
 - **Zebra striping** -- Alternating row backgrounds on all data tables
@@ -114,7 +115,7 @@ pagespeed-monitor/
 │   ├── iislogs.html        # IIS logs & KQL queries
 │   └── ai_analysis.html    # AI-powered analysis
 └── static/
-    ├── css/style.css       # All styles (dark + light mode, ~5830 lines)
+    ├── css/style.css       # All styles with design system tokens (~5668 lines)
     ├── js/app.js           # Shared JavaScript (~1740 lines)
     ├── favicon.ico
     └── images/             # Logos and icons
