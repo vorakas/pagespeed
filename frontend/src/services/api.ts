@@ -93,10 +93,10 @@ class ApiClient {
 
   // ---------- Testing ----------
 
-  async testUrl(urlId: number, strategy: Strategy = "desktop"): Promise<{ result: TestResult }> {
+  async testUrl(urlId: number, url: string, strategy: Strategy = "desktop"): Promise<{ success: boolean; result: TestResult; error?: string }> {
     return this.request("/api/test-url", {
       method: "POST",
-      body: JSON.stringify({ url_id: urlId, strategy }),
+      body: JSON.stringify({ url_id: urlId, url, strategy }),
     })
   }
 
