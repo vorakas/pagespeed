@@ -15,18 +15,26 @@ export function Header({ title, description, actions }: HeaderProps) {
 
   return (
     <header className="border-b border-border bg-card">
-      {/* Top banner with logo */}
+      {/* Top banner with Lamps Plus logo + Pharos branding */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-border">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <img
             src={theme === "dark" ? `${BASE_URL}images/DarkModeLogo.png` : `${BASE_URL}images/LightModeLogo.png`}
-            alt="LampsPlus"
+            alt="Lamps Plus"
             className="h-7 w-auto"
             onError={(e) => {
               e.currentTarget.style.display = "none"
             }}
           />
-          <span className="text-base font-semibold text-foreground">PageSpeed Insights Monitor</span>
+          <div className="h-6 w-px bg-border" />
+          <img
+            src={`${BASE_URL}images/Pharos.png`}
+            alt="Pharos"
+            className="h-10 w-auto"
+            onError={(e) => {
+              e.currentTarget.style.display = "none"
+            }}
+          />
         </div>
         <Button
           variant="ghost"
