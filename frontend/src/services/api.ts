@@ -254,41 +254,67 @@ class ApiClient {
 
   // ---------- Azure ----------
 
-  async testAzureConnection(config: AzureConfig): Promise<{ success: boolean; message: string }> {
+  private azBody(config: AzureConfig, extra: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      tenant_id: config.tenantId,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      workspace_id: config.workspaceId,
+      ...extra,
+    })
+  }
+
+  async testAzureConnection(config: AzureConfig): Promise<{ success: boolean; message: string; warning?: boolean }> {
     return this.request("/api/azure/test-connection", {
       method: "POST",
-      body: JSON.stringify(config),
+      body: this.azBody(config),
     })
   }
 
   async searchAzureLogs(
     config: AzureConfig,
-    filters: { startDate?: string; endDate?: string; urlPath?: string; statusCode?: string; limit?: number }
-  ): Promise<AzureLogEntry[]> {
-    return this.request<AzureLogEntry[]>("/api/azure/search-logs", {
+    filters: { startDate: string; endDate: string; urlFilter?: string; statusCode?: string; siteName?: string; limit?: number }
+  ): Promise<Record<string, unknown>> {
+    return this.request("/api/azure/search-logs", {
       method: "POST",
-      body: JSON.stringify({ ...config, ...filters }),
+      body: this.azBody(config, {
+        start_date: filters.startDate,
+        end_date: filters.endDate,
+        url_filter: filters.urlFilter || null,
+        status_code: filters.statusCode || null,
+        site_name: filters.siteName || null,
+        limit: filters.limit || 100,
+      }),
     })
   }
 
-  async getAzureDashboard(config: AzureConfig): Promise<AzureDashboardSummary> {
-    return this.request<AzureDashboardSummary>("/api/azure/dashboard-summary", {
+  async getAzureDashboard(
+    config: AzureConfig,
+    startDate: string,
+    endDate: string,
+    siteName?: string
+  ): Promise<Record<string, unknown>> {
+    return this.request("/api/azure/dashboard-summary", {
       method: "POST",
-      body: JSON.stringify(config),
+      body: this.azBody(config, {
+        start_date: startDate,
+        end_date: endDate,
+        site_name: siteName || null,
+      }),
     })
   }
 
   async executeAzureQuery(config: AzureConfig, query: string): Promise<Record<string, unknown>> {
     return this.request("/api/azure/execute-query", {
       method: "POST",
-      body: JSON.stringify({ ...config, query }),
+      body: this.azBody(config, { query }),
     })
   }
 
-  async listAzureSites(config: AzureConfig): Promise<string[]> {
-    return this.request<string[]>("/api/azure/list-sites", {
+  async listAzureSites(config: AzureConfig): Promise<{ success: boolean; sites: string[] }> {
+    return this.request("/api/azure/list-sites", {
       method: "POST",
-      body: JSON.stringify(config),
+      body: this.azBody(config),
     })
   }
 
