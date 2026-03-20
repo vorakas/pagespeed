@@ -115,11 +115,10 @@ export type ScheduleType = "preset" | "custom"
 export type TriggerStrategy = "desktop" | "mobile" | "both"
 
 export interface SchedulePreset {
-  id: string
-  name: string
-  description: string
-  schedule_type: string
-  schedule_value: string
+  id: number | null
+  value: string
+  label: string
+  is_builtin: boolean
 }
 
 export interface Trigger {
@@ -127,6 +126,7 @@ export interface Trigger {
   name: string
   schedule_type: ScheduleType
   schedule_value: string
+  schedule_label?: string
   strategy: TriggerStrategy
   enabled: boolean
   created_at: string
@@ -134,6 +134,8 @@ export interface Trigger {
   url_ids: number[]
   url_count: number
   urls?: Url[]
+  last_run_at?: string | null
+  last_run_status?: "success" | "partial" | "failed" | "running" | null
 }
 
 export interface TriggerFormData {

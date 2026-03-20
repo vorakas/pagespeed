@@ -178,8 +178,21 @@ class ApiClient {
   }
 
   async runTrigger(triggerId: number): Promise<{ message: string }> {
-    return this.request<{ message: string }>(`/api/triggers/${triggerId}/run`, {
+    return this.request<{ message: string }>(`/api/triggers/${triggerId}/run-now`, {
       method: "POST",
+    })
+  }
+
+  async createPreset(name: string, cronExpression: string): Promise<{ success: boolean; id: number }> {
+    return this.request("/api/triggers/presets", {
+      method: "POST",
+      body: JSON.stringify({ name, cron_expression: cronExpression }),
+    })
+  }
+
+  async deletePreset(presetId: number): Promise<void> {
+    await this.request<{ success: boolean }>(`/api/triggers/presets/${presetId}`, {
+      method: "DELETE",
     })
   }
 
