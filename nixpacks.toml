@@ -1,6 +1,6 @@
 [phases.setup]
-nixPkgs = ["...", "nodejs_20"]
+nixPkgs = ["...", "nodejs_20", "npm"]
 
-[phases.frontend]
+[phases.build]
 dependsOn = ["install"]
-cmds = ["cd frontend && npm ci && npm run build"]
+cmds = ["cd frontend && npm ci && npm run build", "..."]

@@ -104,6 +104,20 @@ def create_app() -> Flask:
 
     # ---- Serve React frontend on /app/* (coexists with legacy templates) ----
     frontend_dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend', 'dist')
+    logging.info('React frontend dist path: %s (exists: %s)', frontend_dist, os.path.exists(frontend_dist))
+
+    @flask_app.route('/app/debug')
+    def react_debug():
+        """Temporary diagnostic endpoint — shows frontend dist status."""
+        exists = os.path.exists(frontend_dist)
+        contents = os.listdir(frontend_dist) if exists else []
+        return jsonify({
+            'frontend_dist': frontend_dist,
+            'exists': exists,
+            'contents': contents,
+            'cwd': os.getcwd(),
+            'file': os.path.abspath(__file__),
+        })
 
     @flask_app.route('/app/')
     @flask_app.route('/app/<path:path>')
@@ -114,6 +128,12 @@ def create_app() -> Flask:
         output directory. All other paths return index.html so React
         Router can handle client-side routing.
         """
+        if not os.path.exists(frontend_dist):
+            return Response(
+                f'Frontend not built. Expected at: {frontend_dist}',
+                status=503,
+                mimetype='text/plain',
+            )
         if path and os.path.isfile(os.path.join(frontend_dist, path)):
             return send_from_directory(frontend_dist, path)
         return send_from_directory(frontend_dist, 'index.html')
