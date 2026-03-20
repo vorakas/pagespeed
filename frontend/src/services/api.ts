@@ -198,38 +198,57 @@ class ApiClient {
 
   // ---------- New Relic ----------
 
+  private nrBody(config: NewRelicConfig, extra: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      api_key: config.apiKey,
+      account_id: config.accountId,
+      app_name: config.appName,
+      ...extra,
+    })
+  }
+
   async testNewRelicConnection(config: NewRelicConfig): Promise<{ success: boolean; message: string }> {
     return this.request("/api/newrelic/test-connection", {
       method: "POST",
-      body: JSON.stringify(config),
+      body: this.nrBody(config),
     })
   }
 
-  async getNewRelicCwv(config: NewRelicConfig): Promise<NewRelicCwvData[]> {
-    return this.request<NewRelicCwvData[]>("/api/newrelic/core-web-vitals", {
+  async getNewRelicCwv(
+    config: NewRelicConfig,
+    pageUrl: string,
+    timeRange: string = "30 minutes ago"
+  ): Promise<Record<string, unknown>> {
+    return this.request("/api/newrelic/core-web-vitals", {
       method: "POST",
-      body: JSON.stringify(config),
+      body: this.nrBody(config, { page_url: pageUrl, time_range: timeRange }),
     })
   }
 
-  async getNewRelicPerformance(config: NewRelicConfig, period: string = "1 DAY"): Promise<NewRelicPerformanceData> {
-    return this.request<NewRelicPerformanceData>("/api/newrelic/performance-overview", {
+  async getNewRelicPerformance(
+    config: NewRelicConfig,
+    timeRange: string = "30 minutes ago"
+  ): Promise<Record<string, unknown>> {
+    return this.request("/api/newrelic/performance-overview", {
       method: "POST",
-      body: JSON.stringify({ ...config, period }),
+      body: this.nrBody(config, { time_range: timeRange }),
     })
   }
 
-  async getNewRelicApm(config: NewRelicConfig): Promise<Record<string, unknown>> {
+  async getNewRelicApm(
+    config: NewRelicConfig,
+    timeRange: string = "30 minutes ago"
+  ): Promise<Record<string, unknown>> {
     return this.request("/api/newrelic/apm-metrics", {
       method: "POST",
-      body: JSON.stringify(config),
+      body: this.nrBody(config, { time_range: timeRange }),
     })
   }
 
   async executeNewRelicQuery(config: NewRelicConfig, query: string): Promise<Record<string, unknown>> {
     return this.request("/api/newrelic/custom-query", {
       method: "POST",
-      body: JSON.stringify({ ...config, query }),
+      body: this.nrBody(config, { query }),
     })
   }
 
