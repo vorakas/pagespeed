@@ -1,9 +1,0 @@
-[phases.setup]
-nixPkgs = ["python311", "nodejs_20", "npm"]
-
-[phases.install]
-dependsOn = ["setup"]
-cmds = ["pip install -r requirements.txt", "cd frontend && npm ci && npm run build"]
-
-[start]
-cmd = "gunicorn --workers 1 --threads 4 --timeout 300 --bind 0.0.0.0:$PORT app:app"
