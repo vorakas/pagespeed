@@ -1,8 +1,6 @@
 import { NavLink } from "react-router-dom"
 
-const BASE_URL = import.meta.env.BASE_URL
 import { cn } from "@/lib/utils"
-import { useTheme } from "@/hooks/use-theme"
 import {
   LayoutDashboard,
   Gauge,
@@ -51,21 +49,11 @@ const navSections: NavSection[] = [
 ]
 
 export function Sidebar() {
-  const { theme } = useTheme()
-
   return (
     <aside className="fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-sidebar-border bg-sidebar">
-      {/* Logo Header */}
-      <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-5">
-        <img
-          src={theme === "dark" ? `${BASE_URL}images/DarkModeLogo.png` : `${BASE_URL}images/LightModeLogo.png`}
-          alt="LampsPlus"
-          className="h-7 w-auto"
-          onError={(e) => {
-            e.currentTarget.style.display = "none"
-          }}
-        />
-        <span className="text-sm font-semibold text-sidebar-foreground">PageSpeed Monitor</span>
+      {/* Sidebar Header */}
+      <div className="flex items-center px-5 py-4 border-b border-sidebar-border">
+        <span className="text-sm font-semibold text-sidebar-foreground">Navigation</span>
       </div>
 
       {/* Navigation */}

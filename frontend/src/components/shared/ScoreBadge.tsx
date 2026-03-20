@@ -17,7 +17,7 @@ export function ScoreBadge({ score, className }: ScoreBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center rounded-md px-2 py-0.5 text-sm font-semibold tabular-nums",
+        "inline-flex min-w-9 items-center justify-center rounded-md px-2 py-0.5 text-sm font-semibold tabular-nums",
         ratingStyles[rating],
         className
       )}

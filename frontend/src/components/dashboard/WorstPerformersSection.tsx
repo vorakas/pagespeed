@@ -49,7 +49,7 @@ const columns: ColumnDef<WorstPerformer>[] = [
   },
   {
     accessorKey: "accessibility_score",
-    header: "A11y",
+    header: "Access",
     cell: ({ row }) => <ScoreBadge score={row.original.accessibility_score} />,
     size: 70,
   },
