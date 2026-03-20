@@ -20,7 +20,6 @@ import type {
   AiConfig,
   AiAnalysisResult,
   AiFollowUpResult,
-  ComparisonUrl,
 } from "@/types"
 
 class ApiClient {
@@ -133,13 +132,12 @@ class ApiClient {
     return this.request<Record<string, WorstPerformer[]>>(`/api/worst-performing?strategy=${strategy}&limit=${limit}`)
   }
 
-  async getComparisonUrls(): Promise<ComparisonUrl[]> {
-    return this.request<ComparisonUrl[]>("/api/comparison/urls")
+  async compareSites(site1Id: number, site2Id: number, strategy: Strategy = "desktop"): Promise<{ site1: LatestResult[]; site2: LatestResult[] }> {
+    return this.request(`/api/comparison?site1=${site1Id}&site2=${site2Id}&strategy=${strategy}`)
   }
 
-  async getComparison(urlIds: number[], strategy: Strategy = "desktop"): Promise<Record<string, LatestResult>> {
-    const params = urlIds.map(id => `url_ids=${id}`).join("&")
-    return this.request<Record<string, LatestResult>>(`/api/comparison?${params}&strategy=${strategy}`)
+  async compareUrls(url1Id: number, url2Id: number): Promise<{ url1: LatestResult; url2: LatestResult }> {
+    return this.request(`/api/comparison/urls?url1=${url1Id}&url2=${url2Id}`)
   }
 
   // ---------- Triggers ----------
