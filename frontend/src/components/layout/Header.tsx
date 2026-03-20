@@ -21,16 +21,16 @@ export function Header({ title, description, actions }: HeaderProps) {
           <img
             src={theme === "dark" ? `${BASE_URL}images/DarkModeLogo.png` : `${BASE_URL}images/LightModeLogo.png`}
             alt="Lamps Plus"
-            className="h-7 w-auto"
+            className="h-10 w-auto"
             onError={(e) => {
               e.currentTarget.style.display = "none"
             }}
           />
-          <div className="h-6 w-px bg-border" />
+          <div className="h-8 w-px bg-border" />
           <img
-            src={`${BASE_URL}images/Pharos.png`}
+            src={theme === "dark" ? `${BASE_URL}images/Pharos-dark.png` : `${BASE_URL}images/Pharos.png`}
             alt="Pharos"
-            className="h-10 w-auto"
+            className="h-14 w-auto"
             onError={(e) => {
               e.currentTarget.style.display = "none"
             }}
