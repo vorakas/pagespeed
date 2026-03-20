@@ -1,8 +1,8 @@
 # Stage 1: Build React frontend
-FROM node:20-slim AS frontend-build
+FROM node:20-alpine AS frontend-build
 WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 COPY frontend/ .
 RUN npx vite build
 
@@ -10,20 +10,14 @@ RUN npx vite build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
-# Copy application code
 COPY . .
-
-# Copy frontend build output from stage 1
 COPY --from=frontend-build /build/dist /app/frontend/dist
 
-# Create directory for database
 RUN mkdir -p /app/data
 
-# Environment
 ENV FLASK_APP=app.py
 ENV PYTHONUNBUFFERED=1
 
