@@ -6,9 +6,10 @@ error handlers.
 """
 
 import logging
+import os
 import sys
 
-from flask import Flask, jsonify
+from flask import Flask, Response, jsonify, send_from_directory
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 
@@ -100,6 +101,22 @@ def create_app() -> Flask:
     @flask_app.errorhandler(SchedulerError)
     def handle_scheduler_error(exc):
         return jsonify({"success": False, "error": exc.message}), 500
+
+    # ---- Serve React frontend on /app/* (coexists with legacy templates) ----
+    frontend_dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend', 'dist')
+
+    @flask_app.route('/app/')
+    @flask_app.route('/app/<path:path>')
+    def serve_react(path: str = '') -> Response:
+        """Serve the React SPA for all /app/* routes.
+
+        Static assets (JS, CSS, images) are served from the Vite build
+        output directory. All other paths return index.html so React
+        Router can handle client-side routing.
+        """
+        if path and os.path.isfile(os.path.join(frontend_dist, path)):
+            return send_from_directory(frontend_dist, path)
+        return send_from_directory(frontend_dist, 'index.html')
 
     return flask_app
 

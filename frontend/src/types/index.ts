@@ -1,0 +1,242 @@
+/* ============================================
+   API Response Types — PageSpeed Monitor
+   ============================================ */
+
+// ---------- Sites & URLs ----------
+
+export interface Site {
+  id: number
+  name: string
+  created_at: string
+}
+
+export interface Url {
+  id: number
+  site_id: number
+  url: string
+  created_at: string
+}
+
+export interface SiteWithUrls extends Site {
+  urls: Url[]
+}
+
+// ---------- Test Results ----------
+
+export type Strategy = "desktop" | "mobile"
+
+export interface TestResult {
+  id: number
+  url_id: number
+  performance_score: number | null
+  accessibility_score: number | null
+  best_practices_score: number | null
+  seo_score: number | null
+  fcp: number | null
+  lcp: number | null
+  cls: number | null
+  inp: number | null
+  ttfb: number | null
+  tti: number | null
+  tbt: number | null
+  speed_index: number | null
+  total_byte_weight: number | null
+  strategy: Strategy
+  tested_at: string
+  raw_data?: string
+}
+
+export interface LatestResult extends TestResult {
+  url: string
+  site_name?: string
+}
+
+export interface WorstPerformer {
+  id: number
+  url_id: number
+  url: string
+  site_name: string
+  performance_score: number | null
+  accessibility_score: number | null
+  best_practices_score: number | null
+  seo_score: number | null
+  fcp: number | null
+  lcp: number | null
+  cls: number | null
+  inp: number | null
+  ttfb: number | null
+  tti: number | null
+  tbt: number | null
+  speed_index: number | null
+  total_byte_weight: number | null
+  tested_at: string
+}
+
+export interface TestDetail {
+  id: number
+  url: string
+  performance_score: number | null
+  accessibility_score: number | null
+  best_practices_score: number | null
+  seo_score: number | null
+  fcp: number | null
+  lcp: number | null
+  cls: number | null
+  inp: number | null
+  ttfb: number | null
+  tti: number | null
+  tbt: number | null
+  speed_index: number | null
+  total_byte_weight: number | null
+  strategy: Strategy
+  tested_at: string
+  raw_data?: Record<string, unknown>
+}
+
+export interface HistoryPoint {
+  tested_at: string
+  performance_score: number | null
+  accessibility_score: number | null
+  best_practices_score: number | null
+  seo_score: number | null
+  fcp: number | null
+  lcp: number | null
+  cls: number | null
+  inp: number | null
+  ttfb: number | null
+  tti: number | null
+  tbt: number | null
+  speed_index: number | null
+}
+
+// ---------- Triggers ----------
+
+export type ScheduleType = "preset" | "custom"
+export type TriggerStrategy = "desktop" | "mobile" | "both"
+
+export interface SchedulePreset {
+  id: string
+  name: string
+  description: string
+  schedule_type: string
+  schedule_value: string
+}
+
+export interface Trigger {
+  id: number
+  name: string
+  schedule_type: ScheduleType
+  schedule_value: string
+  strategy: TriggerStrategy
+  enabled: boolean
+  created_at: string
+  updated_at: string
+  url_ids: number[]
+  url_count: number
+  urls?: Url[]
+}
+
+export interface TriggerFormData {
+  name: string
+  schedule_type: ScheduleType
+  schedule_value: string
+  strategy: TriggerStrategy
+  url_ids: number[]
+}
+
+// ---------- New Relic ----------
+
+export interface NewRelicConfig {
+  apiKey: string
+  accountId: string
+  appName: string
+}
+
+export interface NewRelicCwvData {
+  metric: string
+  p50: number | null
+  p75: number | null
+  p90: number | null
+}
+
+export interface NewRelicPerformanceData {
+  current: Record<string, number | null>
+  previous: Record<string, number | null>
+}
+
+// ---------- Azure ----------
+
+export interface AzureConfig {
+  tenantId: string
+  clientId: string
+  clientSecret: string
+  workspaceId: string
+  secretExpirationDate: string
+  site: string
+}
+
+export interface AzureLogEntry {
+  TimeGenerated: string
+  csMethod: string
+  csUriStem: string
+  csUriQuery: string
+  scStatus: number
+  timeTaken: number
+  cIP: string
+  sSiteName: string
+}
+
+export interface AzureDashboardSummary {
+  total_requests: number
+  avg_response_time: number
+  error_rate: number
+  top_pages: Array<{ page: string; count: number }>
+  status_distribution: Record<string, number>
+  response_time_percentiles: {
+    p50: number
+    p90: number
+    p99: number
+    max: number
+  }
+}
+
+// ---------- AI Analysis ----------
+
+export interface AiConfig {
+  claudeApiKey: string
+  claudeModel: string
+  openaiApiKey: string
+  openaiModel: string
+}
+
+export interface AiAnalysisResult {
+  provider: string
+  analysis: string
+  input_tokens: number
+  output_tokens: number
+  error?: string
+}
+
+export interface AiFollowUpResult {
+  provider: string
+  response: string
+  input_tokens: number
+  output_tokens: number
+}
+
+// ---------- API Responses ----------
+
+export interface ApiError {
+  error: string
+  details?: string
+}
+
+export interface TestUrlResponse {
+  result: TestResult
+}
+
+export interface ComparisonUrl {
+  id: number
+  url: string
+  site_name: string
+}
