@@ -30,7 +30,7 @@ export function Header({ title, description, actions }: HeaderProps) {
           <img
             src={theme === "dark" ? `${BASE_URL}images/Pharos-dark.png` : `${BASE_URL}images/Pharos.png`}
             alt="Pharos"
-            className="h-14 w-auto"
+            className="h-16 w-auto"
             onError={(e) => {
               e.currentTarget.style.display = "none"
             }}
