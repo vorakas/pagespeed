@@ -1,7 +1,7 @@
-# CLAUDE.md — PageSpeed Insights Monitor
+# CLAUDE.md — Lamps Plus Pharos
 
 ## Context
-This file documents the full project state so a new session can pick up where we left off. The project is a web performance monitoring dashboard for **LampsPlus**, deployed on **Railway** with automatic deployment from the `master` branch.
+This file documents the full project state so a new session can pick up where we left off. The project is a web performance monitoring dashboard for **Lamps Plus** (branded as **Pharos**), deployed on **Railway** with manual deployment from the `master` branch.
 
 ---
 
@@ -12,26 +12,28 @@ This file documents the full project state so a new session can pick up where we
 **Tech Stack:**
 - **Backend:** Python 3.11, Flask, Gunicorn, APScheduler
 - **Database:** SQLite (local dev) / PostgreSQL (production via Railway)
-- **Frontend:** Vanilla HTML/CSS/JS, Chart.js, marked.js, JSZip
+- **Legacy Frontend:** Vanilla HTML/CSS/JS, Chart.js, marked.js, JSZip (served at `/`)
+- **React Frontend:** React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui (base-ui primitives), Recharts, TanStack React Table, marked.js (served at `/app/`)
 - **External APIs:** Google PageSpeed Insights, New Relic NerdGraph (GraphQL), Azure Log Analytics (REST/KQL), Anthropic Claude, OpenAI
-- **Deployment:** Railway (auto-deploys on push to `master`, Nixpacks builder)
+- **Deployment:** Railway (Dockerfile builder, manual deploy via `npx @railway/cli up -m "message"`)
 
 **Repository:** `https://github.com/vorakas/pagespeed.git`
 
 ---
 
-## Git Worktree Workflow
+## Deployment
 
-- **Main repo:** `C:\pagespeed-monitor`
-- **Worktree:** `C:\Users\AdamB\.claude-worktrees\pagespeed-monitor\focused-kilby`
-- **Development branch:** `focused-kilby`
+- **Production URL:** `https://pagespeed-production.up.railway.app/`
+  - `/` — Legacy Flask/template frontend (production)
+  - `/app/` — React frontend (all 7 pages complete)
 - **Production branch:** `master`
-
-**Deploy process:**
-1. Make changes on `focused-kilby` branch in the worktree
-2. Commit changes
-3. `cd C:\pagespeed-monitor && git merge focused-kilby && git push`
-4. Railway auto-deploys from `master`
+- **Builder:** Dockerfile (multi-stage: node:20-alpine for React build, python:3.11-slim for Flask)
+- **GitHub webhook is broken** — auto-deploy on push does not work. Deploy manually:
+  ```
+  git push
+  npx @railway/cli up -m "$(git log -1 --pretty=%s)"
+  ```
+- **PORT:** Railway sets `$PORT` env var. Ensure Railway networking matches (currently 5000).
 
 ---
 
@@ -97,14 +99,14 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── azure_api.py          # Azure Log Analytics proxy API (~107 lines)
 │   └── ai_api.py             # AI analysis API (~159 lines)
 ├── requirements.txt          # Python dependencies
-├── Dockerfile                # Production container (python:3.11-slim)
+├── Dockerfile                # Production container (multi-stage)
 ├── Procfile                  # Gunicorn: 2 workers, 300s timeout
 ├── railway.json              # Railway config (Nixpacks, ON_FAILURE restart)
 ├── setup.sh                  # Local dev setup script
 ├── README.md                 # Project documentation
 ├── CLAUDE.md                 # This file — project context for Claude sessions
 ├── .gitignore
-├── templates/
+├── templates/                # Legacy Flask templates
 │   ├── index.html            # Dashboard home, worst performers, CWV reference guide
 │   ├── setup.html            # Site/URL management + scheduled trigger configuration
 │   ├── test.html             # PageSpeed testing with desktop/mobile toggle
@@ -113,10 +115,48 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── iislogs.html          # IIS logs + KQL queries + profiles (~1624 lines, heavy inline JS)
 │   └── ai_analysis.html      # AI analysis with parallel Claude + OpenAI
 ├── static/
-│   ├── css/style.css         # All styles, dark+light mode (~5830 lines)
-│   ├── js/app.js             # Shared frontend JS (~1740 lines)
+│   ├── css/style.css         # Legacy styles, dark+light mode (~5830 lines)
+│   ├── js/app.js             # Legacy frontend JS (~1740 lines)
 │   ├── favicon.ico
-│   └── images/               # Logo variants (light/dark, LampsPlus)
+│   └── images/               # Logo variants (LampsPlus dark/light, Pharos, Pharos-dark)
+├── frontend/                   # React frontend (served at /app/)
+│   ├── package.json
+│   ├── vite.config.ts          # Build config, /api proxy to localhost:5000, base: /app/
+│   ├── public/images/          # Pharos.png, Pharos-dark.png, LampsPlus logos
+│   ├── src/
+│   │   ├── App.tsx             # React Router with 7 routes under AppLayout
+│   │   ├── index.css           # Tailwind + shadcn design tokens (dark/light), themed scrollbars
+│   │   ├── services/api.ts     # Typed API client (30+ endpoints, snake_case conversion for NR/Azure)
+│   │   ├── types/index.ts      # TypeScript interfaces for all entities
+│   │   ├── lib/utils.ts        # cn(), formatters, scoring helpers, cron description, escapeHtml
+│   │   ├── context/
+│   │   │   ├── ThemeContext.tsx # Dark/light theme with localStorage
+│   │   │   └── SitesContext.tsx # Sites + URLs loaded on mount
+│   │   ├── hooks/
+│   │   │   ├── use-api.ts      # Generic async API hook
+│   │   │   ├── use-sites.ts    # Sites context consumer
+│   │   │   ├── use-theme.ts    # Theme context consumer
+│   │   │   └── use-local-config.ts # localStorage sync hook
+│   │   ├── components/
+│   │   │   ├── layout/         # AppLayout, Sidebar (nav only), Header (logo banner + page title)
+│   │   │   ├── ui/             # ~30 shadcn/ui components (incl. switch, checkbox w/ indeterminate)
+│   │   │   ├── shared/         # ScoreBadge (fixed-width), EmptyState, LoadingSpinner
+│   │   │   ├── dashboard/      # WorstPerformersSection, CwvReferenceSection, LighthouseExplanation
+│   │   │   ├── metrics/        # HistoricalChart, PageComparison
+│   │   │   ├── test-urls/      # TestResultsTable, TestProgressPanel, TestDetailDialog
+│   │   │   ├── setup/          # SiteUrlManager, TriggerForm, TriggerCard, TriggerList
+│   │   │   ├── newrelic/       # NewRelicConfig, CwvMetrics, PerformanceOverview, ApmMetrics, CustomQuery
+│   │   │   ├── ai-analysis/    # AiConfigPanel, AnalysisPanel (markdown chat w/ marked.js)
+│   │   │   └── iis-logs/       # AzureConfigPanel, LogSearchPanel, DashboardSummary, KqlQueryPanel
+│   │   └── pages/
+│   │       ├── Dashboard.tsx   # ✅ Complete — worst performers, CWV reference, Lighthouse
+│   │       ├── Metrics.tsx     # ✅ Complete — historical chart + page comparison
+│   │       ├── TestUrls.tsx    # ✅ Complete — batch testing, progress, results table, detail dialog
+│   │       ├── Setup.tsx       # ✅ Complete — site/URL CRUD, trigger management
+│   │       ├── NewRelic.tsx    # ✅ Complete — CWV, performance overview, APM, custom queries
+│   │       ├── AiAnalysis.tsx  # ✅ Complete — parallel Claude/OpenAI, follow-up conversations
+│   │       └── IisLogs.tsx     # ✅ Complete — Azure logs, dashboard, KQL queries, profiles
+│   └── dist/                   # Vite build output (copied to Docker image)
 ```
 
 ---
@@ -149,13 +189,13 @@ Routes are split across 8 Flask Blueprints in `routes/`, each created via a fact
 
 **Results** (`routes/metrics_api.py`): `GET /api/sites/<id>/latest-results`, `GET /api/urls/<id>/history`, `GET /api/test-details/<id>`, `GET /api/worst-performing`, `GET /api/comparison`, `GET /api/comparison/urls` — all accept `strategy` query param
 
-**New Relic** (`routes/newrelic_api.py`): `POST /api/newrelic/test-connection`, `POST /api/newrelic/core-web-vitals`, `POST /api/newrelic/performance-overview`, `POST /api/newrelic/apm-metrics`, `POST /api/newrelic/custom-query`
+**New Relic** (`routes/newrelic_api.py`): `POST /api/newrelic/test-connection`, `POST /api/newrelic/core-web-vitals`, `POST /api/newrelic/performance-overview`, `POST /api/newrelic/apm-metrics`, `POST /api/newrelic/custom-query` — backend expects snake_case keys (`api_key`, `account_id`, `app_name`)
 
-**Azure** (`routes/azure_api.py`): `POST /api/azure/test-connection`, `POST /api/azure/search-logs`, `POST /api/azure/dashboard-summary`, `POST /api/azure/execute-query`, `POST /api/azure/list-sites`
+**Azure** (`routes/azure_api.py`): `POST /api/azure/test-connection`, `POST /api/azure/search-logs`, `POST /api/azure/dashboard-summary`, `POST /api/azure/execute-query`, `POST /api/azure/list-sites` — backend expects snake_case keys (`tenant_id`, `client_id`, `client_secret`, `workspace_id`)
 
 **AI** (`routes/ai_api.py`): `POST /api/ai/analyze` (parallel Claude + OpenAI), `POST /api/ai/follow-up`
 
-**Triggers** (`routes/triggers_api.py`): `GET /api/triggers`, `POST /api/triggers`, `PUT /api/triggers/<id>`, `DELETE /api/triggers/<id>`, `PATCH /api/triggers/<id>/toggle`, `GET /api/triggers/presets`
+**Triggers** (`routes/triggers_api.py`): `GET /api/triggers`, `POST /api/triggers`, `PUT /api/triggers/<id>`, `DELETE /api/triggers/<id>`, `PATCH /api/triggers/<id>/toggle`, `POST /api/triggers/<id>/run-now`, `GET/POST/DELETE /api/triggers/presets`
 
 **Scheduled:** User-configurable triggers via APScheduler, managed on the Setup page. Supports preset schedules (daily, every 6h/12h, weekly) and custom cron expressions. Each trigger has its own strategy (desktop/mobile/both) and URL selection. Jobs are synced from the database on startup via `trigger_service.sync_all_jobs()`.
 
@@ -164,8 +204,8 @@ Routes are split across 8 Flask Blueprints in `routes/`, each created via a fact
 ## Credential Storage
 
 All API credentials are stored **client-side in localStorage** (not on the server):
-- `nrConfig` — New Relic API key, Account ID, App Name
-- `azureConfig` — Azure Tenant ID, Client ID, Client Secret, Workspace ID, Secret Expiration Date, Site
+- `nrConfig` — New Relic API key, Account ID, App Name (camelCase; API client converts to snake_case)
+- `azureConfig` — Azure Tenant ID, Client ID, Client Secret, Workspace ID, Secret Expiration Date, Site (camelCase; API client converts to snake_case)
 - `aiConfig` — Claude API Key/Model, OpenAI API Key/Model
 - `kqlProfiles` — Per-user KQL query profiles with saved queries (migrated from legacy `kqlSavedQueries`)
 
@@ -173,132 +213,86 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 
 ---
 
-## Key Features Implemented
+## React Frontend — Complete
 
-### Dashboard (index.html, app.js)
-- **Worst Performing URLs** — Top 5 lowest-scoring URLs **per site**, each rendered as a separate table with a site name heading. Uses 13 columns matching the Test URLs page
-- Desktop/Mobile strategy toggle to switch between test strategies
-- All column headers and values centered except URL (left-aligned)
-- Detail button (📊) opens Lighthouse breakdown modal
-- Empty state shown when no test results exist
-- Auto-loads on page visit via `loadWorstPerformers()` function
-- Repository uses `ROW_NUMBER() OVER (PARTITION BY site)` window function for efficient per-site limiting in a single query
+All 7 pages are fully implemented in the React frontend at `/app/`.
 
-### PageSpeed Testing (test.html, app.js)
-- Desktop/Mobile strategy toggle (radio buttons)
-- Batch "Test All URLs" with real-time progress bar
-- Site-tabbed dashboard with sortable 13-column results table
-- URL comparison (side-by-side)
-- 30-day historical chart (Chart.js)
-- Detailed modal with Lighthouse scores, metric weights, opportunities, failed audits
+### Header & Branding
+- **Lamps Plus Pharos** branding — Lamps Plus logo + Pharos lighthouse logo side-by-side in top banner
+- Pharos logo has light variant (dark navy text) and dark variant (white text + soft white glow for visibility)
+- Logo sizes: Lamps Plus `h-10`, Pharos `h-24`, separated by vertical divider
+- Theme toggle (sun/moon) in banner, page title + description below
 
-### IIS Logs (iislogs.html — most complex page)
-- **Azure connection:** OAuth2 config with Test Connection, auto-save, secret expiration warning
-- **Secret expiration:** Shows warning when <= 30 days; shows expired message when <= 0 days
-- **Test Connection message:** Persists on screen with dismiss × button (fixed timer conflict with saveAzureConfig)
-- **Search/Filter:** Date range, URL path, status code (2xx/3xx/4xx/5xx), limit selector
-- **Results table:** 8 columns (Time 6%, Method 3%, URL Path 24%, Query String 40%, Status 5%, Time Taken 7%, Client IP 7%, Site 8%)
-  - `table-layout: fixed` with percentage widths
-  - All `td` elements default to `overflow: hidden; text-overflow: ellipsis; white-space: nowrap`
-  - Query String uses `wrap-cell` class (word-break, white-space: normal, max-width: 0)
-  - Time, Client IP, Site use `truncate-cell` with `title` attributes for hover
-- **Manual column resizing:** `initTableResize(table)` generic function — converts % to px on first drag, compensates adjacent column, min 40px, double-click to reset defaults
-- **KQL Query Mode:**
-  - Tabbed interface (in-memory, not persisted across page reload)
-  - 5 preset queries + save/load/delete custom queries (localStorage)
-  - **KQL Profiles:** Per-user named profiles with private saved queries and share/copy between profiles
-  - Table View + Raw JSON View toggle
-  - CSV/ZIP export (JSZip)
-  - Tab bar positioned inside `.kql-editor`, directly above `<textarea>`
-  - Background query support (results stored silently if tab switched during query)
-  - KQL results table also has manual column resizing (same `initTableResize` function)
-- **Dashboard summary:** Stats cards, response time breakdown (P50/P90/P99/Max), top pages, status distribution
+### Dashboard (`/app/`)
+- Worst performers per site (sortable TanStack tables), CWV reference guide, Lighthouse explanation
+- Desktop/Mobile strategy toggle
 
-### New Relic (newrelic.html)
-- Core Web Vitals (LCP, CLS, Page Load, Backend, Frontend, TTFB, DOM Processing) with percentiles (p50, p75, p90)
-- Performance Overview (response time, throughput, error rate, Apdex) with period comparison
-- APM Metrics (transactions, database ops, external calls, errors)
-- Custom NerdGraph queries
+### Metrics (`/app/metrics`)
+- Historical performance chart (Recharts line chart, 30-day, 4 score lines)
+- Page Comparison (side-by-side URL comparison with Lighthouse scores, CWV, size, and diff summary)
 
-### AI Analysis (ai_analysis.html)
-- Parallel Claude + OpenAI analysis side-by-side
-- Auto-gathers New Relic CWV + Azure IIS logs for selected URL
+### Test URLs (`/app/test`)
+- Desktop/Mobile strategy toggle, "Test All URLs" batch testing with progress panel
+- Site tabs, sortable 13-column results table (TanStack), retest/delete per URL
+- Performance detail dialog with score breakdown, metric weights, opportunities, failed audits
+
+### Setup (`/app/setup`)
+- Add Site / Add URL forms, collapsible site drawers with URL lists, delete site/URL
+- Trigger create/edit/delete with preset or custom cron schedules, strategy selection
+- URL checkbox grid with per-site select-all and indeterminate state
+- Trigger cards with enable/disable switch, run-now, last-run status
+
+### New Relic (`/app/newrelic`)
+- Config panel with localStorage persistence and connection test
+- Core Web Vitals with percentile cards (P50/P75/P90) and threshold indicators
+- Performance overview with period comparison (response time, throughput, error rate, Apdex)
+- APM metrics with tabbed tables (transactions, database, external, errors)
+- Custom NRQL query runner with JSON results
+
+### AI Analysis (`/app/ai-analysis`)
+- Config panel for Claude and OpenAI API keys/models
+- Parallel analysis with side-by-side markdown results (marked.js)
 - Multi-turn follow-up conversations with context preservation
-- Token usage tracking (input/output per provider)
-- Experimental disclaimer banner
-- Site availability notice
-- Markdown rendering (marked.js)
+- Cumulative token usage tracking, data source status badges
+- Experimental disclaimer
 
-### Scheduled Test Triggers (setup.html, app.js)
-- **User-configurable triggers** — Replace hardcoded daily 2 AM test with multiple named triggers on the Setup page
-- **Schedule presets** — Daily at 2 AM UTC, Daily at 6 AM UTC, Every 6 hours, Every 12 hours, Weekly on Monday at 2 AM UTC
-- **Custom cron expressions** — 5-field cron format (minute hour day month weekday) with collapsible syntax reference
-- **Per-trigger strategy** — Desktop, Mobile, or Both (runs two passes with delay between strategies)
-- **URL selection** — Checkbox grid grouped by site with select-all per site and indeterminate state
-- **Enable/disable toggle** — CSS-only toggle switch per trigger card; adds/removes APScheduler job in real-time
-- **Trigger cards** — Display name, schedule description, strategy, URL count, toggle, edit/delete buttons
-- **Startup sync** — `TriggerService.sync_all_jobs()` restores APScheduler jobs for all enabled triggers on app start
-- **Cascade deletes** — Deleting a URL or site cascades to `trigger_urls` junction table
-- **Rate limiting** — Configurable delay between tests via `REQUEST_DELAY_SECONDS`
+### IIS Logs (`/app/iislogs`)
+- Azure config with secret expiration warnings, connection test
+- Log search with date range/URL/status filters, results table with status coloring
+- Dashboard summary (stat cards, P50/P90/P99/Max percentiles, top pages, status distribution)
+- KQL query mode with 5 presets, saved query management, per-user profiles
+- Table/JSON view toggle, CSV export, site selector
 
-### UI/UX
-- Dark mode (default) + Light mode with localStorage persistence
-- **Design system tokens** — CSS custom properties in `:root` for colors, spacing, typography, shadows; `body.light-mode` overrides tokens for automatic theme switching
-- **Inter web font** with system font fallback stack (`@import` from Google Fonts)
-- **Modernized side navigation** — LampsPlus logo header (dark/light variants), links grouped into 3 sections (Monitoring / Integrations / Configuration), pill-shaped active indicator (`border-radius: var(--radius-lg)`), 22px icons, spacing-only section dividers (no lines)
-- **Nav icons** — Inline SVG Feather-style 22px icons on all 7 navigation links (stroke: currentColor for theme inheritance)
-- **Card shadows** — Subtle resting shadows on `.setup-card`, `.site-urls-card`, `.stat-card`, `.browser-metric-card`, `.cwv-metric-card`, `.config-card`, `.infra-card`
-- **Toast notifications** — `showToast(message, type, duration)` replaces all `alert()` calls; 4 types (success/error/info/warning) with auto-dismiss
-- **Zebra striping** — `tbody tr:nth-child(even)` alternating backgrounds on `.results-table` and `.reference-table`
-- **Sticky table headers** — `position: sticky; top: 0; z-index: 2` on all table headers
-- **Enhanced empty states** — `createEmptyState()` helper + `EMPTY_ICONS` SVG constants; icon, title, description, and action button
-- **Consistent loading spinners** — `.loading-indicator` with `.loading-spinner` across all data-loading sections
-- **Collapsible site drawers** — URL lists in Setup page cards expand/collapse with chevron toggle
-- Responsive design with media queries
-- Theme toggle button in header
+### UI Polish
+- Dark/light themed scrollbars (thin, rounded, theme-aware)
+- Fixed-width score badges (`min-w-9`)
+- Full-width select dropdowns with absolute-positioned chevron
+- "Access" column label (was "A11y")
 
 ---
 
 ## Recent Commit History (newest first)
 
 ```
-PENDING  Modernize nav with logo, grouped sections, pill active state, design system tokens
-7d0fe59 Add real-time trigger execution tracking with running state and polling
-1e02813 Add Run Now button for manual trigger execution
-1ec2f76 Fix day-of-week mismatch between standard cron and APScheduler
-31085ff Add scheduler diagnostics and APScheduler logging
-bc12bc6 Fix triggers not firing: use single Gunicorn worker for APScheduler
-PREV     Fix trigger URL checkboxes showing empty labels (global input width override)
-5cab6a1 Add scheduled test triggers with user-configurable schedules on Setup page
-98ad636 Center column alignment on results tables across Dashboard and Test URLs
-f6174f3 Show worst performing URLs per site with centered columns on Dashboard
-0c0f673 Add worst performing URLs section to Dashboard page
-83aa2cd Refactor backend into 3-layer architecture with dependency injection
-43b127b Add enhanced empty states with icons and consistent loading spinners
-eb6c84a Add zebra striping and sticky table headers for improved readability
-6ee3b70 Add visual polish: Inter font, card shadows, nav icons, toast notifications
-fdc5d18 Tighten spacing between URLs in site cards on Setup page
-7b57c7a Add collapsible drawers to site cards on Setup page
-babeffe Change secondary button color from pink to blue
-d5f4903 Add KQL query profiles with per-user saved queries and sharing
-bd67173 Add CLAUDE.md with comprehensive project context documentation
-25d425a Add manual column resizing to KQL results table
-f50abc1 Improve column resize to allow manual width adjustment in IIS Logs table
-bf9bbb0 Drastically reduce column widths to fix query string overflow in IIS Logs table
-4d24f4c Fix query string column overflowing into status column in IIS Logs
-aed8d8c Move KQL query tabs directly above the textarea
-2ec39dd Add tabbed query interface to KQL Query Mode section
-75d4b1d Fix secret expiration showing 'expires in 0 days' on expiry day
-92c6603 Fix Test Connection message disappearing after 3 seconds on IIS Logs page
-94edefa Switch default PageSpeed strategy to desktop and add mobile toggle
-8a469c4 Add site availability notice to AI Analysis disclaimer
-a9fe904 Use percentage column widths to fill available table space
-fd9fe5d Add resizable columns to IIS Logs search results table
-e68ee9c Add hover popup for truncated cells + exact URL match on IIS Logs page
-a61770d Truncate long query strings and URL paths in IIS logs table
-58e7fca Use exact URL match for IIS logs in AI analysis
-9b19096 Remove report title header from Claude + show full data in preview
-5ca8109 Fix markdown list rendering in AI analysis results
+b70f6b8 Enlarge Pharos logo with bigger text matching Lamps Plus logo size
+b063c3e Enhance dark mode Pharos logo and increase logo size
+d3d154a Enlarge logos and add white Pharos text for dark mode
+504bf17 Rebrand to Lamps Plus Pharos with transparent lighthouse logo in header
+4743bdf Polish UI: banner layout, score badges, dropdowns, scrollbars, column labels
+563636b Add IIS Logs page with search, dashboard, and KQL query mode
+0f28916 Add AI Analysis page with parallel Claude/OpenAI and follow-up conversations
+e5554fe Add New Relic page with CWV, performance overview, APM, and custom queries
+9a8cbdb Add Setup page with site/URL CRUD and trigger management
+d54188f Add Test URLs page with batch testing, results table, and detail dialog
+38bf97f Add Metrics page with historical chart and page comparison
+c5b4922 Fix .gitignore lib/ rule ignoring frontend/src/lib/utils.ts
+15dea9c Remove tsc from build script — fix Railway Nixpacks build
+29367e7 Switch to node:20-alpine to bust Railway Docker cache
+1ade427 Skip tsc in Docker build — use vite build directly
+5d6055b Add .dockerignore and force clean Railway rebuild
+6a03c01 Switch to multi-stage Dockerfile for Railway deployment
+345384a Add React frontend scaffold with Dashboard page, served at /app/
+f805b0e Modernize nav with logo, grouped sections, pill active state, design system tokens
 ```
 
 ---
@@ -315,48 +309,31 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 - **Centralized config:** All env vars and defaults in `config.py`
 - **No test suite** — no automated tests exist; all testing is manual
 
-### Frontend Patterns
+### React Frontend Patterns
+- **Component organization:** Feature-based directories under `components/` (dashboard, test-urls, setup, newrelic, ai-analysis, iis-logs)
+- **State management:** SitesContext for global site data, `useLocalConfig` hook for localStorage-persisted configs (NR, Azure, AI)
+- **API client:** `services/api.ts` with `nrBody()` and `azBody()` helpers that convert camelCase TypeScript config to snake_case for backend
+- **Tables:** TanStack React Table with sortable columns, ScoreBadge components, formatters from `lib/utils.ts`
+- **Markdown rendering:** `marked` npm package for AI analysis chat panels
+- **shadcn/ui:** base-ui primitives (not Radix) — Dialog, Select, Tabs, Progress, Checkbox (with indeterminate), Switch, etc.
+- **Tailwind CSS 4:** Design tokens in `index.css`, `cn()` utility for class merging
+
+### Legacy Frontend Patterns
 - **Inline JS in iislogs.html** — ~1200 lines of inline `<script>` (tab management, Azure config, KQL queries, column resize, profiles, etc.)
 - **Shared JS in app.js** — dashboard functionality, site management, testing, charting, theme toggle, `showToast()`, `createEmptyState()`
-- **CSS design system** — All colors use CSS custom property tokens defined in `:root`; light mode overrides reassign tokens in `body.light-mode`, eliminating most per-selector light mode rules
-- **CSS organization:** Major sections separated by `/* ==================== */` comment headers, light mode overrides grouped at end of each section
+- **CSS design system** — All colors use CSS custom property tokens defined in `:root`; light mode overrides reassign tokens in `body.light-mode`
 - **localStorage for config** — all API credentials stored client-side, passed to server in request bodies
-- **`escapeHtml()` utility** — defined in iislogs.html inline script, used for all user-facing data rendering
 
 ### UI Conventions
-- **Status code coloring:** `.status-2xx` (green), `.status-3xx` (blue), `.status-4xx` (yellow), `.status-5xx` (red)
-- **Score coloring:** `.score-good` (90+, green), `.score-average` (50-89, yellow), `.score-poor` (0-49, red)
-- **Inline SVG icons** — Nav icons and empty state icons use Feather-style stroke SVGs with `currentColor` for automatic theme inheritance
-- **Toast notifications** — `showToast(message, type, duration)` in app.js; types: 'success', 'error', 'info', 'warning'
-- **Empty states** — `createEmptyState({icon, title, description, actionText, actionHref})` in app.js; `EMPTY_ICONS` object has 10 reusable SVG constants
+- **Status code coloring:** 2xx (green), 3xx (blue/primary), 4xx (yellow/average), 5xx (red/poor)
+- **Score coloring:** `score-good` (90+, green), `score-average` (50-89, orange), `score-poor` (0-49, red) — used in ScoreBadge and threshold indicators
+- **Lucide icons** — 20px in sidebar nav, smaller in buttons/actions
+- **Toast notifications** — Sonner toasts (React), `showToast()` (legacy)
+- **Empty states** — EmptyState component with icon, title, description, optional action
 
 ### Workflow
-- **Commit messages:** Always include `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`
-
----
-
-## CSS Key Locations (style.css ~5668 lines)
-
-- **Design system tokens (`:root`):** ~6-130
-- **Light mode token overrides (`body.light-mode`):** ~1880-1920
-- **Side nav + nav icons + logo + section labels:** ~161-245
-- **Buttons:** ~206-330
-- **Results table + zebra striping + sticky headers + centered columns:** ~335-475
-- **Modal:** ~477-756
-- **Score badges:** ~758-797
-- **Progress bar:** ~797-871
-- **Empty state component:** ~1121-1200
-- **Worst performers section:** ~1216-1248
-- **Scheduled triggers section:** ~2092-2490 (form, cards, toggle switch, URL checkboxes, cron reference)
-- **Collapsible drawers:** ~2050-2090
-- **Table fixed layout + overflow:** ~2880-2910
-- **Resizable columns:** ~2950-3025
-- **Loading indicator + spinner:** ~3560-3605
-- **New Relic styles:** ~2680-3900
-- **IIS Logs styles:** ~4208-4440
-- **KQL Query Mode + profiles:** ~4442-4690
-- **AI Analysis styles:** ~4974-5400
-- **Toast notifications:** ~5662-5790
+- **Commit messages:** Always include `Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>`
+- **Deploy command:** `npx @railway/cli up -m "$(git log -1 --pretty=%s)"` — uses git commit subject as deploy message
 
 ---
 
@@ -406,13 +383,13 @@ a61770d Truncate long query strings and URL paths in IIS logs table
   2. Identify affected files and modules
   3. Propose an implementation plan with steps
   4. Wait for user approval before proceeding
- 
+
 ## Refactoring Rules
 - When begins a message with "Refactor:", always start by analyzing the current implementation and listing specific issues before changing code
   1. Preserve all existing tests, if any, and verify they pass after changes
   2. Refactor in small, testable increments — never rewrite entire modules in one pass
   3. Performance refactors must include before/after benchmarks
- 
+
 ## Bug Fixing Rules
 - When begins a message with "Bug:", first reproduce and confirm the issue by reading the relevant code before making any changes
   1. Identify the root cause, not just the symptom — explain why the bug exists before proposing a fix
@@ -422,12 +399,12 @@ a61770d Truncate long query strings and URL paths in IIS logs table
   5. If you can't confidently identify the cause, say so and suggest diagnostic steps (add logging, isolate the condition, etc.) rather than guessing at a fix
   6. Never silently swallow exceptions or errors to make a bug "go away"
   7. After applying a fix, verify that existing tests, if any, still pass
- 
+
 ## Data Safety During Bug Fixes
   1. Never modify audio file metadata or database records as part of debugging without explicit confirmation
   2. When a bug involves file operations or database writes, test the fix against a copy of the data first
   3. If a bug fix requires a database schema change, provide a migration path that preserves existing data
- 
+
 ## Commit Rules
 - When the user types "Update and Commit" do the following:
   1. Update the CLAUDE.md
@@ -438,4 +415,17 @@ a61770d Truncate long query strings and URL paths in IIS logs table
 
 ## Current State
 
-All features are implemented and deployed. The backend uses a **3-layer architecture** (Routes → Services → Data Access) with dependency injection, custom exceptions, domain enums, and centralized configuration. The CSS has been fully migrated to a **design system token architecture** — all colors reference CSS custom properties in `:root`, with `body.light-mode` overriding tokens for automatic theme switching. This reduced the stylesheet from ~6200 lines to ~5668 lines by eliminating hundreds of redundant light mode overrides. The **side navigation** has been modernized with a LampsPlus logo header, links grouped into 3 sections (Monitoring / Integrations / Configuration), pill-shaped active indicator, and 22px icons. No pending tasks or known bugs at time of writing.
+**React frontend migration is complete.** All 7 pages are fully implemented at `/app/`. The legacy Flask/template site remains fully functional at `/`.
+
+**App rebranded to "Lamps Plus Pharos"** with lighthouse logo in header (dark/light variants).
+
+**Infrastructure:** Backend is 3-layer architecture with DI. Dockerfile uses multi-stage build (node:20-alpine → python:3.11-slim). Railway GitHub webhook integration is broken; deploy via `npx @railway/cli up -m "$(git log -1 --pretty=%s)"`.
+
+**Known issues:**
+- Railway GitHub webhook does not auto-create on repo connect — manual deploy required
+- `.gitignore` root `lib/` rule was anchored to `/lib/` to avoid ignoring `frontend/src/lib/`
+
+**Potential next steps:**
+- Visual polish and customization of the React frontend (colors, layouts, additional chart types)
+- Legacy frontend deprecation planning
+- Automated testing
