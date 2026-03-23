@@ -42,9 +42,13 @@ def create_metrics_blueprint(test_result_repo: TestResultRepository) -> Blueprin
     def worst_performing():
         strategy = request.args.get("strategy", "desktop")
         limit_per_site = request.args.get("limit", 5, type=int)
-        return jsonify(test_result_repo.get_worst_performing(
+        rows = test_result_repo.get_worst_performing(
             limit_per_site=limit_per_site, strategy=strategy,
-        ))
+        )
+        grouped: dict[str, list[dict]] = {}
+        for row in rows:
+            grouped.setdefault(row["site_name"], []).append(row)
+        return jsonify(grouped)
 
     @bp.route("/api/comparison")
     def comparison():
