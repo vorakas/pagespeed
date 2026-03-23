@@ -182,7 +182,7 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
                   labelStyle={{ color: "hsl(var(--foreground))", fontWeight: 600 }}
                   itemStyle={{ color: "hsl(var(--foreground))" }}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
                 {SCORE_LINES.map((line) => (
                   <Line
                     key={line.key}

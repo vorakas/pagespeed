@@ -102,7 +102,7 @@ export function NewRelic() {
 
         {/* Query Controls */}
         <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5 flex-1 min-w-[200px]">
+          <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
             <Label htmlFor="pageUrl">Page URL to Monitor</Label>
             <Input
               id="pageUrl"
@@ -111,10 +111,10 @@ export function NewRelic() {
               placeholder="https://www.lampsplus.com/"
             />
           </div>
-          <div className="space-y-1.5 w-48">
+          <div className="flex flex-col gap-1.5 w-48">
             <Label>Time Range</Label>
             <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger>
+              <SelectTrigger className="h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

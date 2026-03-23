@@ -122,7 +122,7 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
         <div className="space-y-1.5 w-36">
           <Label>Status</Label>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+            <SelectTrigger className="h-9"><SelectValue placeholder="All" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="2">2xx Success</SelectItem>
@@ -135,7 +135,7 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
         <div className="space-y-1.5 w-24">
           <Label>Limit</Label>
           <Select value={limit} onValueChange={setLimit}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="50">50</SelectItem>
               <SelectItem value="100">100</SelectItem>
