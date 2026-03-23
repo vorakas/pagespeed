@@ -153,36 +153,36 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
           {!loading && !error && chartData && chartData.length > 0 && (
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
                   tickLine={false}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
+                  axisLine={{ stroke: "var(--border)" }}
                 />
                 <YAxis
                   domain={[0, 100]}
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
                   tickLine={false}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
+                  axisLine={{ stroke: "var(--border)" }}
                   label={{
                     value: "Score",
                     angle: -90,
                     position: "insideLeft",
-                    style: { fill: "hsl(var(--muted-foreground))", fontSize: 12 },
+                    style: { fill: "var(--muted-foreground)", fontSize: 12 },
                   }}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
+                    backgroundColor: "var(--card)",
+                    border: "1px solid var(--border)",
                     borderRadius: "var(--radius-md)",
                     fontSize: 13,
                   }}
-                  labelStyle={{ color: "hsl(var(--foreground))", fontWeight: 600 }}
-                  itemStyle={{ color: "hsl(var(--foreground))" }}
+                  labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
+                  itemStyle={{ color: "var(--foreground)" }}
                 />
-                <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
+                <Legend wrapperStyle={{ color: "var(--foreground)" }} />
                 {SCORE_LINES.map((line) => (
                   <Line
                     key={line.key}

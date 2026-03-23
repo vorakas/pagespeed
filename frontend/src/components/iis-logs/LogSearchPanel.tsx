@@ -109,20 +109,20 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <Label>Start Date</Label>
-          <Input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-48" />
+          <Input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 w-48" />
         </div>
         <div className="space-y-1.5">
           <Label>End Date</Label>
-          <Input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-48" />
+          <Input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 w-48" />
         </div>
         <div className="space-y-1.5">
           <Label>URL Path</Label>
-          <Input value={urlFilter} onChange={(e) => setUrlFilter(e.target.value)} placeholder="/products" className="w-40" />
+          <Input value={urlFilter} onChange={(e) => setUrlFilter(e.target.value)} placeholder="/products" className="h-9 w-40" />
         </div>
         <div className="space-y-1.5 w-36">
           <Label>Status</Label>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-9"><SelectValue placeholder="All" /></SelectTrigger>
+            <SelectTrigger className="!h-9"><SelectValue placeholder="All" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="2">2xx Success</SelectItem>
@@ -135,7 +135,7 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
         <div className="space-y-1.5 w-24">
           <Label>Limit</Label>
           <Select value={limit} onValueChange={setLimit}>
-            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="!h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="50">50</SelectItem>
               <SelectItem value="100">100</SelectItem>
@@ -144,7 +144,7 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={handleSearch} disabled={loading}>
+        <Button size="lg" onClick={handleSearch} disabled={loading}>
           <Search className="h-4 w-4" /> Search
         </Button>
       </div>

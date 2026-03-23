@@ -106,6 +106,7 @@ export function NewRelic() {
             <Label htmlFor="pageUrl">Page URL to Monitor</Label>
             <Input
               id="pageUrl"
+              className="h-9"
               value={pageUrl}
               onChange={(e) => setPageUrl(e.target.value)}
               placeholder="https://www.lampsplus.com/"
@@ -114,7 +115,7 @@ export function NewRelic() {
           <div className="flex flex-col gap-1.5 w-48">
             <Label>Time Range</Label>
             <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="!h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -126,7 +127,7 @@ export function NewRelic() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={loadAllMetrics} disabled={loading}>
+          <Button size="lg" onClick={loadAllMetrics} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {loading ? "Loading..." : "Load Metrics"}
           </Button>
