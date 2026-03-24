@@ -106,45 +106,36 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-foreground">Search & Filter IIS Logs</h2>
-      <div className="flex flex-wrap items-end gap-3 [&_input]:h-[38px] [&_[data-slot=select-trigger]]:h-[38px] [&_[data-slot=button]]:h-[38px]">
-        <div className="space-y-1.5">
-          <Label>Start Date</Label>
-          <Input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-48" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>End Date</Label>
-          <Input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-48" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>URL Path</Label>
-          <Input value={urlFilter} onChange={(e) => setUrlFilter(e.target.value)} placeholder="/products" className="w-40" />
-        </div>
-        <div className="space-y-1.5 w-36">
-          <Label>Status</Label>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="2">2xx Success</SelectItem>
-              <SelectItem value="3">3xx Redirect</SelectItem>
-              <SelectItem value="4">4xx Client Error</SelectItem>
-              <SelectItem value="5">5xx Server Error</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5 w-24">
-          <Label>Limit</Label>
-          <Select value={limit} onValueChange={setLimit}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="50">50</SelectItem>
-              <SelectItem value="100">100</SelectItem>
-              <SelectItem value="250">250</SelectItem>
-              <SelectItem value="500">500</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <Button onClick={handleSearch} disabled={loading}>
+      <div className="grid grid-cols-[repeat(5,auto)_1fr] items-end gap-x-3 gap-y-1.5">
+        <Label>Start Date</Label>
+        <Label>End Date</Label>
+        <Label>URL Path</Label>
+        <Label>Status</Label>
+        <Label>Limit</Label>
+        <div />
+        <Input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-48" />
+        <Input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-48" />
+        <Input value={urlFilter} onChange={(e) => setUrlFilter(e.target.value)} placeholder="/products" className="w-40" />
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="All" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="2">2xx Success</SelectItem>
+            <SelectItem value="3">3xx Redirect</SelectItem>
+            <SelectItem value="4">4xx Client Error</SelectItem>
+            <SelectItem value="5">5xx Server Error</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={limit} onValueChange={setLimit}>
+          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="50">50</SelectItem>
+            <SelectItem value="100">100</SelectItem>
+            <SelectItem value="250">250</SelectItem>
+            <SelectItem value="500">500</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button onClick={handleSearch} disabled={loading} className="justify-self-start">
           <Search className="h-4 w-4" /> Search
         </Button>
       </div>
