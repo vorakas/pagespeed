@@ -1,18 +1,12 @@
 import { useState, useCallback } from "react"
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
   ResponsiveContainer,
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
+  Legend,
 } from "recharts"
 import { GitCompareArrows } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -44,18 +38,18 @@ function MetricRow({ label, value1, value2, format, isScore }: MetricRowProps) {
 
   if (isScore) {
     return (
-      <div className="flex items-center justify-between py-1.5">
+      <div className="flex items-center justify-between py-1">
         <span className="text-sm text-muted-foreground">{label}</span>
         <div className="flex items-center gap-6">
-          <ScoreBadge score={value1 as number | null} />
-          <ScoreBadge score={value2 as number | null} />
+          <span className="w-20 flex justify-end"><ScoreBadge score={value1 as number | null} /></span>
+          <span className="w-20 flex justify-end"><ScoreBadge score={value2 as number | null} /></span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex items-center justify-between py-1.5">
+    <div className="flex items-center justify-between py-1">
       <span className="text-sm text-muted-foreground">{label}</span>
       <div className="flex items-center gap-6">
         <span className="w-20 text-right text-sm tabular-nums text-foreground">{formatted1}</span>
@@ -94,13 +88,13 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Lighthouse Scores — radar chart + metrics side by side */}
       <div>
-        <h4 className="mb-2 text-sm font-semibold text-foreground">Lighthouse Scores</h4>
+        <h4 className="mb-1.5 text-sm font-semibold text-foreground">Lighthouse Scores</h4>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="divide-y divide-border">
-            <div className="flex items-center justify-between px-0 pb-1.5">
+            <div className="flex items-center justify-between px-0 pb-1">
               <div />
               <div className="flex items-center gap-6">
                 <span className="w-20 text-right text-xs font-medium text-muted-foreground truncate" title={url1.site_name}>
@@ -116,7 +110,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <MetricRow label="Best Practices" value1={url1.best_practices_score} value2={url2.best_practices_score} isScore />
             <MetricRow label="SEO" value1={url1.seo_score} value2={url2.seo_score} isScore />
           </div>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={220}>
             <RadarChart data={radarData}>
               <PolarGrid stroke="var(--border)" />
               <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
@@ -129,9 +123,9 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
         </div>
       </div>
 
-      {/* Core Web Vitals — bar chart + metrics side by side */}
+      {/* Core Web Vitals — per-metric bars + metrics side by side */}
       <div>
-        <h4 className="mb-2 text-sm font-semibold text-foreground">Core Web Vitals</h4>
+        <h4 className="mb-1.5 text-sm font-semibold text-foreground">Core Web Vitals</h4>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="divide-y divide-border">
             <MetricRow label="FCP" value1={url1.fcp} value2={url2.fcp} format={formatMilliseconds} />
@@ -140,21 +134,30 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <MetricRow label="INP" value1={url1.inp} value2={url2.inp} format={formatMilliseconds} />
             <MetricRow label="TTFB" value1={url1.ttfb} value2={url2.ttfb} format={formatMilliseconds} />
           </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={cwvData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
-              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} label={{ value: "ms", angle: -90, position: "insideLeft", style: { fill: "var(--muted-foreground)", fontSize: 11 } }} />
-              <Tooltip
-                contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", fontSize: 12 }}
-                labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
-                formatter={(value: number) => [`${Math.round(value)} ms`]}
-              />
-              <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12 }} />
-              <Bar name={url1.site_name} dataKey="site1" fill={SITE1_COLOR} radius={[3, 3, 0, 0]} />
-              <Bar name={url2.site_name} dataKey="site2" fill={SITE2_COLOR} radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="space-y-2">
+            {cwvData.map((item) => {
+              const maxVal = Math.max(item.site1, item.site2, 1)
+              return (
+                <div key={item.metric} className="space-y-0.5">
+                  <span className="text-xs font-medium text-muted-foreground">{item.metric}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 text-right text-[10px] text-muted-foreground">{url1.site_name.slice(0, 6)}</span>
+                    <div className="flex-1 h-4 rounded bg-muted/50 overflow-hidden">
+                      <div className="h-full rounded" style={{ width: `${(item.site1 / maxVal) * 100}%`, backgroundColor: SITE1_COLOR }} />
+                    </div>
+                    <span className="w-14 text-right text-xs tabular-nums text-foreground">{formatMilliseconds(item.site1)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 text-right text-[10px] text-muted-foreground">{url2.site_name.slice(0, 6)}</span>
+                    <div className="flex-1 h-4 rounded bg-muted/50 overflow-hidden">
+                      <div className="h-full rounded" style={{ width: `${(item.site2 / maxVal) * 100}%`, backgroundColor: SITE2_COLOR }} />
+                    </div>
+                    <span className="w-14 text-right text-xs tabular-nums text-foreground">{formatMilliseconds(item.site2)}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 
