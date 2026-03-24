@@ -1,4 +1,19 @@
 import { useState, useCallback } from "react"
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+} from "recharts"
 import { GitCompareArrows } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -50,6 +65,9 @@ function MetricRow({ label, value1, value2, format, isScore }: MetricRowProps) {
   )
 }
 
+const SITE1_COLOR = "hsl(234 77% 60%)"
+const SITE2_COLOR = "hsl(160 84% 39%)"
+
 function ComparisonResults({ data }: { data: ComparisonResult }) {
   const { url1, url2 } = data
 
@@ -61,41 +79,82 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
       ? "text-score-poor"
       : "text-muted-foreground"
 
-  return (
-    <div className="space-y-4">
-      {/* Column headers */}
-      <div className="flex items-center justify-between px-0">
-        <div />
-        <div className="flex items-center gap-6">
-          <span className="w-20 text-right text-xs font-medium text-muted-foreground truncate" title={url1.site_name}>
-            {url1.site_name}
-          </span>
-          <span className="w-20 text-right text-xs font-medium text-muted-foreground truncate" title={url2.site_name}>
-            {url2.site_name}
-          </span>
-        </div>
-      </div>
+  const radarData = [
+    { metric: "Performance", site1: url1.performance_score ?? 0, site2: url2.performance_score ?? 0 },
+    { metric: "Accessibility", site1: url1.accessibility_score ?? 0, site2: url2.accessibility_score ?? 0 },
+    { metric: "Best Practices", site1: url1.best_practices_score ?? 0, site2: url2.best_practices_score ?? 0 },
+    { metric: "SEO", site1: url1.seo_score ?? 0, site2: url2.seo_score ?? 0 },
+  ]
 
-      {/* Lighthouse Scores */}
+  const cwvData = [
+    { metric: "FCP", site1: url1.fcp ?? 0, site2: url2.fcp ?? 0 },
+    { metric: "LCP", site1: url1.lcp ?? 0, site2: url2.lcp ?? 0 },
+    { metric: "INP", site1: url1.inp ?? 0, site2: url2.inp ?? 0 },
+    { metric: "TTFB", site1: url1.ttfb ?? 0, site2: url2.ttfb ?? 0 },
+  ]
+
+  return (
+    <div className="space-y-6">
+      {/* Lighthouse Scores — radar chart + metrics side by side */}
       <div>
         <h4 className="mb-2 text-sm font-semibold text-foreground">Lighthouse Scores</h4>
-        <div className="divide-y divide-border">
-          <MetricRow label="Performance" value1={url1.performance_score} value2={url2.performance_score} isScore />
-          <MetricRow label="Accessibility" value1={url1.accessibility_score} value2={url2.accessibility_score} isScore />
-          <MetricRow label="Best Practices" value1={url1.best_practices_score} value2={url2.best_practices_score} isScore />
-          <MetricRow label="SEO" value1={url1.seo_score} value2={url2.seo_score} isScore />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="divide-y divide-border">
+            <div className="flex items-center justify-between px-0 pb-1.5">
+              <div />
+              <div className="flex items-center gap-6">
+                <span className="w-20 text-right text-xs font-medium text-muted-foreground truncate" title={url1.site_name}>
+                  {url1.site_name}
+                </span>
+                <span className="w-20 text-right text-xs font-medium text-muted-foreground truncate" title={url2.site_name}>
+                  {url2.site_name}
+                </span>
+              </div>
+            </div>
+            <MetricRow label="Performance" value1={url1.performance_score} value2={url2.performance_score} isScore />
+            <MetricRow label="Accessibility" value1={url1.accessibility_score} value2={url2.accessibility_score} isScore />
+            <MetricRow label="Best Practices" value1={url1.best_practices_score} value2={url2.best_practices_score} isScore />
+            <MetricRow label="SEO" value1={url1.seo_score} value2={url2.seo_score} isScore />
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <RadarChart data={radarData}>
+              <PolarGrid stroke="var(--border)" />
+              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
+              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
+              <Radar name={url1.site_name} dataKey="site1" stroke={SITE1_COLOR} fill={SITE1_COLOR} fillOpacity={0.2} />
+              <Radar name={url2.site_name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.2} />
+              <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12 }} />
+            </RadarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Core Web Vitals */}
+      {/* Core Web Vitals — bar chart + metrics side by side */}
       <div>
         <h4 className="mb-2 text-sm font-semibold text-foreground">Core Web Vitals</h4>
-        <div className="divide-y divide-border">
-          <MetricRow label="FCP" value1={url1.fcp} value2={url2.fcp} format={formatMilliseconds} />
-          <MetricRow label="LCP" value1={url1.lcp} value2={url2.lcp} format={formatMilliseconds} />
-          <MetricRow label="CLS" value1={url1.cls} value2={url2.cls} format={formatCls} />
-          <MetricRow label="INP" value1={url1.inp} value2={url2.inp} format={formatMilliseconds} />
-          <MetricRow label="TTFB" value1={url1.ttfb} value2={url2.ttfb} format={formatMilliseconds} />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="divide-y divide-border">
+            <MetricRow label="FCP" value1={url1.fcp} value2={url2.fcp} format={formatMilliseconds} />
+            <MetricRow label="LCP" value1={url1.lcp} value2={url2.lcp} format={formatMilliseconds} />
+            <MetricRow label="CLS" value1={url1.cls} value2={url2.cls} format={formatCls} />
+            <MetricRow label="INP" value1={url1.inp} value2={url2.inp} format={formatMilliseconds} />
+            <MetricRow label="TTFB" value1={url1.ttfb} value2={url2.ttfb} format={formatMilliseconds} />
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={cwvData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} label={{ value: "ms", angle: -90, position: "insideLeft", style: { fill: "var(--muted-foreground)", fontSize: 11 } }} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", fontSize: 12 }}
+                labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
+                formatter={(value: number) => [`${Math.round(value)} ms`]}
+              />
+              <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12 }} />
+              <Bar name={url1.site_name} dataKey="site1" fill={SITE1_COLOR} radius={[3, 3, 0, 0]} />
+              <Bar name={url2.site_name} dataKey="site2" fill={SITE2_COLOR} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
