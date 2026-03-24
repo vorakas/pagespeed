@@ -101,12 +101,11 @@ export function NewRelic() {
         />
 
         {/* Query Controls */}
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap items-end gap-3 [&_input]:h-[38px] [&_[data-slot=select-trigger]]:h-[38px] [&_[data-slot=button]]:h-[38px]">
           <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
             <Label htmlFor="pageUrl">Page URL to Monitor</Label>
             <Input
               id="pageUrl"
-              className="h-9"
               value={pageUrl}
               onChange={(e) => setPageUrl(e.target.value)}
               placeholder="https://www.lampsplus.com/"
@@ -115,7 +114,7 @@ export function NewRelic() {
           <div className="flex flex-col gap-1.5 w-48">
             <Label>Time Range</Label>
             <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger className="!h-9">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -127,7 +126,7 @@ export function NewRelic() {
               </SelectContent>
             </Select>
           </div>
-          <Button size="lg" onClick={loadAllMetrics} disabled={loading}>
+          <Button onClick={loadAllMetrics} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {loading ? "Loading..." : "Load Metrics"}
           </Button>
