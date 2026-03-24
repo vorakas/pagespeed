@@ -88,7 +88,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
   ]
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Lighthouse Scores — radar chart + metrics side by side */}
       <div>
         <h4 className="mb-1.5 text-sm font-semibold text-foreground">Lighthouse Scores</h4>
@@ -110,14 +110,14 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <MetricRow label="Best Practices" value1={url1.best_practices_score} value2={url2.best_practices_score} isScore />
             <MetricRow label="SEO" value1={url1.seo_score} value2={url2.seo_score} isScore />
           </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <RadarChart data={radarData}>
+          <ResponsiveContainer width="100%" height={260}>
+            <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 20, left: 30 }}>
               <PolarGrid stroke="var(--border)" />
               <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
               <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
               <Radar name={url1.site_name} dataKey="site1" stroke={SITE1_COLOR} fill={SITE1_COLOR} fillOpacity={0.2} />
               <Radar name={url2.site_name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.2} />
-              <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12 }} />
+              <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12, paddingTop: 8 }} />
             </RadarChart>
           </ResponsiveContainer>
         </div>
@@ -134,25 +134,25 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <MetricRow label="INP" value1={url1.inp} value2={url2.inp} format={formatMilliseconds} />
             <MetricRow label="TTFB" value1={url1.ttfb} value2={url2.ttfb} format={formatMilliseconds} />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {cwvData.map((item) => {
               const maxVal = Math.max(item.site1, item.site2, 1)
               return (
                 <div key={item.metric} className="space-y-0.5">
-                  <span className="text-xs font-medium text-muted-foreground">{item.metric}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="w-8 text-right text-[10px] text-muted-foreground">{url1.site_name.slice(0, 6)}</span>
-                    <div className="flex-1 h-4 rounded bg-muted/50 overflow-hidden">
-                      <div className="h-full rounded" style={{ width: `${(item.site1 / maxVal) * 100}%`, backgroundColor: SITE1_COLOR }} />
+                  <span className="text-[11px] font-medium text-muted-foreground">{item.metric}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-16 text-right text-[10px] text-muted-foreground truncate" title={url1.site_name}>{url1.site_name}</span>
+                    <div className="flex-1 h-2.5 rounded-sm bg-muted/50 overflow-hidden">
+                      <div className="h-full rounded-sm" style={{ width: `${(item.site1 / maxVal) * 100}%`, backgroundColor: SITE1_COLOR }} />
                     </div>
-                    <span className="w-14 text-right text-xs tabular-nums text-foreground">{formatMilliseconds(item.site1)}</span>
+                    <span className="w-12 text-right text-[11px] tabular-nums text-foreground">{formatMilliseconds(item.site1)}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-8 text-right text-[10px] text-muted-foreground">{url2.site_name.slice(0, 6)}</span>
-                    <div className="flex-1 h-4 rounded bg-muted/50 overflow-hidden">
-                      <div className="h-full rounded" style={{ width: `${(item.site2 / maxVal) * 100}%`, backgroundColor: SITE2_COLOR }} />
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-16 text-right text-[10px] text-muted-foreground truncate" title={url2.site_name}>{url2.site_name}</span>
+                    <div className="flex-1 h-2.5 rounded-sm bg-muted/50 overflow-hidden">
+                      <div className="h-full rounded-sm" style={{ width: `${(item.site2 / maxVal) * 100}%`, backgroundColor: SITE2_COLOR }} />
                     </div>
-                    <span className="w-14 text-right text-xs tabular-nums text-foreground">{formatMilliseconds(item.site2)}</span>
+                    <span className="w-12 text-right text-[11px] tabular-nums text-foreground">{formatMilliseconds(item.site2)}</span>
                   </div>
                 </div>
               )
