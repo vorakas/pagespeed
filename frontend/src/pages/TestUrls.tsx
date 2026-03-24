@@ -306,6 +306,7 @@ export function TestUrls() {
           <Tabs
             value={activeSiteId?.toString()}
             onValueChange={handleSiteChange}
+            defaultValue={sites[0]?.id.toString()}
           >
             <TabsList>
               {sites.map((site) => (

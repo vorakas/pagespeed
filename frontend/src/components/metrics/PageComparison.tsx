@@ -160,7 +160,7 @@ export function PageComparison() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="flex items-end gap-3">
             {/* Site 1 */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">Site 1</label>
@@ -184,10 +184,10 @@ export function PageComparison() {
               </select>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
               <label className="text-xs font-medium text-muted-foreground">URL</label>
               <select
-                className="h-9 min-w-[250px] rounded-md border border-border bg-background px-3 text-sm"
+                className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
                 value={url1Id}
                 onChange={(e) => {
                   setUrl1Id(e.target.value ? Number(e.target.value) : "")
@@ -230,10 +230,10 @@ export function PageComparison() {
               </select>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
               <label className="text-xs font-medium text-muted-foreground">URL</label>
               <select
-                className="h-9 min-w-[250px] rounded-md border border-border bg-background px-3 text-sm"
+                className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
                 value={url2Id}
                 onChange={(e) => {
                   setUrl2Id(e.target.value ? Number(e.target.value) : "")
