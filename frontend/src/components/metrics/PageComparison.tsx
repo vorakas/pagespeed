@@ -110,16 +110,27 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <MetricRow label="Best Practices" value1={url1.best_practices_score} value2={url2.best_practices_score} isScore />
             <MetricRow label="SEO" value1={url1.seo_score} value2={url2.seo_score} isScore />
           </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 20, left: 30 }}>
-              <PolarGrid stroke="var(--border)" />
-              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
-              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
-              <Radar name={url1.site_name} dataKey="site1" stroke={SITE1_COLOR} fill={SITE1_COLOR} fillOpacity={0.2} />
-              <Radar name={url2.site_name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.2} />
-              <Legend wrapperStyle={{ color: "var(--foreground)", fontSize: 12, paddingTop: 8 }} />
-            </RadarChart>
-          </ResponsiveContainer>
+          <div>
+            <ResponsiveContainer width="100%" height={240}>
+              <RadarChart data={radarData} margin={{ top: 20, right: 40, bottom: 30, left: 40 }}>
+                <PolarGrid stroke="var(--border)" />
+                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+                <Radar name={url1.site_name} dataKey="site1" stroke={SITE1_COLOR} fill={SITE1_COLOR} fillOpacity={0.2} />
+                <Radar name={url2.site_name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.2} />
+              </RadarChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SITE1_COLOR }} />
+                <span className="text-foreground">{url1.site_name}</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SITE2_COLOR }} />
+                <span className="text-foreground">{url2.site_name}</span>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
