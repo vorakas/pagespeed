@@ -107,15 +107,19 @@ function BreakdownCard({
       <CardContent className="p-3">
         <h4 className="text-sm font-medium text-foreground">{title}</h4>
         <p className="text-[10px] text-muted-foreground mb-2">{idealText}</p>
-        <div className="flex gap-4 text-sm tabular-nums">
-          <span>{formatValue(metric?.p50 ?? null)} ms</span>
-          <span>{formatValue(metric?.p75 ?? null)} ms</span>
-          <span>{formatValue(metric?.p90 ?? null)} ms</span>
-        </div>
-        <div className="flex gap-4 text-[10px] text-muted-foreground">
-          <span>P50</span>
-          <span>P75</span>
-          <span>P90</span>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div>
+            <p className="text-sm font-semibold tabular-nums">{formatValue(metric?.p50 ?? null)} ms</p>
+            <p className="text-[10px] text-muted-foreground">P50</p>
+          </div>
+          <div>
+            <p className="text-sm font-semibold tabular-nums">{formatValue(metric?.p75 ?? null)} ms</p>
+            <p className="text-[10px] text-muted-foreground">P75</p>
+          </div>
+          <div>
+            <p className="text-sm font-semibold tabular-nums">{formatValue(metric?.p90 ?? null)} ms</p>
+            <p className="text-[10px] text-muted-foreground">P90</p>
+          </div>
         </div>
       </CardContent>
     </Card>

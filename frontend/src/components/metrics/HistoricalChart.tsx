@@ -99,7 +99,7 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-muted-foreground">URL</label>
               <select
-                className="h-9 min-w-[300px] rounded-md border border-border bg-background px-3 text-sm"
+                className="h-9 min-w-[200px] rounded-md border border-border bg-background px-3 text-sm"
                 value={selectedUrlId}
                 onChange={(e) => {
                   setSelectedUrlId(e.target.value ? Number(e.target.value) : "")

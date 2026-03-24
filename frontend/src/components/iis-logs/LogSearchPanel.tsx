@@ -113,8 +113,8 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
         <Label>Status</Label>
         <Label>Limit</Label>
         <div />
-        <Input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-48" />
-        <Input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-48" />
+        <Input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-56" />
+        <Input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-56" />
         <Input value={urlFilter} onChange={(e) => setUrlFilter(e.target.value)} placeholder="/products" className="w-40" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-36"><SelectValue placeholder="All" /></SelectTrigger>

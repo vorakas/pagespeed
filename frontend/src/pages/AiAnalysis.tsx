@@ -158,7 +158,7 @@ export function AiAnalysis() {
       }
 
       if (data.claude) {
-        if (data.claude.success) {
+        if (data.claude.analysis) {
           newConv.claudeMessages = [
             { role: "assistant", content: data.claude.analysis, label: "Initial Analysis" },
           ]
@@ -176,7 +176,7 @@ export function AiAnalysis() {
       }
 
       if (data.openai) {
-        if (data.openai.success) {
+        if (data.openai.analysis) {
           newConv.openaiMessages = [
             { role: "assistant", content: data.openai.analysis, label: "Initial Analysis" },
           ]
@@ -267,7 +267,7 @@ export function AiAnalysis() {
       setConversation((prev) => {
         const next = { ...prev, turnCount: prev.turnCount + 1 }
 
-        if (data.claude?.success) {
+        if (data.claude?.analysis) {
           next.claudeMessages = [
             ...prev.claudeMessages,
             { role: "assistant", content: data.claude.analysis, label: `Claude (Follow-up #${followupNum})` },
@@ -283,7 +283,7 @@ export function AiAnalysis() {
           }
         }
 
-        if (data.openai?.success) {
+        if (data.openai?.analysis) {
           next.openaiMessages = [
             ...prev.openaiMessages,
             { role: "assistant", content: data.openai.analysis, label: `OpenAI (Follow-up #${followupNum})` },
