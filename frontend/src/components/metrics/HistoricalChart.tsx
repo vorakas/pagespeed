@@ -181,20 +181,23 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
                   }}
                 />
                 <Tooltip
+                  cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "4 4" }}
                   contentStyle={{
-                    backgroundColor: "var(--card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "hsl(0 0% 9%)",
+                    border: "1px solid hsl(0 0% 15%)",
+                    borderRadius: "8px",
                     fontSize: 13,
+                    padding: "8px 12px",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
                   }}
-                  labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
-                  itemStyle={{ color: "var(--foreground)" }}
+                  labelStyle={{ color: "hsl(0 0% 95%)", fontWeight: 600, marginBottom: 4 }}
+                  itemStyle={{ color: "hsl(0 0% 80%)", padding: "1px 0" }}
                 />
                 <Legend wrapperStyle={{ color: "var(--foreground)" }} />
                 {SCORE_LINES.map((line) => (
                   <Area
                     key={line.key}
-                    type="monotone"
+                    type="natural"
                     dataKey={line.key}
                     name={line.name}
                     stroke={line.color}
