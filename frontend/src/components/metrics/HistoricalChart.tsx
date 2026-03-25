@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react"
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -152,7 +152,15 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
 
           {!loading && !error && chartData && chartData.length > 0 && (
             <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <defs>
+                  {SCORE_LINES.map((line) => (
+                    <linearGradient key={line.key} id={`gradient-${line.key}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={line.color} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={line.color} stopOpacity={0.05} />
+                    </linearGradient>
+                  ))}
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="date"
@@ -184,19 +192,20 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
                 />
                 <Legend wrapperStyle={{ color: "var(--foreground)" }} />
                 {SCORE_LINES.map((line) => (
-                  <Line
+                  <Area
                     key={line.key}
                     type="monotone"
                     dataKey={line.key}
                     name={line.name}
                     stroke={line.color}
                     strokeWidth={2}
-                    dot={{ r: 3 }}
+                    fill={`url(#gradient-${line.key})`}
+                    dot={{ r: 3, fill: line.color }}
                     activeDot={{ r: 5 }}
                     connectNulls
                   />
                 ))}
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           )}
         </CardContent>
