@@ -156,29 +156,25 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
                 <defs>
                   {SCORE_LINES.map((line) => (
                     <linearGradient key={line.key} id={`gradient-${line.key}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={line.color} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={line.color} stopOpacity={0.05} />
+                      <stop offset="5%" stopColor={line.color} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={line.color} stopOpacity={0.1} />
                     </linearGradient>
                   ))}
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <CartesianGrid vertical={false} stroke="var(--border)" strokeOpacity={0.5} />
                 <XAxis
                   dataKey="date"
                   tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
                   tickLine={false}
-                  axisLine={{ stroke: "var(--border)" }}
+                  axisLine={false}
+                  tickMargin={8}
+                  minTickGap={32}
                 />
                 <YAxis
                   domain={[0, 100]}
                   tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
                   tickLine={false}
-                  axisLine={{ stroke: "var(--border)" }}
-                  label={{
-                    value: "Score",
-                    angle: -90,
-                    position: "insideLeft",
-                    style: { fill: "var(--muted-foreground)", fontSize: 12 },
-                  }}
+                  axisLine={false}
                 />
                 <Tooltip
                   cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "4 4" }}
@@ -203,8 +199,8 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
                     stroke={line.color}
                     strokeWidth={2}
                     fill={`url(#gradient-${line.key})`}
-                    dot={{ r: 3, fill: line.color }}
-                    activeDot={{ r: 5 }}
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0 }}
                     connectNulls
                   />
                 ))}
