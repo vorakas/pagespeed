@@ -62,10 +62,38 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
     }
   }, [selectedUrlId, strategy])
 
-  const chartData = history?.map((point) => ({
-    ...point,
-    date: formatDate(point.tested_at),
-  }))
+  const chartData = (() => {
+    if (!history || history.length === 0) return undefined
+
+    const grouped = new Map<string, HistoryPoint[]>()
+    for (const point of history) {
+      const date = formatDate(point.tested_at)
+      const existing = grouped.get(date)
+      if (existing) {
+        existing.push(point)
+      } else {
+        grouped.set(date, [point])
+      }
+    }
+
+    const scoreKeys = [
+      "performance_score",
+      "accessibility_score",
+      "best_practices_score",
+      "seo_score",
+    ] as const
+
+    return Array.from(grouped.entries()).map(([date, points]) => {
+      const averaged: Record<string, unknown> = { date }
+      for (const key of scoreKeys) {
+        const values = points.map((p) => p[key]).filter((v): v is number => v != null)
+        averaged[key] = values.length > 0
+          ? Math.round(values.reduce((sum, v) => sum + v, 0) / values.length)
+          : null
+      }
+      return averaged
+    })
+  })()
 
   return (
     <div className="space-y-4">
@@ -169,7 +197,6 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
                   axisLine={false}
                   tickMargin={8}
                   minTickGap={32}
-                  allowDuplicatedCategory={false}
                 />
                 <YAxis
                   domain={[0, 100]}
