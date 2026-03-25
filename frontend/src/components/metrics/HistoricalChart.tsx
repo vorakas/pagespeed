@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import {
   AreaChart,
   Area,
@@ -23,6 +23,14 @@ interface HistoricalChartProps {
   strategy: Strategy
 }
 
+const DATE_RANGES = [
+  { value: 7, label: "Last 7 days" },
+  { value: 14, label: "Last 14 days" },
+  { value: 30, label: "Last 30 days" },
+  { value: 60, label: "Last 60 days" },
+  { value: 90, label: "Last 90 days" },
+] as const
+
 const SCORE_LINES = [
   { key: "performance_score", name: "Performance", color: "hsl(234 77% 60%)" },
   { key: "accessibility_score", name: "Accessibility", color: "hsl(160 84% 39%)" },
@@ -34,6 +42,7 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
   const { sites, loading: sitesLoading } = useSites()
   const [selectedSiteId, setSelectedSiteId] = useState<number | "">("")
   const [selectedUrlId, setSelectedUrlId] = useState<number | "">("")
+  const [dateRange, setDateRange] = useState<number>(30)
   const [history, setHistory] = useState<HistoryPoint[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -53,14 +62,22 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
     setLoading(true)
     setError(null)
     try {
-      const data = await api.getUrlHistory(selectedUrlId as number, strategy)
+      const data = await api.getUrlHistory(selectedUrlId as number, strategy, dateRange)
       setHistory(data)
+      hasLoaded.current = true
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load history")
     } finally {
       setLoading(false)
     }
-  }, [selectedUrlId, strategy])
+  }, [selectedUrlId, strategy, dateRange])
+
+  const hasLoaded = useRef(false)
+  useEffect(() => {
+    if (hasLoaded.current && selectedUrlId) {
+      loadChart()
+    }
+  }, [dateRange]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const chartData = (() => {
     if (!history || history.length === 0) return undefined
@@ -97,11 +114,24 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-foreground">Historical Performance</h2>
-        <p className="text-sm text-muted-foreground">
-          Track Lighthouse score trends over the last 30 days
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Historical Performance</h2>
+          <p className="text-sm text-muted-foreground">
+            Track Lighthouse score trends over time
+          </p>
+        </div>
+        <select
+          className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+          value={dateRange}
+          onChange={(e) => setDateRange(Number(e.target.value))}
+        >
+          {DATE_RANGES.map((range) => (
+            <option key={range.value} value={range.value}>
+              {range.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <Card>
