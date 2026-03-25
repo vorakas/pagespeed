@@ -169,6 +169,7 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
                   axisLine={false}
                   tickMargin={8}
                   minTickGap={32}
+                  allowDuplicatedCategory={false}
                 />
                 <YAxis
                   domain={[0, 100]}
