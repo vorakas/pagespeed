@@ -137,7 +137,7 @@ function SiteTable({ siteName, results }: { siteName: string; results: WorstPerf
                     <TableHead
                       key={header.id}
                       className="h-9 whitespace-nowrap text-xs"
-                      style={header.column.columnDef.size ? { width: "1px" } : undefined}
+                      style={header.column.columnDef.size ? { width: "1px" } : { width: "100%" }}
                     >
                       {header.isPlaceholder ? null : (
                         <Button
