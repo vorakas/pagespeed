@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { DateTimePicker } from "@/components/ui/date-time-picker"
 import {
   Select,
   SelectTrigger,
@@ -113,8 +114,8 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
         <Label>Status</Label>
         <Label>Limit</Label>
         <div />
-        <Input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-56" />
-        <Input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-56" />
+        <DateTimePicker value={startDate} onChange={setStartDate} className="w-56" />
+        <DateTimePicker value={endDate} onChange={setEndDate} className="w-56" />
         <Input value={urlFilter} onChange={(e) => setUrlFilter(e.target.value)} placeholder="/products" className="w-40" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-36"><SelectValue placeholder="All" /></SelectTrigger>
