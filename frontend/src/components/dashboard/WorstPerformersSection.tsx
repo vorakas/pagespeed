@@ -129,7 +129,7 @@ function SiteTable({ siteName, results }: { siteName: string; results: WorstPerf
       </div>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent">
