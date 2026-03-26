@@ -45,11 +45,10 @@ function createColumns(
       accessorKey: "url",
       header: "URL",
       cell: ({ row }) => (
-        <span className="block max-w-[300px] truncate text-foreground" title={row.original.url}>
+        <span className="block truncate text-foreground" title={row.original.url}>
           {row.original.url}
         </span>
       ),
-      size: 300,
     },
     {
       accessorKey: "performance_score",
@@ -222,7 +221,7 @@ export function TestResultsTable({
                     <TableHead
                       key={header.id}
                       className="h-9 whitespace-nowrap text-xs"
-                      style={{ width: header.getSize() }}
+                      style={header.column.columnDef.size ? { width: header.getSize() } : undefined}
                     >
                       {header.isPlaceholder ? null : header.column.getCanSort() ? (
                         <Button
