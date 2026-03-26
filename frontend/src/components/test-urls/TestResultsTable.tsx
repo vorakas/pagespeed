@@ -213,12 +213,7 @@ export function TestResultsTable({
     <Card>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <Table className="table-fixed">
-            <colgroup>
-              {table.getAllColumns().map((col) => (
-                <col key={col.id} style={col.columnDef.size ? { width: col.columnDef.size } : undefined} />
-              ))}
-            </colgroup>
+          <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent">
@@ -226,6 +221,7 @@ export function TestResultsTable({
                     <TableHead
                       key={header.id}
                       className="h-9 whitespace-nowrap text-xs"
+                      style={header.column.columnDef.size ? { width: "1px" } : undefined}
                     >
                       {header.isPlaceholder ? null : header.column.getCanSort() ? (
                         <Button
