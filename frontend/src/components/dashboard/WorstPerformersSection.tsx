@@ -130,6 +130,11 @@ function SiteTable({ siteName, results }: { siteName: string; results: WorstPerf
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table className="table-fixed">
+            <colgroup>
+              {table.getAllColumns().map((col) => (
+                <col key={col.id} style={col.columnDef.size ? { width: col.columnDef.size } : undefined} />
+              ))}
+            </colgroup>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent">
@@ -137,7 +142,6 @@ function SiteTable({ siteName, results }: { siteName: string; results: WorstPerf
                     <TableHead
                       key={header.id}
                       className="h-9 whitespace-nowrap text-xs"
-                      style={{ width: header.column.columnDef.size ? header.getSize() : undefined }}
                     >
                       {header.isPlaceholder ? null : (
                         <Button
