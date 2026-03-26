@@ -54,61 +54,61 @@ function createColumns(
       accessorKey: "performance_score",
       header: "Perf",
       cell: ({ row }) => <ScoreBadge score={row.original.performance_score} />,
-      size: 70,
+      size: 52,
     },
     {
       accessorKey: "accessibility_score",
       header: "Access",
       cell: ({ row }) => <ScoreBadge score={row.original.accessibility_score} />,
-      size: 70,
+      size: 52,
     },
     {
       accessorKey: "best_practices_score",
       header: "BP",
       cell: ({ row }) => <ScoreBadge score={row.original.best_practices_score} />,
-      size: 70,
+      size: 52,
     },
     {
       accessorKey: "seo_score",
       header: "SEO",
       cell: ({ row }) => <ScoreBadge score={row.original.seo_score} />,
-      size: 70,
+      size: 52,
     },
     {
       accessorKey: "fcp",
       header: "FCP",
       cell: ({ row }) => <span className="tabular-nums">{formatMilliseconds(row.original.fcp)}</span>,
-      size: 80,
+      size: 62,
     },
     {
       accessorKey: "lcp",
       header: "LCP",
       cell: ({ row }) => <span className="tabular-nums">{formatMilliseconds(row.original.lcp)}</span>,
-      size: 80,
+      size: 62,
     },
     {
       accessorKey: "cls",
       header: "CLS",
       cell: ({ row }) => <span className="tabular-nums">{formatCls(row.original.cls)}</span>,
-      size: 70,
+      size: 52,
     },
     {
       accessorKey: "inp",
       header: "INP",
       cell: ({ row }) => <span className="tabular-nums">{formatMilliseconds(row.original.inp)}</span>,
-      size: 80,
+      size: 62,
     },
     {
       accessorKey: "ttfb",
       header: "TTFB",
       cell: ({ row }) => <span className="tabular-nums">{formatMilliseconds(row.original.ttfb)}</span>,
-      size: 80,
+      size: 62,
     },
     {
       accessorKey: "total_byte_weight",
       header: "Size",
       cell: ({ row }) => <span className="tabular-nums">{formatBytes(row.original.total_byte_weight)}</span>,
-      size: 90,
+      size: 68,
     },
     {
       accessorKey: "tested_at",
@@ -116,7 +116,7 @@ function createColumns(
       cell: ({ row }) => (
         <span className="text-muted-foreground">{formatDateTime(row.original.tested_at)}</span>
       ),
-      size: 140,
+      size: 115,
     },
     {
       id: "actions",
@@ -155,7 +155,7 @@ function createColumns(
           </div>
         )
       },
-      size: 100,
+      size: 80,
       enableSorting: false,
     },
   ]
