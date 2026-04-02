@@ -298,7 +298,7 @@ export function TestUrls() {
                 title="No Sites Configured"
                 description="Add your first site and URLs to start monitoring performance."
                 actionText="Go to Setup"
-                actionHref="/app/setup"
+                actionHref="/setup"
               />
             </CardContent>
           </Card>

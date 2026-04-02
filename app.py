@@ -102,31 +102,20 @@ def create_app() -> Flask:
     def handle_scheduler_error(exc):
         return jsonify({"success": False, "error": exc.message}), 500
 
-    # ---- Serve React frontend on /app/* (coexists with legacy templates) ----
+    # ---- Serve React frontend at / (catch-all after API and legacy routes) ----
     frontend_dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend', 'dist')
     logging.info('React frontend dist path: %s (exists: %s)', frontend_dist, os.path.exists(frontend_dist))
 
-    @flask_app.route('/app/debug')
-    def react_debug():
-        """Temporary diagnostic endpoint — shows frontend dist status."""
-        exists = os.path.exists(frontend_dist)
-        contents = os.listdir(frontend_dist) if exists else []
-        return jsonify({
-            'frontend_dist': frontend_dist,
-            'exists': exists,
-            'contents': contents,
-            'cwd': os.getcwd(),
-            'file': os.path.abspath(__file__),
-        })
-
-    @flask_app.route('/app/')
-    @flask_app.route('/app/<path:path>')
+    @flask_app.route('/')
+    @flask_app.route('/<path:path>')
     def serve_react(path: str = '') -> Response:
-        """Serve the React SPA for all /app/* routes.
+        """Serve the React SPA as the primary frontend.
 
         Static assets (JS, CSS, images) are served from the Vite build
         output directory. All other paths return index.html so React
-        Router can handle client-side routing.
+        Router can handle client-side routing. API routes (/api/*) and
+        legacy routes (/legacy/*) are handled by their own blueprints
+        and take priority over this catch-all.
         """
         if not os.path.exists(frontend_dist):
             return Response(

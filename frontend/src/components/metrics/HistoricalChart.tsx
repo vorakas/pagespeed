@@ -204,7 +204,7 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
               title="No Historical Data"
               description="No test results found for this URL. Run some PageSpeed tests first."
               actionText="Go to Test URLs"
-              actionHref="/app/test"
+              actionHref="/test"
             />
           )}
 

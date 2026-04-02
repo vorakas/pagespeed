@@ -13,7 +13,7 @@ This file documents the full project state so a new session can pick up where we
 - **Backend:** Python 3.11, Flask, Gunicorn, APScheduler
 - **Database:** SQLite (local dev) / PostgreSQL (production via Railway)
 - **Legacy Frontend:** Vanilla HTML/CSS/JS, Chart.js, marked.js, JSZip (served at `/`)
-- **React Frontend:** React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui (base-ui primitives), Recharts, TanStack React Table, marked.js (served at `/app/`)
+- **React Frontend:** React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui (base-ui primitives), Recharts, TanStack React Table, react-day-picker, date-fns, marked.js (served at `/app/`)
 - **External APIs:** Google PageSpeed Insights, New Relic NerdGraph (GraphQL), Azure Log Analytics (REST/KQL), Anthropic Claude, OpenAI
 - **Deployment:** Railway (Dockerfile builder, manual deploy via `npx @railway/cli up -m "message"`)
 
@@ -139,7 +139,7 @@ ConnectionManager → Repositories → Services → Blueprints
 │   │   │   └── use-local-config.ts # localStorage sync hook
 │   │   ├── components/
 │   │   │   ├── layout/         # AppLayout, Sidebar (nav only), Header (logo banner + page title)
-│   │   │   ├── ui/             # ~30 shadcn/ui components (incl. switch, checkbox w/ indeterminate)
+│   │   │   ├── ui/             # ~33 shadcn/ui components (incl. calendar, popover, date-time-picker, switch, checkbox w/ indeterminate)
 │   │   │   ├── shared/         # ScoreBadge (fixed-width), EmptyState, LoadingSpinner
 │   │   │   ├── dashboard/      # WorstPerformersSection, CwvReferenceSection, LighthouseExplanation
 │   │   │   ├── metrics/        # HistoricalChart, PageComparison
@@ -228,7 +228,8 @@ All 7 pages are fully implemented in the React frontend at `/app/`.
 - Desktop/Mobile strategy toggle
 
 ### Metrics (`/app/metrics`)
-- Historical performance chart (Recharts line chart, 30-day, 4 score lines)
+- Historical performance area chart (Recharts AreaChart, natural curve interpolation, gradient fills, shadcn-style dark tooltip)
+- Date range dropdown (7/14/30/60/90 days, default 30), multiple tests per day averaged into single data point
 - Page Comparison (side-by-side URL comparison with Lighthouse scores, CWV, size, and diff summary)
 
 ### Test URLs (`/app/test`)
@@ -258,7 +259,7 @@ All 7 pages are fully implemented in the React frontend at `/app/`.
 
 ### IIS Logs (`/app/iislogs`)
 - Azure config with secret expiration warnings, connection test
-- Log search with date range/URL/status filters, results table with status coloring
+- Log search with themed calendar date-time picker (react-day-picker + hour/minute/AM-PM controls), URL/status filters, results table with status coloring
 - Dashboard summary (stat cards, P50/P90/P99/Max percentiles, top pages, status distribution)
 - KQL query mode with 5 presets, saved query management, per-user profiles
 - Table/JSON view toggle, CSV export, site selector
@@ -268,15 +269,30 @@ All 7 pages are fully implemented in the React frontend at `/app/`.
 - Fixed-width score badges (`min-w-9`)
 - Full-width select dropdowns with absolute-positioned chevron
 - "Access" column label (was "A11y")
+- **Table column sizing:** Metric columns use `width: 1px` + `whitespace-nowrap` trick to shrink-wrap to content. URL column uses `width: 100%` (Dashboard) to absorb surplus space. Test URLs page uses `width: 1px` on metric headers without explicit URL width.
+- **Themed date-time picker:** Custom `DateTimePicker` component (`ui/date-time-picker.tsx`) with `Calendar` popover + chevron-based hour/minute/AM-PM controls, replacing native `datetime-local` inputs
 
 ---
 
 ## Recent Commit History (newest first)
 
 ```
+08f31e2 Replace native time input with themed hour/minute/AM-PM picker
+1a77d89 Replace native date inputs with themed Calendar date-time picker
+d7f439a Set URL column to width:100% on Dashboard worst performers table
+7687ef3 Shrink-wrap metric columns using width:1px + nowrap trick
+b7bbc06 Tighten metric column widths to give more space to URL column
+b2a0f83 Widen URL column on Dashboard and Test URLs tables
+c225240 Add date range dropdown to historical performance chart
+2d35e41 Average multiple test results per day on historical chart
+923852f Fix duplicate date labels on historical chart X-axis
+d63774e Match shadcn/ui area chart style: remove dots, clean grid, richer fills
+fb6d5fe Smooth area chart curves and style tooltip like shadcn/ui
+31c3f0d Switch Historical Performance chart from line to area chart
+9a265cd Move radar chart legend outside SVG to prevent label collision
+519389e Tighten comparison layout, shrink bars, fix radar legend overlap
+0132d69 Redesign sidebar as floating panel with rounded cards
 b70f6b8 Enlarge Pharos logo with bigger text matching Lamps Plus logo size
-b063c3e Enhance dark mode Pharos logo and increase logo size
-d3d154a Enlarge logos and add white Pharos text for dark mode
 504bf17 Rebrand to Lamps Plus Pharos with transparent lighthouse logo in header
 4743bdf Polish UI: banner layout, score badges, dropdowns, scrollbars, column labels
 563636b Add IIS Logs page with search, dashboard, and KQL query mode
@@ -285,14 +301,8 @@ e5554fe Add New Relic page with CWV, performance overview, APM, and custom queri
 9a8cbdb Add Setup page with site/URL CRUD and trigger management
 d54188f Add Test URLs page with batch testing, results table, and detail dialog
 38bf97f Add Metrics page with historical chart and page comparison
-c5b4922 Fix .gitignore lib/ rule ignoring frontend/src/lib/utils.ts
-15dea9c Remove tsc from build script — fix Railway Nixpacks build
-29367e7 Switch to node:20-alpine to bust Railway Docker cache
-1ade427 Skip tsc in Docker build — use vite build directly
-5d6055b Add .dockerignore and force clean Railway rebuild
 6a03c01 Switch to multi-stage Dockerfile for Railway deployment
 345384a Add React frontend scaffold with Dashboard page, served at /app/
-f805b0e Modernize nav with logo, grouped sections, pill active state, design system tokens
 ```
 
 ---
@@ -313,9 +323,9 @@ f805b0e Modernize nav with logo, grouped sections, pill active state, design sys
 - **Component organization:** Feature-based directories under `components/` (dashboard, test-urls, setup, newrelic, ai-analysis, iis-logs)
 - **State management:** SitesContext for global site data, `useLocalConfig` hook for localStorage-persisted configs (NR, Azure, AI)
 - **API client:** `services/api.ts` with `nrBody()` and `azBody()` helpers that convert camelCase TypeScript config to snake_case for backend
-- **Tables:** TanStack React Table with sortable columns, ScoreBadge components, formatters from `lib/utils.ts`
+- **Tables:** TanStack React Table with sortable columns, ScoreBadge components, formatters from `lib/utils.ts`. Metric columns use `width: 1px` shrink-wrap trick; URL column absorbs remaining space
 - **Markdown rendering:** `marked` npm package for AI analysis chat panels
-- **shadcn/ui:** base-ui primitives (not Radix) — Dialog, Select, Tabs, Progress, Checkbox (with indeterminate), Switch, etc.
+- **shadcn/ui:** base-ui primitives (not Radix) — Dialog, Select, Tabs, Progress, Checkbox (with indeterminate), Switch, Calendar, Popover, DateTimePicker, etc.
 - **Tailwind CSS 4:** Design tokens in `index.css`, `cn()` utility for class merging
 
 ### Legacy Frontend Patterns
@@ -424,8 +434,10 @@ f805b0e Modernize nav with logo, grouped sections, pill active state, design sys
 **Known issues:**
 - Railway GitHub webhook does not auto-create on repo connect — manual deploy required
 - `.gitignore` root `lib/` rule was anchored to `/lib/` to avoid ignoring `frontend/src/lib/`
+- **Dashboard table column alignment:** The "Worst Performing URLs" section renders separate `<table>` elements per site. With `table-auto`, sites with shorter URLs (e.g., Adobe) still have wider metric columns than sites with longer URLs (e.g., LampsPlus) because the browser distributes surplus space proportionally. The `width: 1px` trick on metric headers + `width: 100%` on the URL header improved it but didn't fully resolve cross-table alignment. A definitive fix would require a single table for all sites, CSS `table-layout: fixed` with explicit pixel widths on every column including URL, or JavaScript-based column width synchronization across tables.
 
 **Potential next steps:**
-- Visual polish and customization of the React frontend (colors, layouts, additional chart types)
+- Resolve Dashboard cross-table column alignment (see known issues above)
+- Visual polish and customization of the React frontend
 - Legacy frontend deprecation planning
 - Automated testing

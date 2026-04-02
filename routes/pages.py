@@ -10,15 +10,18 @@ from services.site_service import SiteService
 
 
 def create_pages_blueprint(site_service: SiteService) -> Blueprint:
-    """Factory that creates the pages blueprint with injected dependencies.
+    """Factory that creates the legacy pages blueprint under /legacy/.
+
+    The legacy Flask/template frontend is archived but still accessible
+    at /legacy/* for reference. The React frontend now serves at /.
 
     Args:
         site_service: Service for retrieving the site list.
 
     Returns:
-        Configured Flask Blueprint.
+        Configured Flask Blueprint with /legacy url_prefix.
     """
-    bp = Blueprint("pages", __name__)
+    bp = Blueprint("pages", __name__, url_prefix="/legacy")
 
     @bp.route("/")
     def index():

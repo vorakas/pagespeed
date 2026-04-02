@@ -13,7 +13,7 @@ import { AiAnalysis } from "@/pages/AiAnalysis"
 
 export default function App() {
   return (
-    <BrowserRouter basename="/app">
+    <BrowserRouter>
       <ThemeProvider>
         <TooltipProvider>
           <SitesProvider>
