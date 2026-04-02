@@ -12,8 +12,8 @@ This file documents the full project state so a new session can pick up where we
 **Tech Stack:**
 - **Backend:** Python 3.11, Flask, Gunicorn, APScheduler
 - **Database:** SQLite (local dev) / PostgreSQL (production via Railway)
-- **Legacy Frontend:** Vanilla HTML/CSS/JS, Chart.js, marked.js, JSZip (served at `/`)
-- **React Frontend:** React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui (base-ui primitives), Recharts, TanStack React Table, react-day-picker, date-fns, marked.js (served at `/app/`)
+- **React Frontend:** React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui (base-ui primitives), Recharts, TanStack React Table, react-day-picker, date-fns, marked.js (served at `/`)
+- **Legacy Frontend (archived):** Vanilla HTML/CSS/JS, Chart.js, marked.js, JSZip (archived at `/legacy/` — do NOT update)
 - **External APIs:** Google PageSpeed Insights, New Relic NerdGraph (GraphQL), Azure Log Analytics (REST/KQL), Anthropic Claude, OpenAI
 - **Deployment:** Railway (Dockerfile builder, manual deploy via `npx @railway/cli up -m "message"`)
 
@@ -24,8 +24,8 @@ This file documents the full project state so a new session can pick up where we
 ## Deployment
 
 - **Production URL:** `https://pagespeed-production.up.railway.app/`
-  - `/` — Legacy Flask/template frontend (production)
-  - `/app/` — React frontend (all 7 pages complete)
+  - `/` — React frontend (primary, all 7 pages)
+  - `/legacy/` — Archived Flask/template frontend (read-only reference, do NOT update)
 - **Production branch:** `master`
 - **Builder:** Dockerfile (multi-stage: node:20-alpine for React build, python:3.11-slim for Flask)
 - **GitHub webhook is broken** — auto-deploy on push does not work. Deploy manually:
@@ -90,7 +90,7 @@ ConnectionManager → Repositories → Services → Blueprints
 │   └── validation.py         # Shared validation helpers (~50 lines)
 ├── routes/
 │   ├── __init__.py           # register_blueprints() factory (~47 lines)
-│   ├── pages.py              # Page rendering routes (~52 lines)
+│   ├── pages.py              # Legacy page routes under /legacy/ (~52 lines, ARCHIVED)
 │   ├── sites_api.py          # Site/URL CRUD API (~56 lines)
 │   ├── testing_api.py        # PageSpeed testing API (~83 lines)
 │   ├── metrics_api.py        # Test results query API (~69 lines)
@@ -106,7 +106,7 @@ ConnectionManager → Repositories → Services → Blueprints
 ├── README.md                 # Project documentation
 ├── CLAUDE.md                 # This file — project context for Claude sessions
 ├── .gitignore
-├── templates/                # Legacy Flask templates
+├── templates/                # ARCHIVED — Legacy Flask templates (served at /legacy/, do NOT update)
 │   ├── index.html            # Dashboard home, worst performers, CWV reference guide
 │   ├── setup.html            # Site/URL management + scheduled trigger configuration
 │   ├── test.html             # PageSpeed testing with desktop/mobile toggle
@@ -114,14 +114,14 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── newrelic.html         # New Relic integration page
 │   ├── iislogs.html          # IIS logs + KQL queries + profiles (~1624 lines, heavy inline JS)
 │   └── ai_analysis.html      # AI analysis with parallel Claude + OpenAI
-├── static/
+├── static/                   # ARCHIVED — Legacy static assets (do NOT update)
 │   ├── css/style.css         # Legacy styles, dark+light mode (~5830 lines)
 │   ├── js/app.js             # Legacy frontend JS (~1740 lines)
 │   ├── favicon.ico
 │   └── images/               # Logo variants (LampsPlus dark/light, Pharos, Pharos-dark)
-├── frontend/                   # React frontend (served at /app/)
+├── frontend/                   # React frontend (served at /)
 │   ├── package.json
-│   ├── vite.config.ts          # Build config, /api proxy to localhost:5000, base: /app/
+│   ├── vite.config.ts          # Build config, /api proxy to localhost:5000, base: /
 │   ├── public/images/          # Pharos.png, Pharos-dark.png, LampsPlus logos
 │   ├── src/
 │   │   ├── App.tsx             # React Router with 7 routes under AppLayout
@@ -181,7 +181,7 @@ Cascade deletes: deleting a URL cleans up `trigger_urls` and `test_results`; del
 
 Routes are split across 8 Flask Blueprints in `routes/`, each created via a factory function with injected dependencies.
 
-**Pages** (`routes/pages.py`): `/`, `/setup`, `/test`, `/metrics`, `/newrelic`, `/iislogs`, `/ai-analysis`
+**Legacy Pages** (`routes/pages.py`): `/legacy/`, `/legacy/setup`, `/legacy/test`, `/legacy/metrics`, `/legacy/newrelic`, `/legacy/iislogs`, `/legacy/ai-analysis` — ARCHIVED, do not update
 
 **Site/URL CRUD** (`routes/sites_api.py`): `POST/GET /api/sites`, `POST/GET /api/sites/<id>/urls`, `PUT/DELETE /api/sites/<id>`, `DELETE /api/urls/<id>`
 
@@ -213,9 +213,11 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 
 ---
 
-## React Frontend — Complete
+## React Frontend (Primary) — All Development Happens Here
 
-All 7 pages are fully implemented in the React frontend at `/app/`.
+**IMPORTANT:** The React frontend is the sole active frontend. All new features, bug fixes, and UI changes must be made in the React frontend (`frontend/src/`). Do NOT modify the legacy `templates/`, `static/css/`, or `static/js/` files — they are archived at `/legacy/` for reference only.
+
+All 7 pages are fully implemented and served at `/`.
 
 ### Header & Branding
 - **Lamps Plus Pharos** branding — Lamps Plus logo + Pharos lighthouse logo side-by-side in top banner
@@ -223,41 +225,41 @@ All 7 pages are fully implemented in the React frontend at `/app/`.
 - Logo sizes: Lamps Plus `h-10`, Pharos `h-24`, separated by vertical divider
 - Theme toggle (sun/moon) in banner, page title + description below
 
-### Dashboard (`/app/`)
+### Dashboard (`/`)
 - Worst performers per site (sortable TanStack tables), CWV reference guide, Lighthouse explanation
 - Desktop/Mobile strategy toggle
 
-### Metrics (`/app/metrics`)
+### Metrics (`/metrics`)
 - Historical performance area chart (Recharts AreaChart, natural curve interpolation, gradient fills, shadcn-style dark tooltip)
 - Date range dropdown (7/14/30/60/90 days, default 30), multiple tests per day averaged into single data point
 - Page Comparison (side-by-side URL comparison with Lighthouse scores, CWV, size, and diff summary)
 
-### Test URLs (`/app/test`)
+### Test URLs (`/test`)
 - Desktop/Mobile strategy toggle, "Test All URLs" batch testing with progress panel
 - Site tabs, sortable 13-column results table (TanStack), retest/delete per URL
 - Performance detail dialog with score breakdown, metric weights, opportunities, failed audits
 
-### Setup (`/app/setup`)
+### Setup (`/setup`)
 - Add Site / Add URL forms, collapsible site drawers with URL lists, delete site/URL
 - Trigger create/edit/delete with preset or custom cron schedules, strategy selection
 - URL checkbox grid with per-site select-all and indeterminate state
 - Trigger cards with enable/disable switch, run-now, last-run status
 
-### New Relic (`/app/newrelic`)
+### New Relic (`/newrelic`)
 - Config panel with localStorage persistence and connection test
 - Core Web Vitals with percentile cards (P50/P75/P90) and threshold indicators
 - Performance overview with period comparison (response time, throughput, error rate, Apdex)
 - APM metrics with tabbed tables (transactions, database, external, errors)
 - Custom NRQL query runner with JSON results
 
-### AI Analysis (`/app/ai-analysis`)
+### AI Analysis (`/ai-analysis`)
 - Config panel for Claude and OpenAI API keys/models
 - Parallel analysis with side-by-side markdown results (marked.js)
 - Multi-turn follow-up conversations with context preservation
 - Cumulative token usage tracking, data source status badges
 - Experimental disclaimer
 
-### IIS Logs (`/app/iislogs`)
+### IIS Logs (`/iislogs`)
 - Azure config with secret expiration warnings, connection test
 - Log search with themed calendar date-time picker (react-day-picker + hour/minute/AM-PM controls), URL/status filters, results table with status coloring
 - Dashboard summary (stat cards, P50/P90/P99/Max percentiles, top pages, status distribution)
@@ -277,6 +279,7 @@ All 7 pages are fully implemented in the React frontend at `/app/`.
 ## Recent Commit History (newest first)
 
 ```
+f0de140 Move React frontend to root URL, archive legacy site at /legacy/
 08f31e2 Replace native time input with themed hour/minute/AM-PM picker
 1a77d89 Replace native date inputs with themed Calendar date-time picker
 d7f439a Set URL column to width:100% on Dashboard worst performers table
@@ -328,11 +331,8 @@ d54188f Add Test URLs page with batch testing, results table, and detail dialog
 - **shadcn/ui:** base-ui primitives (not Radix) — Dialog, Select, Tabs, Progress, Checkbox (with indeterminate), Switch, Calendar, Popover, DateTimePicker, etc.
 - **Tailwind CSS 4:** Design tokens in `index.css`, `cn()` utility for class merging
 
-### Legacy Frontend Patterns
-- **Inline JS in iislogs.html** — ~1200 lines of inline `<script>` (tab management, Azure config, KQL queries, column resize, profiles, etc.)
-- **Shared JS in app.js** — dashboard functionality, site management, testing, charting, theme toggle, `showToast()`, `createEmptyState()`
-- **CSS design system** — All colors use CSS custom property tokens defined in `:root`; light mode overrides reassign tokens in `body.light-mode`
-- **localStorage for config** — all API credentials stored client-side, passed to server in request bodies
+### Legacy Frontend (ARCHIVED — do NOT modify)
+The legacy Flask/template frontend (`templates/`, `static/`) is archived at `/legacy/`. It remains in the repo for reference but should never be updated. All development happens in the React frontend.
 
 ### UI Conventions
 - **Status code coloring:** 2xx (green), 3xx (blue/primary), 4xx (yellow/average), 5xx (red/poor)
@@ -425,7 +425,7 @@ d54188f Add Test URLs page with batch testing, results table, and detail dialog
 
 ## Current State
 
-**React frontend migration is complete.** All 7 pages are fully implemented at `/app/`. The legacy Flask/template site remains fully functional at `/`.
+**React frontend is the primary (and only active) frontend**, served at `/`. The legacy Flask/template site is archived at `/legacy/` and must not be updated.
 
 **App rebranded to "Lamps Plus Pharos"** with lighthouse logo in header (dark/light variants).
 
@@ -439,5 +439,4 @@ d54188f Add Test URLs page with batch testing, results table, and detail dialog
 **Potential next steps:**
 - Resolve Dashboard cross-table column alignment (see known issues above)
 - Visual polish and customization of the React frontend
-- Legacy frontend deprecation planning
 - Automated testing
