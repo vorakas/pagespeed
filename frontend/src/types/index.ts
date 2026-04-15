@@ -226,6 +226,71 @@ export interface AiFollowUpResult {
   output_tokens: number
 }
 
+// ---------- Azure DevOps ----------
+
+export interface DevOpsConfig {
+  pat: string
+  organization: string
+  project: string
+  orchestratorPipelineId: number | null
+  pipelineMap: Record<string, number>
+}
+
+export type BuildStatus =
+  | "notStarted"
+  | "inProgress"
+  | "completed"
+  | "cancelling"
+  | "postponed"
+  | "notSet"
+  | "none"
+
+export type BuildResult =
+  | "succeeded"
+  | "partiallySucceeded"
+  | "failed"
+  | "canceled"
+  | "none"
+  | null
+
+export interface DevOpsPipeline {
+  id: number
+  name: string
+  folder: string
+}
+
+export interface DevOpsBuild {
+  id: number
+  buildNumber: string
+  status: BuildStatus
+  result: BuildResult
+  definitionId: number
+  definitionName: string
+  sourceBranch: string
+  startTime: string | null
+  finishTime: string | null
+  requestedBy: string
+  webUrl: string
+}
+
+export interface FailedTest {
+  testId: string
+  testName: string
+  config: string
+  errorMessage: string
+  stackTrace: string
+  zephyrUrl: string
+  isRerun: boolean
+}
+
+export interface SkippedTest {
+  testId: string
+  testName: string
+  config: string
+  errorMessage: string
+  zephyrUrl: string
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {

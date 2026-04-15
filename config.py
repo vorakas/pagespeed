@@ -116,3 +116,13 @@ AZURE_LOG_ANALYTICS_SCOPE: str = 'https://api.loganalytics.io/.default'
 
 AZURE_LOG_ANALYTICS_BASE_URL: str = 'https://api.loganalytics.io/v1/workspaces'
 """Base URL for Azure Log Analytics REST API."""
+
+# ---------------------------------------------------------------------------
+# Azure DevOps defaults
+# ---------------------------------------------------------------------------
+
+AZDO_API_VERSION: str = '7.1'
+"""Azure DevOps REST API version for pipeline and build operations."""
+
+AZDO_REQUEST_TIMEOUT_SECONDS: int = 15
+"""HTTP timeout for Azure DevOps REST API requests."""

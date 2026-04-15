@@ -20,6 +20,11 @@ import type {
   AiConfig,
   AiAnalysisResult,
   AiFollowUpResult,
+  DevOpsConfig,
+  DevOpsPipeline,
+  DevOpsBuild,
+  FailedTest,
+  SkippedTest,
 } from "@/types"
 
 class ApiClient {
@@ -337,6 +342,137 @@ class ApiClient {
     return this.request("/api/ai/follow-up", {
       method: "POST",
       body: JSON.stringify({ ...config, ...data }),
+    })
+  }
+  // ---------- Azure DevOps ----------
+
+  private devOpsBody(config: DevOpsConfig, extra: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      pat: config.pat,
+      organization: config.organization,
+      project: config.project,
+      ...extra,
+    })
+  }
+
+  async testDevOpsConnection(config: DevOpsConfig): Promise<{ success: boolean; message: string }> {
+    return this.request("/api/devops/test-connection", {
+      method: "POST",
+      body: this.devOpsBody(config),
+    })
+  }
+
+  async getDevOpsFailedTests(
+    config: DevOpsConfig,
+    buildId: number
+  ): Promise<{ success: boolean; failedTests: FailedTest[] }> {
+    return this.request(`/api/devops/failed-tests/${buildId}`, {
+      method: "POST",
+      body: this.devOpsBody(config),
+    })
+  }
+
+  async getDevOpsSkippedTests(
+    config: DevOpsConfig,
+    buildId: number
+  ): Promise<{ success: boolean; skippedTests: SkippedTest[] }> {
+    return this.request(`/api/devops/skipped-tests/${buildId}`, {
+      method: "POST",
+      body: this.devOpsBody(config),
+    })
+  }
+
+  async getDevOpsEffectiveStatus(
+    config: DevOpsConfig,
+    buildId: number
+  ): Promise<{ success: boolean; effectiveResult: string; hasRerun: boolean }> {
+    return this.request(`/api/devops/effective-status/${buildId}`, {
+      method: "POST",
+      body: this.devOpsBody(config),
+    })
+  }
+
+  async getDevOpsPipelines(config: DevOpsConfig): Promise<{ success: boolean; pipelines: DevOpsPipeline[] }> {
+    return this.request("/api/devops/pipelines", {
+      method: "POST",
+      body: this.devOpsBody(config),
+    })
+  }
+
+  async getDevOpsBuilds(
+    config: DevOpsConfig,
+    definitionIds?: number[],
+    top: number = 20
+  ): Promise<{ success: boolean; builds: DevOpsBuild[] }> {
+    return this.request("/api/devops/builds", {
+      method: "POST",
+      body: this.devOpsBody(config, {
+        definition_ids: definitionIds || null,
+        top,
+      }),
+    })
+  }
+
+  async getDevOpsBuild(config: DevOpsConfig, buildId: number): Promise<{ success: boolean; build: DevOpsBuild }> {
+    return this.request(`/api/devops/builds/${buildId}`, {
+      method: "POST",
+      body: this.devOpsBody(config),
+    })
+  }
+
+  async getDevOpsBranches(config: DevOpsConfig): Promise<{ success: boolean; branches: string[] }> {
+    return this.request("/api/devops/branches", {
+      method: "POST",
+      body: this.devOpsBody(config),
+    })
+  }
+
+  async triggerDevOpsPipeline(
+    config: DevOpsConfig,
+    pipelineId: number,
+    branch?: string,
+    templateParameters?: Record<string, string>
+  ): Promise<{ success: boolean; build: DevOpsBuild }> {
+    return this.request(`/api/devops/trigger/${pipelineId}`, {
+      method: "POST",
+      body: this.devOpsBody(config, {
+        branch: branch ? `refs/heads/${branch}` : "refs/heads/master",
+        template_parameters: templateParameters || {},
+      }),
+    })
+  }
+
+  async triggerDevOpsOrchestrator(
+    config: DevOpsConfig,
+    params: {
+      pipelineId: number
+      branch: string
+      targetInstance: string
+      runWarmUp: boolean
+      runFunctional: boolean
+      runVisual: boolean
+      runWindows: boolean
+      runMac: boolean
+      runIPhone: boolean
+      runAndroid: boolean
+    }
+  ): Promise<{ success: boolean; build: DevOpsBuild }> {
+    return this.request("/api/devops/trigger-orchestrator", {
+      method: "POST",
+      body: this.devOpsBody(config, {
+        pipeline_id: params.pipelineId,
+        branch: `refs/heads/${params.branch}`,
+        template_parameters: {
+          runWarmUp: String(params.runWarmUp),
+          runFunctional: String(params.runFunctional),
+          runVisual: String(params.runVisual),
+          runWindows: String(params.runWindows),
+          runMac: String(params.runMac),
+          runIPhone: String(params.runIPhone),
+          runAndroid: String(params.runAndroid),
+          TargetInstance: params.targetInstance,
+        },
+      }),
     })
   }
 }

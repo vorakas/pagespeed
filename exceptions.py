@@ -66,6 +66,13 @@ class AzureError(ExternalAPIError):
         super().__init__(message, provider="Azure")
 
 
+class AzureDevOpsError(ExternalAPIError):
+    """Azure DevOps Pipelines REST API failure."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, provider="Azure DevOps")
+
+
 class AIServiceError(ExternalAPIError):
     """AI provider (Claude / OpenAI) API failure."""
 

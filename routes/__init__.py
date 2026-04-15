@@ -9,6 +9,7 @@ from flask import Flask
 from data_access import TestResultRepository
 from routes.ai_api import create_ai_blueprint
 from routes.azure_api import create_azure_blueprint
+from routes.devops_api import create_devops_blueprint
 from routes.metrics_api import create_metrics_blueprint
 from routes.newrelic_api import create_newrelic_blueprint
 from routes.pages import create_pages_blueprint
@@ -44,3 +45,4 @@ def register_blueprints(
     app.register_blueprint(create_newrelic_blueprint())
     app.register_blueprint(create_azure_blueprint())
     app.register_blueprint(create_ai_blueprint())
+    app.register_blueprint(create_devops_blueprint())

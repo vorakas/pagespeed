@@ -10,6 +10,7 @@ import {
   Activity,
   FileText,
   Brain,
+  Hammer,
   Sun,
   Moon,
 } from "lucide-react"
@@ -40,6 +41,7 @@ const navSections: NavSection[] = [
       { label: "New Relic", href: "/newrelic", icon: <Activity size={16} /> },
       { label: "IIS Logs", href: "/iislogs", icon: <FileText size={16} /> },
       { label: "AI Analysis", href: "/ai-analysis", icon: <Brain size={16} /> },
+      { label: "Automation Builds", href: "/builds", icon: <Hammer size={16} /> },
     ],
   },
   {
