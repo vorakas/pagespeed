@@ -223,19 +223,47 @@ export function Builds() {
     setTimeout(fetchBuilds, 2000)
   }
 
-  const handleAddToSheet = useCallback((roleKey: string) => {
+  const handleAddToSheet = useCallback(async (roleKey: string) => {
     const build = builds[roleKey]
     if (!build) return
     const platform = roleKey === "WarmUp" ? "Windows" : roleKey.split("_")[0]
     const type = roleKey === "WarmUp" ? "Warmup" : roleKey.split("_")[1] || "Functional"
-    const failed = failedTestsCache[build.id] ?? []
-    const skipped = skippedTestsCache[build.id] ?? []
+
+    // Use cached data or fetch on demand
+    let failed = failedTestsCache[build.id] ?? []
+    let skipped = skippedTestsCache[build.id] ?? []
+
+    if (!failedTestsCache[build.id]) {
+      try {
+        const res = await api.getDevOpsFailedTests(config, build.id)
+        if (res.success) {
+          failed = res.failedTests
+          setFailedTestsCache((prev) => ({ ...prev, [build.id]: failed }))
+        }
+      } catch { /* use empty array */ }
+    }
+
+    if (!skippedTestsCache[build.id]) {
+      try {
+        const res = await api.getDevOpsSkippedTests(config, build.id)
+        if (res.success) {
+          skipped = res.skippedTests
+          setSkippedTestsCache((prev) => ({ ...prev, [build.id]: skipped }))
+        }
+      } catch { /* use empty array */ }
+    }
+
+    // Filter out Visual Target tests that only failed because their Baseline failed
+    const filteredFailed = failed.filter((t) =>
+      !t.errorMessage?.includes("Baseline visual test failed and comparison test shouldn't be executed")
+    )
+
     setSheetData((prev) => {
       const next = new Map(prev)
-      next.set(roleKey, { roleKey, platform, type, failed, skipped })
+      next.set(roleKey, { roleKey, platform, type, failed: filteredFailed, skipped })
       return next
     })
-  }, [builds, failedTestsCache, skippedTestsCache])
+  }, [builds, config, failedTestsCache, skippedTestsCache])
 
   const handleSheetClear = useCallback(() => {
     setSheetData(new Map())
