@@ -4,7 +4,7 @@ WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ .
-RUN npm run build
+RUN echo "cache-bust-2026-04-16" && npm run build
 
 # Stage 2: Python application
 FROM python:3.11-slim
