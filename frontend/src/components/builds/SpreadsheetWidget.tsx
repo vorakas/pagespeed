@@ -45,9 +45,10 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
   }, [releaseName, sheetData])
 
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-3 space-y-2.5">
-        <div className="flex items-center gap-1.5">
+    <Card className="overflow-hidden h-full flex flex-col">
+      <CardContent className="p-3 flex flex-col flex-1 min-h-0 gap-2">
+        {/* Header */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <FileSpreadsheet className="h-4 w-4 text-score-good" />
           <p className="text-sm font-medium text-foreground">Spreadsheet Export</p>
           {prefetchingTests && (
@@ -59,7 +60,7 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
         </div>
 
         {/* Release name input */}
-        <div>
+        <div className="shrink-0">
           <label className="text-[10px] text-muted-foreground" htmlFor="release-name">
             Release / Tab Name
           </label>
@@ -73,10 +74,11 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
           />
         </div>
 
-        {/* Breakdown table */}
+        {/* Scrollable table area */}
         {hasData ? (
-          <div className="rounded border border-border overflow-hidden">
-            <table className="w-full text-[11px]">
+          <div className="flex-1 min-h-0 flex flex-col rounded border border-border overflow-hidden">
+            {/* Table header — frozen */}
+            <table className="w-full text-[11px] shrink-0">
               <thead>
                 <tr className="bg-muted/50">
                   <th className="px-2 py-1 text-left font-medium text-muted-foreground">Build</th>
@@ -84,49 +86,60 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
                   <th className="px-2 py-1 text-right font-medium text-muted-foreground">Skipped</th>
                 </tr>
               </thead>
-              <tbody>
-                {DISPLAY_ORDER.filter((d) => sheetData.has(d.key)).map((d) => {
-                  const entry = sheetData.get(d.key)!
-                  return (
-                    <tr key={d.key} className="border-t border-border">
-                      <td className="px-2 py-0.5 text-foreground">{d.label}</td>
-                      <td className="px-2 py-0.5 text-right tabular-nums">
-                        {entry.failed.length > 0 ? (
-                          <span className="text-score-poor">{entry.failed.length}</span>
-                        ) : (
-                          <span className="text-muted-foreground">0</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-0.5 text-right tabular-nums">
-                        {entry.skipped.length > 0 ? (
-                          <span className="text-amber-500">{entry.skipped.length}</span>
-                        ) : (
-                          <span className="text-muted-foreground">0</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-                {/* Totals row */}
+            </table>
+            {/* Scrollable body */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <table className="w-full text-[11px]">
+                <tbody>
+                  {DISPLAY_ORDER.filter((d) => sheetData.has(d.key)).map((d) => {
+                    const entry = sheetData.get(d.key)!
+                    return (
+                      <tr key={d.key} className="border-t border-border">
+                        <td className="px-2 py-0.5 text-foreground">{d.label}</td>
+                        <td className="px-2 py-0.5 text-right tabular-nums">
+                          {entry.failed.length > 0 ? (
+                            <span className="text-score-poor">{entry.failed.length}</span>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-0.5 text-right tabular-nums">
+                          {entry.skipped.length > 0 ? (
+                            <span className="text-amber-500">{entry.skipped.length}</span>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {/* Totals row — frozen at bottom */}
+            <table className="w-full text-[11px] shrink-0">
+              <tfoot>
                 <tr className="border-t border-border bg-muted/50 font-medium">
                   <td className="px-2 py-1 text-foreground">Total</td>
                   <td className="px-2 py-1 text-right tabular-nums text-score-poor">{totals.failed}</td>
                   <td className="px-2 py-1 text-right tabular-nums text-amber-500">{totals.skipped}</td>
                 </tr>
-              </tbody>
+              </tfoot>
             </table>
           </div>
         ) : (
-          <p className="text-[11px] text-muted-foreground py-2">
-            {prefetchingTests
-              ? "Test data is loading. You can click + Sheet once loading completes."
-              : <>Click <span className="font-medium">+ Sheet</span> on a completed build card to add its results.</>
-            }
-          </p>
+          <div className="flex-1 min-h-0 flex items-center">
+            <p className="text-[11px] text-muted-foreground">
+              {prefetchingTests
+                ? "Test data is loading. You can click + Sheet once loading completes."
+                : <>Click <span className="font-medium">+ Sheet</span> on a completed build card to add its results.</>
+              }
+            </p>
+          </div>
         )}
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2">
+        {/* Action buttons — frozen at bottom */}
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"

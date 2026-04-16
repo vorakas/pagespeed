@@ -71,8 +71,8 @@ export function BuildGrid({
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
           WarmUp
         </h3>
-        <div className="flex items-start gap-4">
-          <div className="w-64 shrink-0">
+        <div className="flex items-stretch gap-4">
+          <div className="w-80 shrink-0">
             <BuildCard
               roleKey={WARMUP_ROLE.key}
               roleLabel={WARMUP_ROLE.label}
