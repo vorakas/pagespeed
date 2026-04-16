@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from typing import Optional
 
 import requests
@@ -412,8 +412,9 @@ class AzureDevOpsClient:
 
         # Process re-run failures first (most recent/authoritative)
         for run in rerun_runs:
+            run_id = run["id"]
             try:
-                results = self._fetch_run_results(run["id"])
+                results = self._fetch_run_results(run_id)
             except requests.exceptions.RequestException:
                 continue
             for r in results:
@@ -426,6 +427,8 @@ class AzureDevOpsClient:
                 if not test_id or key in seen_keys:
                     continue
                 seen_keys.add(key)
+                result_id = r.get("id", 0)
+                screenshot_id = self._find_screenshot_id(run_id, result_id)
                 failed_tests.append({
                     "testId": test_id,
                     "testName": self._extract_short_name(name),
@@ -434,12 +437,16 @@ class AzureDevOpsClient:
                     "stackTrace": r.get("stackTrace", ""),
                     "zephyrUrl": f"{self._ZEPHYR_BASE_URL}{test_id}",
                     "isRerun": True,
+                    "runId": run_id,
+                    "resultId": result_id,
+                    "screenshotId": screenshot_id,
                 })
 
         # Then process original failures, skipping any that were re-run
         for run in original_runs:
+            run_id = run["id"]
             try:
-                results = self._fetch_run_results(run["id"])
+                results = self._fetch_run_results(run_id)
             except requests.exceptions.RequestException:
                 continue
             for r in results:
@@ -455,6 +462,8 @@ class AzureDevOpsClient:
                 if key in rerun_all_keys:
                     continue
                 seen_keys.add(key)
+                result_id = r.get("id", 0)
+                screenshot_id = self._find_screenshot_id(run_id, result_id)
                 failed_tests.append({
                     "testId": test_id,
                     "testName": self._extract_short_name(name),
@@ -463,6 +472,9 @@ class AzureDevOpsClient:
                     "stackTrace": r.get("stackTrace", ""),
                     "zephyrUrl": f"{self._ZEPHYR_BASE_URL}{test_id}",
                     "isRerun": False,
+                    "runId": run_id,
+                    "resultId": result_id,
+                    "screenshotId": screenshot_id,
                 })
 
         failed_tests.sort(key=lambda t: t["testId"])
@@ -583,6 +595,92 @@ class AzureDevOpsClient:
             "effectiveResult": "succeeded" if all_passed else raw_result,
             "hasRerun": True,
         }
+
+    # ------------------------------------------------------------------
+    # Test result attachments (screenshots)
+    # ------------------------------------------------------------------
+
+    def _fetch_result_attachments(
+        self, run_id: int, result_id: int
+    ) -> list[dict]:
+        """Fetch attachments for a single test result.
+
+        Args:
+            run_id:    Azure DevOps test run ID.
+            result_id: Azure DevOps test result ID within the run.
+
+        Returns:
+            List of attachment dicts with ``id``, ``fileName``, and ``url``.
+        """
+        url = (
+            f"https://dev.azure.com/{self._organization}/{self._project}"
+            f"/_apis/test/runs/{run_id}/results/{result_id}/attachments"
+        )
+        headers = {
+            "Authorization": self._auth_header,
+            "Content-Type": "application/json",
+        }
+        response = requests.get(
+            url,
+            headers=headers,
+            params={"api-version": AZDO_API_VERSION},
+            timeout=AZDO_REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        return response.json().get("value", [])
+
+    def get_attachment_content(
+        self, run_id: int, result_id: int, attachment_id: int
+    ) -> bytes:
+        """Download the raw bytes of a test result attachment.
+
+        Args:
+            run_id:        Azure DevOps test run ID.
+            result_id:     Test result ID within the run.
+            attachment_id: Attachment ID.
+
+        Returns:
+            Raw bytes of the attachment content.
+        """
+        url = (
+            f"https://dev.azure.com/{self._organization}/{self._project}"
+            f"/_apis/test/runs/{run_id}/results/{result_id}"
+            f"/attachments/{attachment_id}"
+        )
+        headers = {
+            "Authorization": self._auth_header,
+        }
+        response = requests.get(
+            url,
+            headers=headers,
+            params={"api-version": AZDO_API_VERSION},
+            timeout=AZDO_REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        return response.content
+
+    @staticmethod
+    def _find_screenshot_attachment(
+        attachments: list[dict],
+    ) -> dict | None:
+        """Find the first image attachment from a list of attachments."""
+        image_extensions = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+        for att in attachments:
+            filename = att.get("fileName", "").lower()
+            if any(filename.endswith(ext) for ext in image_extensions):
+                return att
+        return None
+
+    def _find_screenshot_id(
+        self, run_id: int, result_id: int
+    ) -> int | None:
+        """Fetch attachments for a result and return the screenshot ID if found."""
+        try:
+            attachments = self._fetch_result_attachments(run_id, result_id)
+            screenshot = self._find_screenshot_attachment(attachments)
+            return screenshot.get("id") if screenshot else None
+        except requests.exceptions.RequestException:
+            return None
 
     # ------------------------------------------------------------------
     # Branches

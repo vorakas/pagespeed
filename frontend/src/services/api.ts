@@ -382,6 +382,25 @@ class ApiClient {
     })
   }
 
+  async getDevOpsTestScreenshot(
+    config: DevOpsConfig,
+    runId: number,
+    resultId: number,
+    attachmentId: number
+  ): Promise<string> {
+    const response = await fetch(
+      `${this.baseUrl}/api/devops/test-screenshot/${runId}/${resultId}/${attachmentId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: this.devOpsBody(config),
+      }
+    )
+    if (!response.ok) throw new Error("Failed to fetch screenshot")
+    const blob = await response.blob()
+    return URL.createObjectURL(blob)
+  }
+
   async getDevOpsEffectiveStatus(
     config: DevOpsConfig,
     buildId: number

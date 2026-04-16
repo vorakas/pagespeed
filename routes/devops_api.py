@@ -4,7 +4,7 @@ Clients are constructed per-request from credentials in the request body
 (stored client-side in localStorage).  No injected dependencies needed.
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
 from services.devops_client import AzureDevOpsClient
 from services.validation import validate_required_fields
@@ -84,6 +84,20 @@ def create_devops_blueprint() -> Blueprint:
         client = _make_client(data)
         tests = client.get_skipped_tests(build_id)
         return jsonify({"success": True, "skippedTests": tests})
+
+    @bp.route(
+        "/api/devops/test-screenshot/<int:run_id>/<int:result_id>/<int:attachment_id>",
+        methods=["POST"],
+    )
+    def test_screenshot(run_id: int, result_id: int, attachment_id: int):
+        data = request.get_json()
+        validate_required_fields(data, _DEVOPS_CRED_FIELDS)
+        client = _make_client(data)
+        try:
+            content = client.get_attachment_content(run_id, result_id, attachment_id)
+            return Response(content, mimetype="image/png")
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
 
     @bp.route("/api/devops/branches", methods=["POST"])
     def list_branches():

@@ -1,6 +1,13 @@
-import { useState, useEffect, useMemo } from "react"
-import { X, ExternalLink, CheckCircle2, Loader2 } from "lucide-react"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import { X, ExternalLink, CheckCircle2, Loader2, ImageIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { api } from "@/services/api"
 import type { DevOpsConfig, DevOpsBuild, FailedTest, SkippedTest } from "@/types"
 
@@ -15,6 +22,95 @@ interface BuildResultsPanelProps {
   onClose: () => void
 }
 
+/** Lazy-loaded screenshot thumbnail for a failed test. */
+function ScreenshotThumbnail({
+  config,
+  test,
+  onOpen,
+}: {
+  config: DevOpsConfig
+  test: FailedTest
+  onOpen: (url: string, testId: string) => void
+}) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+
+  const fetchScreenshot = useCallback(() => {
+    if (url || loading || !test.runId || !test.resultId || !test.screenshotId) return
+    setLoading(true)
+    api
+      .getDevOpsTestScreenshot(config, test.runId, test.resultId, test.screenshotId)
+      .then((objectUrl) => setUrl(objectUrl))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
+  }, [config, test.runId, test.resultId, test.screenshotId, url, loading])
+
+  // Fetch on mount (this component only renders inside an open <details>)
+  useEffect(() => {
+    fetchScreenshot()
+  }, [fetchScreenshot])
+
+  if (error) return null
+  if (loading) {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Loading screenshot...
+      </div>
+    )
+  }
+  if (!url) return null
+
+  return (
+    <button
+      type="button"
+      className="mt-2 block cursor-pointer rounded border border-border overflow-hidden hover:border-foreground/30 transition-colors w-full max-w-xs"
+      onClick={() => onOpen(url, test.testId)}
+      title="Click to view full size"
+    >
+      <img
+        src={url}
+        alt={`Screenshot for ${test.testId}`}
+        className="w-full h-auto"
+      />
+    </button>
+  )
+}
+
+/** Expandable failure details: stack trace + screenshot. */
+function FailureDetails({
+  config,
+  test,
+  onScreenshotOpen,
+}: {
+  config: DevOpsConfig
+  test: FailedTest
+  onScreenshotOpen: (url: string, testId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const hasScreenshot = test.screenshotId != null
+
+  if (!test.stackTrace && !hasScreenshot) return null
+
+  return (
+    <details className="group" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1.5">
+        {test.stackTrace ? "Stack trace" : "Screenshot"}
+        {hasScreenshot && <ImageIcon className="h-3 w-3" />}
+      </summary>
+      {test.stackTrace && (
+        <pre className="mt-1 max-h-64 overflow-auto rounded border border-border bg-background p-2 text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
+          {test.stackTrace}
+        </pre>
+      )}
+      {hasScreenshot && open && (
+        <ScreenshotThumbnail config={config} test={test} onOpen={onScreenshotOpen} />
+      )}
+    </details>
+  )
+}
+
 export function BuildResultsPanel({
   config, build, mode, prefetchedFailedTests, prefetchedSkippedTests, onClose,
 }: BuildResultsPanelProps) {
@@ -22,6 +118,20 @@ export function BuildResultsPanel({
   const [failedTests, setFailedTests] = useState<FailedTest[]>([])
   const [skippedTests, setSkippedTests] = useState<SkippedTest[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Screenshot lightbox state
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [lightboxTestId, setLightboxTestId] = useState<string>("")
+
+  const openLightbox = useCallback((url: string, testId: string) => {
+    setLightboxUrl(url)
+    setLightboxTestId(testId)
+  }, [])
+
+  const closeLightbox = useCallback(() => {
+    setLightboxUrl(null)
+    setLightboxTestId("")
+  }, [])
 
   // Fetch failed tests
   useEffect(() => {
@@ -153,16 +263,13 @@ export function BuildResultsPanel({
                     </p>
                   )}
 
-                  {/* Stack trace (expandable, failed mode only) */}
-                  {"stackTrace" in test && test.stackTrace && (
-                    <details className="group">
-                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                        Stack trace
-                      </summary>
-                      <pre className="mt-1 max-h-64 overflow-auto rounded border border-border bg-background p-2 text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
-                        {test.stackTrace}
-                      </pre>
-                    </details>
+                  {/* Stack trace + screenshot (expandable, failed mode only) */}
+                  {isFailedMode && "stackTrace" in test && (
+                    <FailureDetails
+                      config={config}
+                      test={test as FailedTest}
+                      onScreenshotOpen={openLightbox}
+                    />
                   )}
                 </div>
               ))}
@@ -170,6 +277,27 @@ export function BuildResultsPanel({
           </div>
         )}
       </div>
+
+      {/* Screenshot lightbox modal */}
+      <Dialog open={lightboxUrl !== null} onOpenChange={(open) => { if (!open) closeLightbox() }}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] sm:max-w-[90vw] p-2">
+          <DialogHeader className="px-2 pt-1">
+            <DialogTitle className="text-sm">Screenshot — {lightboxTestId}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Full-size failure screenshot for test {lightboxTestId}
+            </DialogDescription>
+          </DialogHeader>
+          {lightboxUrl && (
+            <div className="overflow-auto max-h-[calc(90vh-4rem)]">
+              <img
+                src={lightboxUrl}
+                alt={`Full screenshot for ${lightboxTestId}`}
+                className="w-full h-auto"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

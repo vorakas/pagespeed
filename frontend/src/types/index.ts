@@ -281,6 +281,9 @@ export interface FailedTest {
   stackTrace: string
   zephyrUrl: string
   isRerun: boolean
+  runId: number | null
+  resultId: number | null
+  screenshotId: number | null
 }
 
 export interface SkippedTest {

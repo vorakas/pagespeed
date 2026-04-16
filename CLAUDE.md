@@ -24,15 +24,17 @@ This file documents the full project state so a new session can pick up where we
 ## Deployment
 
 - **Production URL:** `https://pagespeed-production.up.railway.app/`
-  - `/` — React frontend (primary, all 7 pages)
+  - `/` — React frontend (primary, all 8 pages)
   - `/legacy/` — Archived Flask/template frontend (read-only reference, do NOT update)
 - **Production branch:** `master`
 - **Builder:** Dockerfile (multi-stage: node:20-alpine for React build, python:3.11-slim for Flask)
-- **GitHub webhook is broken** — auto-deploy on push does not work. Deploy manually:
+- **GitHub webhook is broken** — auto-deploy on push does not work. Deploy via Railway GraphQL API (see Deploy Rules below) or manually:
   ```
   git push
   npx @railway/cli up -m "$(git log -1 --pretty=%s)"
   ```
+- **Railway API deploy:** Token stored in `.env` (`RAILWAY_TOKEN`). See "Deploy Rules" section for the automated workflow triggered by "Push to GitHub and deploy to Railway"
+- **Railway IDs:** Project `a6cb2ea4-df71-4b99-b162-38571eea72fa`, Service `0b3030d3-7c70-4d6a-a4ab-47d84a58b123`, Environment `0226ddd8-058c-4d74-a18a-e4d831d1a195`
 - **PORT:** Railway sets `$PORT` env var. Ensure Railway networking matches (currently 5000).
 
 ---
@@ -87,9 +89,10 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── ai_claude.py          # Claude API client (~100 lines)
 │   ├── ai_openai.py          # OpenAI API client (~90 lines)
 │   ├── ai_orchestrator.py    # Parallel AI analysis orchestrator (~300 lines)
+│   ├── devops_client.py      # Azure DevOps REST API client (~675 lines) — builds, triggers, test results, branches, effective status
 │   └── validation.py         # Shared validation helpers (~50 lines)
 ├── routes/
-│   ├── __init__.py           # register_blueprints() factory (~47 lines)
+│   ├── __init__.py           # register_blueprints() factory
 │   ├── pages.py              # Legacy page routes under /legacy/ (~52 lines, ARCHIVED)
 │   ├── sites_api.py          # Site/URL CRUD API (~56 lines)
 │   ├── testing_api.py        # PageSpeed testing API (~83 lines)
@@ -97,7 +100,8 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── triggers_api.py       # Trigger CRUD + toggle + presets API (~81 lines)
 │   ├── newrelic_api.py       # New Relic proxy API (~78 lines)
 │   ├── azure_api.py          # Azure Log Analytics proxy API (~107 lines)
-│   └── ai_api.py             # AI analysis API (~159 lines)
+│   ├── ai_api.py             # AI analysis API (~159 lines)
+│   └── devops_api.py         # Azure DevOps API (~124 lines) — builds, triggers, branches, test results, skipped tests
 ├── requirements.txt          # Python dependencies
 ├── Dockerfile                # Production container (multi-stage)
 ├── Procfile                  # Gunicorn: 2 workers, 300s timeout
@@ -124,7 +128,7 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── vite.config.ts          # Build config, /api proxy to localhost:5000, base: /
 │   ├── public/images/          # Pharos.png, Pharos-dark.png, LampsPlus logos
 │   ├── src/
-│   │   ├── App.tsx             # React Router with 7 routes under AppLayout
+│   │   ├── App.tsx             # React Router with 8 routes under AppLayout
 │   │   ├── index.css           # Tailwind + shadcn design tokens (dark/light), themed scrollbars
 │   │   ├── services/api.ts     # Typed API client (30+ endpoints, snake_case conversion for NR/Azure)
 │   │   ├── types/index.ts      # TypeScript interfaces for all entities
@@ -147,7 +151,15 @@ ConnectionManager → Repositories → Services → Blueprints
 │   │   │   ├── setup/          # SiteUrlManager, TriggerForm, TriggerCard, TriggerList
 │   │   │   ├── newrelic/       # NewRelicConfig, CwvMetrics, PerformanceOverview, ApmMetrics, CustomQuery
 │   │   │   ├── ai-analysis/    # AiConfigPanel, AnalysisPanel (markdown chat w/ marked.js)
-│   │   │   └── iis-logs/       # AzureConfigPanel, LogSearchPanel, DashboardSummary, KqlQueryPanel
+│   │   │   ├── iis-logs/       # AzureConfigPanel, LogSearchPanel, DashboardSummary, KqlQueryPanel
+│   │   │   └── builds/         # Azure DevOps build monitoring components
+│   │   │       ├── BuildCard.tsx           # Individual build card with status, Run/Results/Skipped buttons, per-card branch/env overrides
+│   │   │       ├── BuildGrid.tsx           # Orchestrated grid layout (WarmUp + Functional→Visual per platform)
+│   │   │       ├── BuildResultsModal.tsx   # (Legacy — replaced by BuildResultsPanel)
+│   │   │       ├── BuildResultsPanel.tsx   # Side panel for failed/skipped test results with prefetch support
+│   │   │       ├── DevOpsConfigPanel.tsx   # PAT/organization/project configuration
+│   │   │       ├── OrchestratorPanel.tsx   # Run All Builds: checkboxes, branch dropdown, environment selector
+│   │   │       └── PipelineMapper.tsx      # Map role keys to Azure DevOps pipeline definition IDs
 │   │   └── pages/
 │   │       ├── Dashboard.tsx   # ✅ Complete — worst performers, CWV reference, Lighthouse
 │   │       ├── Metrics.tsx     # ✅ Complete — historical chart + page comparison
@@ -155,7 +167,8 @@ ConnectionManager → Repositories → Services → Blueprints
 │   │       ├── Setup.tsx       # ✅ Complete — site/URL CRUD, trigger management
 │   │       ├── NewRelic.tsx    # ✅ Complete — CWV, performance overview, APM, custom queries
 │   │       ├── AiAnalysis.tsx  # ✅ Complete — parallel Claude/OpenAI, follow-up conversations
-│   │       └── IisLogs.tsx     # ✅ Complete — Azure logs, dashboard, KQL queries, profiles
+│   │       ├── IisLogs.tsx     # ✅ Complete — Azure logs, dashboard, KQL queries, profiles
+│   │       └── Builds.tsx      # ✅ Complete — Azure DevOps build monitoring, orchestration, test results
 │   └── dist/                   # Vite build output (copied to Docker image)
 ```
 
@@ -197,6 +210,8 @@ Routes are split across 8 Flask Blueprints in `routes/`, each created via a fact
 
 **Triggers** (`routes/triggers_api.py`): `GET /api/triggers`, `POST /api/triggers`, `PUT /api/triggers/<id>`, `DELETE /api/triggers/<id>`, `PATCH /api/triggers/<id>/toggle`, `POST /api/triggers/<id>/run-now`, `GET/POST/DELETE /api/triggers/presets`
 
+**Azure DevOps** (`routes/devops_api.py`): `POST /api/devops/test-connection`, `POST /api/devops/pipelines`, `POST /api/devops/builds`, `POST /api/devops/builds/<id>`, `POST /api/devops/effective-status/<id>`, `POST /api/devops/failed-tests/<id>`, `POST /api/devops/skipped-tests/<id>`, `POST /api/devops/branches`, `POST /api/devops/trigger/<pipeline_id>`, `POST /api/devops/trigger-orchestrator` — credentials sent per-request from localStorage (PAT-based auth)
+
 **Scheduled:** User-configurable triggers via APScheduler, managed on the Setup page. Supports preset schedules (daily, every 6h/12h, weekly) and custom cron expressions. Each trigger has its own strategy (desktop/mobile/both) and URL selection. Jobs are synced from the database on startup via `trigger_service.sync_all_jobs()`.
 
 ---
@@ -208,8 +223,10 @@ All API credentials are stored **client-side in localStorage** (not on the serve
 - `azureConfig` — Azure Tenant ID, Client ID, Client Secret, Workspace ID, Secret Expiration Date, Site (camelCase; API client converts to snake_case)
 - `aiConfig` — Claude API Key/Model, OpenAI API Key/Model
 - `kqlProfiles` — Per-user KQL query profiles with saved queries (migrated from legacy `kqlSavedQueries`)
+- `devOpsConfig` — Azure DevOps PAT, Organization, Project, Orchestrator Pipeline ID, Pipeline Map (role key → definition ID)
 
 Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API_KEY` (optional).
+Local-only env vars (`.env`, gitignored): `RAILWAY_TOKEN` — used for Railway deploy automation via GraphQL API.
 
 ---
 
@@ -217,7 +234,7 @@ Server-side env vars: `DATABASE_URL` (Railway auto-sets), `PORT`, `PAGESPEED_API
 
 **IMPORTANT:** The React frontend is the sole active frontend. All new features, bug fixes, and UI changes must be made in the React frontend (`frontend/src/`). Do NOT modify the legacy `templates/`, `static/css/`, or `static/js/` files — they are archived at `/legacy/` for reference only.
 
-All 7 pages are fully implemented and served at `/`.
+All 8 pages are fully implemented and served at `/`.
 
 ### Header & Branding
 - **Lamps Plus Pharos** branding — Lamps Plus logo + Pharos lighthouse logo side-by-side in top banner
@@ -266,6 +283,18 @@ All 7 pages are fully implemented and served at `/`.
 - KQL query mode with 5 presets, saved query management, per-user profiles
 - Table/JSON view toggle, CSV export, site selector
 
+### Automation Builds (`/builds`)
+- Azure DevOps pipeline monitoring with PAT-based auth (stored in localStorage as `devOpsConfig`)
+- **Build Grid:** WarmUp card + 4 platform rows (Windows/Mac/iPhone/Android) each with Functional→Visual chain
+- **Orchestrator Panel (Run All Builds):** Checkboxes for build types (WarmUp/Functional/Visual) and platforms (Windows/Mac/iPhone/Android), branch dropdown (fetched from Azure DevOps Git repos), environment selector (TargetInstance A-I)
+- **Per-card overrides:** Collapsible branch/env override per card via `<details>`, CSS grid layout to prevent card distortion from long branch names
+- **Results side panel:** Sticky panel to the right of the grid, shows failed or skipped test details when clicking Results/Skipped buttons. Uses `flex-1` to fill remaining viewport width
+- **Background prefetching:** Failed and skipped tests are prefetched sequentially after builds load (failed first, then skipped). Panel renders instantly from cache when available
+- **Visual Target test filtering:** Tests with "Baseline visual test failed and comparison test shouldn't be executed" in the error message are filtered out client-side
+- **Effective status:** Accounts for re-run passes (orange "Partial" becomes green "Passed (Re-runs)")
+- **Polling:** 10-second interval while any build is running
+- **Pipeline mapping:** Collapsible advanced section to map role keys to pipeline definition IDs
+
 ### UI Polish
 - Dark/light themed scrollbars (thin, rounded, theme-aware)
 - Fixed-width score badges (`min-w-9`)
@@ -279,6 +308,8 @@ All 7 pages are fully implemented and served at `/`.
 ## Recent Commit History (newest first)
 
 ```
+a69fd9a Add Azure DevOps build monitoring and orchestration dashboard
+3a6f5fa Update CLAUDE.md: React is primary frontend, legacy archived at /legacy/
 f0de140 Move React frontend to root URL, archive legacy site at /legacy/
 08f31e2 Replace native time input with themed hour/minute/AM-PM picker
 1a77d89 Replace native date inputs with themed Calendar date-time picker
@@ -421,6 +452,19 @@ The legacy Flask/template frontend (`templates/`, `static/`) is archived at `/le
   2. Update the README.md
   3. Commit and push all recent changes to GitHub.
 
+## Deploy Rules
+- When the user types "Push to GitHub and deploy to Railway" do the following:
+  1. Push to GitHub (`git push` from `C:/pagespeed-monitor`)
+  2. Read the `RAILWAY_TOKEN` from `C:/pagespeed-monitor/.env`
+  3. Trigger a fresh deploy via the Railway GraphQL API:
+     ```bash
+     source /c/pagespeed-monitor/.env && curl -s -X POST https://backboard.railway.app/graphql/v2 \
+       -H "Authorization: Bearer $RAILWAY_TOKEN" \
+       -H "Content-Type: application/json" \
+       -d '{"query": "mutation { serviceInstanceDeploy(environmentId: \"0226ddd8-058c-4d74-a18a-e4d831d1a195\", serviceId: \"0b3030d3-7c70-4d6a-a4ab-47d84a58b123\") }"}'
+     ```
+  4. Confirm the deploy was triggered successfully
+
 ---
 
 ## Current State
@@ -429,7 +473,7 @@ The legacy Flask/template frontend (`templates/`, `static/`) is archived at `/le
 
 **App rebranded to "Lamps Plus Pharos"** with lighthouse logo in header (dark/light variants).
 
-**Infrastructure:** Backend is 3-layer architecture with DI. Dockerfile uses multi-stage build (node:20-alpine → python:3.11-slim). Railway GitHub webhook integration is broken; deploy via `npx @railway/cli up -m "$(git log -1 --pretty=%s)"`.
+**Infrastructure:** Backend is 3-layer architecture with DI. Dockerfile uses multi-stage build (node:20-alpine → python:3.11-slim). Railway GitHub webhook integration is broken; deploy via Railway GraphQL API (see Deploy Rules) or `npx @railway/cli up -m "$(git log -1 --pretty=%s)"`. Railway CLI v4.37.3 installed globally.
 
 **Known issues:**
 - Railway GitHub webhook does not auto-create on repo connect — manual deploy required
