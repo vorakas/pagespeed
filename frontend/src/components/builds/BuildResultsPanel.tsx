@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { X, ExternalLink, CheckCircle2, Loader2, ImageIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,37 +22,73 @@ interface BuildResultsPanelProps {
   onClose: () => void
 }
 
-/** Lazy-loaded screenshot thumbnail for a failed test. */
+type ScreenshotStatus = "loading" | "loaded" | "error"
+
+/** Cache key for a screenshot, unique per test result. */
+function screenshotKey(test: FailedTest): string {
+  return `${test.runId}-${test.resultId}-${test.screenshotId}`
+}
+
+/**
+ * Hook that background-fetches all screenshots for a list of failed tests.
+ * Returns a Map of key → object URL for ready screenshots, and a status Map.
+ */
+function useScreenshotPrefetch(config: DevOpsConfig, tests: FailedTest[]) {
+  const [urls, setUrls] = useState<Map<string, string>>(new Map())
+  const [statuses, setStatuses] = useState<Map<string, ScreenshotStatus>>(new Map())
+  const activeRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const testsWithScreenshots = tests.filter(
+      (t) => t.runId != null && t.resultId != null && t.screenshotId != null
+    )
+    if (testsWithScreenshots.length === 0) return
+
+    for (const test of testsWithScreenshots) {
+      const key = screenshotKey(test)
+      // Skip if already fetched or in-flight
+      if (activeRef.current.has(key)) continue
+      activeRef.current.add(key)
+
+      setStatuses((prev) => new Map(prev).set(key, "loading"))
+
+      api
+        .getDevOpsTestScreenshot(config, test.runId!, test.resultId!, test.screenshotId!)
+        .then((objectUrl) => {
+          setUrls((prev) => new Map(prev).set(key, objectUrl))
+          setStatuses((prev) => new Map(prev).set(key, "loaded"))
+        })
+        .catch(() => {
+          setStatuses((prev) => new Map(prev).set(key, "error"))
+        })
+    }
+  }, [config, tests])
+
+  // Revoke object URLs on unmount to free memory
+  useEffect(() => {
+    return () => {
+      urls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return { urls, statuses }
+}
+
+/** Screenshot thumbnail that reads from the prefetch cache. */
 function ScreenshotThumbnail({
-  config,
   test,
+  screenshotUrl,
+  status,
   onOpen,
 }: {
-  config: DevOpsConfig
   test: FailedTest
+  screenshotUrl: string | undefined
+  status: ScreenshotStatus | undefined
   onOpen: (url: string, testId: string) => void
 }) {
-  const [url, setUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(false)
-
-  const fetchScreenshot = useCallback(() => {
-    if (url || loading || !test.runId || !test.resultId || !test.screenshotId) return
-    setLoading(true)
-    api
-      .getDevOpsTestScreenshot(config, test.runId, test.resultId, test.screenshotId)
-      .then((objectUrl) => setUrl(objectUrl))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [config, test.runId, test.resultId, test.screenshotId, url, loading])
-
-  // Fetch on mount (this component only renders inside an open <details>)
-  useEffect(() => {
-    fetchScreenshot()
-  }, [fetchScreenshot])
-
-  if (error) return null
-  if (loading) {
+  if (status === "error" || (!status && !screenshotUrl)) return null
+  if (status === "loading") {
     return (
       <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Loader2 className="h-3 w-3 animate-spin" />
@@ -60,17 +96,17 @@ function ScreenshotThumbnail({
       </div>
     )
   }
-  if (!url) return null
+  if (!screenshotUrl) return null
 
   return (
     <button
       type="button"
       className="mt-2 block cursor-pointer rounded border border-border overflow-hidden hover:border-foreground/30 transition-colors w-full max-w-xs"
-      onClick={() => onOpen(url, test.testId)}
+      onClick={() => onOpen(screenshotUrl, test.testId)}
       title="Click to view full size"
     >
       <img
-        src={url}
+        src={screenshotUrl}
         alt={`Screenshot for ${test.testId}`}
         className="w-full h-auto"
       />
@@ -80,21 +116,22 @@ function ScreenshotThumbnail({
 
 /** Expandable failure details: stack trace + screenshot. */
 function FailureDetails({
-  config,
   test,
+  screenshotUrl,
+  screenshotStatus,
   onScreenshotOpen,
 }: {
-  config: DevOpsConfig
   test: FailedTest
+  screenshotUrl: string | undefined
+  screenshotStatus: ScreenshotStatus | undefined
   onScreenshotOpen: (url: string, testId: string) => void
 }) {
-  const [open, setOpen] = useState(false)
   const hasScreenshot = test.screenshotId != null
 
   if (!test.stackTrace && !hasScreenshot) return null
 
   return (
-    <details className="group" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+    <details className="group">
       <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1.5">
         {test.stackTrace ? "Stack trace" : "Screenshot"}
         {hasScreenshot && <ImageIcon className="h-3 w-3" />}
@@ -104,8 +141,13 @@ function FailureDetails({
           {test.stackTrace}
         </pre>
       )}
-      {hasScreenshot && open && (
-        <ScreenshotThumbnail config={config} test={test} onOpen={onScreenshotOpen} />
+      {hasScreenshot && (
+        <ScreenshotThumbnail
+          test={test}
+          screenshotUrl={screenshotUrl}
+          status={screenshotStatus}
+          onOpen={onScreenshotOpen}
+        />
       )}
     </details>
   )
@@ -181,6 +223,10 @@ export function BuildResultsPanel({
       !test.errorMessage?.includes("Baseline visual test failed and comparison test shouldn't be executed")
     ), [failedTests])
 
+  // Background-prefetch all screenshots as soon as failed tests are available
+  const { urls: screenshotUrls, statuses: screenshotStatuses } =
+    useScreenshotPrefetch(config, displayedFailedTests)
+
   const isFailedMode = mode === "failed"
   const tests = isFailedMode ? displayedFailedTests : skippedTests
   const title = isFailedMode ? "Failed Tests" : "Skipped Tests"
@@ -229,50 +275,54 @@ export function BuildResultsPanel({
             <p className="text-sm text-muted-foreground mb-3">{countLabel}</p>
 
             <div className="space-y-3">
-              {tests.map((test, index) => (
-                <div
-                  key={`${test.testId}-${test.config}-${index}`}
-                  className="rounded-lg border border-border bg-card p-3 space-y-2"
-                >
-                  {/* Header row: Test ID + name + config */}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      {test.zephyrUrl ? (
-                        <a
-                          href={test.zephyrUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-semibold text-sidebar-primary hover:underline flex items-center gap-1"
-                        >
-                          {test.testId} <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : (
-                        <span className="text-sm font-semibold text-foreground">{test.testId}</span>
+              {tests.map((test, index) => {
+                const key = isFailedMode ? screenshotKey(test as FailedTest) : ""
+                return (
+                  <div
+                    key={`${test.testId}-${test.config}-${index}`}
+                    className="rounded-lg border border-border bg-card p-3 space-y-2"
+                  >
+                    {/* Header row: Test ID + name + config */}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        {test.zephyrUrl ? (
+                          <a
+                            href={test.zephyrUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-semibold text-sidebar-primary hover:underline flex items-center gap-1"
+                          >
+                            {test.testId} <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          <span className="text-sm font-semibold text-foreground">{test.testId}</span>
+                        )}
+                        <span className="text-xs text-muted-foreground">{test.testName}</span>
+                      </div>
+                      {test.config && (
+                        <span className="text-xs text-muted-foreground">{test.config}</span>
                       )}
-                      <span className="text-xs text-muted-foreground">{test.testName}</span>
                     </div>
-                    {test.config && (
-                      <span className="text-xs text-muted-foreground">{test.config}</span>
+
+                    {/* Exception message */}
+                    {test.errorMessage && (
+                      <p className={`text-xs ${isFailedMode ? "text-score-poor" : "text-muted-foreground"}`}>
+                        {test.errorMessage}
+                      </p>
+                    )}
+
+                    {/* Stack trace + screenshot (expandable, failed mode only) */}
+                    {isFailedMode && "stackTrace" in test && (
+                      <FailureDetails
+                        test={test as FailedTest}
+                        screenshotUrl={screenshotUrls.get(key)}
+                        screenshotStatus={screenshotStatuses.get(key)}
+                        onScreenshotOpen={openLightbox}
+                      />
                     )}
                   </div>
-
-                  {/* Exception message */}
-                  {test.errorMessage && (
-                    <p className={`text-xs ${isFailedMode ? "text-score-poor" : "text-muted-foreground"}`}>
-                      {test.errorMessage}
-                    </p>
-                  )}
-
-                  {/* Stack trace + screenshot (expandable, failed mode only) */}
-                  {isFailedMode && "stackTrace" in test && (
-                    <FailureDetails
-                      config={config}
-                      test={test as FailedTest}
-                      onScreenshotOpen={openLightbox}
-                    />
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
