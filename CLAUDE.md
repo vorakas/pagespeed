@@ -12,7 +12,7 @@ This file documents the full project state so a new session can pick up where we
 **Tech Stack:**
 - **Backend:** Python 3.11, Flask, Gunicorn, APScheduler
 - **Database:** SQLite (local dev) / PostgreSQL (production via Railway)
-- **React Frontend:** React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui (base-ui primitives), Recharts, TanStack React Table, react-day-picker, date-fns, marked.js (served at `/`)
+- **React Frontend:** React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui (base-ui primitives), Recharts, TanStack React Table, react-day-picker, date-fns, marked.js, SheetJS (xlsx) (served at `/`)
 - **Legacy Frontend (archived):** Vanilla HTML/CSS/JS, Chart.js, marked.js, JSZip (archived at `/legacy/` — do NOT update)
 - **External APIs:** Google PageSpeed Insights, New Relic NerdGraph (GraphQL), Azure Log Analytics (REST/KQL), Anthropic Claude, OpenAI
 - **Deployment:** Railway (Dockerfile builder, manual deploy via `npx @railway/cli up -m "message"`)
@@ -28,7 +28,7 @@ This file documents the full project state so a new session can pick up where we
   - `/legacy/` — Archived Flask/template frontend (read-only reference, do NOT update)
 - **Production branch:** `master`
 - **Builder:** Dockerfile (multi-stage: node:20-alpine for React build, python:3.11-slim for Flask)
-- **GitHub webhook is broken** — auto-deploy on push does not work. Deploy via Railway GraphQL API (see Deploy Rules below) or manually:
+- **GitHub webhook is broken** — auto-deploy on push does not work. **Always deploy via Railway CLI** (the GraphQL `serviceInstanceDeploy` mutation reuses Docker cache and may serve stale frontend bundles):
   ```
   git push
   npx @railway/cli up -m "$(git log -1 --pretty=%s)"
@@ -89,7 +89,7 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── ai_claude.py          # Claude API client (~100 lines)
 │   ├── ai_openai.py          # OpenAI API client (~90 lines)
 │   ├── ai_orchestrator.py    # Parallel AI analysis orchestrator (~300 lines)
-│   ├── devops_client.py      # Azure DevOps REST API client (~675 lines) — builds, triggers, test results, branches, effective status
+│   ├── devops_client.py      # Azure DevOps REST API client (~750 lines) — builds, triggers, test results, branches, effective status, test attachments/screenshots
 │   └── validation.py         # Shared validation helpers (~50 lines)
 ├── routes/
 │   ├── __init__.py           # register_blueprints() factory
@@ -130,7 +130,8 @@ ConnectionManager → Repositories → Services → Blueprints
 │   ├── src/
 │   │   ├── App.tsx             # React Router with 8 routes under AppLayout
 │   │   ├── index.css           # Tailwind + shadcn design tokens (dark/light), themed scrollbars
-│   │   ├── services/api.ts     # Typed API client (30+ endpoints, snake_case conversion for NR/Azure)
+│   │   ├── services/api.ts     # Typed API client (30+ endpoints, snake_case conversion for NR/Azure, screenshot proxy)
+│   │   ├── services/spreadsheetExport.ts  # XLSX generation utility (SheetJS) — formatted regression tracking spreadsheet
 │   │   ├── types/index.ts      # TypeScript interfaces for all entities
 │   │   ├── lib/utils.ts        # cn(), formatters, scoring helpers, cron description, escapeHtml
 │   │   ├── context/
@@ -153,13 +154,14 @@ ConnectionManager → Repositories → Services → Blueprints
 │   │   │   ├── ai-analysis/    # AiConfigPanel, AnalysisPanel (markdown chat w/ marked.js)
 │   │   │   ├── iis-logs/       # AzureConfigPanel, LogSearchPanel, DashboardSummary, KqlQueryPanel
 │   │   │   └── builds/         # Azure DevOps build monitoring components
-│   │   │       ├── BuildCard.tsx           # Individual build card with status, Run/Results/Skipped buttons, per-card branch/env overrides
-│   │   │       ├── BuildGrid.tsx           # Orchestrated grid layout (WarmUp + Functional→Visual per platform)
+│   │   │       ├── BuildCard.tsx           # Individual build card with status, Run/Results/Skipped/+Sheet buttons, per-card branch/env overrides
+│   │   │       ├── BuildGrid.tsx           # Orchestrated grid layout (WarmUp + SpreadsheetWidget + Functional→Visual per platform)
 │   │   │       ├── BuildResultsModal.tsx   # (Legacy — replaced by BuildResultsPanel)
-│   │   │       ├── BuildResultsPanel.tsx   # Side panel for failed/skipped test results with prefetch support
+│   │   │       ├── BuildResultsPanel.tsx   # Side panel for failed/skipped test results with prefetch support, screenshot thumbnails + lightbox modal
 │   │   │       ├── DevOpsConfigPanel.tsx   # PAT/organization/project configuration
 │   │   │       ├── OrchestratorPanel.tsx   # Run All Builds: checkboxes, branch dropdown, environment selector
-│   │   │       └── PipelineMapper.tsx      # Map role keys to Azure DevOps pipeline definition IDs
+│   │   │       ├── PipelineMapper.tsx      # Map role keys to Azure DevOps pipeline definition IDs
+│   │   │       └── SpreadsheetWidget.tsx   # Spreadsheet export widget: release name input, breakdown table, download .xlsx
 │   │   └── pages/
 │   │       ├── Dashboard.tsx   # ✅ Complete — worst performers, CWV reference, Lighthouse
 │   │       ├── Metrics.tsx     # ✅ Complete — historical chart + page comparison
@@ -210,7 +212,7 @@ Routes are split across 8 Flask Blueprints in `routes/`, each created via a fact
 
 **Triggers** (`routes/triggers_api.py`): `GET /api/triggers`, `POST /api/triggers`, `PUT /api/triggers/<id>`, `DELETE /api/triggers/<id>`, `PATCH /api/triggers/<id>/toggle`, `POST /api/triggers/<id>/run-now`, `GET/POST/DELETE /api/triggers/presets`
 
-**Azure DevOps** (`routes/devops_api.py`): `POST /api/devops/test-connection`, `POST /api/devops/pipelines`, `POST /api/devops/builds`, `POST /api/devops/builds/<id>`, `POST /api/devops/effective-status/<id>`, `POST /api/devops/failed-tests/<id>`, `POST /api/devops/skipped-tests/<id>`, `POST /api/devops/branches`, `POST /api/devops/trigger/<pipeline_id>`, `POST /api/devops/trigger-orchestrator` — credentials sent per-request from localStorage (PAT-based auth)
+**Azure DevOps** (`routes/devops_api.py`): `POST /api/devops/test-connection`, `POST /api/devops/pipelines`, `POST /api/devops/builds`, `POST /api/devops/builds/<id>`, `POST /api/devops/effective-status/<id>`, `POST /api/devops/failed-tests/<id>`, `POST /api/devops/skipped-tests/<id>`, `POST /api/devops/test-screenshot/<runId>/<resultId>/<attachmentId>` (proxies image from Azure DevOps), `POST /api/devops/branches`, `POST /api/devops/trigger/<pipeline_id>`, `POST /api/devops/trigger-orchestrator` — credentials sent per-request from localStorage (PAT-based auth)
 
 **Scheduled:** User-configurable triggers via APScheduler, managed on the Setup page. Supports preset schedules (daily, every 6h/12h, weekly) and custom cron expressions. Each trigger has its own strategy (desktop/mobile/both) and URL selection. Jobs are synced from the database on startup via `trigger_service.sync_all_jobs()`.
 
@@ -285,15 +287,19 @@ All 8 pages are fully implemented and served at `/`.
 
 ### Automation Builds (`/builds`)
 - Azure DevOps pipeline monitoring with PAT-based auth (stored in localStorage as `devOpsConfig`)
-- **Build Grid:** WarmUp card + 4 platform rows (Windows/Mac/iPhone/Android) each with Functional→Visual chain
+- **Build Grid:** WarmUp card (24rem fixed width) + 4 platform rows (Windows/Mac/iPhone/Android) each with Functional→Visual chain
 - **Orchestrator Panel (Run All Builds):** Checkboxes for build types (WarmUp/Functional/Visual) and platforms (Windows/Mac/iPhone/Android), branch dropdown (fetched from Azure DevOps Git repos), environment selector (TargetInstance A-I)
 - **Per-card overrides:** Collapsible branch/env override per card via `<details>`, CSS grid layout to prevent card distortion from long branch names
 - **Results side panel:** Sticky panel to the right of the grid, shows failed or skipped test details when clicking Results/Skipped buttons. Uses `flex-1` to fill remaining viewport width
-- **Background prefetching:** Failed and skipped tests are prefetched sequentially after builds load (failed first, then skipped). Panel renders instantly from cache when available
-- **Visual Target test filtering:** Tests with "Baseline visual test failed and comparison test shouldn't be executed" in the error message are filtered out client-side
+- **Background prefetching:** Failed and skipped tests are prefetched sequentially after builds load (failed first, then skipped). Panel renders instantly from cache when available. `prefetchingTests` state tracks loading progress and shows spinner in SpreadsheetWidget
+- **Failure screenshots:** Screenshots attached to failed test results in Azure DevOps are fetched via `_apis/test/runs/{runId}/results/{resultId}/attachments` (preview API version `7.2-preview.1`). Thumbnails appear below the stack trace in the expandable details accordion; clicking opens a full-size lightbox modal (Dialog component). Screenshots are prefetched in the background via `useScreenshotPrefetch` hook as soon as failed test data loads. Backend proxies image downloads through `POST /api/devops/test-screenshot/{runId}/{resultId}/{attachmentId}` to handle PAT authentication
+- **Visual Target test filtering:** Tests with "Baseline visual test failed and comparison test shouldn't be executed" in the error message are filtered out client-side (in both the Results panel and spreadsheet export)
+- **Skipped tests:** Uses `outcome == "NotExecuted"` server-side filter (matching xUnit `[Fact(Skip=...)]`) rather than the broad "Others" outcome which includes NotApplicable, Blocked, etc.
 - **Effective status:** Accounts for re-run passes (orange "Partial" becomes green "Passed (Re-runs)")
 - **Polling:** 10-second interval while any build is running
 - **Pipeline mapping:** Collapsible advanced section to map role keys to pipeline definition IDs
+- **Spreadsheet Export:** QA clicks "+ Sheet" button on each completed build card to collect failed/skipped tests. SpreadsheetWidget (CSS grid next to WarmUp card, height-locked) shows breakdown table with frozen header/totals and failed/skipped counts per build. User enters a release name (tab name), then downloads a formatted `.xlsx` via SheetJS (browser-side, no backend). Spreadsheet matches the Google Sheets tracker format: grey merged section headers (`#D9D9D9`), hyperlinked TC URLs (`lampstrack.lampsplus.com/secure/Tests.jspa#/testCase/LP-{testId}`), Automation Execution Status (Skipped/Failed), columns E-I left blank for manual QA entry. Section order: Functional Skipped × 4 platforms, Visual Skipped × 4, Warmup Failures, Functional Failed × 4, Visual Failed × 4, Unresolved × 4 (empty placeholders for future Applitools integration), Manual Execution
+  - **Known issue (WIP):** Skipped test counts may still need validation across all build types. Spreadsheet data accuracy is being refined
 
 ### UI Polish
 - Dark/light themed scrollbars (thin, rounded, theme-aware)
@@ -308,6 +314,17 @@ All 8 pages are fully implemented and served at `/`.
 ## Recent Commit History (newest first)
 
 ```
+e5579f9 Fix WarmUp card width to fit all 4 buttons on one row
+e284cd1 Fix skipped tests: filter by outcome=NotExecuted server-side
+834b47b Fix button clipping, widget height lock, and skipped test counts
+ab05adb Fix widget layout, button fit, and skipped test filtering
+899239c Fix spreadsheet widget layout and add loading indicator
+9a41f58 Fix spreadsheet export: button wrap, fetch skipped, filter baseline
+27b78e6 Add spreadsheet export for regression tracking
+e37afe5 Prefetch screenshots in background when failed tests load
+bfc1390 Force Docker cache invalidation for frontend rebuild
+c371a02 Fix attachment API version to use preview endpoint for screenshots
+0081329 Add failure screenshot display to build results panel
 a69fd9a Add Azure DevOps build monitoring and orchestration dashboard
 3a6f5fa Update CLAUDE.md: React is primary frontend, legacy archived at /legacy/
 f0de140 Move React frontend to root URL, archive legacy site at /legacy/
@@ -481,6 +498,7 @@ The legacy Flask/template frontend (`templates/`, `static/`) is archived at `/le
 - **Dashboard table column alignment:** The "Worst Performing URLs" section renders separate `<table>` elements per site. With `table-auto`, sites with shorter URLs (e.g., Adobe) still have wider metric columns than sites with longer URLs (e.g., LampsPlus) because the browser distributes surplus space proportionally. The `width: 1px` trick on metric headers + `width: 100%` on the URL header improved it but didn't fully resolve cross-table alignment. A definitive fix would require a single table for all sites, CSS `table-layout: fixed` with explicit pixel widths on every column including URL, or JavaScript-based column width synchronization across tables.
 
 **Potential next steps:**
+- **Spreadsheet export data refinement (WIP):** Skipped test counts need validation across all build types; the `outcome == "NotExecuted"` filter may need adjustment. Unresolved section (Applitools integration) is a placeholder
 - Resolve Dashboard cross-table column alignment (see known issues above)
 - Visual polish and customization of the React frontend
 - Automated testing
