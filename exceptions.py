@@ -80,6 +80,25 @@ class AIServiceError(ExternalAPIError):
         super().__init__(message, provider=provider)
 
 
+class RateLimitError(ExternalAPIError):
+    """HTTP 429 — the external service is throttling our requests.
+
+    Args:
+        message:     Human-readable description of the rate-limit event.
+        provider:    Name of the external service.
+        retry_after: Seconds to wait before retrying (from Retry-After header).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        provider: str | None = None,
+        retry_after: int = 30,
+    ) -> None:
+        self.retry_after: int = retry_after
+        super().__init__(message, provider=provider)
+
+
 class AuthenticationError(ExternalAPIError):
     """Invalid or expired API key / credentials for an external service."""
 

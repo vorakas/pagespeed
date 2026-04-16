@@ -36,6 +36,7 @@ from exceptions import (
     AuthenticationError,
     DatabaseError,
     ExternalAPIError,
+    RateLimitError,
     SchedulerError,
     ValidationError,
 )
@@ -93,6 +94,14 @@ def create_app() -> Flask:
     @flask_app.errorhandler(DatabaseError)
     def handle_db_error(exc):
         return jsonify({"success": False, "error": exc.message}), 500
+
+    @flask_app.errorhandler(RateLimitError)
+    def handle_rate_limit_error(exc):
+        return jsonify({
+            "success": False,
+            "error": str(exc),
+            "retryAfter": exc.retry_after,
+        }), 429
 
     @flask_app.errorhandler(ExternalAPIError)
     def handle_external_api_error(exc):

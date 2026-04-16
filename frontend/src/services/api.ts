@@ -27,6 +27,15 @@ import type {
   SkippedTest,
 } from "@/types"
 
+export class RateLimitError extends Error {
+  retryAfter: number
+  constructor(message: string, retryAfter: number) {
+    super(message)
+    this.name = "RateLimitError"
+    this.retryAfter = retryAfter
+  }
+}
+
 class ApiClient {
   private baseUrl: string
 
@@ -45,6 +54,12 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      if (response.status === 429) {
+        throw new RateLimitError(
+          errorData.error || "Rate limit exceeded",
+          errorData.retryAfter ?? 30,
+        )
+      }
       throw new Error(errorData.error || `Request failed: ${response.status}`)
     }
 

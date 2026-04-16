@@ -6,7 +6,7 @@ import { OrchestratorPanel } from "@/components/builds/OrchestratorPanel"
 import { BuildGrid } from "@/components/builds/BuildGrid"
 import { BuildResultsPanel, type PanelMode } from "@/components/builds/BuildResultsPanel"
 import { useLocalConfig } from "@/hooks/use-local-config"
-import { api } from "@/services/api"
+import { api, RateLimitError } from "@/services/api"
 import type { DevOpsConfig, DevOpsBuild, FailedTest, SkippedTest } from "@/types"
 import type { SheetEntry } from "@/services/spreadsheetExport"
 
@@ -40,7 +40,8 @@ const ALL_ROLE_KEYS = [
   "Android_Visual",
 ]
 
-const POLL_INTERVAL_MS = 10_000
+const POLL_INTERVAL_MS = 30_000
+const MAX_POLL_INTERVAL_MS = 120_000
 
 export function Builds() {
   const [config, setConfig] = useLocalConfig<DevOpsConfig>("devOpsConfig", DEFAULT_DEVOPS_CONFIG)
@@ -60,6 +61,9 @@ export function Builds() {
   const prefetchedIdsRef = useRef<Set<number>>(new Set())
   const prefetchedSkippedIdsRef = useRef<Set<number>>(new Set())
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollIntervalRef = useRef(POLL_INTERVAL_MS)
+  const inFlightRef = useRef(false)
+  const [rateLimited, setRateLimited] = useState(false)
   const [sheetData, setSheetData] = useState<Map<string, SheetEntry>>(new Map())
   const [prefetchingTests, setPrefetchingTests] = useState(false)
 
@@ -77,8 +81,23 @@ export function Builds() {
       .finally(() => setAutoConnecting(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const applyBackoff = useCallback((retryAfter?: number) => {
+    const floor = retryAfter ? retryAfter * 1000 : pollIntervalRef.current * 2
+    pollIntervalRef.current = Math.min(floor, MAX_POLL_INTERVAL_MS)
+    setRateLimited(true)
+  }, [])
+
+  const resetBackoff = useCallback(() => {
+    if (pollIntervalRef.current !== POLL_INTERVAL_MS) {
+      pollIntervalRef.current = POLL_INTERVAL_MS
+      setRateLimited(false)
+    }
+  }, [])
+
   const fetchBuilds = useCallback(async () => {
     if (!connected || definitionIds.length === 0) return
+    if (inFlightRef.current) return
+    inFlightRef.current = true
     try {
       const result = await api.getDevOpsBuilds(config, definitionIds, 50)
       if (!result.success) return
@@ -95,8 +114,7 @@ export function Builds() {
       }
       setBuilds(buildMap)
 
-      // Fetch effective status for completed non-succeeded builds
-      const statusChecks: Promise<void>[] = []
+      // Fetch effective status sequentially to reduce API pressure
       for (const key of ALL_ROLE_KEYS) {
         const build = buildMap[key]
         if (
@@ -105,21 +123,19 @@ export function Builds() {
           build.result !== "succeeded" &&
           build.result !== null
         ) {
-          statusChecks.push(
-            api.getDevOpsEffectiveStatus(config, build.id)
-              .then((res) => {
-                if (res.success) {
-                  setEffectiveResults((prev) => ({
-                    ...prev,
-                    [key]: { effectiveResult: res.effectiveResult, hasRerun: res.hasRerun },
-                  }))
-                }
-              })
-              .catch(() => {})
-          )
+          try {
+            const res = await api.getDevOpsEffectiveStatus(config, build.id)
+            if (res.success) {
+              setEffectiveResults((prev) => ({
+                ...prev,
+                [key]: { effectiveResult: res.effectiveResult, hasRerun: res.hasRerun },
+              }))
+            }
+          } catch (err) {
+            if (err instanceof RateLimitError) { applyBackoff(err.retryAfter); return }
+          }
         }
       }
-      await Promise.all(statusChecks)
 
       // Prefetch failed tests sequentially to avoid overwhelming Azure DevOps
       const toPrefetch = ALL_ROLE_KEYS
@@ -139,8 +155,9 @@ export function Builds() {
               if (res.success) {
                 setFailedTestsCache((prev) => ({ ...prev, [build.id]: res.failedTests }))
               }
-            } catch {
+            } catch (err) {
               prefetchedIdsRef.current.delete(build.id)
+              if (err instanceof RateLimitError) { applyBackoff(err.retryAfter); break }
             }
           }
           // Then prefetch skipped tests (lower priority, after failed tests finish)
@@ -152,17 +169,24 @@ export function Builds() {
               if (res.success) {
                 setSkippedTestsCache((prev) => ({ ...prev, [build.id]: res.skippedTests }))
               }
-            } catch {
+            } catch (err) {
               prefetchedSkippedIdsRef.current.delete(build.id)
+              if (err instanceof RateLimitError) { applyBackoff(err.retryAfter); break }
             }
           }
           setPrefetchingTests(false)
         })()
       }
-    } catch {
+
+      // Successful cycle — restore normal interval
+      resetBackoff()
+    } catch (err) {
+      if (err instanceof RateLimitError) { applyBackoff(err.retryAfter); return }
       // Silent fail — will retry on next poll
+    } finally {
+      inFlightRef.current = false
     }
-  }, [connected, config, definitionIds])
+  }, [connected, config, definitionIds, applyBackoff, resetBackoff])
 
   // Initial fetch on connect
   useEffect(() => {
@@ -181,14 +205,18 @@ export function Builds() {
   )
 
   useEffect(() => {
-    if (anyRunning && connected) {
-      pollRef.current = setInterval(fetchBuilds, POLL_INTERVAL_MS)
+    if (!anyRunning || !connected) {
+      if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
+      return
     }
+    const tick = () => {
+      fetchBuilds().finally(() => {
+        pollRef.current = setTimeout(tick, pollIntervalRef.current)
+      })
+    }
+    pollRef.current = setTimeout(tick, pollIntervalRef.current)
     return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current)
-        pollRef.current = null
-      }
+      if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
     }
   }, [anyRunning, connected, fetchBuilds])
 
@@ -286,6 +314,13 @@ export function Builds() {
           onConfigChange={setConfig}
           onConnected={() => setConnected(true)}
         />
+
+        {rateLimited && (
+          <div className="mx-6 mt-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-300">
+            Azure DevOps rate limit reached — polling slowed to {Math.round(pollIntervalRef.current / 1000)}s.
+            It will resume normal speed automatically.
+          </div>
+        )}
 
         {connected && (
           <>

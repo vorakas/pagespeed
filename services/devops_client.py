@@ -15,7 +15,7 @@ from typing import Optional
 import requests
 
 from config import AZDO_API_VERSION, AZDO_REQUEST_TIMEOUT_SECONDS
-from exceptions import AzureDevOpsError, AuthenticationError
+from exceptions import AzureDevOpsError, AuthenticationError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +102,24 @@ class AzureDevOpsClient:
                     "Access denied. Ensure the PAT has the required scopes "
                     "(Build: Read & Execute)."
                 )
+            if response.status_code == 429:
+                retry_after = int(
+                    response.headers.get("Retry-After", "30")
+                )
+                logger.warning(
+                    "Azure DevOps rate limit hit (429). "
+                    "Retry-After: %d seconds.",
+                    retry_after,
+                )
+                raise RateLimitError(
+                    "Azure DevOps rate limit exceeded. "
+                    f"Retry after {retry_after} seconds.",
+                    provider="Azure DevOps",
+                    retry_after=retry_after,
+                )
             response.raise_for_status()
             return response.json()
-        except (AuthenticationError, AzureDevOpsError):
+        except (AuthenticationError, AzureDevOpsError, RateLimitError):
             raise
         except requests.exceptions.Timeout:
             raise AzureDevOpsError("Request to Azure DevOps timed out.")
