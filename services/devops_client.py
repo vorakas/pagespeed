@@ -600,6 +600,10 @@ class AzureDevOpsClient:
     # Test result attachments (screenshots)
     # ------------------------------------------------------------------
 
+    # Azure DevOps test attachments require a preview API version,
+    # matching the version used by the CI pipeline YAML.
+    _ATTACHMENT_API_VERSION = "7.2-preview.1"
+
     def _fetch_result_attachments(
         self, run_id: int, result_id: int
     ) -> list[dict]:
@@ -623,7 +627,7 @@ class AzureDevOpsClient:
         response = requests.get(
             url,
             headers=headers,
-            params={"api-version": AZDO_API_VERSION},
+            params={"api-version": self._ATTACHMENT_API_VERSION},
             timeout=AZDO_REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
@@ -653,7 +657,7 @@ class AzureDevOpsClient:
         response = requests.get(
             url,
             headers=headers,
-            params={"api-version": AZDO_API_VERSION},
+            params={"api-version": self._ATTACHMENT_API_VERSION},
             timeout=AZDO_REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
@@ -677,9 +681,23 @@ class AzureDevOpsClient:
         """Fetch attachments for a result and return the screenshot ID if found."""
         try:
             attachments = self._fetch_result_attachments(run_id, result_id)
+            logger.info(
+                "Attachments for run=%s result=%s: %s",
+                run_id, result_id,
+                [(a.get("id"), a.get("fileName")) for a in attachments],
+            )
             screenshot = self._find_screenshot_attachment(attachments)
+            if screenshot:
+                logger.info(
+                    "Screenshot found: id=%s fileName=%s",
+                    screenshot.get("id"), screenshot.get("fileName"),
+                )
             return screenshot.get("id") if screenshot else None
-        except requests.exceptions.RequestException:
+        except Exception as exc:
+            logger.warning(
+                "Failed to fetch attachments for run=%s result=%s: %s",
+                run_id, result_id, exc,
+            )
             return None
 
     # ------------------------------------------------------------------
