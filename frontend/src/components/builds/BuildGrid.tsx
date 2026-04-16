@@ -53,6 +53,7 @@ interface BuildGridProps {
   onAddToSheet: (roleKey: string) => void
   sheetData: Map<string, SheetEntry>
   onSheetClear: () => void
+  prefetchingTests: boolean
   triggeringKeys: Set<string>
   selectedBuildId?: number
 }
@@ -60,7 +61,7 @@ interface BuildGridProps {
 export function BuildGrid({
   builds, effectiveResults, branches, globalBranch, globalTargetInstance,
   overrides, onOverrideChange, onTrigger, onShowResults, onShowSkipped,
-  onAddToSheet, sheetData, onSheetClear,
+  onAddToSheet, sheetData, onSheetClear, prefetchingTests,
   triggeringKeys, selectedBuildId,
 }: BuildGridProps) {
   return (
@@ -71,7 +72,7 @@ export function BuildGrid({
           WarmUp
         </h3>
         <div className="flex items-start gap-4">
-          <div className="max-w-xs shrink-0">
+          <div className="w-64 shrink-0">
             <BuildCard
               roleKey={WARMUP_ROLE.key}
               roleLabel={WARMUP_ROLE.label}
@@ -92,8 +93,8 @@ export function BuildGrid({
               selected={builds[WARMUP_ROLE.key]?.id === selectedBuildId}
             />
           </div>
-          <div className="max-w-xs flex-1">
-            <SpreadsheetWidget sheetData={sheetData} onClear={onSheetClear} />
+          <div className="flex-1 min-w-0">
+            <SpreadsheetWidget sheetData={sheetData} onClear={onSheetClear} prefetchingTests={prefetchingTests} />
           </div>
         </div>
       </div>

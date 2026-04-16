@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react"
-import { Download, Trash2, FileSpreadsheet } from "lucide-react"
+import { Download, Trash2, FileSpreadsheet, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { generateSpreadsheet, downloadSpreadsheet } from "@/services/spreadsheetExport"
@@ -8,6 +8,7 @@ import type { SheetEntry } from "@/services/spreadsheetExport"
 interface SpreadsheetWidgetProps {
   sheetData: Map<string, SheetEntry>
   onClear: () => void
+  prefetchingTests: boolean
 }
 
 /** Display order for the breakdown table. */
@@ -23,7 +24,7 @@ const DISPLAY_ORDER = [
   { key: "Android_Visual", label: "And Vis" },
 ]
 
-export function SpreadsheetWidget({ sheetData, onClear }: SpreadsheetWidgetProps) {
+export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: SpreadsheetWidgetProps) {
   const [releaseName, setReleaseName] = useState("")
 
   const hasData = sheetData.size > 0
@@ -49,6 +50,12 @@ export function SpreadsheetWidget({ sheetData, onClear }: SpreadsheetWidgetProps
         <div className="flex items-center gap-1.5">
           <FileSpreadsheet className="h-4 w-4 text-score-good" />
           <p className="text-sm font-medium text-foreground">Spreadsheet Export</p>
+          {prefetchingTests && (
+            <span className="flex items-center gap-1 ml-auto text-[10px] text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Loading data...
+            </span>
+          )}
         </div>
 
         {/* Release name input */}
@@ -111,7 +118,10 @@ export function SpreadsheetWidget({ sheetData, onClear }: SpreadsheetWidgetProps
           </div>
         ) : (
           <p className="text-[11px] text-muted-foreground py-2">
-            Click <span className="font-medium">+ Sheet</span> on a completed build card to add its results.
+            {prefetchingTests
+              ? "Test data is loading. You can click + Sheet once loading completes."
+              : <>Click <span className="font-medium">+ Sheet</span> on a completed build card to add its results.</>
+            }
           </p>
         )}
 

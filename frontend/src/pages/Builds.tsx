@@ -61,6 +61,7 @@ export function Builds() {
   const prefetchedSkippedIdsRef = useRef<Set<number>>(new Set())
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [sheetData, setSheetData] = useState<Map<string, SheetEntry>>(new Map())
+  const [prefetchingTests, setPrefetchingTests] = useState(false)
 
   const definitionIds = Object.values(config.pipelineMap).filter(Boolean)
 
@@ -129,6 +130,7 @@ export function Builds() {
 
       if (toPrefetch.length > 0) {
         // Run in background — don't block fetchBuilds
+        setPrefetchingTests(true)
         ;(async () => {
           for (const build of toPrefetch) {
             prefetchedIdsRef.current.add(build.id)
@@ -154,6 +156,7 @@ export function Builds() {
               prefetchedSkippedIdsRef.current.delete(build.id)
             }
           }
+          setPrefetchingTests(false)
         })()
       }
     } catch {
@@ -322,6 +325,7 @@ export function Builds() {
                   onAddToSheet={handleAddToSheet}
                   sheetData={sheetData}
                   onSheetClear={handleSheetClear}
+                  prefetchingTests={prefetchingTests}
                   triggeringKeys={triggeringKeys}
                   selectedBuildId={selectedBuild?.id}
                 />
