@@ -481,7 +481,12 @@ class AzureDevOpsClient:
         return failed_tests
 
     def get_skipped_tests(self, build_id: int) -> list[dict]:
-        """Return tests with 'Others' outcome (skipped) for a build.
+        """Return tests with 'NotExecuted' outcome (skipped) for a build.
+
+        Uses the ``NotExecuted`` outcome filter which matches tests
+        explicitly skipped by the xUnit framework (``[Fact(Skip=...)]``),
+        as opposed to the broader ``Others`` filter which includes all
+        non-Passed/non-Failed results.
 
         Only looks at the original test run — re-runs don't contain
         skipped tests.
@@ -520,7 +525,7 @@ class AzureDevOpsClient:
 
         for run in original_runs:
             try:
-                results = self._fetch_run_results(run["id"], outcomes="Others")
+                results = self._fetch_run_results(run["id"], outcomes="NotExecuted")
             except requests.exceptions.RequestException:
                 continue
             for r in results:

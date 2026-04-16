@@ -71,8 +71,8 @@ export function BuildGrid({
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
           WarmUp
         </h3>
-        <div className="flex items-stretch gap-4">
-          <div className="w-80 shrink-0">
+        <div className="grid grid-cols-[auto_1fr] gap-4 items-stretch">
+          <div className="w-72">
             <BuildCard
               roleKey={WARMUP_ROLE.key}
               roleLabel={WARMUP_ROLE.label}
@@ -93,7 +93,7 @@ export function BuildGrid({
               selected={builds[WARMUP_ROLE.key]?.id === selectedBuildId}
             />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0">
             <SpreadsheetWidget sheetData={sheetData} onClear={onSheetClear} prefetchingTests={prefetchingTests} />
           </div>
         </div>

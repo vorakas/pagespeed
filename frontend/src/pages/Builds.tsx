@@ -261,13 +261,9 @@ export function Builds() {
       !t.errorMessage?.includes("Baseline visual test failed and comparison test shouldn't be executed")
     )
 
-    // Only include skipped tests that have an error message — tests with no
-    // message are simply tests that weren't part of the run, not truly skipped
-    const filteredSkipped = skipped.filter((t) => t.errorMessage?.trim())
-
     setSheetData((prev) => {
       const next = new Map(prev)
-      next.set(roleKey, { roleKey, platform, type, failed: filteredFailed, skipped: filteredSkipped })
+      next.set(roleKey, { roleKey, platform, type, failed: filteredFailed, skipped })
       return next
     })
   }, [builds, config, failedTestsCache, skippedTestsCache])
