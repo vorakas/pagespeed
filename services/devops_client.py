@@ -525,10 +525,15 @@ class AzureDevOpsClient:
 
         for run in original_runs:
             try:
-                results = self._fetch_run_results(run["id"], outcomes="NotExecuted")
+                results = self._fetch_run_results(run["id"])
             except requests.exceptions.RequestException:
                 continue
             for r in results:
+                # Only include tests explicitly marked as NotExecuted
+                # (xUnit [Fact(Skip="reason")]).  The broader "Others"
+                # outcome filter includes NotApplicable, Blocked, etc.
+                if r.get("outcome") != "NotExecuted":
+                    continue
                 name = r.get("automatedTestName", "")
                 test_id = self._extract_test_id(name)
                 config = self._extract_config(name)
