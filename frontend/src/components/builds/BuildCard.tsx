@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Play, ExternalLink, Loader2, ClipboardList, SkipForward } from "lucide-react"
+import { Play, ExternalLink, Loader2, ClipboardList, SkipForward, FileSpreadsheet, Check } from "lucide-react"
 import type { DevOpsBuild, BuildResult, BuildStatus } from "@/types"
 
 const TARGET_INSTANCES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
@@ -24,6 +24,8 @@ interface BuildCardProps {
   onTrigger: () => void
   onShowResults?: (build: DevOpsBuild) => void
   onShowSkipped?: (build: DevOpsBuild) => void
+  onAddToSheet?: (roleKey: string) => void
+  addedToSheet?: boolean
   triggering: boolean
   selected?: boolean
 }
@@ -90,7 +92,8 @@ function formatTimeAgo(dateStr: string | null): string {
 export function BuildCard({
   roleKey, roleLabel, typeBadge, build, effectiveResult,
   branches, globalBranch, globalTargetInstance, override, onOverrideChange,
-  onTrigger, onShowResults, onShowSkipped, triggering, selected,
+  onTrigger, onShowResults, onShowSkipped, onAddToSheet, addedToSheet,
+  triggering, selected,
 }: BuildCardProps) {
   const isRunning = build?.status === "inProgress" || build?.status === "notStarted"
   const isCompleted = build?.status === "completed"
@@ -213,6 +216,22 @@ export function BuildCard({
               >
                 <SkipForward className="h-3 w-3" /> Skipped
               </Button>
+              {onAddToSheet && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`h-7 text-xs ${addedToSheet ? "border-score-good text-score-good" : ""}`}
+                  onClick={() => onAddToSheet(roleKey)}
+                  disabled={addedToSheet}
+                  title={addedToSheet ? "Added to spreadsheet" : "Add failed & skipped tests to spreadsheet"}
+                >
+                  {addedToSheet ? (
+                    <><Check className="h-3 w-3" /> Sheet</>
+                  ) : (
+                    <><FileSpreadsheet className="h-3 w-3" /> + Sheet</>
+                  )}
+                </Button>
+              )}
             </>
           )}
         </div>

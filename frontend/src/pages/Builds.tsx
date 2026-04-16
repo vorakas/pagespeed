@@ -8,6 +8,7 @@ import { BuildResultsPanel, type PanelMode } from "@/components/builds/BuildResu
 import { useLocalConfig } from "@/hooks/use-local-config"
 import { api } from "@/services/api"
 import type { DevOpsConfig, DevOpsBuild, FailedTest, SkippedTest } from "@/types"
+import type { SheetEntry } from "@/services/spreadsheetExport"
 
 const DEFAULT_DEVOPS_CONFIG: DevOpsConfig = {
   pat: "",
@@ -59,6 +60,7 @@ export function Builds() {
   const prefetchedIdsRef = useRef<Set<number>>(new Set())
   const prefetchedSkippedIdsRef = useRef<Set<number>>(new Set())
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [sheetData, setSheetData] = useState<Map<string, SheetEntry>>(new Map())
 
   const definitionIds = Object.values(config.pipelineMap).filter(Boolean)
 
@@ -221,6 +223,24 @@ export function Builds() {
     setTimeout(fetchBuilds, 2000)
   }
 
+  const handleAddToSheet = useCallback((roleKey: string) => {
+    const build = builds[roleKey]
+    if (!build) return
+    const platform = roleKey === "WarmUp" ? "Windows" : roleKey.split("_")[0]
+    const type = roleKey === "WarmUp" ? "Warmup" : roleKey.split("_")[1] || "Functional"
+    const failed = failedTestsCache[build.id] ?? []
+    const skipped = skippedTestsCache[build.id] ?? []
+    setSheetData((prev) => {
+      const next = new Map(prev)
+      next.set(roleKey, { roleKey, platform, type, failed, skipped })
+      return next
+    })
+  }, [builds, failedTestsCache, skippedTestsCache])
+
+  const handleSheetClear = useCallback(() => {
+    setSheetData(new Map())
+  }, [])
+
   return (
     <>
       <Header
@@ -271,6 +291,9 @@ export function Builds() {
                   onTrigger={handleTriggerSingle}
                   onShowResults={(build) => { setSelectedBuild(build); setPanelMode("failed") }}
                   onShowSkipped={(build) => { setSelectedBuild(build); setPanelMode("skipped") }}
+                  onAddToSheet={handleAddToSheet}
+                  sheetData={sheetData}
+                  onSheetClear={handleSheetClear}
                   triggeringKeys={triggeringKeys}
                   selectedBuildId={selectedBuild?.id}
                 />

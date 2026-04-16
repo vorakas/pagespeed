@@ -1,5 +1,7 @@
 import { BuildCard } from "./BuildCard"
+import { SpreadsheetWidget } from "./SpreadsheetWidget"
 import type { DevOpsBuild } from "@/types"
+import type { SheetEntry } from "@/services/spreadsheetExport"
 
 interface BuildRole {
   key: string
@@ -48,6 +50,9 @@ interface BuildGridProps {
   onTrigger: (roleKey: string) => void
   onShowResults: (build: DevOpsBuild) => void
   onShowSkipped: (build: DevOpsBuild) => void
+  onAddToSheet: (roleKey: string) => void
+  sheetData: Map<string, SheetEntry>
+  onSheetClear: () => void
   triggeringKeys: Set<string>
   selectedBuildId?: number
 }
@@ -55,33 +60,41 @@ interface BuildGridProps {
 export function BuildGrid({
   builds, effectiveResults, branches, globalBranch, globalTargetInstance,
   overrides, onOverrideChange, onTrigger, onShowResults, onShowSkipped,
+  onAddToSheet, sheetData, onSheetClear,
   triggeringKeys, selectedBuildId,
 }: BuildGridProps) {
   return (
     <div className="space-y-6">
-      {/* WarmUp row */}
+      {/* WarmUp row + Spreadsheet Widget */}
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
           WarmUp
         </h3>
-        <div className="max-w-xs">
-          <BuildCard
-            roleKey={WARMUP_ROLE.key}
-            roleLabel={WARMUP_ROLE.label}
-            typeBadge={WARMUP_ROLE.type}
-            build={builds[WARMUP_ROLE.key] ?? null}
-            effectiveResult={effectiveResults[WARMUP_ROLE.key]}
-            branches={branches}
-            globalBranch={globalBranch}
-            globalTargetInstance={globalTargetInstance}
-            override={overrides[WARMUP_ROLE.key]}
-            onOverrideChange={onOverrideChange}
-            onTrigger={() => onTrigger(WARMUP_ROLE.key)}
-            onShowResults={onShowResults}
-            onShowSkipped={onShowSkipped}
-            triggering={triggeringKeys.has(WARMUP_ROLE.key)}
-            selected={builds[WARMUP_ROLE.key]?.id === selectedBuildId}
-          />
+        <div className="flex items-start gap-4">
+          <div className="max-w-xs shrink-0">
+            <BuildCard
+              roleKey={WARMUP_ROLE.key}
+              roleLabel={WARMUP_ROLE.label}
+              typeBadge={WARMUP_ROLE.type}
+              build={builds[WARMUP_ROLE.key] ?? null}
+              effectiveResult={effectiveResults[WARMUP_ROLE.key]}
+              branches={branches}
+              globalBranch={globalBranch}
+              globalTargetInstance={globalTargetInstance}
+              override={overrides[WARMUP_ROLE.key]}
+              onOverrideChange={onOverrideChange}
+              onTrigger={() => onTrigger(WARMUP_ROLE.key)}
+              onShowResults={onShowResults}
+              onShowSkipped={onShowSkipped}
+              onAddToSheet={onAddToSheet}
+              addedToSheet={sheetData.has(WARMUP_ROLE.key)}
+              triggering={triggeringKeys.has(WARMUP_ROLE.key)}
+              selected={builds[WARMUP_ROLE.key]?.id === selectedBuildId}
+            />
+          </div>
+          <div className="max-w-xs flex-1">
+            <SpreadsheetWidget sheetData={sheetData} onClear={onSheetClear} />
+          </div>
         </div>
       </div>
 
@@ -111,6 +124,8 @@ export function BuildGrid({
                   onTrigger={() => onTrigger(functional.key)}
                   onShowResults={onShowResults}
                   onShowSkipped={onShowSkipped}
+                  onAddToSheet={onAddToSheet}
+                  addedToSheet={sheetData.has(functional.key)}
                   triggering={triggeringKeys.has(functional.key)}
                   selected={builds[functional.key]?.id === selectedBuildId}
                 />
@@ -133,6 +148,8 @@ export function BuildGrid({
                   onTrigger={() => onTrigger(visual.key)}
                   onShowResults={onShowResults}
                   onShowSkipped={onShowSkipped}
+                  onAddToSheet={onAddToSheet}
+                  addedToSheet={sheetData.has(visual.key)}
                   triggering={triggeringKeys.has(visual.key)}
                   selected={builds[visual.key]?.id === selectedBuildId}
                 />
