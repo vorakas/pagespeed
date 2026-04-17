@@ -159,6 +159,13 @@ export async function generateSpreadsheet(
       }
       styleDataRow(dataRow)
     }
+
+    // Empty sections (especially consecutive Unresolved / Manual
+    // Execution placeholders) get a blank unstyled spacer row so
+    // their headers don't sit back-to-back.
+    if (tests.length === 0) {
+      sheet.addRow([])
+    }
   }
 
   // ---------- Skipped sections ----------
