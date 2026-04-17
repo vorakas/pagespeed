@@ -30,6 +30,7 @@ interface BuildCardProps {
   onAddToSheet?: (roleKey: string) => void
   addedToSheet?: boolean
   triggering: boolean
+  triggerError?: string
   onStop?: () => void
   cancelling?: boolean
   selected?: boolean
@@ -99,7 +100,7 @@ export function BuildCard({
   selectedBuildOverrideId, onSelectBuild, effectiveResult,
   branches, globalBranch, globalTargetInstance, override, onOverrideChange,
   onTrigger, onShowResults, onShowSkipped, onAddToSheet, addedToSheet,
-  triggering, onStop, cancelling, selected,
+  triggering, triggerError, onStop, cancelling, selected,
 }: BuildCardProps) {
   const isServerCancelling = build?.status === "cancelling"
   const showCancelling = cancelling || isServerCancelling
@@ -289,6 +290,12 @@ export function BuildCard({
             </>
           )}
         </div>
+
+        {triggerError && (
+          <p className="text-[10px] text-score-poor break-words" role="alert">
+            {triggerError}
+          </p>
+        )}
       </CardContent>
     </Card>
   )

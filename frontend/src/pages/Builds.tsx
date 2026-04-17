@@ -52,6 +52,7 @@ export function Builds() {
   const [buildOverrides, setBuildOverrides] = useState<Record<string, number>>({})
   const [effectiveByBuildId, setEffectiveByBuildId] = useState<Record<number, { effectiveResult: string; hasRerun: boolean }>>({})
   const [triggeringKeys, setTriggeringKeys] = useState<Set<string>>(new Set())
+  const [triggerErrors, setTriggerErrors] = useState<Record<string, string>>({})
   const [cancellingKeys, setCancellingKeys] = useState<Set<string>>(new Set())
   const [confirmStopKey, setConfirmStopKey] = useState<string | null>(null)
   const [branches, setBranches] = useState<string[]>([])
@@ -71,7 +72,10 @@ export function Builds() {
   const [sheetData, setSheetData] = useState<Map<string, SheetEntry>>(new Map())
   const [prefetchingTests, setPrefetchingTests] = useState(false)
 
-  const definitionIds = Object.values(config.pipelineMap).filter(Boolean)
+  const definitionIds = useMemo(
+    () => Object.values(config.pipelineMap).filter(Boolean),
+    [config.pipelineMap],
+  )
 
   // Displayed build per role: user-selected override, else most recent.
   // Falls back to latest if the pinned build id has aged out of the top-5 list.
@@ -229,16 +233,22 @@ export function Builds() {
     }
   }, [connected, config, definitionIds, buildOverrides, applyBackoff, resetBackoff])
 
-  // Initial fetch on connect
+  // Initial builds fetch on connect (re-fires when fetchBuilds identity changes)
   useEffect(() => {
-    if (connected) {
-      fetchBuilds()
-      // Fetch available branches once
-      api.getDevOpsBranches(config)
-        .then((res) => { if (res.success) setBranches(res.branches) })
-        .catch(() => {})
-    }
-  }, [connected, fetchBuilds]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (connected) fetchBuilds()
+  }, [connected, fetchBuilds])
+
+  // Fetch branches once per connect — isolated from fetchBuilds so a changing
+  // fetchBuilds identity can't retrigger it. Intentionally omits `config` from
+  // deps: reconnecting with a different PAT re-runs via the `connected` edge.
+  useEffect(() => {
+    if (!connected) return
+    let cancelled = false
+    api.getDevOpsBranches(config)
+      .then((res) => { if (!cancelled && res.success) setBranches(res.branches) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [connected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll while any LATEST build is running (regardless of which build the
   // user is viewing per card) — polling should track active work.
@@ -264,8 +274,20 @@ export function Builds() {
   }, [anyRunning, connected, fetchBuilds])
 
   const handleTriggerSingle = async (roleKey: string) => {
+    setTriggerErrors((prev) => {
+      if (!(roleKey in prev)) return prev
+      const next = { ...prev }
+      delete next[roleKey]
+      return next
+    })
     const defId = config.pipelineMap[roleKey]
-    if (!defId) return
+    if (!defId) {
+      setTriggerErrors((prev) => ({
+        ...prev,
+        [roleKey]: `No pipeline mapped for ${roleKey}. Set one in Pipeline Mapping (advanced).`,
+      }))
+      return
+    }
     const cardOverride = overrides[roleKey]
     const effectiveBranch = cardOverride?.branch || branch
     const effectiveInstance = cardOverride?.targetInstance || targetInstance
@@ -275,8 +297,11 @@ export function Builds() {
         TargetInstance: effectiveInstance,
       })
       setTimeout(fetchBuilds, 2000)
-    } catch {
-      // User sees it via status not changing
+    } catch (err) {
+      setTriggerErrors((prev) => ({
+        ...prev,
+        [roleKey]: err instanceof Error ? err.message : "Trigger failed",
+      }))
     } finally {
       setTriggeringKeys((prev) => {
         const next = new Set(prev)
@@ -486,6 +511,7 @@ export function Builds() {
                   onSheetClear={handleSheetClear}
                   prefetchingTests={prefetchingTests}
                   triggeringKeys={triggeringKeys}
+                  triggerErrors={triggerErrors}
                   cancellingKeys={cancellingKeys}
                   selectedBuildId={selectedBuild?.id}
                 />

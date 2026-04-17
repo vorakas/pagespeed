@@ -59,6 +59,7 @@ interface BuildGridProps {
   onSheetClear: () => void
   prefetchingTests: boolean
   triggeringKeys: Set<string>
+  triggerErrors: Record<string, string>
   cancellingKeys: Set<string>
   selectedBuildId?: number
 }
@@ -68,7 +69,7 @@ export function BuildGrid({
   effectiveResults, branches, globalBranch, globalTargetInstance,
   overrides, onOverrideChange, onTrigger, onStop, onShowResults, onShowSkipped,
   onAddToSheet, sheetData, onSheetClear, prefetchingTests,
-  triggeringKeys, cancellingKeys, selectedBuildId,
+  triggeringKeys, triggerErrors, cancellingKeys, selectedBuildId,
 }: BuildGridProps) {
   return (
     <div className="space-y-6">
@@ -101,6 +102,7 @@ export function BuildGrid({
               onAddToSheet={onAddToSheet}
               addedToSheet={sheetData.has(WARMUP_ROLE.key)}
               triggering={triggeringKeys.has(WARMUP_ROLE.key)}
+              triggerError={triggerErrors[WARMUP_ROLE.key]}
               selected={builds[WARMUP_ROLE.key]?.id === selectedBuildId}
             />
           </div>
@@ -144,6 +146,7 @@ export function BuildGrid({
                   onAddToSheet={onAddToSheet}
                   addedToSheet={sheetData.has(functional.key)}
                   triggering={triggeringKeys.has(functional.key)}
+                  triggerError={triggerErrors[functional.key]}
                   selected={builds[functional.key]?.id === selectedBuildId}
                 />
               </div>
@@ -173,6 +176,7 @@ export function BuildGrid({
                   onAddToSheet={onAddToSheet}
                   addedToSheet={sheetData.has(visual.key)}
                   triggering={triggeringKeys.has(visual.key)}
+                  triggerError={triggerErrors[visual.key]}
                   selected={builds[visual.key]?.id === selectedBuildId}
                 />
               </div>
