@@ -150,12 +150,26 @@ class AzureDevOpsClient:
         except requests.exceptions.RequestException as exc:
             # Surface AzDO's error body — their 400 payload has the
             # specific reason (unknown parameter, bad branch, etc.)
-            # that the HTTPError stringification discards.
+            # that the HTTPError stringification discards. For queue
+            # validation failures, the useful detail lives in
+            # customProperties.ValidationResults, not in `message`.
             detail = ""
             if exc.response is not None:
                 try:
                     body = exc.response.json()
-                    detail = f" — {body.get('message') or body}"
+                    parts = []
+                    message = body.get("message")
+                    if message:
+                        parts.append(str(message))
+                    validation = (body.get("customProperties") or {}).get(
+                        "ValidationResults"
+                    )
+                    if validation:
+                        for item in validation:
+                            vmsg = item.get("message") if isinstance(item, dict) else None
+                            if vmsg:
+                                parts.append(vmsg)
+                    detail = f" — {'; '.join(parts) if parts else body}"
                 except ValueError:
                     detail = f" — {exc.response.text[:500]}"
             raise AzureDevOpsError(
