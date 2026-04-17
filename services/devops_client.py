@@ -1103,13 +1103,23 @@ class AzureDevOpsClient:
         definition_id: int,
         source_branch: str = "refs/heads/master",
         template_parameters: Optional[dict] = None,
+        variables: Optional[dict] = None,
     ) -> dict:
         """Queue a new build for the given pipeline definition.
 
         Args:
             definition_id:       Pipeline definition ID.
             source_branch:       Git ref to build (default: master).
-            template_parameters: Optional dict of parameter overrides.
+            template_parameters: Optional dict of template parameter
+                                 overrides. Each key must be declared
+                                 in the pipeline's top-level
+                                 ``parameters:`` block, or AzDO rejects
+                                 the queue with "Unexpected parameter".
+            variables:           Optional dict of queue-time variable
+                                 overrides (maps name -> string value).
+                                 Each must be marked "Settable at queue
+                                 time" in the pipeline/variable group
+                                 settings for the override to apply.
 
         Returns:
             Normalized build dict for the queued build.
@@ -1120,6 +1130,10 @@ class AzureDevOpsClient:
         }
         if template_parameters:
             body["templateParameters"] = template_parameters
+        if variables:
+            body["variables"] = {
+                name: {"value": str(value)} for name, value in variables.items()
+            }
         data = self._request("POST", "build/builds", body=body)
         return self._normalize_build(data)
 

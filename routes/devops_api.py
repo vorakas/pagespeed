@@ -122,10 +122,12 @@ def create_devops_blueprint() -> Blueprint:
         client = _make_client(data)
         branch = data.get("branch", "refs/heads/master")
         template_parameters = data.get("template_parameters", {})
+        variables = data.get("variables", {})
         build = client.trigger_pipeline(
             definition_id=pipeline_id,
             source_branch=branch,
             template_parameters=template_parameters or None,
+            variables=variables or None,
         )
         return jsonify({"success": True, "build": build})
 

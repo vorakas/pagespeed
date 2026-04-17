@@ -294,7 +294,7 @@ export function Builds() {
     setTriggeringKeys((prev) => new Set(prev).add(roleKey))
     try {
       await api.triggerDevOpsPipeline(config, defId, effectiveBranch, {
-        TargetInstance: effectiveInstance,
+        variables: { TargetInstance: effectiveInstance },
       })
       setTimeout(fetchBuilds, 2000)
     } catch (err) {

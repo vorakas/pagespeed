@@ -475,13 +475,17 @@ class ApiClient {
     config: DevOpsConfig,
     pipelineId: number,
     branch?: string,
-    templateParameters?: Record<string, string>
+    options?: {
+      templateParameters?: Record<string, string>
+      variables?: Record<string, string>
+    }
   ): Promise<{ success: boolean; build: DevOpsBuild }> {
     return this.request(`/api/devops/trigger/${pipelineId}`, {
       method: "POST",
       body: this.devOpsBody(config, {
         branch: branch ? `refs/heads/${branch}` : "refs/heads/master",
-        template_parameters: templateParameters || {},
+        template_parameters: options?.templateParameters || {},
+        variables: options?.variables || {},
       }),
     })
   }
