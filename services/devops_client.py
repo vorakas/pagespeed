@@ -11,6 +11,7 @@ import json
 import logging
 import re
 from base64 import b64encode, b64decode
+from pathlib import Path
 from typing import Optional
 
 import requests
@@ -19,6 +20,28 @@ from config import AZDO_API_VERSION, AZDO_REQUEST_TIMEOUT_SECONDS
 from exceptions import AzureDevOpsError, AuthenticationError, RateLimitError
 
 logger = logging.getLogger(__name__)
+
+# Tests declared with ``[Theory(Skip = "...")]`` are skipped at xUnit
+# discovery time, so Azure DevOps records the result without the
+# ``InlineData`` config parameter — we can't derive a user-role pill
+# from a test name that has no config.  This JSON, generated from the
+# test-automation sources by ``scripts/scan_skipped_test_configs.py``,
+# maps the test class name (e.g. ``T226_Windows_VerifyColorPlusItem``)
+# to the config string it would have run under, so the pill lookup
+# works for discovery-skipped tests too.
+_SKIPPED_CONFIG_PATH = (
+    Path(__file__).resolve().parent.parent / "data" / "skipped_test_configs.json"
+)
+try:
+    _SKIPPED_TEST_CONFIGS: dict[str, str] = json.loads(
+        _SKIPPED_CONFIG_PATH.read_text(encoding="utf-8")
+    )
+except (OSError, ValueError):
+    logger.warning(
+        "Could not load %s — discovery-skipped tests will show no role pill",
+        _SKIPPED_CONFIG_PATH,
+    )
+    _SKIPPED_TEST_CONFIGS = {}
 
 
 class AzureDevOpsClient:
@@ -786,6 +809,13 @@ class AzureDevOpsClient:
                 name = r.get("automatedTestName", "")
                 test_id = self._extract_test_id(name)
                 config = self._extract_config(name)
+                # Discovery-skipped `[Theory(Skip=...)]` tests arrive
+                # without a config parameter in the name — fall back to
+                # the static mapping keyed by the test class name.
+                if not config:
+                    bare_parts = name.split("(", 1)[0].split(".")
+                    class_name = bare_parts[-2] if len(bare_parts) >= 2 else ""
+                    config = _SKIPPED_TEST_CONFIGS.get(class_name, "")
                 # Dedup key uses the parameterless FQN (class+method),
                 # not just test_id — two tests may share a T-number but
                 # differ by user role encoded in the class name
