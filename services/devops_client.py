@@ -125,8 +125,18 @@ class AzureDevOpsClient:
         except requests.exceptions.Timeout:
             raise AzureDevOpsError("Request to Azure DevOps timed out.")
         except requests.exceptions.RequestException as exc:
+            # Surface AzDO's error body — their 400 payload has the
+            # specific reason (unknown parameter, bad branch, etc.)
+            # that the HTTPError stringification discards.
+            detail = ""
+            if exc.response is not None:
+                try:
+                    body = exc.response.json()
+                    detail = f" — {body.get('message') or body}"
+                except ValueError:
+                    detail = f" — {exc.response.text[:500]}"
             raise AzureDevOpsError(
-                f"Error calling Azure DevOps: {exc}"
+                f"Error calling Azure DevOps: {exc}{detail}"
             ) from exc
         except json.JSONDecodeError as exc:
             raise AzureDevOpsError(
