@@ -61,6 +61,14 @@ def create_devops_blueprint() -> Blueprint:
         build = client.get_build(build_id)
         return jsonify({"success": True, "build": build})
 
+    @bp.route("/api/devops/builds/<int:build_id>/cancel", methods=["POST"])
+    def cancel_build(build_id: int):
+        data = request.get_json()
+        validate_required_fields(data, _DEVOPS_CRED_FIELDS)
+        client = _make_client(data)
+        build = client.cancel_build(build_id)
+        return jsonify({"success": True, "build": build})
+
     @bp.route("/api/devops/effective-status/<int:build_id>", methods=["POST"])
     def effective_status(build_id: int):
         data = request.get_json()

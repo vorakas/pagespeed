@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Play, ExternalLink, Loader2, ClipboardList, SkipForward, FileSpreadsheet, Check } from "lucide-react"
+import { Play, ExternalLink, Loader2, ClipboardList, SkipForward, FileSpreadsheet, Check, Square } from "lucide-react"
 import type { DevOpsBuild, BuildResult, BuildStatus } from "@/types"
 
 const TARGET_INSTANCES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
@@ -15,6 +15,9 @@ interface BuildCardProps {
   roleLabel: string
   typeBadge: "WarmUp" | "Functional" | "Visual"
   build: DevOpsBuild | null
+  recentBuilds: DevOpsBuild[]
+  selectedBuildOverrideId: number | null
+  onSelectBuild: (buildId: number | null) => void
   effectiveResult?: EffectiveResult
   branches: string[]
   globalBranch: string
@@ -27,6 +30,8 @@ interface BuildCardProps {
   onAddToSheet?: (roleKey: string) => void
   addedToSheet?: boolean
   triggering: boolean
+  onStop?: () => void
+  cancelling?: boolean
   selected?: boolean
 }
 
@@ -90,11 +95,14 @@ function formatTimeAgo(dateStr: string | null): string {
 }
 
 export function BuildCard({
-  roleKey, roleLabel, typeBadge, build, effectiveResult,
+  roleKey, roleLabel, typeBadge, build, recentBuilds,
+  selectedBuildOverrideId, onSelectBuild, effectiveResult,
   branches, globalBranch, globalTargetInstance, override, onOverrideChange,
   onTrigger, onShowResults, onShowSkipped, onAddToSheet, addedToSheet,
-  triggering, selected,
+  triggering, onStop, cancelling, selected,
 }: BuildCardProps) {
+  const isServerCancelling = build?.status === "cancelling"
+  const showCancelling = cancelling || isServerCancelling
   const isRunning = build?.status === "inProgress" || build?.status === "notStarted"
   const isCompleted = build?.status === "completed"
 
@@ -106,6 +114,11 @@ export function BuildCard({
   const hasRerun = effectiveResult?.hasRerun ?? false
 
   const hasOverride = override?.branch || override?.targetInstance
+
+  const selectedBuild = selectedBuildOverrideId
+    ? recentBuilds.find((b) => b.id === selectedBuildOverrideId)
+    : null
+  const hasBuildOverride = !!selectedBuild
 
   return (
     <Card className={`relative overflow-hidden transition-colors ${selected ? "ring-1 ring-sidebar-primary" : ""}`}>
@@ -119,9 +132,9 @@ export function BuildCard({
           </div>
           {build && (
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className={`h-2 w-2 rounded-full ${statusColor(displayStatus, displayResult)} ${isRunning ? "animate-pulse" : ""}`} />
+              <span className={`h-2 w-2 rounded-full ${showCancelling ? "bg-amber-500" : statusColor(displayStatus, displayResult)} ${(isRunning || showCancelling) ? "animate-pulse" : ""}`} />
               <span className="text-xs text-muted-foreground">
-                {statusLabel(displayStatus, displayResult)}
+                {showCancelling ? "Cancelling..." : statusLabel(displayStatus, displayResult)}
                 {hasRerun && displayResult === "succeeded" && " (Re-runs)"}
               </span>
             </div>
@@ -182,13 +195,37 @@ export function BuildCard({
           </div>
         </details>
 
+        {recentBuilds.length > 0 && (
+          <details className="group">
+            <summary className={`text-[10px] cursor-pointer hover:text-foreground ${hasBuildOverride ? "text-sidebar-primary" : "text-muted-foreground"}`}>
+              {hasBuildOverride
+                ? `Viewing #${selectedBuild!.buildNumber}`
+                : "Select build"}
+            </summary>
+            <div className="mt-1.5">
+              <select
+                value={selectedBuildOverrideId ? String(selectedBuildOverrideId) : ""}
+                onChange={(e) => onSelectBuild(e.target.value ? Number(e.target.value) : null)}
+                className="h-6 w-full rounded border border-border bg-background px-1 text-[10px] text-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
+              >
+                <option value="">Latest (auto)</option>
+                {recentBuilds.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    #{b.buildNumber} — {formatTimeAgo(b.startTime)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </details>
+        )}
+
         <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"
             className="h-7 text-xs"
             onClick={onTrigger}
-            disabled={triggering || isRunning}
+            disabled={triggering || isRunning || showCancelling}
           >
             {triggering ? (
               <><Loader2 className="h-3 w-3 animate-spin" /> Triggering...</>
@@ -198,6 +235,23 @@ export function BuildCard({
               <><Play className="h-3 w-3" /> Run</>
             )}
           </Button>
+          {(isRunning || showCancelling) && onStop && build && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={onStop}
+              disabled={showCancelling}
+              title={showCancelling ? "Cancelling..." : "Stop build"}
+              aria-label={showCancelling ? "Cancelling build" : "Stop build"}
+            >
+              {showCancelling ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Square className="h-3 w-3 fill-current" />
+              )}
+            </Button>
+          )}
           {isCompleted && build && (
             <>
               <Button

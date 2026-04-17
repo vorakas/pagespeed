@@ -41,6 +41,9 @@ interface EffectiveResult {
 
 interface BuildGridProps {
   builds: Record<string, DevOpsBuild | null>
+  recentBuilds: Record<string, DevOpsBuild[]>
+  buildOverrides: Record<string, number>
+  onSelectBuild: (roleKey: string, buildId: number | null) => void
   effectiveResults: Record<string, EffectiveResult>
   branches: string[]
   globalBranch: string
@@ -48,6 +51,7 @@ interface BuildGridProps {
   overrides: Record<string, { branch?: string; targetInstance?: string }>
   onOverrideChange: (roleKey: string, field: "branch" | "targetInstance", value: string) => void
   onTrigger: (roleKey: string) => void
+  onStop: (roleKey: string) => void
   onShowResults: (build: DevOpsBuild) => void
   onShowSkipped: (build: DevOpsBuild) => void
   onAddToSheet: (roleKey: string) => void
@@ -55,14 +59,16 @@ interface BuildGridProps {
   onSheetClear: () => void
   prefetchingTests: boolean
   triggeringKeys: Set<string>
+  cancellingKeys: Set<string>
   selectedBuildId?: number
 }
 
 export function BuildGrid({
-  builds, effectiveResults, branches, globalBranch, globalTargetInstance,
-  overrides, onOverrideChange, onTrigger, onShowResults, onShowSkipped,
+  builds, recentBuilds, buildOverrides, onSelectBuild,
+  effectiveResults, branches, globalBranch, globalTargetInstance,
+  overrides, onOverrideChange, onTrigger, onStop, onShowResults, onShowSkipped,
   onAddToSheet, sheetData, onSheetClear, prefetchingTests,
-  triggeringKeys, selectedBuildId,
+  triggeringKeys, cancellingKeys, selectedBuildId,
 }: BuildGridProps) {
   return (
     <div className="space-y-6">
@@ -78,6 +84,9 @@ export function BuildGrid({
               roleLabel={WARMUP_ROLE.label}
               typeBadge={WARMUP_ROLE.type}
               build={builds[WARMUP_ROLE.key] ?? null}
+              recentBuilds={recentBuilds[WARMUP_ROLE.key] ?? []}
+              selectedBuildOverrideId={buildOverrides[WARMUP_ROLE.key] ?? null}
+              onSelectBuild={(id) => onSelectBuild(WARMUP_ROLE.key, id)}
               effectiveResult={effectiveResults[WARMUP_ROLE.key]}
               branches={branches}
               globalBranch={globalBranch}
@@ -85,6 +94,8 @@ export function BuildGrid({
               override={overrides[WARMUP_ROLE.key]}
               onOverrideChange={onOverrideChange}
               onTrigger={() => onTrigger(WARMUP_ROLE.key)}
+              onStop={() => onStop(WARMUP_ROLE.key)}
+              cancelling={cancellingKeys.has(WARMUP_ROLE.key)}
               onShowResults={onShowResults}
               onShowSkipped={onShowSkipped}
               onAddToSheet={onAddToSheet}
@@ -116,6 +127,9 @@ export function BuildGrid({
                   roleLabel={functional.label}
                   typeBadge={functional.type}
                   build={builds[functional.key] ?? null}
+                  recentBuilds={recentBuilds[functional.key] ?? []}
+                  selectedBuildOverrideId={buildOverrides[functional.key] ?? null}
+                  onSelectBuild={(id) => onSelectBuild(functional.key, id)}
                   effectiveResult={effectiveResults[functional.key]}
                   branches={branches}
                   globalBranch={globalBranch}
@@ -123,6 +137,8 @@ export function BuildGrid({
                   override={overrides[functional.key]}
                   onOverrideChange={onOverrideChange}
                   onTrigger={() => onTrigger(functional.key)}
+                  onStop={() => onStop(functional.key)}
+                  cancelling={cancellingKeys.has(functional.key)}
                   onShowResults={onShowResults}
                   onShowSkipped={onShowSkipped}
                   onAddToSheet={onAddToSheet}
@@ -140,6 +156,9 @@ export function BuildGrid({
                   roleLabel={visual.label}
                   typeBadge={visual.type}
                   build={builds[visual.key] ?? null}
+                  recentBuilds={recentBuilds[visual.key] ?? []}
+                  selectedBuildOverrideId={buildOverrides[visual.key] ?? null}
+                  onSelectBuild={(id) => onSelectBuild(visual.key, id)}
                   effectiveResult={effectiveResults[visual.key]}
                   branches={branches}
                   globalBranch={globalBranch}
@@ -147,6 +166,8 @@ export function BuildGrid({
                   override={overrides[visual.key]}
                   onOverrideChange={onOverrideChange}
                   onTrigger={() => onTrigger(visual.key)}
+                  onStop={() => onStop(visual.key)}
+                  cancelling={cancellingKeys.has(visual.key)}
                   onShowResults={onShowResults}
                   onShowSkipped={onShowSkipped}
                   onAddToSheet={onAddToSheet}

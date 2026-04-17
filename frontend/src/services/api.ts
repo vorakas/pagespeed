@@ -454,6 +454,16 @@ class ApiClient {
     })
   }
 
+  async cancelDevOpsBuild(
+    config: DevOpsConfig,
+    buildId: number
+  ): Promise<{ success: boolean; build: DevOpsBuild }> {
+    return this.request(`/api/devops/builds/${buildId}/cancel`, {
+      method: "POST",
+      body: this.devOpsBody(config),
+    })
+  }
+
   async getDevOpsBranches(config: DevOpsConfig): Promise<{ success: boolean; branches: string[] }> {
     return this.request("/api/devops/branches", {
       method: "POST",

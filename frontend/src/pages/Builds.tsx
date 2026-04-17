@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Header } from "@/components/layout/Header"
 import { DevOpsConfigPanel } from "@/components/builds/DevOpsConfigPanel"
 import { PipelineMapper } from "@/components/builds/PipelineMapper"
 import { OrchestratorPanel } from "@/components/builds/OrchestratorPanel"
 import { BuildGrid } from "@/components/builds/BuildGrid"
 import { BuildResultsPanel, type PanelMode } from "@/components/builds/BuildResultsPanel"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import { useLocalConfig } from "@/hooks/use-local-config"
 import { api, RateLimitError } from "@/services/api"
 import type { DevOpsConfig, DevOpsBuild, FailedTest, SkippedTest } from "@/types"
@@ -47,9 +48,12 @@ export function Builds() {
   const [config, setConfig] = useLocalConfig<DevOpsConfig>("devOpsConfig", DEFAULT_DEVOPS_CONFIG)
   const [connected, setConnected] = useState(false)
   const [autoConnecting, setAutoConnecting] = useState(false)
-  const [builds, setBuilds] = useState<Record<string, DevOpsBuild | null>>({})
-  const [effectiveResults, setEffectiveResults] = useState<Record<string, { effectiveResult: string; hasRerun: boolean }>>({})
+  const [recentBuilds, setRecentBuilds] = useState<Record<string, DevOpsBuild[]>>({})
+  const [buildOverrides, setBuildOverrides] = useState<Record<string, number>>({})
+  const [effectiveByBuildId, setEffectiveByBuildId] = useState<Record<number, { effectiveResult: string; hasRerun: boolean }>>({})
   const [triggeringKeys, setTriggeringKeys] = useState<Set<string>>(new Set())
+  const [cancellingKeys, setCancellingKeys] = useState<Set<string>>(new Set())
+  const [confirmStopKey, setConfirmStopKey] = useState<string | null>(null)
   const [branches, setBranches] = useState<string[]>([])
   const [branch, setBranch] = useState("master")
   const [targetInstance, setTargetInstance] = useState("A")
@@ -68,6 +72,29 @@ export function Builds() {
   const [prefetchingTests, setPrefetchingTests] = useState(false)
 
   const definitionIds = Object.values(config.pipelineMap).filter(Boolean)
+
+  // Displayed build per role: user-selected override, else most recent.
+  // Falls back to latest if the pinned build id has aged out of the top-5 list.
+  const builds = useMemo(() => {
+    const map: Record<string, DevOpsBuild | null> = {}
+    for (const key of ALL_ROLE_KEYS) {
+      const list = recentBuilds[key] ?? []
+      const overrideId = buildOverrides[key]
+      const pinned = overrideId ? list.find((b) => b.id === overrideId) : undefined
+      map[key] = pinned ?? list[0] ?? null
+    }
+    return map
+  }, [recentBuilds, buildOverrides])
+
+  const effectiveResults = useMemo(() => {
+    const map: Record<string, { effectiveResult: string; hasRerun: boolean }> = {}
+    for (const key of ALL_ROLE_KEYS) {
+      const b = builds[key]
+      const e = b ? effectiveByBuildId[b.id] : undefined
+      if (e) map[key] = e
+    }
+    return map
+  }, [builds, effectiveByBuildId])
 
   // Auto-connect on page load if PAT is saved
   useEffect(() => {
@@ -99,24 +126,38 @@ export function Builds() {
     if (inFlightRef.current) return
     inFlightRef.current = true
     try {
-      const result = await api.getDevOpsBuilds(config, definitionIds, 50)
+      // Bumped from 50 → 100 to make the "last 5 per definition" window
+      // robust when one pipeline is much more active than others.
+      const result = await api.getDevOpsBuilds(config, definitionIds, 100)
       if (!result.success) return
 
-      const buildMap: Record<string, DevOpsBuild | null> = {}
+      const recent: Record<string, DevOpsBuild[]> = {}
       for (const key of ALL_ROLE_KEYS) {
         const defId = config.pipelineMap[key]
         if (!defId) {
-          buildMap[key] = null
+          recent[key] = []
           continue
         }
-        const latest = result.builds.find((b) => b.definitionId === defId)
-        buildMap[key] = latest ?? null
+        recent[key] = result.builds
+          .filter((b) => b.definitionId === defId)
+          .slice(0, 5)
       }
-      setBuilds(buildMap)
+      setRecentBuilds(recent)
+
+      // Compute the currently displayed build per role using the same
+      // rules as the render-time memo — we cannot read `builds` here
+      // since it reflects the previous render.
+      const displayed: Record<string, DevOpsBuild | null> = {}
+      for (const key of ALL_ROLE_KEYS) {
+        const list = recent[key]
+        const overrideId = buildOverrides[key]
+        const pinned = overrideId ? list.find((b) => b.id === overrideId) : undefined
+        displayed[key] = pinned ?? list[0] ?? null
+      }
 
       // Fetch effective status sequentially to reduce API pressure
       for (const key of ALL_ROLE_KEYS) {
-        const build = buildMap[key]
+        const build = displayed[key]
         if (
           build &&
           build.status === "completed" &&
@@ -126,9 +167,9 @@ export function Builds() {
           try {
             const res = await api.getDevOpsEffectiveStatus(config, build.id)
             if (res.success) {
-              setEffectiveResults((prev) => ({
+              setEffectiveByBuildId((prev) => ({
                 ...prev,
-                [key]: { effectiveResult: res.effectiveResult, hasRerun: res.hasRerun },
+                [build.id]: { effectiveResult: res.effectiveResult, hasRerun: res.hasRerun },
               }))
             }
           } catch (err) {
@@ -139,7 +180,7 @@ export function Builds() {
 
       // Prefetch failed tests sequentially to avoid overwhelming Azure DevOps
       const toPrefetch = ALL_ROLE_KEYS
-        .map((key) => buildMap[key])
+        .map((key) => displayed[key])
         .filter((b): b is DevOpsBuild =>
           b !== null && b.status === "completed" && !prefetchedIdsRef.current.has(b.id)
         )
@@ -186,7 +227,7 @@ export function Builds() {
     } finally {
       inFlightRef.current = false
     }
-  }, [connected, config, definitionIds, applyBackoff, resetBackoff])
+  }, [connected, config, definitionIds, buildOverrides, applyBackoff, resetBackoff])
 
   // Initial fetch on connect
   useEffect(() => {
@@ -199,10 +240,12 @@ export function Builds() {
     }
   }, [connected, fetchBuilds]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll while any build is running
-  const anyRunning = Object.values(builds).some(
-    (b) => b?.status === "inProgress" || b?.status === "notStarted"
-  )
+  // Poll while any LATEST build is running (regardless of which build the
+  // user is viewing per card) — polling should track active work.
+  const anyRunning = ALL_ROLE_KEYS.some((key) => {
+    const latest = recentBuilds[key]?.[0]
+    return latest?.status === "inProgress" || latest?.status === "notStarted"
+  })
 
   useEffect(() => {
     if (!anyRunning || !connected) {
@@ -253,6 +296,81 @@ export function Builds() {
   const handleOrchestratorTriggered = () => {
     setTimeout(fetchBuilds, 2000)
   }
+
+  const handleRequestStop = (roleKey: string) => {
+    setConfirmStopKey(roleKey)
+  }
+
+  const cancelBuildForKey = useCallback(async (roleKey: string) => {
+    const build = builds[roleKey]
+    if (!build) return
+    setCancellingKeys((prev) => new Set(prev).add(roleKey))
+    try {
+      await api.cancelDevOpsBuild(config, build.id)
+      setTimeout(fetchBuilds, 1500)
+    } catch {
+      setCancellingKeys((prev) => {
+        const next = new Set(prev)
+        next.delete(roleKey)
+        return next
+      })
+    }
+  }, [builds, config, fetchBuilds])
+
+  // "Active" is computed against the LATEST build per role, not the one
+  // the user is currently viewing, so Stop All targets real in-flight work.
+  const activeRoleKeys = ALL_ROLE_KEYS.filter((key) => {
+    const latest = recentBuilds[key]?.[0]
+    return latest?.status === "inProgress" || latest?.status === "notStarted"
+  })
+
+  const handleSelectBuild = useCallback((roleKey: string, buildId: number | null) => {
+    setBuildOverrides((prev) => {
+      const next = { ...prev }
+      if (buildId === null) delete next[roleKey]
+      else next[roleKey] = buildId
+      return next
+    })
+  }, [])
+
+  const handleStopAll = useCallback(async () => {
+    const targets = activeRoleKeys
+    if (targets.length === 0) return
+    setCancellingKeys((prev) => {
+      const next = new Set(prev)
+      targets.forEach((k) => next.add(k))
+      return next
+    })
+    const jobs = targets.map((roleKey) => {
+      const latest = recentBuilds[roleKey]?.[0]
+      if (!latest) return Promise.resolve()
+      return api.cancelDevOpsBuild(config, latest.id).catch(() => {
+        setCancellingKeys((prev) => {
+          const next = new Set(prev)
+          next.delete(roleKey)
+          return next
+        })
+      })
+    })
+    await Promise.allSettled(jobs)
+    setTimeout(fetchBuilds, 1500)
+  }, [activeRoleKeys, recentBuilds, config, fetchBuilds])
+
+  // Clear optimistic `cancelling` flags once the server confirms
+  // (status transitions to `cancelling` or the build is no longer active).
+  useEffect(() => {
+    setCancellingKeys((prev) => {
+      if (prev.size === 0) return prev
+      const next = new Set(prev)
+      for (const key of prev) {
+        const b = builds[key]
+        if (!b) continue
+        const stillActive = b.status === "inProgress" || b.status === "notStarted"
+        if (!stillActive) next.delete(key)
+      }
+      return next.size === prev.size ? prev : next
+    })
+  }, [builds])
 
   const handleAddToSheet = useCallback(async (roleKey: string) => {
     const build = builds[roleKey]
@@ -345,9 +463,14 @@ export function Builds() {
                   onBranchChange={setBranch}
                   onTargetInstanceChange={setTargetInstance}
                   onTriggered={handleOrchestratorTriggered}
+                  activeBuildCount={activeRoleKeys.length}
+                  onStopAll={handleStopAll}
                 />
                 <BuildGrid
                   builds={builds}
+                  recentBuilds={recentBuilds}
+                  buildOverrides={buildOverrides}
+                  onSelectBuild={handleSelectBuild}
                   effectiveResults={effectiveResults}
                   branches={branches}
                   globalBranch={branch}
@@ -355,6 +478,7 @@ export function Builds() {
                   overrides={overrides}
                   onOverrideChange={handleOverrideChange}
                   onTrigger={handleTriggerSingle}
+                  onStop={handleRequestStop}
                   onShowResults={(build) => { setSelectedBuild(build); setPanelMode("failed") }}
                   onShowSkipped={(build) => { setSelectedBuild(build); setPanelMode("skipped") }}
                   onAddToSheet={handleAddToSheet}
@@ -362,6 +486,7 @@ export function Builds() {
                   onSheetClear={handleSheetClear}
                   prefetchingTests={prefetchingTests}
                   triggeringKeys={triggeringKeys}
+                  cancellingKeys={cancellingKeys}
                   selectedBuildId={selectedBuild?.id}
                 />
               </div>
@@ -383,6 +508,22 @@ export function Builds() {
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmStopKey !== null}
+        onOpenChange={(o) => { if (!o) setConfirmStopKey(null) }}
+        title="Stop this build?"
+        description={
+          confirmStopKey
+            ? `This will cancel the ${confirmStopKey.replace(/_/g, " ")} build (#${builds[confirmStopKey]?.buildNumber ?? "?"}) in Azure DevOps.`
+            : undefined
+        }
+        confirmLabel="Stop build"
+        destructive
+        onConfirm={async () => {
+          if (confirmStopKey) await cancelBuildForKey(confirmStopKey)
+        }}
+      />
     </>
   )
 }

@@ -465,8 +465,24 @@ class AzureDevOpsClient:
 
     @staticmethod
     def _extract_test_id(automated_test_name: str) -> str | None:
-        """Extract the first T-number (e.g. 'T7024') from a test name."""
+        """Extract the T-number (e.g. 'T7024') from a test name.
+
+        For iPhone/Android tests whose implementation class is nested
+        inside a shared parent class, the FQN carries two T-numbers —
+        e.g. ``...T8115_T8117_VerifyX.T8117_iPhone_VerifyX.Method(...)``
+        — and only the mobile-specific one (``T8117``) is correct.  The
+        test-class segment (second-to-last dot segment) always carries
+        exactly that correct ID, so take the last T-number from there.
+        For unnested tests the class name has a single T-number and the
+        behaviour is unchanged.
+        """
         import re
+        parts = automated_test_name.split(".")
+        class_segment = parts[-2] if len(parts) >= 2 else automated_test_name
+        matches = re.findall(r"T(\d+)", class_segment)
+        if matches:
+            return f"T{matches[-1]}"
+        # Fallback: scan the whole FQN if the class segment has no T-number.
         match = re.search(r"T(\d+)", automated_test_name)
         return f"T{match.group(1)}" if match else None
 
@@ -497,6 +513,34 @@ class AzureDevOpsClient:
         "Verif", "Validat", "Test", "Check", "Confirm", "Assert",
         "Ensure",
     )
+
+    # User-role tokens encoded in the Theory `config:"..."` parameter.
+    # Ordered most-specific first: SNIS_ESI_CIC must be checked before
+    # SNIS_ESI so the longer, more specific match wins.
+    _CONFIG_ROLE_PATTERNS: tuple[tuple[str, str], ...] = (
+        ("SNIS_ESI_CIC", "Employee Signed In Company In Cart"),
+        ("SNIS_UNSI", "Anonymous User"),
+        ("SNIS_NPCSI", "Customer Signed In"),
+        ("SNIS_PCSI", "Professional"),
+        ("SNIS_ESI", "Employee Signed In"),
+        ("SIS_UNSI", "Kiosk"),
+        ("SIS_ESI", "Store In Session Employee Signed In"),
+    )
+
+    @classmethod
+    def _extract_role_from_config(cls, config: str) -> str:
+        """Map a config string to a human-readable user role.
+
+        Returns an empty string when no known role token is present.
+        Longer patterns are checked first so a config containing
+        ``SNIS_ESI_CIC`` does not match the shorter ``SNIS_ESI`` rule.
+        """
+        if not config:
+            return ""
+        for pattern, role in cls._CONFIG_ROLE_PATTERNS:
+            if pattern in config:
+                return role
+        return ""
 
     @classmethod
     def _extract_user_role(cls, automated_test_name: str) -> str:
@@ -752,11 +796,15 @@ class AzureDevOpsClient:
                     continue
                 seen_keys.add(key)
                 error_message = r.get("errorMessage", "") or ""
+                user_role = (
+                    self._extract_role_from_config(config)
+                    or self._extract_user_role(name)
+                )
                 skipped_tests.append({
                     "testId": test_id,
                     "testName": self._extract_short_name(name),
                     "config": config,
-                    "userRole": self._extract_user_role(name),
+                    "userRole": user_role,
                     "errorMessage": error_message,
                     "zephyrUrl": f"{self._ZEPHYR_BASE_URL}{test_id}",
                 })
@@ -1029,6 +1077,28 @@ class AzureDevOpsClient:
         if template_parameters:
             body["templateParameters"] = template_parameters
         data = self._request("POST", "build/builds", body=body)
+        return self._normalize_build(data)
+
+    def cancel_build(self, build_id: int) -> dict:
+        """Request cancellation of an in-flight build.
+
+        Azure DevOps has no dedicated cancel endpoint; cancellation is
+        a ``PATCH`` on the build with ``status = "cancelling"``.  The
+        server transitions the build through ``cancelling`` and then
+        ``completed`` with ``result = "canceled"`` asynchronously.
+
+        Args:
+            build_id: The Azure DevOps build ID.
+
+        Returns:
+            Normalized build dict reflecting the post-PATCH state
+            (typically ``status = "cancelling"``).
+        """
+        data = self._request(
+            "PATCH",
+            f"build/builds/{build_id}",
+            body={"status": "cancelling"},
+        )
         return self._normalize_build(data)
 
     def trigger_orchestrator(

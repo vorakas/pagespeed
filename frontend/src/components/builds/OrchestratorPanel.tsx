@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, Rocket } from "lucide-react"
+import { Loader2, Rocket, Square } from "lucide-react"
 import { api } from "@/services/api"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import type { DevOpsConfig } from "@/types"
 
 const TARGET_INSTANCES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
@@ -15,12 +16,16 @@ interface OrchestratorPanelProps {
   onBranchChange: (branch: string) => void
   onTargetInstanceChange: (instance: string) => void
   onTriggered: () => void
+  activeBuildCount: number
+  onStopAll: () => Promise<void>
 }
 
 export function OrchestratorPanel({
   config, branches, branch, targetInstance,
   onBranchChange, onTargetInstanceChange, onTriggered,
+  activeBuildCount, onStopAll,
 }: OrchestratorPanelProps) {
+  const [confirmStopAll, setConfirmStopAll] = useState(false)
   const [runWarmUp, setRunWarmUp] = useState(true)
   const [runFunctional, setRunFunctional] = useState(true)
   const [runVisual, setRunVisual] = useState(true)
@@ -72,13 +77,28 @@ export function OrchestratorPanel({
       <CardContent className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground">Run All Builds</h3>
-          <Button onClick={handleTrigger} disabled={triggering}>
-            {triggering ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Triggering...</>
-            ) : (
-              <><Rocket className="h-4 w-4" /> Run Orchestrator</>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="destructive"
+              onClick={() => setConfirmStopAll(true)}
+              disabled={activeBuildCount === 0}
+              title={
+                activeBuildCount === 0
+                  ? "No active builds to stop"
+                  : `Stop ${activeBuildCount} active build${activeBuildCount === 1 ? "" : "s"}`
+              }
+            >
+              <Square className="h-4 w-4 fill-current" /> Stop All
+              {activeBuildCount > 0 && ` (${activeBuildCount})`}
+            </Button>
+            <Button onClick={handleTrigger} disabled={triggering}>
+              {triggering ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Triggering...</>
+              ) : (
+                <><Rocket className="h-4 w-4" /> Run Orchestrator</>
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-x-6 gap-y-2">
@@ -135,6 +155,16 @@ export function OrchestratorPanel({
           </p>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={confirmStopAll}
+        onOpenChange={setConfirmStopAll}
+        title="Stop all active builds?"
+        description={`This will request cancellation for ${activeBuildCount} active automation build${activeBuildCount === 1 ? "" : "s"} in Azure DevOps.`}
+        confirmLabel={`Stop ${activeBuildCount} build${activeBuildCount === 1 ? "" : "s"}`}
+        destructive
+        onConfirm={onStopAll}
+      />
     </Card>
   )
 }

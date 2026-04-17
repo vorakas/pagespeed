@@ -341,7 +341,7 @@ export function BuildResultsPanel({
                         <span className="text-xs text-muted-foreground">{test.config}</span>
                       )}
                       {!isFailedMode && "userRole" in test && test.userRole && (
-                        <span className="ml-2 inline-block rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <span className="ml-2 inline-block rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground">
                           {test.userRole}
                         </span>
                       )}
