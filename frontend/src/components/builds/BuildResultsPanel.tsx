@@ -13,6 +13,44 @@ import type { DevOpsConfig, DevOpsBuild, FailedTest, SkippedTest } from "@/types
 
 export type PanelMode = "failed" | "skipped"
 
+const _ISSUE_LINK_RE = /\bACD-\d+\b|\bLP-\d+\b|\bT\d+\b/g
+
+function issueHref(token: string): string {
+  if (token.startsWith("ACD-") || token.startsWith("LP-")) {
+    return `https://lampstrack.lampsplus.com/browse/${token}`
+  }
+  return `https://lampstrack.lampsplus.com/secure/Tests.jspa#/testCase/LP-${token}`
+}
+
+/** Turn ACD-####, LP-####, and T#### tokens into clickable lampstrack links. */
+function linkifyIssues(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  _ISSUE_LINK_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = _ISSUE_LINK_RE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+    const token = match[0]
+    parts.push(
+      <a
+        key={match.index}
+        href={issueHref(token)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-sky-400 underline hover:no-underline"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {token}
+      </a>
+    )
+    lastIndex = _ISSUE_LINK_RE.lastIndex
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
+  return parts.length > 0 ? <>{parts}</> : text
+}
+
 interface BuildResultsPanelProps {
   config: DevOpsConfig
   build: DevOpsBuild
@@ -302,12 +340,17 @@ export function BuildResultsPanel({
                       {test.config && (
                         <span className="text-xs text-muted-foreground">{test.config}</span>
                       )}
+                      {!isFailedMode && "userRole" in test && test.userRole && (
+                        <span className="ml-2 inline-block rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {test.userRole}
+                        </span>
+                      )}
                     </div>
 
                     {/* Exception message */}
                     {test.errorMessage && (
-                      <p className={`text-xs ${isFailedMode ? "text-score-poor" : "text-muted-foreground"}`}>
-                        {test.errorMessage}
+                      <p className={`text-xs ${isFailedMode ? "text-score-poor" : "text-score-average font-medium"}`}>
+                        {isFailedMode ? test.errorMessage : linkifyIssues(test.errorMessage)}
                       </p>
                     )}
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from base64 import b64encode, b64decode
 from typing import Optional
 
@@ -318,6 +319,140 @@ class AzureDevOpsClient:
         response.raise_for_status()
         return response.json().get("value", [])
 
+    # ------------------------------------------------------------------
+    # xUnit skip-reason recovery via build log parse
+    # ------------------------------------------------------------------
+    #
+    # AzDO's TRX ingestion drops the <ErrorInfo><Message> for NotExecuted
+    # results, so the test-results API never returns a skip reason (the
+    # detail endpoint has no message field at all).  The xUnit runner
+    # does print the reason to the VSTest task's stdout as two adjacent
+    # lines:
+    #     [xUnit.net HH:MM:SS.ss]     <FQN> [SKIP]
+    #     [xUnit.net HH:MM:SS.ss]       <reason>
+    # so we fetch the build log and pair them.
+
+    # Matches the `... <FQN> [SKIP]` header line.
+    # FQN is non-greedy because it may contain whitespace (theory
+    # parameters like `Method(config: "X")`); trailing `[SKIP]` anchors.
+    _SKIP_HEADER_RE = re.compile(
+        r"\[xUnit\.net\s+[\d:.]+\]\s+(.+?)\s+\[SKIP\]\s*$"
+    )
+    # Captures everything after the `[xUnit.net HH:MM:SS.ss]` prefix,
+    # wherever in the line it appears (AzDO prepends an ISO timestamp).
+    _XUNIT_MESSAGE_RE = re.compile(r"\[xUnit\.net\s+[\d:.]+\]\s+(.*)")
+
+    def _fetch_build_timeline(self, build_id: int) -> dict:
+        """Return the build timeline (lists all tasks with their log IDs)."""
+        url = (
+            f"https://dev.azure.com/{self._organization}/{self._project}"
+            f"/_apis/build/builds/{build_id}/timeline"
+        )
+        headers = {"Authorization": self._auth_header}
+        response = requests.get(
+            url, headers=headers,
+            params={"api-version": AZDO_API_VERSION},
+            timeout=AZDO_REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def _fetch_build_log(self, build_id: int, log_id: int) -> str:
+        """Fetch a single build-task log as plain text."""
+        url = (
+            f"https://dev.azure.com/{self._organization}/{self._project}"
+            f"/_apis/build/builds/{build_id}/logs/{log_id}"
+        )
+        headers = {"Authorization": self._auth_header}
+        # Logs can be tens of MB; allow a longer timeout than the default.
+        response = requests.get(
+            url, headers=headers,
+            params={"api-version": AZDO_API_VERSION},
+            timeout=60,
+        )
+        response.raise_for_status()
+        return response.text
+
+    def _fetch_skip_reasons_from_logs(
+        self, build_id: int
+    ) -> dict[str, str]:
+        """Return ``{automatedTestName → skip_reason}`` from VSTest logs.
+
+        Scans every task log whose name hints at xUnit/VSTest execution.
+        Non-test logs are cheap to skim since the ``[SKIP]`` regex fails
+        fast on non-matching lines.
+        """
+        try:
+            timeline = self._fetch_build_timeline(build_id)
+        except requests.exceptions.RequestException as exc:
+            logger.warning("Timeline fetch failed: %s", exc)
+            return {}
+
+        candidate_log_ids: list[int] = []
+        all_task_names: list[tuple[str, int | None]] = []
+        for record in timeline.get("records", []):
+            if record.get("type") != "Task":
+                continue
+            display_name = record.get("name") or ""
+            name = display_name.lower()
+            log_info = record.get("log") or {}
+            log_id = log_info.get("id") if isinstance(log_info, dict) else None
+            all_task_names.append(
+                (display_name, log_id if isinstance(log_id, int) else None)
+            )
+            if not any(k in name for k in ("vstest", "xunit", "ui tests")):
+                continue
+            if isinstance(log_id, int):
+                candidate_log_ids.append(log_id)
+        logger.info(
+            "Timeline tasks for build %s: %s",
+            build_id,
+            [n for n, _ in all_task_names],
+        )
+
+        if not candidate_log_ids:
+            logger.info("No VSTest task logs found for build %s", build_id)
+            return {}
+
+        reasons: dict[str, str] = {}
+        for log_id in candidate_log_ids:
+            try:
+                text = self._fetch_build_log(build_id, log_id)
+            except requests.exceptions.RequestException as exc:
+                logger.warning(
+                    "Log fetch failed (build=%s log=%s): %s",
+                    build_id, log_id, exc,
+                )
+                continue
+            lines = text.splitlines()
+            for i, line in enumerate(lines):
+                match = self._SKIP_HEADER_RE.search(line)
+                if not match or i + 1 >= len(lines):
+                    continue
+                fqn = match.group(1)
+                reason_line = lines[i + 1]
+                reason_match = self._XUNIT_MESSAGE_RE.search(reason_line)
+                reason = (
+                    reason_match.group(1).strip()
+                    if reason_match
+                    else reason_line.strip()
+                )
+                if not reason:
+                    continue
+                reasons[fqn] = reason
+                # Also index by the parameterless name so AzDO's
+                # non-parameterized NotExecuted rows (static
+                # `[Theory(Skip=...)]`) still match even when xUnit
+                # printed the SKIP with parameters.
+                bare = fqn.split("(", 1)[0]
+                reasons.setdefault(bare, reason)
+
+        logger.info(
+            "Parsed %d skip reasons from %d log(s) for build %s",
+            len(reasons), len(candidate_log_ids), build_id,
+        )
+        return reasons
+
     @staticmethod
     def _extract_test_id(automated_test_name: str) -> str | None:
         """Extract the first T-number (e.g. 'T7024') from a test name."""
@@ -342,6 +477,43 @@ class AzureDevOpsClient:
                 # This is the method name with params — strip params
                 return part.split("(")[0]
         return parts[-1] if parts else automated_test_name
+
+    # Prefixes that mark the start of the test action within a class
+    # name, so anything between platform and the first such token is
+    # the role.  Stored as prefixes (not full words) to match both
+    # verb forms ("Verify", "Validate") and the noun forms teams
+    # sometimes use ("Verification", "Validation").
+    _ACTION_VERB_PREFIXES = (
+        "Verif", "Validat", "Test", "Check", "Confirm", "Assert",
+        "Ensure",
+    )
+
+    @classmethod
+    def _extract_user_role(cls, automated_test_name: str) -> str:
+        """Return the user-role segment of the nested class name, e.g. "Kiosk".
+
+        Test class names follow the pattern
+        ``T####_{Platform}_{Role?}_{Verb...}`` — when no role tokens are
+        present, the test runs under the default (anonymous) user and
+        an empty string is returned.
+        """
+        parts = automated_test_name.split(".")
+        if len(parts) < 2:
+            return ""
+        bare_class = parts[-2].split("(", 1)[0]
+        tokens = bare_class.split("_")
+        if len(tokens) < 3:
+            return ""
+        role_tokens: list[str] = []
+        # Skip tokens[0] (T-number) and tokens[1] (platform).
+        for token in tokens[2:]:
+            if any(
+                token.startswith(prefix)
+                for prefix in cls._ACTION_VERB_PREFIXES
+            ):
+                break
+            role_tokens.append(token)
+        return " ".join(role_tokens)
 
     def get_failed_tests(self, build_id: int) -> list[dict]:
         """Return failed test details for a build, accounting for re-runs.
@@ -399,7 +571,9 @@ class AzureDevOpsClient:
                 rerun_runs.append(r)
 
         # Collect passed test keys from re-runs (these override original failures).
-        # Key is testId|config to distinguish same test ID with different user roles.
+        # Key uses the parameterless FQN (class+method), not just test_id —
+        # two tests may share a T-number but differ by user role encoded in
+        # the class name (e.g. `T8030_Windows_...` vs `T8030_Windows_Kiosk_...`).
         rerun_passed_keys: set[str] = set()
         rerun_all_keys: set[str] = set()
         for run in rerun_runs:
@@ -411,7 +585,8 @@ class AzureDevOpsClient:
                     config = self._extract_config(name)
                     if not test_id:
                         continue
-                    key = f"{test_id}|{config}"
+                    bare_fqn = name.split("(", 1)[0]
+                    key = f"{bare_fqn}|{config}"
                     rerun_all_keys.add(key)
                     if r.get("outcome") == "Passed":
                         rerun_passed_keys.add(key)
@@ -438,7 +613,8 @@ class AzureDevOpsClient:
                 name = r.get("automatedTestName", "")
                 test_id = self._extract_test_id(name)
                 config = self._extract_config(name)
-                key = f"{test_id}|{config}"
+                bare_fqn = name.split("(", 1)[0]
+                key = f"{bare_fqn}|{config}"
                 if not test_id or key in seen_keys:
                     continue
                 seen_keys.add(key)
@@ -470,7 +646,8 @@ class AzureDevOpsClient:
                 name = r.get("automatedTestName", "")
                 test_id = self._extract_test_id(name)
                 config = self._extract_config(name)
-                key = f"{test_id}|{config}"
+                bare_fqn = name.split("(", 1)[0]
+                key = f"{bare_fqn}|{config}"
                 if not test_id or key in seen_keys:
                     continue
                 # Skip if this test+config was re-run (passed or already counted)
@@ -537,6 +714,9 @@ class AzureDevOpsClient:
 
         skipped_tests: list[dict] = []
         seen_keys: set[str] = set()
+        # FQN → indexes into skipped_tests for rows with blank reasons,
+        # so we can fill them in after parsing the build log.
+        indexes_by_fqn: dict[str, list[int]] = {}
 
         for run in original_runs:
             try:
@@ -552,17 +732,68 @@ class AzureDevOpsClient:
                 name = r.get("automatedTestName", "")
                 test_id = self._extract_test_id(name)
                 config = self._extract_config(name)
-                key = f"{test_id}|{config}"
+                # Dedup key uses the parameterless FQN (class+method),
+                # not just test_id — two tests may share a T-number but
+                # differ by user role encoded in the class name
+                # (e.g. `T8030_Windows_...` vs `T8030_Windows_Kiosk_...`).
+                bare_fqn = name.split("(", 1)[0]
+                key = f"{bare_fqn}|{config}"
                 if not test_id or key in seen_keys:
                     continue
                 seen_keys.add(key)
+                error_message = r.get("errorMessage", "") or ""
                 skipped_tests.append({
                     "testId": test_id,
                     "testName": self._extract_short_name(name),
                     "config": config,
-                    "errorMessage": r.get("errorMessage", ""),
+                    "userRole": self._extract_user_role(name),
+                    "errorMessage": error_message,
                     "zephyrUrl": f"{self._ZEPHYR_BASE_URL}{test_id}",
                 })
+                if not error_message and name:
+                    indexes_by_fqn.setdefault(name, []).append(
+                        len(skipped_tests) - 1
+                    )
+
+        # AzDO's TRX ingestion strips skip reasons, so recover them by
+        # parsing the xUnit `[SKIP]` pairs out of the VSTest task log.
+        if indexes_by_fqn:
+            reason_map = self._fetch_skip_reasons_from_logs(build_id)
+            matched = 0
+            unmatched_azdo: list[str] = []
+            for fqn, indexes in indexes_by_fqn.items():
+                reason = reason_map.get(fqn)
+                if not reason:
+                    # xUnit prints the parameterless FQN; AzDO may
+                    # append "(param: value)" for theory cases.
+                    reason = reason_map.get(fqn.split("(", 1)[0])
+                if reason:
+                    matched += 1
+                    for idx in indexes:
+                        skipped_tests[idx]["errorMessage"] = reason
+                else:
+                    unmatched_azdo.append(fqn)
+            unmatched_log = [
+                fqn for fqn in reason_map
+                if fqn not in indexes_by_fqn
+                and all(
+                    fqn != k.split("(", 1)[0] for k in indexes_by_fqn
+                )
+            ]
+            logger.info(
+                "Skip reasons matched %d / %d blank skips",
+                matched, len(indexes_by_fqn),
+            )
+            if unmatched_azdo:
+                logger.info(
+                    "Unmatched AzDO skips (no log reason): %s",
+                    unmatched_azdo,
+                )
+            if unmatched_log:
+                logger.info(
+                    "Unmatched log reasons (no AzDO skip): %s",
+                    unmatched_log,
+                )
 
         skipped_tests.sort(key=lambda t: t["testId"])
         return skipped_tests

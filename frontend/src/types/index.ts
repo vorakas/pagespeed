@@ -290,6 +290,7 @@ export interface SkippedTest {
   testId: string
   testName: string
   config: string
+  userRole: string
   errorMessage: string
   zephyrUrl: string
 }
