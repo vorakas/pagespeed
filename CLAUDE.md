@@ -480,7 +480,19 @@ The legacy Flask/template frontend (`templates/`, `static/`) is archived at `/le
        -H "Content-Type: application/json" \
        -d '{"query": "mutation { serviceInstanceDeploy(environmentId: \"0226ddd8-058c-4d74-a18a-e4d831d1a195\", serviceId: \"0b3030d3-7c70-4d6a-a4ab-47d84a58b123\") }"}'
      ```
-  4. Confirm the deploy was triggered successfully
+  4. Verify the deploy used the new commit. The GraphQL mutation **often redeploys the previously-built image** instead of building the just-pushed commit, so check:
+     ```bash
+     curl -s -X POST https://backboard.railway.app/graphql/v2 \
+       -H "Authorization: Bearer $RAILWAY_TOKEN" -H "Content-Type: application/json" \
+       -d '{"query": "query { deployments(first: 1, input: { serviceId: \"0b3030d3-7c70-4d6a-a4ab-47d84a58b123\", environmentId: \"0226ddd8-058c-4d74-a18a-e4d831d1a195\" }) { edges { node { status meta } } } }"}'
+     ```
+     If `meta.commitHash` is not the HEAD you just pushed, fall back to the CLI (step 5).
+  5. **Fallback — force a fresh build via Railway CLI** when the mutation served a stale image:
+     ```bash
+     cd /c/pagespeed-monitor && source .env && RAILWAY_API_TOKEN="$RAILWAY_TOKEN" npx @railway/cli up -m "$(git log -1 --pretty=%s)"
+     ```
+     - The CLI requires the token under `RAILWAY_API_TOKEN` (account-scoped). `RAILWAY_TOKEN` is reserved for project-scoped tokens and fails CLI auth with "Invalid RAILWAY_TOKEN".
+     - `railway up` uploads the local working tree and forces a fresh Docker build, bypassing the image cache.
 
 ---
 
