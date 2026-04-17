@@ -45,7 +45,7 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
   }, [releaseName, sheetData])
 
   return (
-    <Card className="overflow-hidden h-full flex flex-col">
+    <Card className="overflow-hidden flex flex-col max-h-[22rem]">
       <CardContent className="p-3 flex flex-col flex-1 min-h-0 gap-2">
         {/* Header */}
         <div className="flex items-center gap-1.5 shrink-0">
@@ -74,52 +74,51 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
           />
         </div>
 
-        {/* Scrollable table area */}
+        {/* Scrollable table area.  One table with sticky <thead>/<tfoot>
+            keeps the Failed/Skipped columns vertically aligned across
+            header, body, and totals — a scrollbar in a separate body
+            table would shift its columns inward. */}
         {hasData ? (
-          <div className="flex-1 min-h-0 flex flex-col rounded border border-border overflow-hidden">
-            {/* Table header — frozen */}
-            <table className="w-full text-[11px] shrink-0">
-              <thead>
-                <tr className="bg-muted/50">
+          <div className="flex-1 min-h-0 rounded border border-border overflow-y-auto">
+            <table className="w-full text-[11px] table-fixed">
+              <colgroup>
+                <col />
+                <col className="w-16" />
+                <col className="w-20" />
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-muted/50">
+                <tr>
                   <th className="px-2 py-1 text-left font-medium text-muted-foreground">Build</th>
                   <th className="px-2 py-1 text-right font-medium text-muted-foreground">Failed</th>
                   <th className="px-2 py-1 text-right font-medium text-muted-foreground">Skipped</th>
                 </tr>
               </thead>
-            </table>
-            {/* Scrollable body */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              <table className="w-full text-[11px]">
-                <tbody>
-                  {DISPLAY_ORDER.filter((d) => sheetData.has(d.key)).map((d) => {
-                    const entry = sheetData.get(d.key)!
-                    return (
-                      <tr key={d.key} className="border-t border-border">
-                        <td className="px-2 py-0.5 text-foreground">{d.label}</td>
-                        <td className="px-2 py-0.5 text-right tabular-nums">
-                          {entry.failed.length > 0 ? (
-                            <span className="text-score-poor">{entry.failed.length}</span>
-                          ) : (
-                            <span className="text-muted-foreground">0</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-0.5 text-right tabular-nums">
-                          {entry.skipped.length > 0 ? (
-                            <span className="text-amber-500">{entry.skipped.length}</span>
-                          ) : (
-                            <span className="text-muted-foreground">0</span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {/* Totals row — frozen at bottom */}
-            <table className="w-full text-[11px] shrink-0">
-              <tfoot>
-                <tr className="border-t border-border bg-muted/50 font-medium">
+              <tbody>
+                {DISPLAY_ORDER.filter((d) => sheetData.has(d.key)).map((d) => {
+                  const entry = sheetData.get(d.key)!
+                  return (
+                    <tr key={d.key} className="border-t border-border">
+                      <td className="px-2 py-0.5 text-foreground">{d.label}</td>
+                      <td className="px-2 py-0.5 text-right tabular-nums">
+                        {entry.failed.length > 0 ? (
+                          <span className="text-score-poor">{entry.failed.length}</span>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-0.5 text-right tabular-nums">
+                        {entry.skipped.length > 0 ? (
+                          <span className="text-amber-500">{entry.skipped.length}</span>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot className="sticky bottom-0 z-10 bg-muted/50">
+                <tr className="border-t border-border font-medium">
                   <td className="px-2 py-1 text-foreground">Total</td>
                   <td className="px-2 py-1 text-right tabular-nums text-score-poor">{totals.failed}</td>
                   <td className="px-2 py-1 text-right tabular-nums text-amber-500">{totals.skipped}</td>
