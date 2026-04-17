@@ -496,6 +496,7 @@ class ApiClient {
       pipelineId: number
       branch: string
       targetInstance: string
+      stagingInstance: string
       runWarmUp: boolean
       runFunctional: boolean
       runVisual: boolean
@@ -519,6 +520,7 @@ class ApiClient {
           runIPhone: String(params.runIPhone),
           runAndroid: String(params.runAndroid),
           TargetInstance: params.targetInstance,
+          StagingInstance: params.stagingInstance,
         },
       }),
     })

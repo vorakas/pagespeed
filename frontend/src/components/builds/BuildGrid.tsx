@@ -48,8 +48,13 @@ interface BuildGridProps {
   branches: string[]
   globalBranch: string
   globalTargetInstance: string
-  overrides: Record<string, { branch?: string; targetInstance?: string }>
-  onOverrideChange: (roleKey: string, field: "branch" | "targetInstance", value: string) => void
+  globalStagingInstance: string
+  overrides: Record<string, { branch?: string; targetInstance?: string; stagingInstance?: string }>
+  onOverrideChange: (
+    roleKey: string,
+    field: "branch" | "targetInstance" | "stagingInstance",
+    value: string,
+  ) => void
   onTrigger: (roleKey: string) => void
   onStop: (roleKey: string) => void
   onShowResults: (build: DevOpsBuild) => void
@@ -66,7 +71,7 @@ interface BuildGridProps {
 
 export function BuildGrid({
   builds, recentBuilds, buildOverrides, onSelectBuild,
-  effectiveResults, branches, globalBranch, globalTargetInstance,
+  effectiveResults, branches, globalBranch, globalTargetInstance, globalStagingInstance,
   overrides, onOverrideChange, onTrigger, onStop, onShowResults, onShowSkipped,
   onAddToSheet, sheetData, onSheetClear, prefetchingTests,
   triggeringKeys, triggerErrors, cancellingKeys, selectedBuildId,
@@ -92,6 +97,7 @@ export function BuildGrid({
               branches={branches}
               globalBranch={globalBranch}
               globalTargetInstance={globalTargetInstance}
+              globalStagingInstance={globalStagingInstance}
               override={overrides[WARMUP_ROLE.key]}
               onOverrideChange={onOverrideChange}
               onTrigger={() => onTrigger(WARMUP_ROLE.key)}
@@ -136,6 +142,7 @@ export function BuildGrid({
                   branches={branches}
                   globalBranch={globalBranch}
                   globalTargetInstance={globalTargetInstance}
+                  globalStagingInstance={globalStagingInstance}
                   override={overrides[functional.key]}
                   onOverrideChange={onOverrideChange}
                   onTrigger={() => onTrigger(functional.key)}
@@ -166,6 +173,7 @@ export function BuildGrid({
                   branches={branches}
                   globalBranch={globalBranch}
                   globalTargetInstance={globalTargetInstance}
+                  globalStagingInstance={globalStagingInstance}
                   override={overrides[visual.key]}
                   onOverrideChange={onOverrideChange}
                   onTrigger={() => onTrigger(visual.key)}

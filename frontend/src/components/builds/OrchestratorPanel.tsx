@@ -13,16 +13,18 @@ interface OrchestratorPanelProps {
   branches: string[]
   branch: string
   targetInstance: string
+  stagingInstance: string
   onBranchChange: (branch: string) => void
   onTargetInstanceChange: (instance: string) => void
+  onStagingInstanceChange: (instance: string) => void
   onTriggered: () => void
   activeBuildCount: number
   onStopAll: () => Promise<void>
 }
 
 export function OrchestratorPanel({
-  config, branches, branch, targetInstance,
-  onBranchChange, onTargetInstanceChange, onTriggered,
+  config, branches, branch, targetInstance, stagingInstance,
+  onBranchChange, onTargetInstanceChange, onStagingInstanceChange, onTriggered,
   activeBuildCount, onStopAll,
 }: OrchestratorPanelProps) {
   const [confirmStopAll, setConfirmStopAll] = useState(false)
@@ -48,6 +50,7 @@ export function OrchestratorPanel({
         pipelineId: config.orchestratorPipelineId,
         branch,
         targetInstance,
+        stagingInstance,
         runWarmUp,
         runFunctional,
         runVisual,
@@ -136,10 +139,27 @@ export function OrchestratorPanel({
             </select>
           </div>
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Environment</p>
+            <p className="text-xs font-medium text-muted-foreground">PROD Instance</p>
             <select
               value={targetInstance}
               onChange={(e) => onTargetInstanceChange(e.target.value)}
+              className="h-8 w-14 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
+            >
+              {TARGET_INSTANCES.map((i) => (
+                <option key={i} value={i}>{i}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <p
+              className="text-xs font-medium text-muted-foreground"
+              title="Applied only to Visual builds; WarmUp and Functional ignore this."
+            >
+              PPE Instance
+            </p>
+            <select
+              value={stagingInstance}
+              onChange={(e) => onStagingInstanceChange(e.target.value)}
               className="h-8 w-14 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
             >
               {TARGET_INSTANCES.map((i) => (

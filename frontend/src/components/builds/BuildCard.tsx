@@ -22,8 +22,13 @@ interface BuildCardProps {
   branches: string[]
   globalBranch: string
   globalTargetInstance: string
-  override?: { branch?: string; targetInstance?: string }
-  onOverrideChange: (roleKey: string, field: "branch" | "targetInstance", value: string) => void
+  globalStagingInstance: string
+  override?: { branch?: string; targetInstance?: string; stagingInstance?: string }
+  onOverrideChange: (
+    roleKey: string,
+    field: "branch" | "targetInstance" | "stagingInstance",
+    value: string,
+  ) => void
   onTrigger: () => void
   onShowResults?: (build: DevOpsBuild) => void
   onShowSkipped?: (build: DevOpsBuild) => void
@@ -98,7 +103,7 @@ function formatTimeAgo(dateStr: string | null): string {
 export function BuildCard({
   roleKey, roleLabel, typeBadge, build, recentBuilds,
   selectedBuildOverrideId, onSelectBuild, effectiveResult,
-  branches, globalBranch, globalTargetInstance, override, onOverrideChange,
+  branches, globalBranch, globalTargetInstance, globalStagingInstance, override, onOverrideChange,
   onTrigger, onShowResults, onShowSkipped, onAddToSheet, addedToSheet,
   triggering, triggerError, onStop, cancelling, selected,
 }: BuildCardProps) {
@@ -114,7 +119,11 @@ export function BuildCard({
   const displayStatus = build?.status ?? "none"
   const hasRerun = effectiveResult?.hasRerun ?? false
 
-  const hasOverride = override?.branch || override?.targetInstance
+  const isVisual = typeBadge === "Visual"
+  const hasOverride =
+    override?.branch ||
+    override?.targetInstance ||
+    (isVisual && override?.stagingInstance)
 
   const selectedBuild = selectedBuildOverrideId
     ? recentBuilds.find((b) => b.id === selectedBuildOverrideId)
@@ -169,9 +178,15 @@ export function BuildCard({
         {/* Per-card overrides */}
         <details className="group">
           <summary className={`text-[10px] cursor-pointer hover:text-foreground ${hasOverride ? "text-sidebar-primary" : "text-muted-foreground"}`}>
-            {hasOverride ? "Override active" : "Override branch / env"}
+            {hasOverride
+              ? "Override active"
+              : isVisual
+                ? "Override branch / PROD / PPE"
+                : "Override branch / PROD"}
           </summary>
-          <div className="mt-1.5 grid grid-cols-[1fr_2.5rem] gap-2">
+          <div
+            className={`mt-1.5 grid gap-2 ${isVisual ? "grid-cols-[1fr_2.5rem_2.5rem]" : "grid-cols-[1fr_2.5rem]"}`}
+          >
             <select
               value={override?.branch || ""}
               onChange={(e) => onOverrideChange(roleKey, "branch", e.target.value)}
@@ -186,6 +201,7 @@ export function BuildCard({
             <select
               value={override?.targetInstance || ""}
               onChange={(e) => onOverrideChange(roleKey, "targetInstance", e.target.value)}
+              title={`PROD Instance (global: ${globalTargetInstance})`}
               className="h-6 w-full rounded border border-border bg-background px-1 text-[10px] text-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
             >
               <option value="">{globalTargetInstance}</option>
@@ -193,6 +209,19 @@ export function BuildCard({
                 <option key={i} value={i}>{i}</option>
               ))}
             </select>
+            {isVisual && (
+              <select
+                value={override?.stagingInstance || ""}
+                onChange={(e) => onOverrideChange(roleKey, "stagingInstance", e.target.value)}
+                title={`PPE Instance (global: ${globalStagingInstance})`}
+                className="h-6 w-full rounded border border-border bg-background px-1 text-[10px] text-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
+              >
+                <option value="">{globalStagingInstance}</option>
+                {TARGET_INSTANCES.map((i) => (
+                  <option key={i} value={i}>{i}</option>
+                ))}
+              </select>
+            )}
           </div>
         </details>
 

@@ -58,7 +58,8 @@ export function Builds() {
   const [branches, setBranches] = useState<string[]>([])
   const [branch, setBranch] = useState("master")
   const [targetInstance, setTargetInstance] = useState("A")
-  const [overrides, setOverrides] = useState<Record<string, { branch?: string; targetInstance?: string }>>({})
+  const [stagingInstance, setStagingInstance] = useState("C")
+  const [overrides, setOverrides] = useState<Record<string, { branch?: string; targetInstance?: string; stagingInstance?: string }>>({})
   const [selectedBuild, setSelectedBuild] = useState<DevOpsBuild | null>(null)
   const [panelMode, setPanelMode] = useState<PanelMode>("failed")
   const [failedTestsCache, setFailedTestsCache] = useState<Record<number, FailedTest[]>>({})
@@ -290,7 +291,12 @@ export function Builds() {
     }
     const cardOverride = overrides[roleKey]
     const effectiveBranch = cardOverride?.branch || branch
-    const effectiveInstance = cardOverride?.targetInstance || targetInstance
+    const effectiveProd = cardOverride?.targetInstance || targetInstance
+    const effectiveStaging = cardOverride?.stagingInstance || stagingInstance
+    const isVisual = roleKey.endsWith("_Visual")
+    const effectiveInstance = isVisual
+      ? `${effectiveProd}.${effectiveStaging}`
+      : effectiveProd
     setTriggeringKeys((prev) => new Set(prev).add(roleKey))
     try {
       await api.triggerDevOpsPipeline(config, defId, effectiveBranch, {
@@ -311,7 +317,11 @@ export function Builds() {
     }
   }
 
-  const handleOverrideChange = (roleKey: string, field: "branch" | "targetInstance", value: string) => {
+  const handleOverrideChange = (
+    roleKey: string,
+    field: "branch" | "targetInstance" | "stagingInstance",
+    value: string,
+  ) => {
     setOverrides((prev) => ({
       ...prev,
       [roleKey]: { ...prev[roleKey], [field]: value || undefined },
@@ -485,8 +495,10 @@ export function Builds() {
                   branches={branches}
                   branch={branch}
                   targetInstance={targetInstance}
+                  stagingInstance={stagingInstance}
                   onBranchChange={setBranch}
                   onTargetInstanceChange={setTargetInstance}
+                  onStagingInstanceChange={setStagingInstance}
                   onTriggered={handleOrchestratorTriggered}
                   activeBuildCount={activeRoleKeys.length}
                   onStopAll={handleStopAll}
@@ -500,6 +512,7 @@ export function Builds() {
                   branches={branches}
                   globalBranch={branch}
                   globalTargetInstance={targetInstance}
+                  globalStagingInstance={stagingInstance}
                   overrides={overrides}
                   onOverrideChange={handleOverrideChange}
                   onTrigger={handleTriggerSingle}
