@@ -39,8 +39,8 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
     return { failed, skipped }
   }, [sheetData])
 
-  const handleDownload = useCallback(() => {
-    const blob = generateSpreadsheet(releaseName, sheetData)
+  const handleDownload = useCallback(async () => {
+    const blob = await generateSpreadsheet(releaseName, sheetData)
     downloadSpreadsheet(blob, releaseName)
   }, [releaseName, sheetData])
 

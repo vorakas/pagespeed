@@ -1,15 +1,18 @@
 /**
- * Generates a formatted .xlsx regression tracking spreadsheet
- * from build test results (failed + skipped tests).
+ * Generates a styled .xlsx regression tracking spreadsheet from build
+ * test results (failed + skipped tests).
  *
- * Matches the structure used in the QA team's Google Sheets tracker:
- *   - Blue header rows with column names
- *   - Grey merged section headers for each platform/type/status group
- *   - Data rows with View, Type, TC URL (hyperlink), Automation Status
- *   - Columns E-I left blank for manual QA entry
+ * Colors and layout match docs/Spreadsheet_Template.xlsx:
+ *   - Column header rows (1-2): light-blue fill (#8EB4E3), bold
+ *   - Section header rows (merged A:I): grey fill (#BFBFBF), bold
+ *   - Data rows: no fill, plain
+ *   - Every cell carries a thin black border on all sides
+ *
+ * Switched from the ``xlsx`` (SheetJS CE) library to ``exceljs`` because
+ * the former's free edition does not write cell fills.
  */
 
-import * as XLSX from "xlsx"
+import ExcelJS from "exceljs"
 import type { FailedTest, SkippedTest } from "@/types"
 
 // ---------- Types ----------
@@ -26,52 +29,67 @@ export interface SheetEntry {
 
 const ZEPHYR_BASE_URL = "https://lampstrack.lampsplus.com/secure/Tests.jspa#/testCase/LP-"
 
-const HEADER_ROW_1 = ["View", "Type", "TC URL", "Automation", "Manual", "Assign QA", "Task URL (Rework / Bug / Update Test Case task)", "InfoGain Comments", "Corporate Response"]
+const HEADER_ROW_1 = [
+  "View",
+  "Type",
+  "TC URL",
+  "Automation",
+  "Manual",
+  "Assign QA",
+  "Task URL (Rework / Bug / Update Test Case task)",
+  "InfoGain Comments",
+  "Corporate Response",
+]
 const HEADER_ROW_2 = ["", "", "", "Execution Status", "Execution Status", "", "", "", ""]
 
 /** Platform order used throughout the spreadsheet. */
 const PLATFORMS = ["Windows", "Mac", "iPhone", "Android"] as const
 
 /** Column widths matching the example spreadsheet. */
-const COLUMN_WIDTHS = [
-  { wch: 10 },  // A: View
-  { wch: 12 },  // B: Type
-  { wch: 62 },  // C: TC URL
-  { wch: 16 },  // D: Automation
-  { wch: 16 },  // E: Manual
-  { wch: 14 },  // F: Assign QA
-  { wch: 50 },  // G: Task URL
-  { wch: 50 },  // H: InfoGain Comments
-  { wch: 30 },  // I: Corporate Response
-]
+const COLUMN_WIDTHS = [10, 12, 62, 16, 16, 14, 50, 50, 30]
+
+// Fill / font constants resolved from the template's theme colors.
+// Theme index 3 (#1F497D) + tint +0.60 → #8EB4E3 (column header fill)
+// Theme index 0 (#FFFFFF) + tint -0.25 → #BFBFBF (section header fill)
+const FILL_COLUMN_HEADER = "FF8EB4E3"
+const FILL_SECTION_HEADER = "FFBFBFBF"
+
+const FONT_DEFAULT: Partial<ExcelJS.Font> = { name: "Calibri", size: 10 }
+const FONT_HEADER: Partial<ExcelJS.Font> = { name: "Calibri", size: 10, bold: true }
+
+const THIN_BORDER: Partial<ExcelJS.Borders> = {
+  top: { style: "thin" },
+  left: { style: "thin" },
+  bottom: { style: "thin" },
+  right: { style: "thin" },
+}
 
 // ---------- Helpers ----------
-
-/** Extract platform name from a roleKey like "Windows_Functional" or "WarmUp". */
-function parsePlatform(roleKey: string): string {
-  if (roleKey === "WarmUp") return "Windows"
-  return roleKey.split("_")[0]
-}
-
-/** Extract type from a roleKey. */
-function parseType(roleKey: string): string {
-  if (roleKey === "WarmUp") return "Warmup"
-  return roleKey.split("_")[1] || "Functional"
-}
 
 /** Build the Zephyr test case URL from a test ID. */
 function buildTcUrl(testId: string): string {
   return `${ZEPHYR_BASE_URL}${testId}`
 }
 
-/** Create a grey merged section header row. */
-function makeSectionHeader(title: string): string[] {
-  return [title, "", "", "", "", "", "", "", ""]
+/** Apply header-style fill + font + borders to every cell in the given row. */
+function styleHeaderRow(row: ExcelJS.Row, fillArgb: string): void {
+  row.eachCell({ includeEmpty: true }, (cell) => {
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: fillArgb },
+    }
+    cell.font = FONT_HEADER
+    cell.border = THIN_BORDER
+  })
 }
 
-/** Create a data row for a test. */
-function makeDataRow(platform: string, type: string, testId: string, status: "Skipped" | "Failed"): string[] {
-  return [platform, type, buildTcUrl(testId), status, "", "", "", "", ""]
+/** Apply plain data-row styling (default font + borders, no fill). */
+function styleDataRow(row: ExcelJS.Row): void {
+  row.eachCell({ includeEmpty: true }, (cell) => {
+    cell.font = FONT_DEFAULT
+    cell.border = THIN_BORDER
+  })
 }
 
 // ---------- Main Export Function ----------
@@ -83,135 +101,126 @@ function makeDataRow(platform: string, type: string, testId: string, status: "Sk
  * @param entries      Map of roleKey → SheetEntry with failed/skipped tests
  * @returns            Blob of the .xlsx file ready for download
  */
-export function generateSpreadsheet(
+export async function generateSpreadsheet(
   releaseName: string,
-  entries: Map<string, SheetEntry>
-): Blob {
-  const rows: string[][] = []
+  entries: Map<string, SheetEntry>,
+): Promise<Blob> {
+  const workbook = new ExcelJS.Workbook()
+  const sheet = workbook.addWorksheet(releaseName || "Regression")
 
-  // Row 1-2: Headers
-  rows.push(HEADER_ROW_1)
-  rows.push(HEADER_ROW_2)
+  sheet.columns = COLUMN_WIDTHS.map((width) => ({ width }))
 
-  // ---------- Skipped sections ----------
+  // Rows 1-2: column headers
+  const headerRow1 = sheet.addRow(HEADER_ROW_1)
+  const headerRow2 = sheet.addRow(HEADER_ROW_2)
+  styleHeaderRow(headerRow1, FILL_COLUMN_HEADER)
+  styleHeaderRow(headerRow2, FILL_COLUMN_HEADER)
 
-  // Functional Skipped (Windows, Mac, iPhone, Android)
-  for (const platform of PLATFORMS) {
-    const key = `${platform}_Functional`
-    const entry = entries.get(key)
-    rows.push(makeSectionHeader(`${platform} Functional Skipped`))
-    if (entry) {
-      for (const test of entry.skipped) {
-        rows.push(makeDataRow(platform, "Functional", test.testId, "Skipped"))
+  // Merge single-label header columns across rows 1-2 so each column has
+  // one visual header cell except D/E which are grouped under "Execution Status".
+  sheet.mergeCells("A1:A2")
+  sheet.mergeCells("B1:B2")
+  sheet.mergeCells("C1:C2")
+  sheet.mergeCells("F1:F2")
+  sheet.mergeCells("G1:G2")
+  sheet.mergeCells("H1:H2")
+  sheet.mergeCells("I1:I2")
+
+  // Each section emits a merged grey header row followed by its data rows.
+  const addSection = (
+    title: string,
+    tests: Array<{ testId: string }>,
+    platform: string,
+    type: string,
+    status: "Skipped" | "Failed",
+  ) => {
+    const headerRow = sheet.addRow([title])
+    sheet.mergeCells(headerRow.number, 1, headerRow.number, 9)
+    styleHeaderRow(headerRow, FILL_SECTION_HEADER)
+
+    for (const test of tests) {
+      const dataRow = sheet.addRow([
+        platform,
+        type,
+        buildTcUrl(test.testId),
+        status,
+        "",
+        "",
+        "",
+        "",
+        "",
+      ])
+      // Column C: convert the plain URL string to a real hyperlink.
+      const urlCell = dataRow.getCell(3)
+      urlCell.value = {
+        text: String(urlCell.value ?? ""),
+        hyperlink: buildTcUrl(test.testId),
+        tooltip: buildTcUrl(test.testId),
       }
+      styleDataRow(dataRow)
     }
   }
 
-  // Visual Skipped (Windows, Mac, iPhone, Android)
+  // ---------- Skipped sections ----------
   for (const platform of PLATFORMS) {
-    const key = `${platform}_Visual`
-    const entry = entries.get(key)
-    rows.push(makeSectionHeader(`${platform} Visual Skipped`))
-    if (entry) {
-      for (const test of entry.skipped) {
-        rows.push(makeDataRow(platform, "Visual", test.testId, "Skipped"))
-      }
-    }
+    const entry = entries.get(`${platform}_Functional`)
+    addSection(
+      `${platform} Functional Skipped`,
+      entry?.skipped ?? [],
+      platform,
+      "Functional",
+      "Skipped",
+    )
+  }
+  for (const platform of PLATFORMS) {
+    const entry = entries.get(`${platform}_Visual`)
+    addSection(
+      `${platform} Visual Skipped`,
+      entry?.skipped ?? [],
+      platform,
+      "Visual",
+      "Skipped",
+    )
   }
 
   // ---------- Failed sections ----------
-
-  // Warmup Failures
-  const warmupEntry = entries.get("WarmUp")
-  rows.push(makeSectionHeader("Automated Functional Warmup Failures"))
-  if (warmupEntry) {
-    for (const test of warmupEntry.failed) {
-      rows.push(makeDataRow("Windows", "Warmup", test.testId, "Failed"))
-    }
-  }
-
-  // Functional Failed (Windows, Mac, iPhone, Android)
+  const warmup = entries.get("WarmUp")
+  addSection(
+    "Automated Functional Warmup Failures",
+    warmup?.failed ?? [],
+    "Windows",
+    "Warmup",
+    "Failed",
+  )
   for (const platform of PLATFORMS) {
-    const key = `${platform}_Functional`
-    const entry = entries.get(key)
-    rows.push(makeSectionHeader(`Automated Functional ${platform} Failures`))
-    if (entry) {
-      for (const test of entry.failed) {
-        rows.push(makeDataRow(platform, "Functional", test.testId, "Failed"))
-      }
-    }
+    const entry = entries.get(`${platform}_Functional`)
+    addSection(
+      `Automated Functional ${platform} Failures`,
+      entry?.failed ?? [],
+      platform,
+      "Functional",
+      "Failed",
+    )
   }
-
-  // Visual Failed (Windows, Mac, iPhone, Android)
   for (const platform of PLATFORMS) {
-    const key = `${platform}_Visual`
-    const entry = entries.get(key)
-    rows.push(makeSectionHeader(`Automated Visual ${platform} Failed`))
-    if (entry) {
-      for (const test of entry.failed) {
-        rows.push(makeDataRow(platform, "Visual", test.testId, "Failed"))
-      }
-    }
+    const entry = entries.get(`${platform}_Visual`)
+    addSection(
+      `Automated Visual ${platform} Failed`,
+      entry?.failed ?? [],
+      platform,
+      "Visual",
+      "Failed",
+    )
   }
 
-  // ---------- Unresolved sections (empty placeholders) ----------
+  // ---------- Unresolved + Manual Execution placeholders ----------
   for (const platform of PLATFORMS) {
-    rows.push(makeSectionHeader(`Automated ${platform} Unresolved`))
+    addSection(`Automated ${platform} Unresolved`, [], platform, "", "Failed")
   }
+  addSection("Manual Execution", [], "", "", "Failed")
 
-  // ---------- Manual Execution (empty placeholder) ----------
-  rows.push(makeSectionHeader("Manual Execution"))
-
-  // ---------- Build workbook ----------
-
-  const worksheet = XLSX.utils.aoa_to_sheet(rows)
-
-  // Column widths
-  worksheet["!cols"] = COLUMN_WIDTHS
-
-  // Track which rows are section headers for styling
-  const sectionHeaderRows: number[] = []
-  let currentRow = 0
-  for (const row of rows) {
-    if (currentRow >= 2 && row[1] === "" && row[2] === "" && row[0] !== "") {
-      sectionHeaderRows.push(currentRow)
-    }
-    currentRow++
-  }
-
-  // Merge section header cells (A:I) and apply styles
-  const merges: XLSX.Range[] = [
-    // Header merges (row 1-2 column merges for certain columns)
-    { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },  // A1:A2
-    { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },  // B1:B2
-    { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },  // C1:C2
-    { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },  // F1:F2
-    { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },  // G1:G2
-    { s: { r: 0, c: 7 }, e: { r: 1, c: 7 } },  // H1:H2
-    { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } },  // I1:I2
-  ]
-
-  // Merge section header rows (A:I)
-  for (const rowIdx of sectionHeaderRows) {
-    merges.push({ s: { r: rowIdx, c: 0 }, e: { r: rowIdx, c: 8 } })
-  }
-
-  worksheet["!merges"] = merges
-
-  // Add hyperlinks to TC URL cells (column C, starting from row 3)
-  for (let r = 2; r < rows.length; r++) {
-    const cellRef = XLSX.utils.encode_cell({ r, c: 2 })
-    const cell = worksheet[cellRef]
-    if (cell && typeof cell.v === "string" && cell.v.startsWith("https://")) {
-      cell.l = { Target: cell.v, Tooltip: cell.v }
-    }
-  }
-
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, releaseName || "Regression")
-
-  const arrayBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
-  return new Blob([arrayBuffer], {
+  const buffer = await workbook.xlsx.writeBuffer()
+  return new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   })
 }
