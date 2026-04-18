@@ -230,6 +230,29 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS blazemeter_presets (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                project_id BIGINT,
+                project_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS blazemeter_preset_tests (
+                id SERIAL PRIMARY KEY,
+                preset_id INTEGER NOT NULL,
+                test_id BIGINT NOT NULL,
+                test_name TEXT NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (preset_id) REFERENCES blazemeter_presets (id) ON DELETE CASCADE,
+                UNIQUE(preset_id, test_id)
+            )
+        """)
+
         # Migration: add trigger execution tracking columns
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP")
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_status TEXT")
@@ -308,6 +331,29 @@ class ConnectionManager:
                 name TEXT NOT NULL UNIQUE,
                 cron_expression TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS blazemeter_presets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                project_id INTEGER,
+                project_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS blazemeter_preset_tests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                preset_id INTEGER NOT NULL,
+                test_id INTEGER NOT NULL,
+                test_name TEXT NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (preset_id) REFERENCES blazemeter_presets (id) ON DELETE CASCADE,
+                UNIQUE(preset_id, test_id)
             )
         """)
 

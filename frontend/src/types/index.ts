@@ -354,6 +354,29 @@ export interface BlazemeterQueueSnapshot {
   configured: boolean
 }
 
+export interface BlazemeterPresetTest {
+  test_id: number
+  test_name: string
+  position: number
+}
+
+export interface BlazemeterPreset {
+  id: number
+  name: string
+  project_id: number | null
+  project_name: string | null
+  tests: BlazemeterPresetTest[]
+  created_at: string
+  updated_at: string
+}
+
+export interface BlazemeterPresetInput {
+  name: string
+  projectId?: number | null
+  projectName?: string | null
+  tests: Array<{ testId: number; testName: string }>
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {

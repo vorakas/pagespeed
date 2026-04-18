@@ -31,6 +31,7 @@ from config import (
     PORT,
 )
 from data_access import (
+    BlazemeterPresetRepository,
     ConnectionManager,
     SiteRepository,
     UrlRepository,
@@ -70,6 +71,7 @@ def create_app() -> Flask:
     test_result_repo = TestResultRepository(conn_mgr)
     trigger_repo = TriggerRepository(conn_mgr)
     preset_repo = PresetRepository(conn_mgr)
+    blazemeter_preset_repo = BlazemeterPresetRepository(conn_mgr)
 
     pagespeed = PageSpeedClient(api_key=PAGESPEED_API_KEY)
 
@@ -107,6 +109,7 @@ def create_app() -> Flask:
     # ---- Blueprints ----
     register_blueprints(
         flask_app, site_service, testing_service, test_result_repo, trigger_service,
+        blazemeter_preset_repo=blazemeter_preset_repo,
         blazemeter_client=blazemeter_client,
         blazemeter_queue=blazemeter_queue,
     )

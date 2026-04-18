@@ -6,7 +6,7 @@ dependencies (services, repositories) through explicit arguments.
 
 from flask import Flask
 
-from data_access import TestResultRepository
+from data_access import BlazemeterPresetRepository, TestResultRepository
 from routes.ai_api import create_ai_blueprint
 from routes.azure_api import create_azure_blueprint
 from routes.blazemeter_api import create_blazemeter_blueprint
@@ -30,6 +30,7 @@ def register_blueprints(
     testing_service: TestingService,
     test_result_repo: TestResultRepository,
     trigger_service: TriggerService,
+    blazemeter_preset_repo: BlazemeterPresetRepository,
     blazemeter_client: "BlazemeterClient | None" = None,
     blazemeter_queue: "BlazemeterQueueService | None" = None,
 ) -> None:
@@ -51,4 +52,6 @@ def register_blueprints(
     app.register_blueprint(create_azure_blueprint())
     app.register_blueprint(create_ai_blueprint())
     app.register_blueprint(create_devops_blueprint())
-    app.register_blueprint(create_blazemeter_blueprint(blazemeter_queue, blazemeter_client))
+    app.register_blueprint(
+        create_blazemeter_blueprint(blazemeter_queue, blazemeter_client, blazemeter_preset_repo),
+    )

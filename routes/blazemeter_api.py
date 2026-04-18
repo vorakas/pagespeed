@@ -19,6 +19,7 @@ from config import (
     BLAZEMETER_PROJECT_ID,  # optional — becomes the UI's default selected project
     BLAZEMETER_WORKSPACE_ID,
 )
+from data_access import BlazemeterPresetRepository
 from exceptions import AuthenticationError, ValidationError
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
@@ -27,6 +28,7 @@ from services.blazemeter_queue import BlazemeterQueueService
 def create_blazemeter_blueprint(
     queue_service: Optional[BlazemeterQueueService],
     client: Optional[BlazemeterClient],
+    preset_repo: BlazemeterPresetRepository,
 ) -> Blueprint:
     """Factory that creates the BlazeMeter API blueprint.
 
@@ -127,5 +129,87 @@ def create_blazemeter_blueprint(
         _require_configured()
         cancelled = queue_service.cancel_active()  # type: ignore[union-attr]
         return jsonify({"success": cancelled})
+
+    # ------------------------------------------------------------------
+    # Presets — server-side, shared across all users
+    # ------------------------------------------------------------------
+
+    @bp.route("/api/blazemeter/presets", methods=["GET"])
+    def list_presets():
+        presets = preset_repo.get_all()
+        return jsonify({"success": True, "presets": presets})
+
+    @bp.route("/api/blazemeter/presets", methods=["POST"])
+    def create_preset():
+        data = request.get_json() or {}
+        name = (data.get("name") or "").strip()
+        if not name:
+            raise ValidationError("Preset name is required")
+        tests = data.get("tests") or []
+        if not isinstance(tests, list):
+            raise ValidationError("tests must be a list")
+        preset = preset_repo.create(
+            name=name,
+            tests=[
+                {
+                    "test_id": t.get("testId") or t.get("test_id"),
+                    "test_name": t.get("testName") or t.get("test_name"),
+                }
+                for t in tests
+            ],
+            project_id=int(data["projectId"]) if data.get("projectId") else None,
+            project_name=data.get("projectName"),
+        )
+        return jsonify({"success": True, "preset": preset}), 201
+
+    @bp.route("/api/blazemeter/presets/<int:preset_id>", methods=["PUT"])
+    def update_preset(preset_id: int):
+        data = request.get_json() or {}
+        name = (data.get("name") or "").strip()
+        if not name:
+            raise ValidationError("Preset name is required")
+        tests = data.get("tests") or []
+        if not isinstance(tests, list):
+            raise ValidationError("tests must be a list")
+        preset = preset_repo.update(
+            preset_id=preset_id,
+            name=name,
+            tests=[
+                {
+                    "test_id": t.get("testId") or t.get("test_id"),
+                    "test_name": t.get("testName") or t.get("test_name"),
+                }
+                for t in tests
+            ],
+            project_id=int(data["projectId"]) if data.get("projectId") else None,
+            project_name=data.get("projectName"),
+        )
+        if preset is None:
+            return jsonify({"success": False, "error": "Preset not found"}), 404
+        return jsonify({"success": True, "preset": preset})
+
+    @bp.route("/api/blazemeter/presets/<int:preset_id>", methods=["DELETE"])
+    def delete_preset(preset_id: int):
+        removed = preset_repo.delete(preset_id)
+        if not removed:
+            return jsonify({"success": False, "error": "Preset not found"}), 404
+        return jsonify({"success": True})
+
+    @bp.route("/api/blazemeter/presets/<int:preset_id>/queue", methods=["POST"])
+    def queue_preset(preset_id: int):
+        _require_configured()
+        preset = preset_repo.get_by_id(preset_id)
+        if preset is None:
+            return jsonify({"success": False, "error": "Preset not found"}), 404
+        items = []
+        for test in preset["tests"]:
+            item = queue_service.enqueue(  # type: ignore[union-attr]
+                test_id=int(test["test_id"]),
+                test_name=str(test["test_name"]),
+                project_id=preset.get("project_id"),
+                project_name=preset.get("project_name"),
+            )
+            items.append(item.to_dict())
+        return jsonify({"success": True, "queued": len(items), "items": items})
 
     return bp

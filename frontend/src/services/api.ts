@@ -30,6 +30,8 @@ import type {
   BlazemeterTest,
   BlazemeterQueueSnapshot,
   BlazemeterQueueItem,
+  BlazemeterPreset,
+  BlazemeterPresetInput,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -584,6 +586,34 @@ class ApiClient {
 
   async cancelBlazemeterActive(): Promise<{ success: boolean }> {
     return this.request("/api/blazemeter/queue/cancel-active", { method: "POST" })
+  }
+
+  // ---------- BlazeMeter presets ----------
+
+  async listBlazemeterPresets(): Promise<{ success: boolean; presets: BlazemeterPreset[] }> {
+    return this.request("/api/blazemeter/presets")
+  }
+
+  async createBlazemeterPreset(input: BlazemeterPresetInput): Promise<{ success: boolean; preset: BlazemeterPreset }> {
+    return this.request("/api/blazemeter/presets", {
+      method: "POST",
+      body: JSON.stringify(input),
+    })
+  }
+
+  async updateBlazemeterPreset(presetId: number, input: BlazemeterPresetInput): Promise<{ success: boolean; preset: BlazemeterPreset }> {
+    return this.request(`/api/blazemeter/presets/${presetId}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    })
+  }
+
+  async deleteBlazemeterPreset(presetId: number): Promise<{ success: boolean }> {
+    return this.request(`/api/blazemeter/presets/${presetId}`, { method: "DELETE" })
+  }
+
+  async queueBlazemeterPreset(presetId: number): Promise<{ success: boolean; queued: number }> {
+    return this.request(`/api/blazemeter/presets/${presetId}/queue`, { method: "POST" })
   }
 }
 
