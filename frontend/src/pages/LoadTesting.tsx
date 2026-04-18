@@ -746,12 +746,18 @@ export function LoadTesting() {
                     disabled={projectsLoading || projects.length === 0}
                   >
                     <SelectTrigger className="h-8 w-56 text-sm" aria-label="Project">
-                      <SelectValue placeholder={projectsLoading ? "Loading projects…" : "Select project"} />
+                      <SelectValue placeholder={projectsLoading ? "Loading projects…" : "Select project"}>
+                        {(val: string) => {
+                          const p = projects.find((pp) => String(pp.id) === val)
+                          if (!p) return projectsLoading ? "Loading projects…" : "Select project"
+                          return p.name?.trim() ? p.name : `Project #${p.id}`
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {projects.map((project) => (
                         <SelectItem key={project.id} value={String(project.id)}>
-                          {project.name}
+                          {project.name?.trim() ? project.name : `Project #${project.id}`}
                           {project.testsCount != null && (
                             <span className="ml-2 text-xs text-muted-foreground">
                               ({project.testsCount})
@@ -985,7 +991,7 @@ export function LoadTesting() {
 
       {/* ---------- Preset create/edit dialog ---------- */}
       <Dialog open={presetDialogOpen} onOpenChange={setPresetDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>{editingPreset ? "Edit preset" : "New preset"}</DialogTitle>
             <DialogDescription>
@@ -1019,12 +1025,18 @@ export function LoadTesting() {
                     disabled={projects.length === 0}
                   >
                     <SelectTrigger className="h-8 flex-1 text-sm" aria-label="Project">
-                      <SelectValue placeholder="Select project" />
+                      <SelectValue placeholder="Select project">
+                        {(val: string) => {
+                          const p = projects.find((pp) => String(pp.id) === val)
+                          if (!p) return "Select project"
+                          return p.name?.trim() ? p.name : `Project #${p.id}`
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {projects.map((project) => (
                         <SelectItem key={project.id} value={String(project.id)}>
-                          {project.name}
+                          {project.name?.trim() ? project.name : `Project #${project.id}`}
                           {project.testsCount != null && (
                             <span className="ml-2 text-xs text-muted-foreground">
                               ({project.testsCount})
