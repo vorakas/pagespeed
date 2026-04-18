@@ -148,7 +148,8 @@ class BlazemeterPresetRepository:
     def _fetch_tests(self, cursor: Any, preset_id: int) -> list[dict]:
         ph = self._cm._placeholder()
         cursor.execute(
-            f"SELECT test_id, test_name, position FROM blazemeter_preset_tests "
+            f"SELECT test_id, test_name, project_id, project_name, position "
+            f"FROM blazemeter_preset_tests "
             f"WHERE preset_id = {ph} ORDER BY position, id",
             (preset_id,),
         )
@@ -168,9 +169,18 @@ class BlazemeterPresetRepository:
                 raise ValidationError(
                     "Each preset test requires test_id and test_name"
                 )
+            project_id = test.get("project_id") if isinstance(test, dict) else None
+            project_name = test.get("project_name") if isinstance(test, dict) else None
             cursor.execute(
                 f"INSERT INTO blazemeter_preset_tests "
-                f"(preset_id, test_id, test_name, position) "
-                f"VALUES ({ph}, {ph}, {ph}, {ph})",
-                (preset_id, int(test_id), str(test_name), position),
+                f"(preset_id, test_id, test_name, project_id, project_name, position) "
+                f"VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})",
+                (
+                    preset_id,
+                    int(test_id),
+                    str(test_name),
+                    int(project_id) if project_id else None,
+                    str(project_name) if project_name else None,
+                    position,
+                ),
             )

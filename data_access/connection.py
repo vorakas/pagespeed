@@ -247,11 +247,16 @@ class ConnectionManager:
                 preset_id INTEGER NOT NULL,
                 test_id BIGINT NOT NULL,
                 test_name TEXT NOT NULL,
+                project_id BIGINT,
+                project_name TEXT,
                 position INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (preset_id) REFERENCES blazemeter_presets (id) ON DELETE CASCADE,
                 UNIQUE(preset_id, test_id)
             )
         """)
+
+        cursor.execute("ALTER TABLE blazemeter_preset_tests ADD COLUMN IF NOT EXISTS project_id BIGINT")
+        cursor.execute("ALTER TABLE blazemeter_preset_tests ADD COLUMN IF NOT EXISTS project_name TEXT")
 
         # Migration: add trigger execution tracking columns
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP")
@@ -351,6 +356,8 @@ class ConnectionManager:
                 preset_id INTEGER NOT NULL,
                 test_id INTEGER NOT NULL,
                 test_name TEXT NOT NULL,
+                project_id INTEGER,
+                project_name TEXT,
                 position INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (preset_id) REFERENCES blazemeter_presets (id) ON DELETE CASCADE,
                 UNIQUE(preset_id, test_id)
@@ -365,6 +372,8 @@ class ConnectionManager:
             "ALTER TABLE test_results ADD COLUMN strategy TEXT DEFAULT 'desktop'",
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_at TIMESTAMP",
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_status TEXT",
+            "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_id INTEGER",
+            "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_name TEXT",
         ]
         for statement in _SQLITE_MIGRATIONS:
             try:

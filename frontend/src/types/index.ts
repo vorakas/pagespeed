@@ -357,6 +357,8 @@ export interface BlazemeterQueueSnapshot {
 export interface BlazemeterPresetTest {
   test_id: number
   test_name: string
+  project_id: number | null
+  project_name: string | null
   position: number
 }
 
@@ -374,7 +376,12 @@ export interface BlazemeterPresetInput {
   name: string
   projectId?: number | null
   projectName?: string | null
-  tests: Array<{ testId: number; testName: string }>
+  tests: Array<{
+    testId: number
+    testName: string
+    projectId?: number | null
+    projectName?: string | null
+  }>
 }
 
 // ---------- API Responses ----------

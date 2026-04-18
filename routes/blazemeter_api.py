@@ -139,24 +139,36 @@ def create_blazemeter_blueprint(
         presets = preset_repo.get_all()
         return jsonify({"success": True, "presets": presets})
 
+    def _normalise_preset_tests(raw: list) -> list[dict]:
+        """Convert the incoming JSON test list into repository input shape.
+
+        Accepts both camelCase (from the React client) and snake_case.
+        """
+        if not isinstance(raw, list):
+            raise ValidationError("tests must be a list")
+        out: list[dict] = []
+        for t in raw:
+            if not isinstance(t, dict):
+                continue
+            project_id = t.get("projectId") or t.get("project_id")
+            project_name = t.get("projectName") or t.get("project_name")
+            out.append({
+                "test_id": t.get("testId") or t.get("test_id"),
+                "test_name": t.get("testName") or t.get("test_name"),
+                "project_id": int(project_id) if project_id else None,
+                "project_name": project_name,
+            })
+        return out
+
     @bp.route("/api/blazemeter/presets", methods=["POST"])
     def create_preset():
         data = request.get_json() or {}
         name = (data.get("name") or "").strip()
         if not name:
             raise ValidationError("Preset name is required")
-        tests = data.get("tests") or []
-        if not isinstance(tests, list):
-            raise ValidationError("tests must be a list")
         preset = preset_repo.create(
             name=name,
-            tests=[
-                {
-                    "test_id": t.get("testId") or t.get("test_id"),
-                    "test_name": t.get("testName") or t.get("test_name"),
-                }
-                for t in tests
-            ],
+            tests=_normalise_preset_tests(data.get("tests") or []),
             project_id=int(data["projectId"]) if data.get("projectId") else None,
             project_name=data.get("projectName"),
         )
@@ -168,19 +180,10 @@ def create_blazemeter_blueprint(
         name = (data.get("name") or "").strip()
         if not name:
             raise ValidationError("Preset name is required")
-        tests = data.get("tests") or []
-        if not isinstance(tests, list):
-            raise ValidationError("tests must be a list")
         preset = preset_repo.update(
             preset_id=preset_id,
             name=name,
-            tests=[
-                {
-                    "test_id": t.get("testId") or t.get("test_id"),
-                    "test_name": t.get("testName") or t.get("test_name"),
-                }
-                for t in tests
-            ],
+            tests=_normalise_preset_tests(data.get("tests") or []),
             project_id=int(data["projectId"]) if data.get("projectId") else None,
             project_name=data.get("projectName"),
         )
@@ -202,12 +205,15 @@ def create_blazemeter_blueprint(
         if preset is None:
             return jsonify({"success": False, "error": "Preset not found"}), 404
         items = []
+        # Each test row carries its own project context (tests may come
+        # from different projects).  Fall back to the preset-level project
+        # for legacy rows written before per-test context was stored.
         for test in preset["tests"]:
             item = queue_service.enqueue(  # type: ignore[union-attr]
                 test_id=int(test["test_id"]),
                 test_name=str(test["test_name"]),
-                project_id=preset.get("project_id"),
-                project_name=preset.get("project_name"),
+                project_id=test.get("project_id") or preset.get("project_id"),
+                project_name=test.get("project_name") or preset.get("project_name"),
             )
             items.append(item.to_dict())
         return jsonify({"success": True, "queued": len(items), "items": items})

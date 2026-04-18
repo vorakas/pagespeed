@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
   AlertCircle,
+  ArrowDown,
+  ArrowUp,
   CheckCircle2,
   CircleDot,
   Edit2,
@@ -12,6 +14,7 @@ import {
   RefreshCw,
   Square,
   Trash2,
+  X,
   XCircle,
 } from "lucide-react"
 
@@ -42,7 +45,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { EmptyState } from "@/components/shared/EmptyState"
@@ -127,7 +129,13 @@ export function LoadTesting() {
   const [presetDialogOpen, setPresetDialogOpen] = useState(false)
   const [editingPreset, setEditingPreset] = useState<BlazemeterPreset | null>(null)
   const [presetName, setPresetName] = useState("")
-  const [presetTestIds, setPresetTestIds] = useState<Set<number>>(new Set())
+  const [presetSelected, setPresetSelected] = useState<
+    Array<{ testId: number; testName: string; projectId: number | null; projectName: string | null }>
+  >([])
+  const [dialogProjectId, setDialogProjectId] = useState<string>("")
+  const [dialogTests, setDialogTests] = useState<BlazemeterTest[]>([])
+  const [dialogTestsLoading, setDialogTestsLoading] = useState(false)
+  const [dialogTestFilter, setDialogTestFilter] = useState("")
   const [presetSaving, setPresetSaving] = useState(false)
   const [presetQueueBusy, setPresetQueueBusy] = useState<number | null>(null)
 
@@ -305,25 +313,67 @@ export function LoadTesting() {
   const openCreatePreset = useCallback(() => {
     setEditingPreset(null)
     setPresetName("")
-    setPresetTestIds(new Set())
+    setPresetSelected([])
+    setDialogProjectId(selectedProjectId)
+    setDialogTestFilter("")
     setPresetDialogOpen(true)
+  }, [selectedProjectId])
+
+  const openEditPreset = useCallback(
+    (preset: BlazemeterPreset) => {
+      setEditingPreset(preset)
+      setPresetName(preset.name)
+      setPresetSelected(
+        preset.tests
+          .slice()
+          .sort((a, b) => a.position - b.position)
+          .map((t) => ({
+            testId: t.test_id,
+            testName: t.test_name,
+            projectId: t.project_id,
+            projectName: t.project_name,
+          })),
+      )
+      // Default the browsing dropdown to the first project a test belongs to,
+      // else the currently-selected main-page project.
+      const firstProjectId = preset.tests.find((t) => t.project_id)?.project_id
+      setDialogProjectId(firstProjectId ? String(firstProjectId) : selectedProjectId)
+      setDialogTestFilter("")
+      setPresetDialogOpen(true)
+    },
+    [selectedProjectId],
+  )
+
+  const addPresetTest = useCallback(
+    (test: BlazemeterTest, project: BlazemeterProject | null) => {
+      setPresetSelected((prev) => {
+        if (prev.some((t) => t.testId === test.id)) return prev
+        return [
+          ...prev,
+          {
+            testId: test.id,
+            testName: test.name,
+            projectId: project?.id ?? null,
+            projectName: project?.name ?? null,
+          },
+        ]
+      })
+    },
+    [],
+  )
+
+  const removePresetTest = useCallback((testId: number) => {
+    setPresetSelected((prev) => prev.filter((t) => t.testId !== testId))
   }, [])
 
-  const openEditPreset = useCallback((preset: BlazemeterPreset) => {
-    setEditingPreset(preset)
-    setPresetName(preset.name)
-    setPresetTestIds(new Set(preset.tests.map((t) => t.test_id)))
-    setPresetDialogOpen(true)
-  }, [])
-
-  const togglePresetTest = useCallback((testId: number) => {
-    setPresetTestIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(testId)) {
-        next.delete(testId)
-      } else {
-        next.add(testId)
-      }
+  const movePresetTest = useCallback((testId: number, direction: -1 | 1) => {
+    setPresetSelected((prev) => {
+      const idx = prev.findIndex((t) => t.testId === testId)
+      if (idx === -1) return prev
+      const target = idx + direction
+      if (target < 0 || target >= prev.length) return prev
+      const next = prev.slice()
+      ;[next[idx], next[target]] = [next[target], next[idx]]
       return next
     })
   }, [])
@@ -334,27 +384,28 @@ export function LoadTesting() {
       toast.error("Preset name is required")
       return
     }
-    if (presetTestIds.size === 0) {
+    if (presetSelected.length === 0) {
       toast.error("Select at least one test")
       return
     }
 
-    // Resolve test names from both the current tests list (for newly-checked
-    // items in this project) and the existing preset (for items that aren't
-    // in the current filter). This keeps the name intact across projects.
-    const nameById = new Map<number, string>()
-    tests.forEach((t) => nameById.set(t.id, t.name))
-    editingPreset?.tests.forEach((t) => {
-      if (!nameById.has(t.test_id)) nameById.set(t.test_id, t.test_name)
-    })
+    // When every selected test belongs to the same project, keep that as
+    // the preset-level project (used only as a display label in the UI).
+    // Otherwise leave the preset-level project null — per-test context is
+    // what actually drives queue enqueueing.
+    const projectIds = new Set(presetSelected.map((t) => t.projectId).filter(Boolean))
+    const presetProjectId = projectIds.size === 1 ? presetSelected[0].projectId : null
+    const presetProjectName = projectIds.size === 1 ? presetSelected[0].projectName : null
 
     const input = {
       name,
-      projectId: selectedProject?.id ?? null,
-      projectName: selectedProject?.name ?? null,
-      tests: Array.from(presetTestIds).map((testId) => ({
-        testId,
-        testName: nameById.get(testId) ?? `Test ${testId}`,
+      projectId: presetProjectId,
+      projectName: presetProjectName,
+      tests: presetSelected.map((t) => ({
+        testId: t.testId,
+        testName: t.testName,
+        projectId: t.projectId,
+        projectName: t.projectName,
       })),
     }
 
@@ -374,7 +425,52 @@ export function LoadTesting() {
     } finally {
       setPresetSaving(false)
     }
-  }, [presetName, presetTestIds, tests, editingPreset, selectedProject, refreshPresets])
+  }, [presetName, presetSelected, editingPreset, refreshPresets])
+
+  // Load tests for the dialog's currently-selected project (independent of
+  // the main Tests panel so switching in the dialog doesn't disturb the
+  // rest of the page).
+  useEffect(() => {
+    if (!presetDialogOpen || !dialogProjectId) {
+      setDialogTests([])
+      return
+    }
+    let cancelled = false
+    setDialogTestsLoading(true)
+    api.listBlazemeterTests(dialogProjectId)
+      .then((data) => {
+        if (!cancelled) setDialogTests(data.tests ?? [])
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          toast.error(err instanceof Error ? err.message : "Failed to load tests")
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDialogTestsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [presetDialogOpen, dialogProjectId])
+
+  const dialogProject = useMemo(
+    () => projects.find((p) => String(p.id) === dialogProjectId) ?? null,
+    [projects, dialogProjectId],
+  )
+
+  const filteredDialogTests = useMemo(() => {
+    if (!dialogTestFilter.trim()) return dialogTests
+    const needle = dialogTestFilter.trim().toLowerCase()
+    return dialogTests.filter(
+      (t) => t.name.toLowerCase().includes(needle) || String(t.id).includes(needle),
+    )
+  }, [dialogTests, dialogTestFilter])
+
+  const presetSelectedIds = useMemo(
+    () => new Set(presetSelected.map((t) => t.testId)),
+    [presetSelected],
+  )
 
   const handleDeletePreset = useCallback(
     async (preset: BlazemeterPreset) => {
@@ -557,11 +653,37 @@ export function LoadTesting() {
                           <span>
                             {preset.tests.length} test{preset.tests.length === 1 ? "" : "s"}
                           </span>
-                          {preset.project_name && (
-                            <Badge variant="outline" className="text-[10px]">
-                              {preset.project_name}
-                            </Badge>
-                          )}
+                          {(() => {
+                            const projectNames = Array.from(
+                              new Set(
+                                preset.tests
+                                  .map((t) => t.project_name)
+                                  .filter((n): n is string => Boolean(n)),
+                              ),
+                            )
+                            if (projectNames.length === 0 && preset.project_name) {
+                              return (
+                                <Badge variant="outline" className="text-[10px]">
+                                  {preset.project_name}
+                                </Badge>
+                              )
+                            }
+                            if (projectNames.length === 1) {
+                              return (
+                                <Badge variant="outline" className="text-[10px]">
+                                  {projectNames[0]}
+                                </Badge>
+                              )
+                            }
+                            if (projectNames.length > 1) {
+                              return (
+                                <Badge variant="outline" className="text-[10px]">
+                                  {projectNames.length} projects
+                                </Badge>
+                              )
+                            }
+                            return null
+                          })()}
                         </div>
                       </div>
                       <div className="flex flex-shrink-0 items-center gap-1">
@@ -863,14 +985,12 @@ export function LoadTesting() {
 
       {/* ---------- Preset create/edit dialog ---------- */}
       <Dialog open={presetDialogOpen} onOpenChange={setPresetDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editingPreset ? "Edit preset" : "New preset"}</DialogTitle>
             <DialogDescription>
-              Select the tests that should be queued when this preset runs.
-              {selectedProject
-                ? ` Showing tests from ${selectedProject.name}.`
-                : " Switch projects in the Tests panel to see tests from another project."}
+              Build a queue of tests to run sequentially. You can pick tests from
+              any project and reorder them with the up/down buttons.
             </DialogDescription>
           </DialogHeader>
 
@@ -888,60 +1008,167 @@ export function LoadTesting() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">
-                  Tests ({presetTestIds.size} selected)
-                </Label>
-                {editingPreset && editingPreset.tests.some((t) => !tests.find((ct) => ct.id === t.test_id)) && (
-                  <span className="text-[11px] text-muted-foreground">
-                    Some saved tests aren't shown (different project)
-                  </span>
-                )}
-              </div>
-              <div className="max-h-[280px] overflow-auto rounded-md border border-border">
-                {tests.length === 0 ? (
-                  <p className="p-4 text-sm text-muted-foreground">
-                    No tests in the current project. Switch projects or refresh.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {tests.map((test) => {
-                      const checked = presetTestIds.has(test.id)
-                      return (
-                        <li key={test.id}>
-                          <label className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-accent/40">
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={() => togglePresetTest(test.id)}
-                            />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {/* Browse / add column */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Add tests from</Label>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={dialogProjectId}
+                    onValueChange={(val) => setDialogProjectId(val)}
+                    disabled={projects.length === 0}
+                  >
+                    <SelectTrigger className="h-8 flex-1 text-sm" aria-label="Project">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={String(project.id)}>
+                          {project.name}
+                          {project.testsCount != null && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              ({project.testsCount})
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Input
+                  placeholder="Filter tests…"
+                  value={dialogTestFilter}
+                  onChange={(e) => setDialogTestFilter(e.target.value)}
+                  className="h-8 text-sm"
+                />
+                <div className="max-h-[300px] overflow-auto rounded-md border border-border">
+                  {dialogTestsLoading ? (
+                    <div className="p-6"><LoadingSpinner /></div>
+                  ) : filteredDialogTests.length === 0 ? (
+                    <p className="p-4 text-sm text-muted-foreground">
+                      {dialogProjectId
+                        ? dialogTestFilter
+                          ? "No tests match your filter."
+                          : "No tests in this project."
+                        : "Select a project to see tests."}
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-border">
+                      {filteredDialogTests.map((test) => {
+                        const already = presetSelectedIds.has(test.id)
+                        return (
+                          <li
+                            key={test.id}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm"
+                          >
                             <span className="font-mono text-xs text-muted-foreground">
                               {test.id}
                             </span>
-                            <span className="truncate">{test.name}</span>
-                          </label>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
-              {editingPreset && editingPreset.tests.some((t) => !tests.find((ct) => ct.id === t.test_id)) && (
-                <div className="rounded-md border border-dashed border-border p-2 text-xs text-muted-foreground">
-                  {editingPreset.tests
-                    .filter((t) => !tests.find((ct) => ct.id === t.test_id))
-                    .map((t) => (
-                      <div key={t.test_id} className="flex items-center gap-2 py-0.5">
-                        <Checkbox
-                          checked={presetTestIds.has(t.test_id)}
-                          onCheckedChange={() => togglePresetTest(t.test_id)}
-                        />
-                        <span className="font-mono">{t.test_id}</span>
-                        <span className="truncate">{t.test_name}</span>
-                      </div>
-                    ))}
+                            <span className="flex-1 truncate">{test.name}</span>
+                            <Button
+                              size="sm"
+                              variant={already ? "outline" : "default"}
+                              disabled={already}
+                              onClick={() => addPresetTest(test, dialogProject)}
+                              className="h-7"
+                            >
+                              {already ? "Added" : (
+                                <>
+                                  <Plus className="mr-1 h-3.5 w-3.5" />
+                                  Add
+                                </>
+                              )}
+                            </Button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
                 </div>
-              )}
+              </div>
+
+              {/* Ordered selected column */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">
+                    Selected ({presetSelected.length}) — runs top-to-bottom
+                  </Label>
+                  {presetSelected.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setPresetSelected([])}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <div className="max-h-[362px] overflow-auto rounded-md border border-border">
+                  {presetSelected.length === 0 ? (
+                    <p className="p-4 text-sm text-muted-foreground">
+                      No tests selected yet. Add tests from the list on the left.
+                    </p>
+                  ) : (
+                    <ol className="divide-y divide-border">
+                      {presetSelected.map((item, idx) => (
+                        <li
+                          key={item.testId}
+                          className="flex items-center gap-2 px-2 py-1.5 text-sm"
+                        >
+                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate">{item.testName}</span>
+                            </div>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                              <span className="font-mono">{item.testId}</span>
+                              {item.projectName && (
+                                <Badge variant="outline" className="text-[10px]">
+                                  {item.projectName}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-shrink-0 items-center gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              disabled={idx === 0}
+                              onClick={() => movePresetTest(item.testId, -1)}
+                              aria-label="Move up"
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              disabled={idx === presetSelected.length - 1}
+                              onClick={() => movePresetTest(item.testId, 1)}
+                              aria-label="Move down"
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-destructive"
+                              onClick={() => removePresetTest(item.testId)}
+                              aria-label="Remove from preset"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
