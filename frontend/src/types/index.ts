@@ -295,6 +295,65 @@ export interface SkippedTest {
   zephyrUrl: string
 }
 
+// ---------- BlazeMeter (Load Testing) ----------
+
+export interface BlazemeterConfigStatus {
+  configured: boolean
+  apiKeyIdMasked: string | null
+  workspaceId: string | null
+  defaultProjectId: string | null
+}
+
+export interface BlazemeterProject {
+  id: number
+  name: string
+  workspaceId: number | null
+  description: string | null
+  testsCount: number | null
+  updated: number | null
+}
+
+export interface BlazemeterTest {
+  id: number
+  name: string
+  testType: string | null
+  projectId: number | null
+  workspaceId: number | null
+  updated: number | null
+}
+
+
+
+export type BlazemeterQueueStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled"
+
+export interface BlazemeterQueueItem {
+  itemId: number
+  testId: number
+  testName: string
+  projectId: number | null
+  projectName: string | null
+  status: BlazemeterQueueStatus
+  masterId: number | null
+  enqueuedAt: number
+  startedAt: number | null
+  endedAt: number | null
+  lastStatus: string | null
+  error: string | null
+}
+
+export interface BlazemeterQueueSnapshot {
+  active: BlazemeterQueueItem | null
+  pending: BlazemeterQueueItem[]
+  history: BlazemeterQueueItem[]
+  pollSeconds?: number
+  configured: boolean
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {

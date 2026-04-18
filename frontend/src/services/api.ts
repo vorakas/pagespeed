@@ -25,6 +25,11 @@ import type {
   DevOpsBuild,
   FailedTest,
   SkippedTest,
+  BlazemeterConfigStatus,
+  BlazemeterProject,
+  BlazemeterTest,
+  BlazemeterQueueSnapshot,
+  BlazemeterQueueItem,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -524,6 +529,61 @@ class ApiClient {
         },
       }),
     })
+  }
+
+  // ---------- BlazeMeter (Load Testing) ----------
+
+  async getBlazemeterConfig(): Promise<BlazemeterConfigStatus> {
+    return this.request<BlazemeterConfigStatus>("/api/blazemeter/config-status")
+  }
+
+  async testBlazemeterConnection(): Promise<{ success: boolean; user?: { email?: string; displayName?: string } }> {
+    return this.request("/api/blazemeter/test-connection", { method: "POST" })
+  }
+
+  async listBlazemeterProjects(): Promise<{ success: boolean; projects: BlazemeterProject[] }> {
+    return this.request("/api/blazemeter/projects")
+  }
+
+  async listBlazemeterTests(
+    projectId?: number | string | null,
+    limit: number = 200,
+  ): Promise<{ success: boolean; tests: BlazemeterTest[] }> {
+    const qs = new URLSearchParams({ limit: String(limit) })
+    if (projectId) qs.set("projectId", String(projectId))
+    return this.request(`/api/blazemeter/tests?${qs.toString()}`)
+  }
+
+  async getBlazemeterQueue(): Promise<BlazemeterQueueSnapshot> {
+    return this.request<BlazemeterQueueSnapshot>("/api/blazemeter/queue")
+  }
+
+  async enqueueBlazemeterTest(
+    testId: number,
+    testName: string,
+    projectContext?: { projectId: number; projectName: string },
+  ): Promise<{ success: boolean; item: BlazemeterQueueItem }> {
+    return this.request("/api/blazemeter/queue", {
+      method: "POST",
+      body: JSON.stringify({
+        testId,
+        testName,
+        projectId: projectContext?.projectId,
+        projectName: projectContext?.projectName,
+      }),
+    })
+  }
+
+  async removeBlazemeterQueueItem(itemId: number): Promise<{ success: boolean }> {
+    return this.request(`/api/blazemeter/queue/${itemId}`, { method: "DELETE" })
+  }
+
+  async clearBlazemeterQueue(): Promise<{ success: boolean; removed: number }> {
+    return this.request("/api/blazemeter/queue/clear", { method: "POST" })
+  }
+
+  async cancelBlazemeterActive(): Promise<{ success: boolean }> {
+    return this.request("/api/blazemeter/queue/cancel-active", { method: "POST" })
   }
 }
 

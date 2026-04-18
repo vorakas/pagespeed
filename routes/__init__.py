@@ -9,6 +9,7 @@ from flask import Flask
 from data_access import TestResultRepository
 from routes.ai_api import create_ai_blueprint
 from routes.azure_api import create_azure_blueprint
+from routes.blazemeter_api import create_blazemeter_blueprint
 from routes.devops_api import create_devops_blueprint
 from routes.metrics_api import create_metrics_blueprint
 from routes.newrelic_api import create_newrelic_blueprint
@@ -16,6 +17,8 @@ from routes.pages import create_pages_blueprint
 from routes.sites_api import create_sites_blueprint
 from routes.testing_api import create_testing_blueprint
 from routes.triggers_api import create_triggers_blueprint
+from services.blazemeter_client import BlazemeterClient
+from services.blazemeter_queue import BlazemeterQueueService
 from services.site_service import SiteService
 from services.testing_service import TestingService
 from services.trigger_service import TriggerService
@@ -27,6 +30,8 @@ def register_blueprints(
     testing_service: TestingService,
     test_result_repo: TestResultRepository,
     trigger_service: TriggerService,
+    blazemeter_client: "BlazemeterClient | None" = None,
+    blazemeter_queue: "BlazemeterQueueService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -46,3 +51,4 @@ def register_blueprints(
     app.register_blueprint(create_azure_blueprint())
     app.register_blueprint(create_ai_blueprint())
     app.register_blueprint(create_devops_blueprint())
+    app.register_blueprint(create_blazemeter_blueprint(blazemeter_queue, blazemeter_client))

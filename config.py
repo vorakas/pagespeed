@@ -126,3 +126,28 @@ AZDO_API_VERSION: str = '7.1'
 
 AZDO_REQUEST_TIMEOUT_SECONDS: int = 15
 """HTTP timeout for Azure DevOps REST API requests."""
+
+# ---------------------------------------------------------------------------
+# BlazeMeter defaults
+# ---------------------------------------------------------------------------
+
+BLAZEMETER_API_KEY_ID: str | None = os.getenv('BLAZEMETER_API_KEY_ID')
+"""BlazeMeter API key ID (server-side env var; never sent to the client)."""
+
+BLAZEMETER_API_SECRET: str | None = os.getenv('BLAZEMETER_API_SECRET')
+"""BlazeMeter API key secret (server-side env var; never sent to the client)."""
+
+BLAZEMETER_WORKSPACE_ID: str | None = os.getenv('BLAZEMETER_WORKSPACE_ID')
+"""BlazeMeter workspace ID used to scope test listings."""
+
+BLAZEMETER_PROJECT_ID: str | None = os.getenv('BLAZEMETER_PROJECT_ID')
+"""Optional BlazeMeter project ID used to further scope test listings."""
+
+BLAZEMETER_BASE_URL: str = 'https://a.blazemeter.com/api/v4'
+"""BlazeMeter REST API v4 base URL."""
+
+BLAZEMETER_TIMEOUT_SECONDS: int = 30
+"""HTTP timeout for BlazeMeter REST requests."""
+
+BLAZEMETER_POLL_SECONDS: int = 20
+"""Interval at which the queue manager polls the active BlazeMeter run."""

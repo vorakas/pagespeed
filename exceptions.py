@@ -73,6 +73,13 @@ class AzureDevOpsError(ExternalAPIError):
         super().__init__(message, provider="Azure DevOps")
 
 
+class BlazemeterError(ExternalAPIError):
+    """BlazeMeter REST API failure."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, provider="BlazeMeter")
+
+
 class AIServiceError(ExternalAPIError):
     """AI provider (Claude / OpenAI) API failure."""
 

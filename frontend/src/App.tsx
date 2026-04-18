@@ -11,6 +11,7 @@ import { NewRelic } from "@/pages/NewRelic"
 import { IisLogs } from "@/pages/IisLogs"
 import { AiAnalysis } from "@/pages/AiAnalysis"
 import { Builds } from "@/pages/Builds"
+import { LoadTesting } from "@/pages/LoadTesting"
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
                 <Route path="iislogs" element={<IisLogs />} />
                 <Route path="ai-analysis" element={<AiAnalysis />} />
               <Route path="builds" element={<Builds />} />
+              <Route path="load-testing" element={<LoadTesting />} />
               </Route>
             </Routes>
           </SitesProvider>

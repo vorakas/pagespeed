@@ -23,7 +23,13 @@ logging.basicConfig(
 )
 logging.getLogger('apscheduler').setLevel(logging.DEBUG)
 
-from config import PAGESPEED_API_KEY, PORT
+from config import (
+    BLAZEMETER_API_KEY_ID,
+    BLAZEMETER_API_SECRET,
+    BLAZEMETER_WORKSPACE_ID,
+    PAGESPEED_API_KEY,
+    PORT,
+)
 from data_access import (
     ConnectionManager,
     SiteRepository,
@@ -40,6 +46,8 @@ from exceptions import (
     SchedulerError,
     ValidationError,
 )
+from services.blazemeter_client import BlazemeterClient
+from services.blazemeter_queue import BlazemeterQueueService
 from services.pagespeed_client import PageSpeedClient
 from routes import register_blueprints
 from services.site_service import SiteService
@@ -77,9 +85,30 @@ def create_app() -> Flask:
     trigger_service = TriggerService(trigger_repo, preset_repo, testing_service, scheduler)
     trigger_service.sync_all_jobs()
 
+    # ---- BlazeMeter (optional; only wired when env vars are present) ----
+    blazemeter_client: BlazemeterClient | None = None
+    blazemeter_queue: BlazemeterQueueService | None = None
+    if BLAZEMETER_API_KEY_ID and BLAZEMETER_API_SECRET:
+        try:
+            blazemeter_client = BlazemeterClient(
+                api_key_id=BLAZEMETER_API_KEY_ID,
+                api_key_secret=BLAZEMETER_API_SECRET,
+                workspace_id=BLAZEMETER_WORKSPACE_ID,
+            )
+            blazemeter_queue = BlazemeterQueueService(blazemeter_client, scheduler)
+            logging.info("BlazeMeter integration enabled")
+        except Exception:
+            logging.exception("Failed to initialise BlazeMeter integration")
+            blazemeter_client = None
+            blazemeter_queue = None
+    else:
+        logging.info("BlazeMeter env vars not set — load testing disabled")
+
     # ---- Blueprints ----
     register_blueprints(
         flask_app, site_service, testing_service, test_result_repo, trigger_service,
+        blazemeter_client=blazemeter_client,
+        blazemeter_queue=blazemeter_queue,
     )
 
     # ---- Centralized error handlers ----
