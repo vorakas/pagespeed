@@ -1107,8 +1107,15 @@ class AzureDevOpsClient:
     ) -> dict:
         """Queue a new build for the given pipeline definition.
 
+        Uses the Pipelines API (``POST pipelines/{id}/runs``) rather
+        than the legacy Builds API because the latter silently drops
+        queue-time ``variables`` overrides for some pipelines even when
+        the variable is marked "Settable at queue time".
+
         Args:
-            definition_id:       Pipeline definition ID.
+            definition_id:       Pipeline definition ID (same numeric
+                                 ID as the pipeline ID used by the
+                                 Pipelines API).
             source_branch:       Git ref to build (default: master).
             template_parameters: Optional dict of template parameter
                                  overrides. Each key must be declared
@@ -1118,24 +1125,18 @@ class AzureDevOpsClient:
             variables:           Optional dict of queue-time variable
                                  overrides (maps name -> string value).
                                  Each must be marked "Settable at queue
-                                 time" in the pipeline/variable group
-                                 settings for the override to apply.
+                                 time" in the pipeline settings for
+                                 the override to apply.
 
         Returns:
             Normalized build dict for the queued build.
         """
-        body: dict = {
-            "definition": {"id": definition_id},
-            "sourceBranch": source_branch,
-        }
-        if template_parameters:
-            body["templateParameters"] = template_parameters
-        if variables:
-            body["variables"] = {
-                name: {"value": str(value)} for name, value in variables.items()
-            }
-        data = self._request("POST", "build/builds", body=body)
-        return self._normalize_build(data)
+        return self._queue_pipeline_run(
+            definition_id=definition_id,
+            source_branch=source_branch,
+            template_parameters=template_parameters,
+            variables=variables,
+        )
 
     def cancel_build(self, build_id: int) -> dict:
         """Request cancellation of an in-flight build.
@@ -1176,10 +1177,50 @@ class AzureDevOpsClient:
         Returns:
             Normalized build dict for the queued orchestrator build.
         """
-        body = {
-            "definition": {"id": definition_id},
-            "sourceBranch": source_branch,
-            "templateParameters": template_parameters,
+        return self._queue_pipeline_run(
+            definition_id=definition_id,
+            source_branch=source_branch,
+            template_parameters=template_parameters,
+            variables=None,
+        )
+
+    def _queue_pipeline_run(
+        self,
+        definition_id: int,
+        source_branch: str,
+        template_parameters: Optional[dict],
+        variables: Optional[dict],
+    ) -> dict:
+        """Queue a pipeline run via the Pipelines API and return the
+        normalized build dict.
+
+        The Pipelines API returns a "run" object rather than a "build",
+        so after queueing we re-fetch via ``get_build`` to keep the
+        caller-facing shape consistent with the rest of the client.
+        """
+        body: dict = {
+            "resources": {
+                "repositories": {
+                    "self": {"refName": source_branch},
+                },
+            },
         }
-        data = self._request("POST", "build/builds", body=body)
-        return self._normalize_build(data)
+        if template_parameters:
+            body["templateParameters"] = template_parameters
+        if variables:
+            body["variables"] = {
+                name: {"value": str(value), "isSecret": False}
+                for name, value in variables.items()
+            }
+        run = self._request(
+            "POST",
+            f"pipelines/{definition_id}/runs",
+            body=body,
+            params={"api-version": "7.1-preview.1"},
+        )
+        run_id = run.get("id")
+        if run_id is None:
+            raise AzureDevOpsError(
+                "Pipelines API did not return a run id for the queued build."
+            )
+        return self.get_build(run_id)
