@@ -198,6 +198,43 @@ def create_blazemeter_blueprint(
             return jsonify({"success": False, "error": "Preset not found"}), 404
         return jsonify({"success": True})
 
+    @bp.route("/api/blazemeter/masters/<int:master_id>/report", methods=["GET"])
+    def get_master_report(master_id: int):
+        """Aggregate every post-test report into one payload.
+
+        Each sub-section is fetched independently and degrades gracefully:
+        if BlazeMeter returns an error for one section (e.g. the test had no
+        CI gates configured, so ``/ci-status`` 404s), its value is ``None``
+        and ``errors[<section>]`` carries the message — the rest still renders.
+        """
+        _require_configured()
+        assert client is not None  # _require_configured guarantees it
+
+        sections: dict[str, object] = {}
+        errors: dict[str, str] = {}
+
+        def _safe(section: str, fn):
+            try:
+                sections[section] = fn()
+            except Exception as exc:  # noqa: BLE001 — we want to surface, not raise
+                errors[section] = str(exc)
+                sections[section] = None
+
+        _safe("master", lambda: client.get_master(master_id))
+        _safe("summary", lambda: client.get_master_summary(master_id))
+        _safe("aggregate", lambda: client.get_master_aggregate(master_id))
+        _safe("timeline", lambda: client.get_master_timeline(master_id))
+        _safe("errors", lambda: client.get_master_errors(master_id))
+        _safe("ciStatus", lambda: client.get_master_ci_status(master_id))
+        _safe("thresholds", lambda: client.get_master_thresholds(master_id))
+
+        return jsonify({
+            "success": True,
+            "masterId": master_id,
+            **sections,
+            "fetchErrors": errors,
+        })
+
     @bp.route("/api/blazemeter/presets/<int:preset_id>/queue", methods=["POST"])
     def queue_preset(preset_id: int):
         _require_configured()

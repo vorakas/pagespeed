@@ -32,6 +32,7 @@ import type {
   BlazemeterQueueItem,
   BlazemeterPreset,
   BlazemeterPresetInput,
+  BlazemeterMasterReport,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -614,6 +615,10 @@ class ApiClient {
 
   async queueBlazemeterPreset(presetId: number): Promise<{ success: boolean; queued: number }> {
     return this.request(`/api/blazemeter/presets/${presetId}/queue`, { method: "POST" })
+  }
+
+  async getBlazemeterMasterReport(masterId: number): Promise<BlazemeterMasterReport> {
+    return this.request(`/api/blazemeter/masters/${masterId}/report`)
   }
 }
 

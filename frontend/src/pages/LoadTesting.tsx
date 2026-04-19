@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
+  BarChart3,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -42,6 +43,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { BlazemeterMasterReportDialog } from "@/components/load-testing/BlazemeterMasterReportDialog"
 import { api } from "@/services/api"
 import type {
   BlazemeterConfigStatus,
@@ -133,6 +135,8 @@ export function LoadTesting() {
   const [presetSaving, setPresetSaving] = useState(false)
   const [presetQueueBusy, setPresetQueueBusy] = useState<number | null>(null)
   const [expandedPresetIds, setExpandedPresetIds] = useState<Set<number>>(new Set())
+  const [reportMasterId, setReportMasterId] = useState<number | null>(null)
+  const [reportTestName, setReportTestName] = useState<string | null>(null)
 
   const togglePresetExpanded = useCallback((presetId: number) => {
     setExpandedPresetIds((prev) => {
@@ -1253,6 +1257,21 @@ export function LoadTesting() {
                             {item.status}
                           </Badge>
                           <span>{formatRelative(item.endedAt)}</span>
+                          {item.masterId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => {
+                                setReportMasterId(item.masterId)
+                                setReportTestName(item.testName)
+                              }}
+                              aria-label="View report"
+                            >
+                              <BarChart3 className="mr-1 h-3.5 w-3.5" />
+                              Report
+                            </Button>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -1266,6 +1285,14 @@ export function LoadTesting() {
         )}
       </div>
 
+      <BlazemeterMasterReportDialog
+        masterId={reportMasterId}
+        testName={reportTestName}
+        onClose={() => {
+          setReportMasterId(null)
+          setReportTestName(null)
+        }}
+      />
     </div>
   )
 }

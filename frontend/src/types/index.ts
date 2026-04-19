@@ -384,6 +384,96 @@ export interface BlazemeterPresetInput {
   }>
 }
 
+export interface BlazemeterMasterInfo {
+  id: number | null
+  testId: number | null
+  name: string | null
+  status: number | string | null
+  reportStatus: string | null
+  created: number | null
+  ended: number | null
+  note: string | null
+  publicTokenUrl: string | null
+}
+
+export interface BlazemeterRunSummary {
+  hits: number | null
+  failed: number | null
+  errorRate: number | null
+  avgResponseTime: number | null
+  minResponseTime: number | null
+  maxResponseTime: number | null
+  p50: number | null
+  p90: number | null
+  p95: number | null
+  p99: number | null
+  avgLatency: number | null
+  avgBandwidth: number | null
+  avgThroughput: number | null
+  duration: number | null
+  startTime: number | null
+  endTime: number | null
+}
+
+export interface BlazemeterLabelRow {
+  labelId: number | string | null
+  labelName: string | null
+  samples: number | null
+  errors: number | null
+  errorRate: number | null
+  avgResponseTime: number | null
+  minResponseTime: number | null
+  maxResponseTime: number | null
+  p50: number | null
+  p90: number | null
+  p95: number | null
+  p99: number | null
+  avgLatency: number | null
+  avgThroughput: number | null
+  avgBytes: number | null
+}
+
+export interface BlazemeterTimelinePoint {
+  t: number | string | null
+  avgResponseTime: number | null
+  errorRate: number | null
+  users: number | null
+  hits: number | null
+}
+
+export interface BlazemeterTimeline {
+  points: BlazemeterTimelinePoint[]
+  interval: number | null
+}
+
+export interface BlazemeterErrorRow {
+  labelId: number | string | null
+  labelName: string | null
+  errorCode: number | string | null
+  count: number | null
+  message: string | null
+}
+
+export interface BlazemeterCiStatus {
+  failures?: Array<Record<string, unknown>>
+  failuresCount?: number | null
+  passed?: boolean | null
+  reason?: string | null
+  thresholds?: Array<Record<string, unknown>>
+}
+
+export interface BlazemeterMasterReport {
+  masterId: number
+  master: BlazemeterMasterInfo | null
+  summary: BlazemeterRunSummary | null
+  aggregate: BlazemeterLabelRow[] | null
+  timeline: BlazemeterTimeline | null
+  errors: BlazemeterErrorRow[] | null
+  ciStatus: BlazemeterCiStatus | null
+  thresholds: Array<Record<string, unknown>> | null
+  fetchErrors: Record<string, string>
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {

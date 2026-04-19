@@ -26,6 +26,13 @@ from exceptions import AuthenticationError, BlazemeterError, RateLimitError
 logger = logging.getLogger(__name__)
 
 
+def _safe_index(seq: Any, idx: int) -> Any:
+    """Return ``seq[idx]`` if possible, else None — survives non-lists."""
+    if isinstance(seq, list) and 0 <= idx < len(seq):
+        return seq[idx]
+    return None
+
+
 class BlazemeterClient:
     """Client for the BlazeMeter v4 REST API.
 
@@ -225,6 +232,89 @@ class BlazemeterClient:
         return [self._project_master(m) for m in results]
 
     # ------------------------------------------------------------------
+    # Post-test reports (only call after a master has terminated)
+    # ------------------------------------------------------------------
+
+    def get_master_summary(self, master_id: int) -> dict:
+        """Return the aggregated run-level summary (hits, error %, percentiles)."""
+        payload = self._request(
+            "GET", f"/masters/{master_id}/reports/main/summary",
+        )
+        result = payload.get("result", {}) if isinstance(payload, dict) else {}
+        # BM returns either a summary dict directly or `{ summary: [...] }`
+        if isinstance(result, dict) and isinstance(result.get("summary"), list) and result["summary"]:
+            entry = result["summary"][0]
+        else:
+            entry = result if isinstance(result, dict) else {}
+        return self._project_summary(entry)
+
+    def get_master_aggregate(self, master_id: int) -> list[dict]:
+        """Return per-label aggregated stats (one row per URL/transaction)."""
+        payload = self._request(
+            "GET", f"/masters/{master_id}/reports/aggregatereport/data",
+        )
+        results = payload.get("result", []) if isinstance(payload, dict) else []
+        if not isinstance(results, list):
+            return []
+        return [self._project_aggregate_row(r) for r in results]
+
+    def get_master_timeline(
+        self, master_id: int, granularity: Optional[int] = None,
+    ) -> dict:
+        """Return time-series data (response time, users, errors, throughput)."""
+        params: dict[str, Any] = {}
+        if granularity is not None:
+            params["granularity"] = granularity
+        payload = self._request(
+            "GET", f"/masters/{master_id}/reports/timeline/data",
+            params=params or None,
+        )
+        result = payload.get("result", {}) if isinstance(payload, dict) else {}
+        return self._project_timeline(result if isinstance(result, dict) else {})
+
+    def get_master_errors(self, master_id: int) -> list[dict]:
+        """Return error breakdown (per-label messages + counts)."""
+        payload = self._request(
+            "GET", f"/masters/{master_id}/reports/errorsreport/data",
+        )
+        results = payload.get("result", []) if isinstance(payload, dict) else []
+        if not isinstance(results, list):
+            return []
+        return [self._project_error_row(r) for r in results]
+
+    def get_master_ci_status(self, master_id: int) -> dict:
+        """Return CI pass/fail status (present only when CI gates were configured)."""
+        payload = self._request("GET", f"/masters/{master_id}/ci-status")
+        result = payload.get("result", {}) if isinstance(payload, dict) else {}
+        if not isinstance(result, dict):
+            return {}
+        return {
+            "failures": result.get("failures") or [],
+            "failuresCount": result.get("failuresCount"),
+            "passed": result.get("passed"),
+            "reason": result.get("reason"),
+            "thresholds": result.get("thresholds") or [],
+        }
+
+    def get_master_thresholds(self, master_id: int) -> list[dict]:
+        """Return threshold/SLA results (list of threshold checks with pass/fail)."""
+        payload = self._request("GET", f"/masters/{master_id}/thresholds")
+        result = payload.get("result", []) if isinstance(payload, dict) else []
+        if isinstance(result, dict):
+            # Some BM accounts return `{ data: [...] }` shape.
+            inner = result.get("data") or result.get("thresholds")
+            if isinstance(inner, list):
+                return inner
+            return []
+        return result if isinstance(result, list) else []
+
+    def get_master_full(self, master_id: int) -> dict:
+        """Return the master plus the expanded config blob."""
+        payload = self._request("GET", f"/masters/{master_id}/full")
+        result = payload.get("result", {}) if isinstance(payload, dict) else {}
+        return result if isinstance(result, dict) else {}
+
+    # ------------------------------------------------------------------
     # Response projection (keep only the fields the UI actually uses)
     # ------------------------------------------------------------------
 
@@ -262,4 +352,115 @@ class BlazemeterClient:
             "ended": master.get("ended"),
             "note": master.get("note"),
             "publicTokenUrl": master.get("publicTokenUrl"),
+        }
+
+    @staticmethod
+    def _project_summary(entry: dict) -> dict:
+        """Flatten BlazeMeter's summary response into UI-friendly keys.
+
+        BM's summary payload uses keys that differ slightly across API
+        revisions (``avg``/``average``, ``tp90``/``percentileResponseTime90``).
+        This helper normalises whichever shape we get.
+        """
+        def pick(*keys: str) -> Any:
+            for k in keys:
+                if k in entry and entry[k] is not None:
+                    return entry[k]
+            return None
+
+        return {
+            "hits": pick("hits", "samples"),
+            "failed": pick("failed", "errors", "errorsCount"),
+            "errorRate": pick("errorsRate", "errorRate", "errorPct"),
+            "avgResponseTime": pick("avg", "average", "avgResponseTime"),
+            "minResponseTime": pick("min", "minResponseTime"),
+            "maxResponseTime": pick("max", "maxResponseTime"),
+            "p50": pick("tp50", "percentileResponseTime50", "median", "p50"),
+            "p90": pick("tp90", "percentileResponseTime90", "p90"),
+            "p95": pick("tp95", "percentileResponseTime95", "p95"),
+            "p99": pick("tp99", "percentileResponseTime99", "p99"),
+            "avgLatency": pick("avgLatency", "latency"),
+            "avgBandwidth": pick("avgBandwidth", "bandwidth", "avgThroughput"),
+            "avgThroughput": pick("avgThroughput", "throughput", "hitsPerSec"),
+            "duration": pick("duration"),
+            "startTime": pick("first", "startTime", "startedAt"),
+            "endTime": pick("last", "endTime", "endedAt"),
+        }
+
+    @staticmethod
+    def _project_aggregate_row(row: dict) -> dict:
+        """Normalise a per-label aggregate row."""
+        def pick(*keys: str) -> Any:
+            for k in keys:
+                if k in row and row[k] is not None:
+                    return row[k]
+            return None
+
+        return {
+            "labelId": pick("labelId", "id"),
+            "labelName": pick("labelName", "name", "label"),
+            "samples": pick("samples", "hits"),
+            "errors": pick("errors", "errorsCount"),
+            "errorRate": pick("errorsRate", "errorRate"),
+            "avgResponseTime": pick("avgResponseTime", "avg", "average"),
+            "minResponseTime": pick("minResponseTime", "min"),
+            "maxResponseTime": pick("maxResponseTime", "max"),
+            "p50": pick("medianResponseTime", "percentileResponseTime50", "tp50", "p50"),
+            "p90": pick("percentileResponseTime90", "tp90", "p90"),
+            "p95": pick("percentileResponseTime95", "tp95", "p95"),
+            "p99": pick("percentileResponseTime99", "tp99", "p99"),
+            "avgLatency": pick("avgLatency", "latency"),
+            "avgThroughput": pick("avgThroughput", "throughput", "hitsPerSec"),
+            "avgBytes": pick("avgBytes", "bytes", "avgBandwidth"),
+        }
+
+    @staticmethod
+    def _project_timeline(result: dict) -> dict:
+        """Normalise timeline data to a list of time-bucketed points.
+
+        Returns `{ points: [{ t, avgResponseTime, errorRate, users, throughput }] }`
+        so the frontend can render a sparkline directly.
+        """
+        # BM timeline is typically returned as `{ labels: [...], interval: N,
+        # series: { avgResponseTime: [...], errorRate: [...], users: [...],
+        # hits: [...] } }` OR as `[{ label, data }]`.  Support both.
+        points: list[dict] = []
+
+        series = result.get("series") if isinstance(result.get("series"), dict) else None
+        labels = result.get("labels") if isinstance(result.get("labels"), list) else None
+        interval = result.get("interval") or result.get("granularity")
+
+        if series and labels:
+            for i, t in enumerate(labels):
+                points.append({
+                    "t": t,
+                    "avgResponseTime": _safe_index(series.get("avgResponseTime"), i),
+                    "errorRate": _safe_index(series.get("errorRate"), i),
+                    "users": _safe_index(series.get("users"), i),
+                    "hits": _safe_index(series.get("hits"), i),
+                })
+        elif isinstance(result.get("metrics"), list):
+            # Alternative shape: `{ metrics: [{ timestamp, values: {...} }] }`
+            for entry in result["metrics"]:
+                if not isinstance(entry, dict):
+                    continue
+                values = entry.get("values") or {}
+                points.append({
+                    "t": entry.get("timestamp") or entry.get("t"),
+                    "avgResponseTime": values.get("avgResponseTime") or values.get("avg"),
+                    "errorRate": values.get("errorRate"),
+                    "users": values.get("users"),
+                    "hits": values.get("hits") or values.get("throughput"),
+                })
+
+        return {"points": points, "interval": interval}
+
+    @staticmethod
+    def _project_error_row(row: dict) -> dict:
+        return {
+            "labelId": row.get("labelId") or row.get("id"),
+            "labelName": row.get("labelName") or row.get("name") or row.get("label"),
+            "errorCode": row.get("errorCode") or row.get("rc") or row.get("responseCode"),
+            "count": row.get("count") or row.get("errorsCount") or row.get("errors"),
+            "message": row.get("errorMessage") or row.get("message") or row.get("error"),
         }
