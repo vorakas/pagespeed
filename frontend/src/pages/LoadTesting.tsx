@@ -5,6 +5,8 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   CircleDot,
   Edit2,
   Loader2,
@@ -130,6 +132,16 @@ export function LoadTesting() {
   const [dialogTestFilter, setDialogTestFilter] = useState("")
   const [presetSaving, setPresetSaving] = useState(false)
   const [presetQueueBusy, setPresetQueueBusy] = useState<number | null>(null)
+  const [expandedPresetIds, setExpandedPresetIds] = useState<Set<number>>(new Set())
+
+  const togglePresetExpanded = useCallback((presetId: number) => {
+    setExpandedPresetIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(presetId)) next.delete(presetId)
+      else next.add(presetId)
+      return next
+    })
+  }, [])
 
   const selectedProject = useMemo(
     () => projects.find((p) => String(p.id) === selectedProjectId) ?? null,
@@ -852,14 +864,31 @@ export function LoadTesting() {
               </p>
             ) : (
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {presets.map((preset) => (
+                {presets.map((preset) => {
+                  const expanded = expandedPresetIds.has(preset.id)
+                  const orderedTests = [...preset.tests].sort(
+                    (a, b) => a.position - b.position,
+                  )
+                  return (
                   <div
                     key={preset.id}
                     className="flex flex-col gap-2 rounded-lg border border-border bg-background/40 p-3"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{preset.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => togglePresetExpanded(preset.id)}
+                        className="group flex min-w-0 flex-1 items-start gap-1.5 text-left"
+                        aria-expanded={expanded}
+                        aria-label={expanded ? "Hide preset details" : "Show preset details"}
+                      >
+                        {expanded ? (
+                          <ChevronDown className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                        )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium group-hover:underline">{preset.name}</p>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                           <span>
                             {preset.tests.length} test{preset.tests.length === 1 ? "" : "s"}
@@ -897,6 +926,7 @@ export function LoadTesting() {
                           })()}
                         </div>
                       </div>
+                      </button>
                       <div className="flex flex-shrink-0 items-center gap-1">
                         <Button
                           variant="ghost"
@@ -918,6 +948,41 @@ export function LoadTesting() {
                         </Button>
                       </div>
                     </div>
+                    {expanded && (
+                      <div className="rounded-md border border-border bg-background/60">
+                        {orderedTests.length === 0 ? (
+                          <p className="p-3 text-xs text-muted-foreground">
+                            This preset has no tests.
+                          </p>
+                        ) : (
+                          <ol className="divide-y divide-border">
+                            {orderedTests.map((t, idx) => (
+                              <li
+                                key={t.test_id}
+                                className="flex items-center gap-2 px-2.5 py-1.5 text-xs"
+                              >
+                                <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-semibold text-muted-foreground">
+                                  {idx + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm" title={t.test_name}>
+                                    {t.test_name}
+                                  </div>
+                                  <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                                    <span className="font-mono">{t.test_id}</span>
+                                    {t.project_name && (
+                                      <Badge variant="outline" className="text-[9px]">
+                                        {t.project_name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </div>
+                    )}
                     <Button
                       size="sm"
                       className="w-full"
@@ -932,7 +997,8 @@ export function LoadTesting() {
                       Queue all
                     </Button>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </section>
