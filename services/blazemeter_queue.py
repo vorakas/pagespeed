@@ -24,16 +24,21 @@ from services.blazemeter_client import BlazemeterClient
 
 logger = logging.getLogger(__name__)
 
-# BlazeMeter master statuses that mean the run is still active.
-_ACTIVE_STATUSES: frozenset[str] = frozenset(
-    {"CREATED", "INITIATED", "BOOKED", "DEPLOYED", "RUNNING", "ENDED_ABORTED"}
-    # ENDED_ABORTED shows up briefly while teardown runs.
+# BlazeMeter master string statuses that mean the run has finished.
+# Note: BlazeMeter's /masters/{id} endpoint returns `status` as either a
+# string ("ENDED") or a numeric code (e.g. 140 = ENDED, negative = aborted).
+# The authoritative terminal signal is a non-null `ended` timestamp.
+_TERMINAL_STATUSES: frozenset[str] = frozenset(
+    {"ENDED", "FAILED", "CANCELLED", "ABORTED", "ENDED_TIMEOUT"}
 )
 
-# BlazeMeter master statuses that mean the run has finished.
-_TERMINAL_STATUSES: frozenset[str] = frozenset(
-    {"ENDED", "FAILED", "CANCELLED", "ABORTED"}
+# String statuses that mean the run completed unsuccessfully.
+_FAILED_STATUSES: frozenset[str] = frozenset(
+    {"FAILED", "CANCELLED", "ABORTED"}
 )
+
+# Numeric code for a successful ENDED on /masters/{id}.
+_ENDED_CODE: int = 140
 
 
 @dataclass
@@ -248,12 +253,33 @@ class BlazemeterQueueService:
             logger.warning("Poll failed for master %s: %s", item.master_id, exc)
             return
 
-        status = (master.get("status") or "").upper()
+        raw_status = master.get("status")
+        ended_epoch = master.get("ended")
+        status_str = str(raw_status).upper() if raw_status is not None else ""
+
+        # A non-null `ended` epoch is the authoritative terminal signal.
+        terminal_by_ended = bool(ended_epoch)
+        terminal_by_status = status_str in _TERMINAL_STATUSES
+        terminal_by_code = (
+            isinstance(raw_status, int) and (raw_status == _ENDED_CODE or raw_status < 0)
+        )
+        is_terminal = terminal_by_ended or terminal_by_status or terminal_by_code
+
+        logger.debug(
+            "BlazeMeter poll master=%s raw_status=%r ended=%s terminal=%s",
+            item.master_id, raw_status, ended_epoch, is_terminal,
+        )
+
         with self._lock:
-            item.last_status = status
-            if status in _TERMINAL_STATUSES:
-                item.status = "completed" if status == "ENDED" else "failed"
-                if status != "ENDED":
-                    item.error = master.get("note") or status
+            item.last_status = status_str or (
+                str(raw_status) if raw_status is not None else None
+            )
+            if is_terminal:
+                failed = status_str in _FAILED_STATUSES or (
+                    isinstance(raw_status, int) and raw_status < 0
+                )
+                item.status = "failed" if failed else "completed"
+                if failed:
+                    item.error = master.get("note") or item.last_status
                 item.ended_at = time.time()
                 self._active = None
