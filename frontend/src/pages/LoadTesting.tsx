@@ -43,7 +43,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { EmptyState } from "@/components/shared/EmptyState"
-import { BlazemeterMasterReportDialog } from "@/components/load-testing/BlazemeterMasterReportDialog"
+import { BlazemeterMasterReportPanel } from "@/components/load-testing/BlazemeterMasterReportPanel"
 import { api } from "@/services/api"
 import type {
   BlazemeterConfigStatus,
@@ -1283,16 +1283,18 @@ export function LoadTesting() {
             </section>
           </div>
         )}
-      </div>
 
-      <BlazemeterMasterReportDialog
-        masterId={reportMasterId}
-        testName={reportTestName}
-        onClose={() => {
-          setReportMasterId(null)
-          setReportTestName(null)
-        }}
-      />
+        {config?.configured && reportMasterId !== null && (
+          <BlazemeterMasterReportPanel
+            masterId={reportMasterId}
+            testName={reportTestName}
+            onClose={() => {
+              setReportMasterId(null)
+              setReportTestName(null)
+            }}
+          />
+        )}
+      </div>
     </div>
   )
 }
