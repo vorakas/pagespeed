@@ -33,6 +33,7 @@ import type {
   BlazemeterPreset,
   BlazemeterPresetInput,
   BlazemeterMasterReport,
+  BlazemeterRunsResponse,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -619,6 +620,10 @@ class ApiClient {
 
   async getBlazemeterMasterReport(masterId: number): Promise<BlazemeterMasterReport> {
     return this.request(`/api/blazemeter/masters/${masterId}/report`)
+  }
+
+  async listBlazemeterRuns(limit = 50, offset = 0): Promise<BlazemeterRunsResponse> {
+    return this.request(`/api/blazemeter/runs?limit=${limit}&offset=${offset}`)
   }
 }
 

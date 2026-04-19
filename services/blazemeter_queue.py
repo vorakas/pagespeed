@@ -20,6 +20,7 @@ from typing import Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import BLAZEMETER_POLL_SECONDS
+from data_access import BlazemeterRunRepository
 from services.blazemeter_client import BlazemeterClient
 
 logger = logging.getLogger(__name__)
@@ -107,9 +108,11 @@ class BlazemeterQueueService:
         self,
         client: BlazemeterClient,
         scheduler: BackgroundScheduler,
+        run_repo: Optional[BlazemeterRunRepository] = None,
     ) -> None:
         self._client: BlazemeterClient = client
         self._scheduler: BackgroundScheduler = scheduler
+        self._run_repo: Optional[BlazemeterRunRepository] = run_repo
         self._items: list[QueueItem] = []
         self._active: Optional[QueueItem] = None
         self._lock: threading.RLock = threading.RLock()
@@ -189,7 +192,30 @@ class BlazemeterQueueService:
             active.status = "cancelled"
             active.ended_at = time.time()
             self._active = None
+        self._persist_run(active)
         return True
+
+    def _persist_run(self, item: QueueItem) -> None:
+        """Save a terminated run to the DB so it survives process restart."""
+        if self._run_repo is None or item.master_id is None:
+            return
+        try:
+            self._run_repo.record_run(
+                master_id=int(item.master_id),
+                test_id=int(item.test_id),
+                test_name=item.test_name,
+                project_id=item.project_id,
+                project_name=item.project_name,
+                status=item.status,
+                last_status=item.last_status,
+                error=item.error,
+                started_at=item.started_at,
+                ended_at=item.ended_at,
+            )
+        except Exception:  # noqa: BLE001 — never let persistence crash the queue
+            logger.exception(
+                "Failed to persist BlazeMeter run master_id=%s", item.master_id,
+            )
 
     def clear_pending(self) -> int:
         """Drop every pending item; returns how many were removed."""
@@ -238,6 +264,10 @@ class BlazemeterQueueService:
                 next_item.error = str(exc)
                 next_item.ended_at = time.time()
                 self._active = None
+            # Only persist if we obtained a master_id; pre-launch failures
+            # have no BM master to reference so they stay in-memory only.
+            if next_item.master_id is not None:
+                self._persist_run(next_item)
             return
 
         with self._lock:
@@ -283,3 +313,5 @@ class BlazemeterQueueService:
                     item.error = master.get("note") or item.last_status
                 item.ended_at = time.time()
                 self._active = None
+        if is_terminal:
+            self._persist_run(item)

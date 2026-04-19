@@ -462,6 +462,28 @@ export interface BlazemeterCiStatus {
   thresholds?: Array<Record<string, unknown>>
 }
 
+export interface BlazemeterPersistedRun {
+  masterId: number
+  testId: number
+  testName: string
+  projectId: number | null
+  projectName: string | null
+  status: BlazemeterQueueStatus
+  lastStatus: string | null
+  error: string | null
+  startedAt: number | null
+  endedAt: number | null
+  createdAt: number | null
+}
+
+export interface BlazemeterRunsResponse {
+  success: boolean
+  runs: BlazemeterPersistedRun[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export interface BlazemeterMasterReport {
   masterId: number
   master: BlazemeterMasterInfo | null

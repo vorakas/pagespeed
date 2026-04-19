@@ -19,7 +19,7 @@ from config import (
     BLAZEMETER_PROJECT_ID,  # optional — becomes the UI's default selected project
     BLAZEMETER_WORKSPACE_ID,
 )
-from data_access import BlazemeterPresetRepository
+from data_access import BlazemeterPresetRepository, BlazemeterRunRepository
 from exceptions import AuthenticationError, ValidationError
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
@@ -29,6 +29,7 @@ def create_blazemeter_blueprint(
     queue_service: Optional[BlazemeterQueueService],
     client: Optional[BlazemeterClient],
     preset_repo: BlazemeterPresetRepository,
+    run_repo: BlazemeterRunRepository,
 ) -> Blueprint:
     """Factory that creates the BlazeMeter API blueprint.
 
@@ -197,6 +198,26 @@ def create_blazemeter_blueprint(
         if not removed:
             return jsonify({"success": False, "error": "Preset not found"}), 404
         return jsonify({"success": True})
+
+    @bp.route("/api/blazemeter/runs", methods=["GET"])
+    def list_runs():
+        """Paginated history of persisted BlazeMeter runs (survives restart)."""
+        try:
+            limit = int(request.args.get("limit", 50))
+            offset = int(request.args.get("offset", 0))
+        except (TypeError, ValueError):
+            raise ValidationError("limit and offset must be integers")
+        limit = max(1, min(limit, 200))
+        offset = max(0, offset)
+        runs = run_repo.list_recent(limit=limit, offset=offset)
+        total = run_repo.count()
+        return jsonify({
+            "success": True,
+            "runs": runs,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        })
 
     @bp.route("/api/blazemeter/masters/<int:master_id>/report", methods=["GET"])
     def get_master_report(master_id: int):

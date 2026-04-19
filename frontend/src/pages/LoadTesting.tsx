@@ -47,6 +47,7 @@ import { BlazemeterMasterReportPanel } from "@/components/load-testing/Blazemete
 import { api } from "@/services/api"
 import type {
   BlazemeterConfigStatus,
+  BlazemeterPersistedRun,
   BlazemeterPreset,
   BlazemeterProject,
   BlazemeterQueueItem,
@@ -137,6 +138,10 @@ export function LoadTesting() {
   const [expandedPresetIds, setExpandedPresetIds] = useState<Set<number>>(new Set())
   const [reportMasterId, setReportMasterId] = useState<number | null>(null)
   const [reportTestName, setReportTestName] = useState<string | null>(null)
+  const [persistedRuns, setPersistedRuns] = useState<BlazemeterPersistedRun[]>([])
+  const [persistedRunsLoading, setPersistedRunsLoading] = useState(false)
+  const [persistedRunsTotal, setPersistedRunsTotal] = useState(0)
+  const PERSISTED_RUNS_PAGE_SIZE = 50
 
   const togglePresetExpanded = useCallback((presetId: number) => {
     setExpandedPresetIds((prev) => {
@@ -214,6 +219,20 @@ export function LoadTesting() {
     }
   }, [])
 
+  const refreshPersistedRuns = useCallback(async () => {
+    setPersistedRunsLoading(true)
+    try {
+      const data = await api.listBlazemeterRuns(PERSISTED_RUNS_PAGE_SIZE, 0)
+      setPersistedRuns(data.runs ?? [])
+      setPersistedRunsTotal(data.total ?? 0)
+    } catch (err) {
+      // Quiet — don't spam toast; the section just stays empty.
+      console.warn("Failed to load persisted runs", err)
+    } finally {
+      setPersistedRunsLoading(false)
+    }
+  }, [])
+
   // Initial load.
   useEffect(() => {
     void refreshConfig()
@@ -224,7 +243,14 @@ export function LoadTesting() {
     void refreshQueue()
     void refreshProjects()
     void refreshPresets()
-  }, [config?.configured, refreshQueue, refreshProjects, refreshPresets])
+    void refreshPersistedRuns()
+  }, [
+    config?.configured,
+    refreshQueue,
+    refreshProjects,
+    refreshPresets,
+    refreshPersistedRuns,
+  ])
 
   // Pick a default project once the list arrives: remembered → env default → first.
   useEffect(() => {
@@ -254,6 +280,14 @@ export function LoadTesting() {
     const id = window.setInterval(refreshQueue, interval)
     return () => window.clearInterval(id)
   }, [config?.configured, queue?.active, queue?.pending.length, refreshQueue])
+
+  // Refresh persisted runs whenever the in-memory history grows (a run
+  // just terminated) so the "Previous runs" section stays in sync.
+  const historyLen = queue?.history.length ?? 0
+  useEffect(() => {
+    if (!config?.configured) return
+    void refreshPersistedRuns()
+  }, [historyLen, config?.configured, refreshPersistedRuns])
 
   const handleTestConnection = useCallback(async () => {
     try {
@@ -1293,6 +1327,107 @@ export function LoadTesting() {
               setReportTestName(null)
             }}
           />
+        )}
+
+        {config?.configured && (
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">Previous runs</h2>
+                <p className="text-xs text-muted-foreground">
+                  All BlazeMeter runs recorded by this app — persists across restarts.
+                  {persistedRunsTotal > 0 && ` ${persistedRunsTotal} total.`}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void refreshPersistedRuns()}
+                disabled={persistedRunsLoading}
+                aria-label="Refresh previous runs"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${persistedRunsLoading ? "animate-spin" : ""}`}
+                />
+              </Button>
+            </div>
+
+            {persistedRunsLoading && persistedRuns.length === 0 ? (
+              <div className="mt-4"><LoadingSpinner /></div>
+            ) : persistedRuns.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                No runs recorded yet. Queue a test and its results will appear here.
+              </p>
+            ) : (
+              <div className="mt-3 overflow-x-auto rounded-md border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Test</TableHead>
+                      <TableHead className="w-[140px]">Project</TableHead>
+                      <TableHead className="w-[100px]">Status</TableHead>
+                      <TableHead className="w-[140px]">Ended</TableHead>
+                      <TableHead className="w-[100px]">Duration</TableHead>
+                      <TableHead className="w-[100px] text-right">Report</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {persistedRuns.map((r) => (
+                      <TableRow key={r.masterId}>
+                        <TableCell className="text-sm">
+                          <div className="flex items-center gap-2">
+                            <StatusIcon status={r.status} />
+                            <div className="min-w-0">
+                              <div className="truncate" title={r.testName}>
+                                {r.testName}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                Master <code className="rounded bg-muted px-1">{r.masterId}</code>
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {r.projectName || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={statusBadgeVariant[r.status]}
+                            className="text-[10px]"
+                          >
+                            {r.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {r.endedAt
+                            ? new Date(r.endedAt * 1000).toLocaleString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {formatDuration(r.startedAt, r.endedAt)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => {
+                              setReportMasterId(r.masterId)
+                              setReportTestName(r.testName)
+                            }}
+                            aria-label="View report"
+                          >
+                            <BarChart3 className="mr-1 h-3.5 w-3.5" />
+                            Report
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </section>
         )}
       </div>
     </div>

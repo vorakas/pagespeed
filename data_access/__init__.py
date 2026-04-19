@@ -11,6 +11,7 @@ from data_access.test_result_repository import TestResultRepository
 from data_access.trigger_repository import TriggerRepository
 from data_access.preset_repository import PresetRepository
 from data_access.blazemeter_preset_repository import BlazemeterPresetRepository
+from data_access.blazemeter_run_repository import BlazemeterRunRepository
 
 __all__ = [
     "ConnectionManager",
@@ -20,4 +21,5 @@ __all__ = [
     "TriggerRepository",
     "PresetRepository",
     "BlazemeterPresetRepository",
+    "BlazemeterRunRepository",
 ]

@@ -258,6 +258,23 @@ class ConnectionManager:
         cursor.execute("ALTER TABLE blazemeter_preset_tests ADD COLUMN IF NOT EXISTS project_id BIGINT")
         cursor.execute("ALTER TABLE blazemeter_preset_tests ADD COLUMN IF NOT EXISTS project_name TEXT")
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS blazemeter_runs (
+                id SERIAL PRIMARY KEY,
+                master_id BIGINT NOT NULL UNIQUE,
+                test_id BIGINT NOT NULL,
+                test_name TEXT NOT NULL,
+                project_id BIGINT,
+                project_name TEXT,
+                status TEXT NOT NULL,
+                last_status TEXT,
+                error TEXT,
+                started_at TIMESTAMP,
+                ended_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # Migration: add trigger execution tracking columns
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP")
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_status TEXT")
@@ -361,6 +378,23 @@ class ConnectionManager:
                 position INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (preset_id) REFERENCES blazemeter_presets (id) ON DELETE CASCADE,
                 UNIQUE(preset_id, test_id)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS blazemeter_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                master_id INTEGER NOT NULL UNIQUE,
+                test_id INTEGER NOT NULL,
+                test_name TEXT NOT NULL,
+                project_id INTEGER,
+                project_name TEXT,
+                status TEXT NOT NULL,
+                last_status TEXT,
+                error TEXT,
+                started_at TIMESTAMP,
+                ended_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 

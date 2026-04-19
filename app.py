@@ -32,6 +32,7 @@ from config import (
 )
 from data_access import (
     BlazemeterPresetRepository,
+    BlazemeterRunRepository,
     ConnectionManager,
     SiteRepository,
     UrlRepository,
@@ -72,6 +73,7 @@ def create_app() -> Flask:
     trigger_repo = TriggerRepository(conn_mgr)
     preset_repo = PresetRepository(conn_mgr)
     blazemeter_preset_repo = BlazemeterPresetRepository(conn_mgr)
+    blazemeter_run_repo = BlazemeterRunRepository(conn_mgr)
 
     pagespeed = PageSpeedClient(api_key=PAGESPEED_API_KEY)
 
@@ -97,7 +99,9 @@ def create_app() -> Flask:
                 api_key_secret=BLAZEMETER_API_SECRET,
                 workspace_id=BLAZEMETER_WORKSPACE_ID,
             )
-            blazemeter_queue = BlazemeterQueueService(blazemeter_client, scheduler)
+            blazemeter_queue = BlazemeterQueueService(
+                blazemeter_client, scheduler, run_repo=blazemeter_run_repo,
+            )
             logging.info("BlazeMeter integration enabled")
         except Exception:
             logging.exception("Failed to initialise BlazeMeter integration")
@@ -110,6 +114,7 @@ def create_app() -> Flask:
     register_blueprints(
         flask_app, site_service, testing_service, test_result_repo, trigger_service,
         blazemeter_preset_repo=blazemeter_preset_repo,
+        blazemeter_run_repo=blazemeter_run_repo,
         blazemeter_client=blazemeter_client,
         blazemeter_queue=blazemeter_queue,
     )
