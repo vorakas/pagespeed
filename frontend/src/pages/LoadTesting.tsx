@@ -37,14 +37,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { EmptyState } from "@/components/shared/EmptyState"
@@ -626,12 +618,231 @@ export function LoadTesting() {
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${presetsLoading ? "animate-spin" : ""}`} />
                 </Button>
-                <Button size="sm" onClick={openCreatePreset}>
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  New preset
-                </Button>
+                {!presetDialogOpen && (
+                  <Button size="sm" onClick={openCreatePreset}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    New preset
+                  </Button>
+                )}
               </div>
             </div>
+
+            {presetDialogOpen && (
+              <div className="mt-4 rounded-lg border border-border bg-background/40 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {editingPreset ? "Edit preset" : "New preset"}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPresetDialogOpen(false)}
+                      disabled={presetSaving}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => void handleSavePreset()}
+                      disabled={presetSaving}
+                    >
+                      {presetSaving ? (
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ListPlus className="mr-1 h-3.5 w-3.5" />
+                      )}
+                      {editingPreset ? "Save changes" : "Create preset"}
+                    </Button>
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Build a queue of tests to run sequentially. Pick tests from any project and reorder with the up/down buttons.
+                </p>
+
+                <div className="mt-4 space-y-1.5">
+                  <Label htmlFor="preset-name" className="text-xs">Name</Label>
+                  <Input
+                    id="preset-name"
+                    value={presetName}
+                    onChange={(e) => setPresetName(e.target.value)}
+                    placeholder="e.g. Regression — PPE"
+                    className="h-8 max-w-md text-sm"
+                  />
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  {/* Browse / add column */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Add tests from</Label>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={dialogProjectId}
+                        onValueChange={(val) => setDialogProjectId(val)}
+                        disabled={projects.length === 0}
+                      >
+                        <SelectTrigger className="h-8 flex-1 text-sm" aria-label="Project">
+                          <SelectValue placeholder="Select project">
+                            {(val: string) => {
+                              const p = projects.find((pp) => String(pp.id) === val)
+                              if (!p) return "Select project"
+                              return p.name?.trim() ? p.name : `Project #${p.id}`
+                            }}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {projects.map((project) => (
+                            <SelectItem key={project.id} value={String(project.id)}>
+                              {project.name?.trim() ? project.name : `Project #${project.id}`}
+                              {project.testsCount != null && (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  ({project.testsCount})
+                                </span>
+                              )}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Input
+                      placeholder="Filter tests…"
+                      value={dialogTestFilter}
+                      onChange={(e) => setDialogTestFilter(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <div className="max-h-[480px] overflow-auto rounded-md border border-border">
+                      {dialogTestsLoading ? (
+                        <div className="p-6"><LoadingSpinner /></div>
+                      ) : filteredDialogTests.length === 0 ? (
+                        <p className="p-4 text-sm text-muted-foreground">
+                          {dialogProjectId
+                            ? dialogTestFilter
+                              ? "No tests match your filter."
+                              : "No tests in this project."
+                            : "Select a project to see tests."}
+                        </p>
+                      ) : (
+                        <ul className="divide-y divide-border">
+                          {filteredDialogTests.map((test) => {
+                            const already = presetSelectedIds.has(test.id)
+                            return (
+                              <li
+                                key={test.id}
+                                className="flex items-center gap-3 px-3 py-1.5 text-sm"
+                              >
+                                <span className="w-20 flex-shrink-0 font-mono text-xs text-muted-foreground">
+                                  {test.id}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate" title={test.name}>
+                                  {test.name}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant={already ? "outline" : "default"}
+                                  disabled={already}
+                                  onClick={() => addPresetTest(test, dialogProject)}
+                                  className="h-7 flex-shrink-0"
+                                >
+                                  {already ? "Added" : (
+                                    <>
+                                      <Plus className="mr-1 h-3.5 w-3.5" />
+                                      Add
+                                    </>
+                                  )}
+                                </Button>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Ordered selected column */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">
+                        Selected ({presetSelected.length}) — runs top-to-bottom
+                      </Label>
+                      {presetSelected.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setPresetSelected([])}
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    <div className="max-h-[542px] overflow-auto rounded-md border border-border">
+                      {presetSelected.length === 0 ? (
+                        <p className="p-4 text-sm text-muted-foreground">
+                          No tests selected yet. Add tests from the list on the left.
+                        </p>
+                      ) : (
+                        <ol className="divide-y divide-border">
+                          {presetSelected.map((item, idx) => (
+                            <li
+                              key={item.testId}
+                              className="flex items-center gap-2 px-2 py-1.5 text-sm"
+                            >
+                              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                                {idx + 1}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate" title={item.testName}>
+                                  {item.testName}
+                                </div>
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                                  <span className="font-mono">{item.testId}</span>
+                                  {item.projectName && (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      {item.projectName}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex flex-shrink-0 items-center gap-0.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  disabled={idx === 0}
+                                  onClick={() => movePresetTest(item.testId, -1)}
+                                  aria-label="Move up"
+                                >
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  disabled={idx === presetSelected.length - 1}
+                                  onClick={() => movePresetTest(item.testId, 1)}
+                                  aria-label="Move down"
+                                >
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-destructive"
+                                  onClick={() => removePresetTest(item.testId)}
+                                  aria-label="Remove from preset"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {presetsLoading && presets.length === 0 ? (
               <div className="mt-3"><LoadingSpinner /></div>
@@ -989,216 +1200,6 @@ export function LoadTesting() {
         )}
       </div>
 
-      {/* ---------- Preset create/edit dialog ---------- */}
-      <Dialog open={presetDialogOpen} onOpenChange={setPresetDialogOpen}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>{editingPreset ? "Edit preset" : "New preset"}</DialogTitle>
-            <DialogDescription>
-              Build a queue of tests to run sequentially. You can pick tests from
-              any project and reorder them with the up/down buttons.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="preset-name" className="text-xs">
-                Name
-              </Label>
-              <Input
-                id="preset-name"
-                value={presetName}
-                onChange={(e) => setPresetName(e.target.value)}
-                placeholder="e.g. Regression — PPE"
-                className="h-8 text-sm"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Browse / add column */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Add tests from</Label>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={dialogProjectId}
-                    onValueChange={(val) => setDialogProjectId(val)}
-                    disabled={projects.length === 0}
-                  >
-                    <SelectTrigger className="h-8 flex-1 text-sm" aria-label="Project">
-                      <SelectValue placeholder="Select project">
-                        {(val: string) => {
-                          const p = projects.find((pp) => String(pp.id) === val)
-                          if (!p) return "Select project"
-                          return p.name?.trim() ? p.name : `Project #${p.id}`
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={String(project.id)}>
-                          {project.name?.trim() ? project.name : `Project #${project.id}`}
-                          {project.testsCount != null && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              ({project.testsCount})
-                            </span>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Input
-                  placeholder="Filter tests…"
-                  value={dialogTestFilter}
-                  onChange={(e) => setDialogTestFilter(e.target.value)}
-                  className="h-8 text-sm"
-                />
-                <div className="max-h-[300px] overflow-auto rounded-md border border-border">
-                  {dialogTestsLoading ? (
-                    <div className="p-6"><LoadingSpinner /></div>
-                  ) : filteredDialogTests.length === 0 ? (
-                    <p className="p-4 text-sm text-muted-foreground">
-                      {dialogProjectId
-                        ? dialogTestFilter
-                          ? "No tests match your filter."
-                          : "No tests in this project."
-                        : "Select a project to see tests."}
-                    </p>
-                  ) : (
-                    <ul className="divide-y divide-border">
-                      {filteredDialogTests.map((test) => {
-                        const already = presetSelectedIds.has(test.id)
-                        return (
-                          <li
-                            key={test.id}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm"
-                          >
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {test.id}
-                            </span>
-                            <span className="flex-1 truncate">{test.name}</span>
-                            <Button
-                              size="sm"
-                              variant={already ? "outline" : "default"}
-                              disabled={already}
-                              onClick={() => addPresetTest(test, dialogProject)}
-                              className="h-7"
-                            >
-                              {already ? "Added" : (
-                                <>
-                                  <Plus className="mr-1 h-3.5 w-3.5" />
-                                  Add
-                                </>
-                              )}
-                            </Button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              {/* Ordered selected column */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs">
-                    Selected ({presetSelected.length}) — runs top-to-bottom
-                  </Label>
-                  {presetSelected.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setPresetSelected([])}
-                    >
-                      Clear
-                    </Button>
-                  )}
-                </div>
-                <div className="max-h-[362px] overflow-auto rounded-md border border-border">
-                  {presetSelected.length === 0 ? (
-                    <p className="p-4 text-sm text-muted-foreground">
-                      No tests selected yet. Add tests from the list on the left.
-                    </p>
-                  ) : (
-                    <ol className="divide-y divide-border">
-                      {presetSelected.map((item, idx) => (
-                        <li
-                          key={item.testId}
-                          className="flex items-center gap-2 px-2 py-1.5 text-sm"
-                        >
-                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
-                            {idx + 1}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate">{item.testName}</span>
-                            </div>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
-                              <span className="font-mono">{item.testId}</span>
-                              {item.projectName && (
-                                <Badge variant="outline" className="text-[10px]">
-                                  {item.projectName}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-shrink-0 items-center gap-0.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              disabled={idx === 0}
-                              onClick={() => movePresetTest(item.testId, -1)}
-                              aria-label="Move up"
-                            >
-                              <ArrowUp className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              disabled={idx === presetSelected.length - 1}
-                              onClick={() => movePresetTest(item.testId, 1)}
-                              aria-label="Move down"
-                            >
-                              <ArrowDown className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-destructive"
-                              onClick={() => removePresetTest(item.testId)}
-                              aria-label="Remove from preset"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPresetDialogOpen(false)} disabled={presetSaving}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleSavePreset()} disabled={presetSaving}>
-              {presetSaving ? (
-                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <ListPlus className="mr-1 h-3.5 w-3.5" />
-              )}
-              {editingPreset ? "Save changes" : "Create preset"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
