@@ -77,8 +77,10 @@ function fmtDuration(seconds: number | null | undefined): string {
 
 /**
  * Priority page labels the QA team cares about on the Request Stats tab.
- * Matched case-insensitively as substrings so small naming variations in
- * BM (e.g. "Homepage" vs "Home Page", "PDP" vs "PDP - Desktop") still hit.
+ * Matched against the whole trimmed label (case-insensitive) — optionally
+ * allowing a common JMeter step-number prefix like "01 - PDP" or "T03_PDP".
+ * Substring match was too loose: short codes like "PDP" and "SFP" pulled
+ * in every child sampler of the transaction.
  */
 const KEY_PAGE_LABELS = [
   "Homepage",
@@ -91,10 +93,19 @@ const KEY_PAGE_LABELS = [
   "Payment Page",
 ]
 
+const KEY_PAGE_SET = new Set(KEY_PAGE_LABELS.map((l) => l.toLowerCase()))
+
+/** Strip a leading "NN ", "NN - ", "NN_", "TNN_", "TC-NN " etc. step prefix. */
+function stripStepPrefix(label: string): string {
+  return label.replace(/^\s*(?:T?C?-?\d{1,3})\s*[-_.:)]\s*/i, "").trim()
+}
+
 function matchesKeyPage(label: string | null): boolean {
   if (!label) return false
-  const normalized = label.toLowerCase()
-  return KEY_PAGE_LABELS.some((key) => normalized.includes(key.toLowerCase()))
+  const trimmed = label.trim().toLowerCase()
+  if (KEY_PAGE_SET.has(trimmed)) return true
+  const stripped = stripStepPrefix(label).toLowerCase()
+  return KEY_PAGE_SET.has(stripped)
 }
 
 function fmtDateTime(epoch: number | null | undefined): string {
