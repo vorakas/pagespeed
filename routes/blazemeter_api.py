@@ -234,12 +234,20 @@ def create_blazemeter_blueprint(
         sections: dict[str, object] = {}
         errors: dict[str, str] = {}
 
+        # Sections marked optional silently degrade to None on 404 — these
+        # endpoints only exist when the test was configured with CI gates or
+        # SLA thresholds, so "not found" is the normal shape for most runs.
+        OPTIONAL_SECTIONS = {"ciStatus", "thresholds"}
+
         def _safe(section: str, fn):
             try:
                 sections[section] = fn()
             except Exception as exc:  # noqa: BLE001 — we want to surface, not raise
-                errors[section] = str(exc)
+                msg = str(exc)
                 sections[section] = None
+                if section in OPTIONAL_SECTIONS and "404" in msg:
+                    return
+                errors[section] = msg
 
         _safe("master", lambda: client.get_master(master_id))
         _safe("summary", lambda: client.get_master_summary(master_id))

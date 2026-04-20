@@ -394,6 +394,7 @@ export interface BlazemeterMasterInfo {
   ended: number | null
   note: string | null
   publicTokenUrl: string | null
+  maxUsers: number | null
 }
 
 export interface BlazemeterRunSummary {
@@ -413,6 +414,7 @@ export interface BlazemeterRunSummary {
   duration: number | null
   startTime: number | null
   endTime: number | null
+  maxUsers: number | null
 }
 
 export interface BlazemeterLabelRow {

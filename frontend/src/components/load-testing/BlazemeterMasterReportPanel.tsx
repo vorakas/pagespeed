@@ -197,8 +197,8 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
     })
   }, [report])
 
-  const maxUsers = useMemo(() => {
-    const values = chartData.map((d) => d.users ?? 0)
+  const timelineMaxUsers = useMemo(() => {
+    const values = chartData.map((d) => d.users ?? 0).filter((v) => v > 0)
     return values.length ? Math.max(...values) : null
   }, [chartData])
 
@@ -216,6 +216,30 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
   const title = testName || master?.name || `Master ${masterId}`
   const startedEpoch = summary?.startTime ?? master?.created ?? null
   const endedEpoch = summary?.endTime ?? master?.ended ?? null
+
+  const maxUsers = summary?.maxUsers ?? master?.maxUsers ?? timelineMaxUsers
+  const avgThroughput =
+    summary?.avgThroughput ??
+    (summary?.hits != null && summary?.duration
+      ? summary.hits / summary.duration
+      : null)
+
+  // Bandwidth fallback: sum total bytes across per-label aggregate rows
+  // (samples × avgBytes) and divide by duration for bytes/sec.
+  const avgBandwidth =
+    summary?.avgBandwidth ??
+    (() => {
+      if (!summary?.duration || !labelRows.length) return null
+      let totalBytes = 0
+      let haveData = false
+      for (const r of labelRows) {
+        if (r.samples != null && r.avgBytes != null) {
+          totalBytes += r.samples * r.avgBytes
+          haveData = true
+        }
+      }
+      return haveData ? totalBytes / summary.duration : null
+    })()
 
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -288,7 +312,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
               <Kpi accent="green" value={fmtNum(maxUsers)} unit="VU" label="Max Users" />
               <Kpi
                 accent="green"
-                value={summary?.avgThroughput != null ? summary.avgThroughput.toFixed(2) : "—"}
+                value={avgThroughput != null ? avgThroughput.toFixed(2) : "—"}
                 unit="Hits/s"
                 label="Avg. Throughput"
               />
@@ -314,11 +338,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
               />
               <Kpi
                 accent="amber"
-                value={
-                  summary?.avgBandwidth != null
-                    ? (summary.avgBandwidth / (1024 * 1024)).toFixed(2)
-                    : "—"
-                }
+                value={avgBandwidth != null ? (avgBandwidth / (1024 * 1024)).toFixed(2) : "—"}
                 unit="MiB/s"
                 label="Avg. Bandwidth"
               />

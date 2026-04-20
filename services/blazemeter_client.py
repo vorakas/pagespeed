@@ -352,6 +352,7 @@ class BlazemeterClient:
             "ended": master.get("ended"),
             "note": master.get("note"),
             "publicTokenUrl": master.get("publicTokenUrl"),
+            "maxUsers": master.get("maxUsers") or master.get("maxConcurrency"),
         }
 
     @staticmethod
@@ -380,11 +381,12 @@ class BlazemeterClient:
             "p95": pick("tp95", "percentileResponseTime95", "p95"),
             "p99": pick("tp99", "percentileResponseTime99", "p99"),
             "avgLatency": pick("avgLatency", "latency"),
-            "avgBandwidth": pick("avgBandwidth", "bandwidth", "avgThroughput"),
-            "avgThroughput": pick("avgThroughput", "throughput", "hitsPerSec"),
+            "avgBandwidth": pick("avgBandwidth", "bandwidth", "bytesPerSec", "avgBytes"),
+            "avgThroughput": pick("avgThroughput", "throughput", "hitsPerSec", "avgHits"),
             "duration": pick("duration"),
             "startTime": pick("first", "startTime", "startedAt"),
             "endTime": pick("last", "endTime", "endedAt"),
+            "maxUsers": pick("maxUsers", "usersMax", "maxConcurrency"),
         }
 
     @staticmethod
