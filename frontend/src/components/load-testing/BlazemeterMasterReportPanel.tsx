@@ -680,8 +680,9 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
                                       ? r.errorRate * 100
                                       : r.errorRate
                                     : null
-                                const kbPerSec =
-                                  r.avgBytes != null ? r.avgBytes / 1024 : null
+                                // BM's aggregate `avgBytes` field is already in KB/s
+                                // (matches its "Avg. Bandwidth (KBytes/s)" column). Do not divide.
+                                const kbPerSec = r.avgBytes
                                 return (
                                   <TableRow
                                     key={r.labelId ?? i}
