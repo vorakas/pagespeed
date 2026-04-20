@@ -409,28 +409,111 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
   const startedEpoch = summary?.startTime ?? master?.created ?? null
   const endedEpoch = summary?.endTime ?? master?.ended ?? null
 
-  const maxUsers = summary?.maxUsers ?? master?.maxUsers ?? timelineMaxUsers
-  const avgThroughput =
-    summary?.avgThroughput ??
-    (summary?.hits != null && summary?.duration
-      ? summary.hits / summary.duration
-      : null)
+  // Roll up the per-label aggregate — this is the source of truth whenever
+  // BM honours the time filter on the aggregate endpoint but ignores it on
+  // the summary endpoint (which seems to be the common case).
+  const aggregateTotals = useMemo(() => {
+    if (!labelRows.length) return null
+    let samples = 0
+    let errors = 0
+    let weightedRt = 0
+    let rtSamples = 0
+    let kbPerSec = 0
+    let haveKbps = false
+    let minRt: number | null = null
+    let maxRt: number | null = null
+    for (const r of labelRows) {
+      if (r.samples != null) samples += r.samples
+      if (r.errors != null) errors += r.errors
+      if (r.avgResponseTime != null && r.samples != null) {
+        weightedRt += r.avgResponseTime * r.samples
+        rtSamples += r.samples
+      }
+      if (r.avgBytes != null) {
+        kbPerSec += r.avgBytes
+        haveKbps = true
+      }
+      if (r.minResponseTime != null) {
+        minRt = minRt == null ? r.minResponseTime : Math.min(minRt, r.minResponseTime)
+      }
+      if (r.maxResponseTime != null) {
+        maxRt = maxRt == null ? r.maxResponseTime : Math.max(maxRt, r.maxResponseTime)
+      }
+    }
+    return {
+      samples,
+      errors,
+      errorRate: samples > 0 ? (errors / samples) * 100 : null,
+      avgResponseTime: rtSamples > 0 ? weightedRt / rtSamples : null,
+      kbPerSec: haveKbps ? kbPerSec : null,
+      minRt,
+      maxRt,
+    }
+  }, [labelRows])
 
-  // Bandwidth fallback chain:
-  // 1. Direct rate from BM (avgBandwidth / bandwidth / bytesPerSec)
-  // 2. Total bytes / duration (when BM exposes `bytes` on the summary)
-  // 3. hits × avgBytesPerHit / duration (when BM only exposes per-hit)
-  // 4. Sum across per-label aggregate rows as a last resort
-  const avgBandwidth =
-    summary?.avgBandwidth ??
-    (summary?.totalBytes != null && summary?.duration
-      ? summary.totalBytes / summary.duration
-      : null) ??
-    (summary?.avgBytesPerHit != null && summary?.hits != null && summary?.duration
-      ? (summary.avgBytesPerHit * summary.hits) / summary.duration
-      : null) ??
-    (() => {
-      if (!summary?.duration || !labelRows.length) return null
+  // Same rollup on the unfiltered baseline — lets us compare and decide
+  // whether a filtered re-fetch actually changed the aggregate.
+  const fullAggregateSamples = useMemo(() => {
+    const rows = fullReport?.aggregate ?? []
+    return rows.reduce((sum, r) => sum + (r.samples ?? 0), 0)
+  }, [fullReport])
+
+  const [s0, e0] = bounds ?? [null, null]
+  const filterActive =
+    bounds != null && range != null && (range[0] > (s0 ?? 0) || range[1] < (e0 ?? 0))
+  const aggregateWasFiltered =
+    filterActive &&
+    aggregateTotals != null &&
+    fullAggregateSamples > 0 &&
+    aggregateTotals.samples !== fullAggregateSamples
+
+  // Effective duration for rate KPIs — the slider window, not the whole run.
+  const effectiveDuration =
+    filterActive && range ? Math.max(1, range[1] - range[0]) : summary?.duration ?? null
+
+  // Prefer aggregate-derived totals when the aggregate honoured the filter
+  // but the summary endpoint didn't (a common BM asymmetry).
+  const displayHits = aggregateWasFiltered
+    ? aggregateTotals?.samples ?? null
+    : summary?.hits ?? null
+  const displayErrors = aggregateWasFiltered
+    ? aggregateTotals?.errors ?? null
+    : summary?.failed ?? null
+  const displayErrorRate = aggregateWasFiltered
+    ? aggregateTotals?.errorRate ?? null
+    : summary?.errorRate ?? null
+  const displayAvgRt = aggregateWasFiltered
+    ? aggregateTotals?.avgResponseTime ?? null
+    : summary?.avgResponseTime ?? null
+
+  const maxUsers = summary?.maxUsers ?? master?.maxUsers ?? timelineMaxUsers
+  const avgThroughput = (() => {
+    if (aggregateWasFiltered && aggregateTotals?.samples != null && effectiveDuration) {
+      return aggregateTotals.samples / effectiveDuration
+    }
+    if (summary?.avgThroughput != null) return summary.avgThroughput
+    if (summary?.hits != null && summary?.duration) return summary.hits / summary.duration
+    return null
+  })()
+
+  // Bandwidth: when the aggregate was filtered, its per-label KB/s sum is
+  // the most accurate. Otherwise fall back through summary fields.
+  const avgBandwidth = (() => {
+    if (aggregateWasFiltered && aggregateTotals?.kbPerSec != null) {
+      return aggregateTotals.kbPerSec * 1024 // convert KB/s -> bytes/s for the MiB/s tile
+    }
+    if (summary?.avgBandwidth != null) return summary.avgBandwidth
+    if (summary?.totalBytes != null && summary?.duration) {
+      return summary.totalBytes / summary.duration
+    }
+    if (
+      summary?.avgBytesPerHit != null &&
+      summary?.hits != null &&
+      summary?.duration
+    ) {
+      return (summary.avgBytesPerHit * summary.hits) / summary.duration
+    }
+    if (summary?.duration && labelRows.length) {
       let totalBytes = 0
       let haveData = false
       for (const r of labelRows) {
@@ -439,8 +522,10 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
           haveData = true
         }
       }
-      return haveData ? totalBytes / summary.duration : null
-    })()
+      if (haveData) return totalBytes / summary.duration
+    }
+    return null
+  })()
 
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -533,36 +618,24 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
             format={fmtClock}
             disabled={refreshing}
           />
-          {/* Filter-applied diagnostic: if the filtered summary matches the
-              unfiltered one exactly (hits + errors), BM silently ignored the
-              time range params — warn the user so they don't trust the stats. */}
-          {(() => {
-            if (refreshing) return null
-            const [s, e] = bounds
-            const [from, to] = range
-            const filterActive = from > s || to < e
-            if (!filterActive) return null
-            const fullHits = fullReport?.summary?.hits ?? null
-            const filteredHits = report.summary?.hits ?? null
-            const fullErrors = fullReport?.summary?.failed ?? null
-            const filteredErrors = report.summary?.failed ?? null
-            const identical =
-              fullHits != null &&
-              filteredHits != null &&
-              fullHits === filteredHits &&
-              fullErrors === filteredErrors
-            if (!identical) return null
-            return (
+          {/* Diagnostic: fires only when the *aggregate* (what Request Stats
+              reads) has the same total samples as the whole run — i.e. BM
+              ignored the filter on the endpoint that actually drives the
+              table. Summary-endpoint mismatches are handled silently by
+              recomputing KPIs from the aggregate. */}
+          {!refreshing &&
+            filterActive &&
+            aggregateTotals != null &&
+            fullAggregateSamples > 0 &&
+            aggregateTotals.samples === fullAggregateSamples && (
               <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
                 <span>
-                  BlazeMeter returned the same stats as the full run — it likely
-                  ignored the time window filter. Request Stats and KPIs below
-                  still reflect the whole run.
+                  BlazeMeter returned the same per-label stats as the full run —
+                  Request Stats may still reflect the whole run.
                 </span>
               </div>
-            )
-          })()}
+            )}
         </div>
       )}
 
@@ -593,23 +666,33 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
               />
               <Kpi
                 accent="red"
-                value={summary?.errorRate != null ? fmtPct(summary.errorRate).replace("%", "") : "0"}
+                value={
+                  displayErrorRate != null
+                    ? fmtPct(displayErrorRate).replace("%", "")
+                    : "0"
+                }
                 unit="%"
                 label="Errors"
               />
               <Kpi
                 accent="amber"
                 value={
-                  summary?.avgResponseTime != null ? Math.round(summary.avgResponseTime).toString() : "—"
+                  displayAvgRt != null ? Math.round(displayAvgRt).toString() : "—"
                 }
                 unit="ms"
                 label="Avg. Response Time"
               />
               <Kpi
                 accent="amber"
-                value={summary?.p90 != null ? Math.round(summary.p90).toString() : "—"}
-                unit="ms"
-                label="90% Response Time"
+                value={
+                  aggregateWasFiltered
+                    ? "—"
+                    : summary?.p90 != null
+                      ? Math.round(summary.p90).toString()
+                      : "—"
+                }
+                unit={aggregateWasFiltered ? "" : "ms"}
+                label={aggregateWasFiltered ? "90% Response Time (whole run)" : "90% Response Time"}
               />
               <Kpi
                 accent="amber"
@@ -639,7 +722,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
                   </MetaRow>
                 )}
                 <MetaRow icon={<Tag className="h-3.5 w-3.5" />} label="Samples">
-                  {fmtNum(summary?.hits ?? null)} hits · {fmtNum(summary?.failed ?? null)} errors
+                  {fmtNum(displayHits)} hits · {fmtNum(displayErrors)} errors
                 </MetaRow>
               </div>
             </div>
