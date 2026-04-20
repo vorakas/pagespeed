@@ -1,12 +1,29 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, Rocket, Square } from "lucide-react"
 import { api } from "@/services/api"
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
-import type { DevOpsConfig } from "@/types"
+import type { DevOpsConfig, DevOpsBuild } from "@/types"
 
 const TARGET_INSTANCES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
+
+// Status message shown on the Run All Builds card. Evolves from the
+// initial "queued" message into WarmUp-aware follow-ups as the
+// orchestrator's WarmUp child build progresses.
+type OrchestratorStatus =
+  | { type: "success"; message: string }
+  | { type: "info"; message: string }
+  | { type: "error"; message: string }
+
+// Tracks the orchestrator run we just kicked off so follow-up messages
+// can be scoped to the WarmUp build that THIS run produces, not a
+// stale WarmUp still sitting at the top of recentBuilds.
+interface OrchestratorTracking {
+  orchestratorBuildNumber: string
+  warmUpBaselineId: number | null  // WarmUp id observed at trigger time
+  runWarmUpSelected: boolean       // was WarmUp included in this run?
+}
 
 interface OrchestratorPanelProps {
   config: DevOpsConfig
@@ -20,12 +37,16 @@ interface OrchestratorPanelProps {
   onTriggered: () => void
   activeBuildCount: number
   onStopAll: () => Promise<void>
+  /** Currently displayed WarmUp build (from parent page state). */
+  warmUpBuild: DevOpsBuild | null
+  /** Effective result (re-run aware) for warmUpBuild, if known. */
+  warmUpEffective?: { effectiveResult: string; hasRerun: boolean }
 }
 
 export function OrchestratorPanel({
   config, branches, branch, targetInstance, stagingInstance,
   onBranchChange, onTargetInstanceChange, onStagingInstanceChange, onTriggered,
-  activeBuildCount, onStopAll,
+  activeBuildCount, onStopAll, warmUpBuild, warmUpEffective,
 }: OrchestratorPanelProps) {
   const [confirmStopAll, setConfirmStopAll] = useState(false)
   const [runWarmUp, setRunWarmUp] = useState(true)
@@ -36,7 +57,8 @@ export function OrchestratorPanel({
   const [runIPhone, setRunIPhone] = useState(true)
   const [runAndroid, setRunAndroid] = useState(true)
   const [triggering, setTriggering] = useState(false)
-  const [status, setStatus] = useState<{ message: string; type: "success" | "error" } | null>(null)
+  const [status, setStatus] = useState<OrchestratorStatus | null>(null)
+  const [tracking, setTracking] = useState<OrchestratorTracking | null>(null)
 
   const handleTrigger = async () => {
     if (!config.orchestratorPipelineId) {
@@ -46,6 +68,10 @@ export function OrchestratorPanel({
     setTriggering(true)
     setStatus(null)
     try {
+      // Snapshot the current WarmUp id BEFORE triggering so we can
+      // distinguish the WarmUp this orchestrator run spawns from the
+      // (possibly still-displayed) previous one.
+      const baselineId = warmUpBuild?.id ?? null
       const result = await api.triggerDevOpsOrchestrator(config, {
         pipelineId: config.orchestratorPipelineId,
         branch,
@@ -60,7 +86,17 @@ export function OrchestratorPanel({
         runAndroid,
       })
       if (result.success) {
-        setStatus({ message: `Orchestrator queued: #${result.build.buildNumber}`, type: "success" })
+        setTracking({
+          orchestratorBuildNumber: result.build.buildNumber,
+          warmUpBaselineId: baselineId,
+          runWarmUpSelected: runWarmUp,
+        })
+        setStatus({
+          type: "success",
+          message: runWarmUp
+            ? `Orchestrator queued: #${result.build.buildNumber} — waiting for WarmUp to start…`
+            : `Orchestrator queued: #${result.build.buildNumber} (WarmUp skipped).`,
+        })
         onTriggered()
       } else {
         setStatus({ message: "Failed to trigger orchestrator", type: "error" })
@@ -74,6 +110,66 @@ export function OrchestratorPanel({
       setTriggering(false)
     }
   }
+
+  // Follow the WarmUp build as it progresses through the orchestrator.
+  // Updates `status` with a live description of the gate:
+  //   queued → in progress → passed (remaining stages running)
+  //   or failed (orchestrator aborts remaining stages).
+  // Only active while we're tracking an orchestrator run that included
+  // WarmUp; otherwise the initial "queued" message stays put.
+  useEffect(() => {
+    if (!tracking || !tracking.runWarmUpSelected) return
+    if (!warmUpBuild) return
+    // Ignore the pre-trigger WarmUp still sitting on top of recentBuilds
+    // until a fresher one replaces it.
+    if (tracking.warmUpBaselineId !== null && warmUpBuild.id === tracking.warmUpBaselineId) return
+
+    const warmUpLabel = `WarmUp #${warmUpBuild.buildNumber}`
+
+    if (warmUpBuild.status === "notStarted") {
+      setStatus({
+        type: "info",
+        message: `Orchestrator #${tracking.orchestratorBuildNumber}: ${warmUpLabel} queued, waiting to start…`,
+      })
+      return
+    }
+    if (warmUpBuild.status === "inProgress") {
+      setStatus({
+        type: "info",
+        message: `Orchestrator #${tracking.orchestratorBuildNumber}: ${warmUpLabel} in progress…`,
+      })
+      return
+    }
+    if (warmUpBuild.status === "cancelling" || warmUpBuild.status === "postponed") {
+      setStatus({
+        type: "info",
+        message: `Orchestrator #${tracking.orchestratorBuildNumber}: ${warmUpLabel} ${warmUpBuild.status}…`,
+      })
+      return
+    }
+    if (warmUpBuild.status !== "completed") return
+
+    // Completed — apply effective result (re-run aware) if available.
+    const effective = warmUpEffective?.effectiveResult ?? warmUpBuild.result
+    const rerunSuffix = warmUpEffective?.hasRerun && effective === "succeeded" && warmUpBuild.result !== "succeeded"
+      ? " (re-runs all passed)"
+      : ""
+
+    if (effective === "succeeded" || effective === "partiallySucceeded") {
+      setStatus({
+        type: "success",
+        message: `Orchestrator #${tracking.orchestratorBuildNumber}: ${warmUpLabel} passed${rerunSuffix} — running Functional + Visual stages.`,
+      })
+      setTracking(null) // done watching; message stays
+      return
+    }
+    // Anything else (failed, canceled, timedOut, null) — WarmUp did not pass.
+    setStatus({
+      type: "error",
+      message: `Orchestrator #${tracking.orchestratorBuildNumber}: ${warmUpLabel} ${effective ?? "did not complete"} — remaining stages aborted.`,
+    })
+    setTracking(null)
+  }, [tracking, warmUpBuild, warmUpEffective])
 
   return (
     <Card className="max-w-4xl">
@@ -170,7 +266,15 @@ export function OrchestratorPanel({
         </div>
 
         {status && (
-          <p className={`text-sm ${status.type === "success" ? "text-score-good" : "text-score-poor"}`}>
+          <p
+            className={`text-sm ${
+              status.type === "success"
+                ? "text-score-good"
+                : status.type === "error"
+                  ? "text-score-poor"
+                  : "text-muted-foreground"
+            }`}
+          >
             {status.message}
           </p>
         )}

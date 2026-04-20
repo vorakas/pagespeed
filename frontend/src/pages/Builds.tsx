@@ -502,6 +502,8 @@ export function Builds() {
                   onTriggered={handleOrchestratorTriggered}
                   activeBuildCount={activeRoleKeys.length}
                   onStopAll={handleStopAll}
+                  warmUpBuild={builds["WarmUp"]}
+                  warmUpEffective={effectiveResults["WarmUp"]}
                 />
                 <BuildGrid
                   builds={builds}
