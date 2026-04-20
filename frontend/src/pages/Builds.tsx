@@ -72,6 +72,14 @@ export function Builds() {
   const [rateLimited, setRateLimited] = useState(false)
   const [sheetData, setSheetData] = useState<Map<string, SheetEntry>>(new Map())
   const [prefetchingTests, setPrefetchingTests] = useState(false)
+  // Epoch ms until which polling runs even when no child build is
+  // currently active. The orchestrator itself is a build in a separate
+  // pipeline (261) that isn't tracked here, and it queues the 9 child
+  // builds on a delay (~30s–several minutes depending on agent start-
+  // up). Without this, `anyRunning` stays false after a trigger and
+  // the poll loop never starts, so the cards don't update until the
+  // user manually refreshes.
+  const [forcePollUntil, setForcePollUntil] = useState(0)
 
   const definitionIds = useMemo(
     () => Object.values(config.pipelineMap).filter(Boolean),
@@ -259,20 +267,35 @@ export function Builds() {
   })
 
   useEffect(() => {
-    if (!anyRunning || !connected) {
+    if (!connected) {
+      if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
+      return
+    }
+    // Keep polling while either:
+    //   - something is actually running (normal case), or
+    //   - we're inside the post-trigger force-poll window (catches
+    //     orchestrator children that haven't been queued yet).
+    // Evaluated fresh on each tick so expiry of forcePollUntil stops
+    // the loop without needing another state change to re-trigger.
+    const shouldKeepPolling = () => anyRunning || Date.now() < forcePollUntil
+    if (!shouldKeepPolling()) {
       if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
       return
     }
     const tick = () => {
       fetchBuilds().finally(() => {
-        pollRef.current = setTimeout(tick, pollIntervalRef.current)
+        if (shouldKeepPolling()) {
+          pollRef.current = setTimeout(tick, pollIntervalRef.current)
+        } else {
+          pollRef.current = null
+        }
       })
     }
     pollRef.current = setTimeout(tick, pollIntervalRef.current)
     return () => {
       if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null }
     }
-  }, [anyRunning, connected, fetchBuilds])
+  }, [anyRunning, connected, fetchBuilds, forcePollUntil])
 
   const handleTriggerSingle = async (roleKey: string) => {
     setTriggerErrors((prev) => {
@@ -329,6 +352,11 @@ export function Builds() {
   }
 
   const handleOrchestratorTriggered = () => {
+    // Orchestrator (pipeline 261) queues child builds on a delay, so
+    // keep polling for 20 min regardless of whether anything is
+    // currently visible as "running" — that window covers agent
+    // start-up plus the full WarmUp + at least one Functional step.
+    setForcePollUntil(Date.now() + 20 * 60 * 1000)
     setTimeout(fetchBuilds, 2000)
   }
 
