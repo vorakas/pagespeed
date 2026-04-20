@@ -75,6 +75,28 @@ function fmtDuration(seconds: number | null | undefined): string {
   return `${s}s`
 }
 
+/**
+ * Priority page labels the QA team cares about on the Request Stats tab.
+ * Matched case-insensitively as substrings so small naming variations in
+ * BM (e.g. "Homepage" vs "Home Page", "PDP" vs "PDP - Desktop") still hit.
+ */
+const KEY_PAGE_LABELS = [
+  "Homepage",
+  "Search Result BR",
+  "Sort Page BR",
+  "SFP",
+  "PDP",
+  "Cart Overview",
+  "Shipping Page",
+  "Payment Page",
+]
+
+function matchesKeyPage(label: string | null): boolean {
+  if (!label) return false
+  const normalized = label.toLowerCase()
+  return KEY_PAGE_LABELS.some((key) => normalized.includes(key.toLowerCase()))
+}
+
 function fmtDateTime(epoch: number | null | undefined): string {
   if (!epoch) return "—"
   const ms = epoch > 1e12 ? epoch : epoch * 1000
@@ -143,6 +165,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
   const [report, setReport] = useState<BlazemeterMasterReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [keyPagesOnly, setKeyPagesOnly] = useState(true)
 
   useEffect(() => {
     if (masterId === null) {
@@ -595,49 +618,88 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
                 No per-label stats available.
               </p>
             ) : (
-              <div className="overflow-x-auto rounded-md border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Label</TableHead>
-                      <TableHead className="text-right">Samples</TableHead>
-                      <TableHead className="text-right">Errors</TableHead>
-                      <TableHead className="text-right">Err %</TableHead>
-                      <TableHead className="text-right">Avg</TableHead>
-                      <TableHead className="text-right">p90</TableHead>
-                      <TableHead className="text-right">p95</TableHead>
-                      <TableHead className="text-right">p99</TableHead>
-                      <TableHead className="text-right">Max</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {labelRows.map((r, i) => (
-                      <TableRow key={r.labelId ?? i}>
-                        <TableCell
-                          className="max-w-[420px] truncate text-xs"
-                          title={r.labelName ?? ""}
+              <>
+                {(() => {
+                  const filtered = keyPagesOnly
+                    ? labelRows.filter((r) => matchesKeyPage(r.labelName))
+                    : labelRows
+                  return (
+                    <>
+                      <div className="mb-3 flex items-center justify-between gap-3 text-xs">
+                        <span className="text-muted-foreground">
+                          Showing {filtered.length} of {labelRows.length} labels
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setKeyPagesOnly((v) => !v)}
                         >
-                          {r.labelName ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-right text-xs">{fmtNum(r.samples)}</TableCell>
-                        <TableCell className="text-right text-xs">{fmtNum(r.errors)}</TableCell>
-                        <TableCell className="text-right text-xs">
-                          {fmtPct(r.errorRate)}
-                        </TableCell>
-                        <TableCell className="text-right text-xs">
-                          {fmtMs(r.avgResponseTime)}
-                        </TableCell>
-                        <TableCell className="text-right text-xs">{fmtMs(r.p90)}</TableCell>
-                        <TableCell className="text-right text-xs">{fmtMs(r.p95)}</TableCell>
-                        <TableCell className="text-right text-xs">{fmtMs(r.p99)}</TableCell>
-                        <TableCell className="text-right text-xs">
-                          {fmtMs(r.maxResponseTime)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                          {keyPagesOnly ? "Show all labels" : "Show key pages only"}
+                        </Button>
+                      </div>
+                      {filtered.length === 0 ? (
+                        <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                          No labels matched the key-page filter. Try "Show all labels".
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto rounded-md border border-border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Label</TableHead>
+                                <TableHead className="text-right">Samples</TableHead>
+                                <TableHead className="text-right">Errors</TableHead>
+                                <TableHead className="text-right">Err %</TableHead>
+                                <TableHead className="text-right">Avg</TableHead>
+                                <TableHead className="text-right">p90</TableHead>
+                                <TableHead className="text-right">p95</TableHead>
+                                <TableHead className="text-right">p99</TableHead>
+                                <TableHead className="text-right">Max</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {filtered.map((r, i) => (
+                                <TableRow key={r.labelId ?? i}>
+                                  <TableCell
+                                    className="max-w-[420px] truncate text-xs"
+                                    title={r.labelName ?? ""}
+                                  >
+                                    {r.labelName ?? "—"}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    {fmtNum(r.samples)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    {fmtNum(r.errors)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    {fmtPct(r.errorRate)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    {fmtMs(r.avgResponseTime)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    {fmtMs(r.p90)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    {fmtMs(r.p95)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    {fmtMs(r.p99)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    {fmtMs(r.maxResponseTime)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+              </>
             )}
           </TabsContent>
 
