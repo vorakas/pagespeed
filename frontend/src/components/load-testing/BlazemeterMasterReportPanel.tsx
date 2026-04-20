@@ -533,6 +533,36 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
             format={fmtClock}
             disabled={refreshing}
           />
+          {/* Filter-applied diagnostic: if the filtered summary matches the
+              unfiltered one exactly (hits + errors), BM silently ignored the
+              time range params — warn the user so they don't trust the stats. */}
+          {(() => {
+            if (refreshing) return null
+            const [s, e] = bounds
+            const [from, to] = range
+            const filterActive = from > s || to < e
+            if (!filterActive) return null
+            const fullHits = fullReport?.summary?.hits ?? null
+            const filteredHits = report.summary?.hits ?? null
+            const fullErrors = fullReport?.summary?.failed ?? null
+            const filteredErrors = report.summary?.failed ?? null
+            const identical =
+              fullHits != null &&
+              filteredHits != null &&
+              fullHits === filteredHits &&
+              fullErrors === filteredErrors
+            if (!identical) return null
+            return (
+              <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                <span>
+                  BlazeMeter returned the same stats as the full run — it likely
+                  ignored the time window filter. Request Stats and KPIs below
+                  still reflect the whole run.
+                </span>
+              </div>
+            )
+          })()}
         </div>
       )}
 

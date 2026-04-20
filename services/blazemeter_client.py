@@ -241,15 +241,23 @@ class BlazemeterClient:
     ) -> dict[str, Any]:
         """Build query params to constrain a BM report to [from_ts, to_ts].
 
-        BM's aggregate/summary/timeline endpoints accept ``min_ts`` / ``max_ts``
-        as unix epoch seconds.  When a param is None the endpoint returns the
-        full-run data, which is the default we want on initial load.
+        BM's API revisions disagree on the exact param name — the aggregate
+        endpoint uses ``min_ts``/``max_ts`` in some versions, ``fromTimestamp``/
+        ``toTimestamp`` in others, and the timeline endpoint has additionally
+        accepted plain ``from``/``to``.  Sending all variants is safe because
+        BM silently ignores unknown query params, and at least one will stick.
         """
         params: dict[str, Any] = {}
         if from_ts is not None:
-            params["min_ts"] = int(from_ts)
+            s = int(from_ts)
+            params["min_ts"] = s
+            params["fromTimestamp"] = s
+            params["from"] = s
         if to_ts is not None:
-            params["max_ts"] = int(to_ts)
+            s = int(to_ts)
+            params["max_ts"] = s
+            params["toTimestamp"] = s
+            params["to"] = s
         return params
 
     def get_master_summary(
