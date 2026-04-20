@@ -403,6 +403,31 @@ class BlazemeterClient:
                     return row[k]
             return None
 
+        def pick_percentile(p: int) -> Any:
+            """Pull the p-th percentile from BM's various shapes.
+
+            Different BM API revisions emit ``percentileResponseTime90``,
+            ``tp90``, ``90line``, ``perc_90_0`` at the row level — or nest
+            them under ``quantiles``/``percentiles`` as ``{"90.0": 800}``.
+            """
+            flat_keys = (
+                f"percentileResponseTime{p}",
+                f"tp{p}",
+                f"p{p}",
+                f"{p}line",
+                f"perc_{p}_0",
+            )
+            for key in flat_keys:
+                if key in row and row[key] is not None:
+                    return row[key]
+            for container_key in ("quantiles", "percentiles"):
+                container = row.get(container_key)
+                if isinstance(container, dict):
+                    for nested_key in (str(p), f"{p}.0", float(p)):
+                        if nested_key in container and container[nested_key] is not None:
+                            return container[nested_key]
+            return None
+
         return {
             "labelId": pick("labelId", "id"),
             "labelName": pick("labelName", "name", "label"),
@@ -412,10 +437,10 @@ class BlazemeterClient:
             "avgResponseTime": pick("avgResponseTime", "avg", "average"),
             "minResponseTime": pick("minResponseTime", "min"),
             "maxResponseTime": pick("maxResponseTime", "max"),
-            "p50": pick("medianResponseTime", "percentileResponseTime50", "tp50", "p50"),
-            "p90": pick("percentileResponseTime90", "tp90", "p90"),
-            "p95": pick("percentileResponseTime95", "tp95", "p95"),
-            "p99": pick("percentileResponseTime99", "tp99", "p99"),
+            "p50": pick("medianResponseTime") or pick_percentile(50),
+            "p90": pick_percentile(90),
+            "p95": pick_percentile(95),
+            "p99": pick_percentile(99),
             "avgLatency": pick("avgLatency", "latency"),
             "avgThroughput": pick("avgThroughput", "throughput", "hitsPerSec"),
             "avgBytes": pick("avgBytes", "bytes", "avgBandwidth"),

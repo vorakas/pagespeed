@@ -645,53 +645,90 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
                         <div className="overflow-x-auto rounded-md border border-border">
                           <Table>
                             <TableHeader>
-                              <TableRow>
+                              <TableRow className="bg-muted/50">
                                 <TableHead>Label</TableHead>
-                                <TableHead className="text-right">Samples</TableHead>
-                                <TableHead className="text-right">Errors</TableHead>
-                                <TableHead className="text-right">Err %</TableHead>
-                                <TableHead className="text-right">Avg</TableHead>
-                                <TableHead className="text-right">p90</TableHead>
-                                <TableHead className="text-right">p95</TableHead>
-                                <TableHead className="text-right">p99</TableHead>
-                                <TableHead className="text-right">Max</TableHead>
+                                <TableHead className="text-right"># Samples</TableHead>
+                                <TableHead className="text-right">Avg. Response Time (ms)</TableHead>
+                                <TableHead className="text-right">Avg. Hits/s</TableHead>
+                                <TableHead className="text-right">90% line (ms)</TableHead>
+                                <TableHead className="text-right">95% line (ms)</TableHead>
+                                <TableHead className="text-right">99% line (ms)</TableHead>
+                                <TableHead className="text-right">Min Response Time (ms)</TableHead>
+                                <TableHead className="text-right">Max Response Time (ms)</TableHead>
+                                <TableHead className="text-right">
+                                  Avg. Bandwidth (KBytes/s)
+                                </TableHead>
+                                <TableHead className="text-right">Error Percentage</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {filtered.map((r, i) => (
-                                <TableRow key={r.labelId ?? i}>
-                                  <TableCell
-                                    className="max-w-[420px] truncate text-xs"
-                                    title={r.labelName ?? ""}
+                              {filtered.map((r, i) => {
+                                const errPct =
+                                  r.errorRate != null
+                                    ? r.errorRate <= 1
+                                      ? r.errorRate * 100
+                                      : r.errorRate
+                                    : null
+                                const kbPerSec =
+                                  r.avgBytes != null ? r.avgBytes / 1024 : null
+                                return (
+                                  <TableRow
+                                    key={r.labelId ?? i}
+                                    className="odd:bg-background even:bg-muted/30 hover:bg-muted/60"
                                   >
-                                    {r.labelName ?? "—"}
-                                  </TableCell>
-                                  <TableCell className="text-right text-xs">
-                                    {fmtNum(r.samples)}
-                                  </TableCell>
-                                  <TableCell className="text-right text-xs">
-                                    {fmtNum(r.errors)}
-                                  </TableCell>
-                                  <TableCell className="text-right text-xs">
-                                    {fmtPct(r.errorRate)}
-                                  </TableCell>
-                                  <TableCell className="text-right text-xs">
-                                    {fmtMs(r.avgResponseTime)}
-                                  </TableCell>
-                                  <TableCell className="text-right text-xs">
-                                    {fmtMs(r.p90)}
-                                  </TableCell>
-                                  <TableCell className="text-right text-xs">
-                                    {fmtMs(r.p95)}
-                                  </TableCell>
-                                  <TableCell className="text-right text-xs">
-                                    {fmtMs(r.p99)}
-                                  </TableCell>
-                                  <TableCell className="text-right text-xs">
-                                    {fmtMs(r.maxResponseTime)}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                                    <TableCell
+                                      className="max-w-[340px] truncate text-xs font-medium"
+                                      title={r.labelName ?? ""}
+                                    >
+                                      {r.labelName ?? "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs tabular-nums">
+                                      {fmtNum(r.samples)}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs tabular-nums">
+                                      {r.avgResponseTime != null
+                                        ? fmtNum(Math.round(r.avgResponseTime))
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs tabular-nums">
+                                      {r.avgThroughput != null
+                                        ? r.avgThroughput.toFixed(2)
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs tabular-nums">
+                                      {r.p90 != null ? fmtNum(Math.round(r.p90)) : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs tabular-nums">
+                                      {r.p95 != null ? fmtNum(Math.round(r.p95)) : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs tabular-nums">
+                                      {r.p99 != null ? fmtNum(Math.round(r.p99)) : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs tabular-nums">
+                                      {r.minResponseTime != null
+                                        ? fmtNum(Math.round(r.minResponseTime))
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs tabular-nums">
+                                      {r.maxResponseTime != null
+                                        ? fmtNum(Math.round(r.maxResponseTime))
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs tabular-nums">
+                                      {kbPerSec != null ? kbPerSec.toFixed(2) : "—"}
+                                    </TableCell>
+                                    <TableCell
+                                      className={`text-right text-xs tabular-nums ${
+                                        errPct != null && errPct > 0
+                                          ? "font-semibold text-destructive"
+                                          : ""
+                                      }`}
+                                    >
+                                      {errPct != null ? `${errPct.toFixed(2)}%` : "—"}
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
                             </TableBody>
                           </Table>
                         </div>
