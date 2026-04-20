@@ -235,10 +235,34 @@ class BlazemeterClient:
     # Post-test reports (only call after a master has terminated)
     # ------------------------------------------------------------------
 
-    def get_master_summary(self, master_id: int) -> dict:
+    @staticmethod
+    def _time_range_params(
+        from_ts: Optional[int], to_ts: Optional[int]
+    ) -> dict[str, Any]:
+        """Build query params to constrain a BM report to [from_ts, to_ts].
+
+        BM's aggregate/summary/timeline endpoints accept ``min_ts`` / ``max_ts``
+        as unix epoch seconds.  When a param is None the endpoint returns the
+        full-run data, which is the default we want on initial load.
+        """
+        params: dict[str, Any] = {}
+        if from_ts is not None:
+            params["min_ts"] = int(from_ts)
+        if to_ts is not None:
+            params["max_ts"] = int(to_ts)
+        return params
+
+    def get_master_summary(
+        self,
+        master_id: int,
+        from_ts: Optional[int] = None,
+        to_ts: Optional[int] = None,
+    ) -> dict:
         """Return the aggregated run-level summary (hits, error %, percentiles)."""
+        params = self._time_range_params(from_ts, to_ts)
         payload = self._request(
             "GET", f"/masters/{master_id}/reports/main/summary",
+            params=params or None,
         )
         result = payload.get("result", {}) if isinstance(payload, dict) else {}
         # BM returns either a summary dict directly or `{ summary: [...] }`
@@ -248,10 +272,17 @@ class BlazemeterClient:
             entry = result if isinstance(result, dict) else {}
         return self._project_summary(entry)
 
-    def get_master_aggregate(self, master_id: int) -> list[dict]:
+    def get_master_aggregate(
+        self,
+        master_id: int,
+        from_ts: Optional[int] = None,
+        to_ts: Optional[int] = None,
+    ) -> list[dict]:
         """Return per-label aggregated stats (one row per URL/transaction)."""
+        params = self._time_range_params(from_ts, to_ts)
         payload = self._request(
             "GET", f"/masters/{master_id}/reports/aggregatereport/data",
+            params=params or None,
         )
         results = payload.get("result", []) if isinstance(payload, dict) else []
         if not isinstance(results, list):
@@ -259,10 +290,14 @@ class BlazemeterClient:
         return [self._project_aggregate_row(r) for r in results]
 
     def get_master_timeline(
-        self, master_id: int, granularity: Optional[int] = None,
+        self,
+        master_id: int,
+        granularity: Optional[int] = None,
+        from_ts: Optional[int] = None,
+        to_ts: Optional[int] = None,
     ) -> dict:
         """Return time-series data (response time, users, errors, throughput)."""
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = self._time_range_params(from_ts, to_ts)
         if granularity is not None:
             params["granularity"] = granularity
         payload = self._request(
@@ -272,10 +307,17 @@ class BlazemeterClient:
         result = payload.get("result", {}) if isinstance(payload, dict) else {}
         return self._project_timeline(result if isinstance(result, dict) else {})
 
-    def get_master_errors(self, master_id: int) -> list[dict]:
+    def get_master_errors(
+        self,
+        master_id: int,
+        from_ts: Optional[int] = None,
+        to_ts: Optional[int] = None,
+    ) -> list[dict]:
         """Return error breakdown (per-label messages + counts)."""
+        params = self._time_range_params(from_ts, to_ts)
         payload = self._request(
             "GET", f"/masters/{master_id}/reports/errorsreport/data",
+            params=params or None,
         )
         results = payload.get("result", []) if isinstance(payload, dict) else []
         if not isinstance(results, list):

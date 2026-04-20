@@ -227,9 +227,25 @@ def create_blazemeter_blueprint(
         if BlazeMeter returns an error for one section (e.g. the test had no
         CI gates configured, so ``/ci-status`` 404s), its value is ``None``
         and ``errors[<section>]`` carries the message — the rest still renders.
+
+        Optional query params ``fromTs`` / ``toTs`` (unix epoch seconds) narrow
+        the summary/aggregate/timeline/errors sections to a sub-range of the
+        run.  Master info, ci-status and thresholds are always whole-run.
         """
         _require_configured()
         assert client is not None  # _require_configured guarantees it
+
+        def _parse_epoch(name: str) -> Optional[int]:
+            raw = request.args.get(name)
+            if raw in (None, ""):
+                return None
+            try:
+                return int(float(raw))
+            except (TypeError, ValueError):
+                return None
+
+        from_ts = _parse_epoch("fromTs")
+        to_ts = _parse_epoch("toTs")
 
         sections: dict[str, object] = {}
         errors: dict[str, str] = {}
@@ -250,10 +266,10 @@ def create_blazemeter_blueprint(
                 errors[section] = msg
 
         _safe("master", lambda: client.get_master(master_id))
-        _safe("summary", lambda: client.get_master_summary(master_id))
-        _safe("aggregate", lambda: client.get_master_aggregate(master_id))
-        _safe("timeline", lambda: client.get_master_timeline(master_id))
-        _safe("errors", lambda: client.get_master_errors(master_id))
+        _safe("summary", lambda: client.get_master_summary(master_id, from_ts, to_ts))
+        _safe("aggregate", lambda: client.get_master_aggregate(master_id, from_ts, to_ts))
+        _safe("timeline", lambda: client.get_master_timeline(master_id, from_ts=from_ts, to_ts=to_ts))
+        _safe("errors", lambda: client.get_master_errors(master_id, from_ts, to_ts))
         _safe("ciStatus", lambda: client.get_master_ci_status(master_id))
         _safe("thresholds", lambda: client.get_master_thresholds(master_id))
 

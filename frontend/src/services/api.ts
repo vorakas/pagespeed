@@ -618,8 +618,17 @@ class ApiClient {
     return this.request(`/api/blazemeter/presets/${presetId}/queue`, { method: "POST" })
   }
 
-  async getBlazemeterMasterReport(masterId: number): Promise<BlazemeterMasterReport> {
-    return this.request(`/api/blazemeter/masters/${masterId}/report`)
+  async getBlazemeterMasterReport(
+    masterId: number,
+    range?: { fromTs?: number | null; toTs?: number | null },
+  ): Promise<BlazemeterMasterReport> {
+    const params = new URLSearchParams()
+    if (range?.fromTs != null) params.set("fromTs", String(Math.floor(range.fromTs)))
+    if (range?.toTs != null) params.set("toTs", String(Math.floor(range.toTs)))
+    const query = params.toString()
+    return this.request(
+      `/api/blazemeter/masters/${masterId}/report${query ? `?${query}` : ""}`,
+    )
   }
 
   async listBlazemeterRuns(limit = 50, offset = 0): Promise<BlazemeterRunsResponse> {

@@ -1,5 +1,5 @@
-import type { ReactElement, ReactNode } from "react"
-import { useEffect, useMemo, useState } from "react"
+import type { ReactElement, ReactNode, PointerEvent as ReactPointerEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Area,
   CartesianGrid,
@@ -152,6 +152,94 @@ function Kpi({
   )
 }
 
+/** Two-handle range slider — mirrors BlazeMeter's time window control. */
+function RangeSlider({
+  min,
+  max,
+  value,
+  onChange,
+  onCommit,
+  format,
+  disabled,
+}: {
+  min: number
+  max: number
+  value: [number, number]
+  onChange: (next: [number, number]) => void
+  onCommit?: (next: [number, number]) => void
+  format: (v: number) => string
+  disabled?: boolean
+}) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const draggingRef = useRef<"low" | "high" | null>(null)
+
+  const span = Math.max(1, max - min)
+  const pct = (v: number) => ((v - min) / span) * 100
+
+  const handleDown =
+    (handle: "low" | "high") =>
+    (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (disabled) return
+      e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      draggingRef.current = handle
+    }
+
+  const handleMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!draggingRef.current || !trackRef.current) return
+    const rect = trackRef.current.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    const next = Math.round(min + ratio * span)
+    if (draggingRef.current === "low") {
+      onChange([Math.min(next, value[1] - 1), value[1]])
+    } else {
+      onChange([value[0], Math.max(next, value[0] + 1)])
+    }
+  }
+
+  const handleUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!draggingRef.current) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    draggingRef.current = null
+    onCommit?.(value)
+  }
+
+  return (
+    <div className="w-full">
+      <div ref={trackRef} className="relative h-10 touch-none select-none px-2">
+        <div className="absolute left-2 right-2 top-1/2 h-1 -translate-y-1/2 rounded-full bg-muted" />
+        <div
+          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-violet-500"
+          style={{
+            left: `calc(${pct(value[0])}% * (100% - 16px) / 100% + 8px)`,
+            right: `calc((100% - ${pct(value[1])}%) * (100% - 16px) / 100% + 8px)`,
+          }}
+        />
+        {(["low", "high"] as const).map((h) => (
+          <button
+            key={h}
+            type="button"
+            aria-label={h === "low" ? "Range start" : "Range end"}
+            disabled={disabled}
+            onPointerDown={handleDown(h)}
+            onPointerMove={handleMove}
+            onPointerUp={handleUp}
+            onPointerCancel={handleUp}
+            className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-violet-600 bg-background shadow-sm transition-transform active:cursor-grabbing active:scale-110 disabled:cursor-not-allowed"
+            style={{
+              left: `calc(${pct(h === "low" ? value[0] : value[1])}% * (100% - 16px) / 100% + 8px)`,
+            }}
+          />
+        ))}
+      </div>
+      <div className="flex justify-between px-2 text-xs text-muted-foreground tabular-nums">
+        <span>{format(value[0])}</span>
+        <span>{format(value[1])}</span>
+      </div>
+    </div>
+  )
+}
+
 function MetaRow({
   icon,
   label,
@@ -172,16 +260,40 @@ function MetaRow({
   )
 }
 
+const RAMPUP_SKIP_SECONDS = 60
+
+/** Pull start/end epoch (seconds) from a report, preferring the summary. */
+function getReportBounds(
+  r: BlazemeterMasterReport | null,
+): [number, number] | null {
+  if (!r) return null
+  const start = r.summary?.startTime ?? r.master?.created ?? null
+  const end = r.summary?.endTime ?? r.master?.ended ?? null
+  if (start == null || end == null || end <= start) return null
+  return [start, end]
+}
+
 export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Props) {
+  // `fullReport` is the unfiltered whole-run result — we fetch it once and keep
+  // it around purely so the slider always knows the full time bounds, even
+  // after the displayed `report` is swapped for a time-filtered one.
+  const [fullReport, setFullReport] = useState<BlazemeterMasterReport | null>(null)
   const [report, setReport] = useState<BlazemeterMasterReport | null>(null)
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [keyPagesOnly, setKeyPagesOnly] = useState(true)
+  const [range, setRange] = useState<[number, number] | null>(null)
 
+  const bounds = useMemo(() => getReportBounds(fullReport), [fullReport])
+
+  // Initial unfiltered fetch — establishes bounds and a default skip-rampup range.
   useEffect(() => {
     if (masterId === null) {
+      setFullReport(null)
       setReport(null)
       setError(null)
+      setRange(null)
       return
     }
     let cancelled = false
@@ -190,7 +302,16 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
     api
       .getBlazemeterMasterReport(masterId)
       .then((r) => {
-        if (!cancelled) setReport(r)
+        if (cancelled) return
+        setFullReport(r)
+        setReport(r)
+        const b = getReportBounds(r)
+        if (b) {
+          const [s, e] = b
+          setRange(
+            e - s > RAMPUP_SKIP_SECONDS ? [s + RAMPUP_SKIP_SECONDS, e] : [s, e],
+          )
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load report")
@@ -202,6 +323,44 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
       cancelled = true
     }
   }, [masterId])
+
+  // Range-driven re-fetch (debounced). Skips when the range covers the whole run.
+  useEffect(() => {
+    if (masterId === null || !range || !bounds) return
+    const [s, e] = bounds
+    const [from, to] = range
+    const coversWholeRun = from <= s && to >= e
+    if (coversWholeRun) return
+
+    let cancelled = false
+    const handle = setTimeout(() => {
+      setRefreshing(true)
+      api
+        .getBlazemeterMasterReport(masterId, { fromTs: from, toTs: to })
+        .then((r) => {
+          if (!cancelled) setReport(r)
+        })
+        .catch((err) => {
+          if (!cancelled)
+            setError(err instanceof Error ? err.message : "Failed to refresh report")
+        })
+        .finally(() => {
+          if (!cancelled) setRefreshing(false)
+        })
+    }, 350)
+    return () => {
+      cancelled = true
+      clearTimeout(handle)
+    }
+  }, [masterId, range, bounds])
+
+  const resetRange = useCallback(() => {
+    if (!bounds) return
+    const [s, e] = bounds
+    setRange(
+      e - s > RAMPUP_SKIP_SECONDS ? [s + RAMPUP_SKIP_SECONDS, e] : [s, e],
+    )
+  }, [bounds])
 
   const chartData = useMemo(() => {
     const points = report?.timeline?.points ?? []
@@ -330,6 +489,50 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
       {error && !loading && (
         <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {report && !loading && bounds && range && (
+        <div className="mt-5 rounded-lg border border-border bg-background/30 p-3">
+          <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              <span>Time window</span>
+              {refreshing && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-500" />
+                  Updating…
+                </span>
+              )}
+              {(() => {
+                const [s, e] = bounds
+                const [from, to] = range
+                const skippedStart = Math.max(0, from - s)
+                const skippedEnd = Math.max(0, e - to)
+                if (skippedStart === 0 && skippedEnd === 0) {
+                  return <span>whole run</span>
+                }
+                return (
+                  <span>
+                    {fmtDuration(to - from)} window
+                    {skippedStart > 0 && ` · skipped first ${fmtDuration(skippedStart)}`}
+                    {skippedEnd > 0 && ` · skipped last ${fmtDuration(skippedEnd)}`}
+                  </span>
+                )
+              })()}
+            </div>
+            <Button variant="ghost" size="sm" onClick={resetRange} className="h-7 text-xs">
+              Reset
+            </Button>
+          </div>
+          <RangeSlider
+            min={bounds[0]}
+            max={bounds[1]}
+            value={range}
+            onChange={setRange}
+            format={fmtClock}
+            disabled={refreshing}
+          />
         </div>
       )}
 
