@@ -381,7 +381,12 @@ class BlazemeterClient:
             "p95": pick("tp95", "percentileResponseTime95", "p95"),
             "p99": pick("tp99", "percentileResponseTime99", "p99"),
             "avgLatency": pick("avgLatency", "latency"),
-            "avgBandwidth": pick("avgBandwidth", "bandwidth", "bytesPerSec", "avgBytes"),
+            # Pure bandwidth rate keys only — avgBytes is per-hit, not per-second
+            "avgBandwidth": pick("avgBandwidth", "bandwidth", "bytesPerSec"),
+            # Total bytes transferred over the whole run (if BM exposes it)
+            "totalBytes": pick("bytes", "totalBytes", "totalBandwidth"),
+            # Average bytes per hit — lets the UI derive bandwidth as hits × avgBytesPerHit / duration
+            "avgBytesPerHit": pick("avgBytes", "bytesPerHit"),
             "avgThroughput": pick("avgThroughput", "throughput", "hitsPerSec", "avgHits"),
             "duration": pick("duration"),
             "startTime": pick("first", "startTime", "startedAt"),

@@ -415,6 +415,8 @@ export interface BlazemeterRunSummary {
   startTime: number | null
   endTime: number | null
   maxUsers: number | null
+  totalBytes: number | null
+  avgBytesPerHit: number | null
 }
 
 export interface BlazemeterLabelRow {

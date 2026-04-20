@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
-  MapPin,
   PlayCircle,
   StopCircle,
   Tag,
@@ -224,10 +223,19 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
       ? summary.hits / summary.duration
       : null)
 
-  // Bandwidth fallback: sum total bytes across per-label aggregate rows
-  // (samples × avgBytes) and divide by duration for bytes/sec.
+  // Bandwidth fallback chain:
+  // 1. Direct rate from BM (avgBandwidth / bandwidth / bytesPerSec)
+  // 2. Total bytes / duration (when BM exposes `bytes` on the summary)
+  // 3. hits × avgBytesPerHit / duration (when BM only exposes per-hit)
+  // 4. Sum across per-label aggregate rows as a last resort
   const avgBandwidth =
     summary?.avgBandwidth ??
+    (summary?.totalBytes != null && summary?.duration
+      ? summary.totalBytes / summary.duration
+      : null) ??
+    (summary?.avgBytesPerHit != null && summary?.hits != null && summary?.duration
+      ? (summary.avgBytesPerHit * summary.hits) / summary.duration
+      : null) ??
     (() => {
       if (!summary?.duration || !labelRows.length) return null
       let totalBytes = 0
@@ -363,9 +371,6 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
                     {master.note}
                   </MetaRow>
                 )}
-                <MetaRow icon={<MapPin className="h-3.5 w-3.5" />} label="Report Status">
-                  <span className="capitalize">{master?.reportStatus ?? "—"}</span>
-                </MetaRow>
                 <MetaRow icon={<Tag className="h-3.5 w-3.5" />} label="Samples">
                   {fmtNum(summary?.hits ?? null)} hits · {fmtNum(summary?.failed ?? null)} errors
                 </MetaRow>
