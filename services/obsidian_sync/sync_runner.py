@@ -147,6 +147,7 @@ def run_jira_jql_sync(
     base_url: str,
     jql: str,
     output_name: str,
+    full_refresh: bool = False,
     progress_callback: Optional[ProgressCallback] = None,
 ) -> SyncResult:
     """Run a custom JQL Jira sync into ``<vault_root>/<output_name>/``.
@@ -154,6 +155,10 @@ def run_jira_jql_sync(
     Mirrors :func:`run_jira_sync` but invokes :func:`jira_sync.sync_jql`
     instead of iterating projects. Used for curated feeds (e.g. the WPM
     hierarchy) that don't map to a single Jira project key.
+
+    Incremental by default: after the first run, the state file in the
+    output folder bounds subsequent pulls to issues updated since then.
+    Pass ``full_refresh=True`` to re-export everything.
     """
     if not pat:
         return SyncResult(success=False, lines=[], error="Missing Jira PAT")
@@ -180,9 +185,11 @@ def run_jira_jql_sync(
             print(f"   Authenticated as: {user.get('displayName', user.get('name', '?'))}")
             print(f"   Vault root: {vault_root}")
             print(f"   Feed:       {output_name} (custom JQL)")
+            if full_refresh:
+                print("   Mode:       --full (forced complete refresh)")
             print()
 
-            jira_sync.sync_jql(session, jql, output_name)
+            jira_sync.sync_jql(session, jql, output_name, force_full=full_refresh)
 
             print(f"🏁 JQL feed '{output_name}' synced!")
         return SyncResult(success=True, lines=buffer)

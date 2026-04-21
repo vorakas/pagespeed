@@ -253,6 +253,7 @@ class ObsidianSyncService:
                             base_url=self._jira_base_url,
                             jql=jql,
                             output_name=feed_name,
+                            full_refresh=job.full_refresh,
                             progress_callback=on_line,
                         ))
 

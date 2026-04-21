@@ -874,12 +874,21 @@ def save_sync_state(output, project_key):
     state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
-def collect_existing_issues(output, project_key):
-    """Scan the vault folder and return all existing issue keys → file paths."""
+def collect_existing_issues(output, project_key=None):
+    """Scan the vault folder and return all existing issue keys → file paths.
+
+    If ``project_key`` is given, only files whose name starts with that key
+    are returned. If ``None``, any Jira-style key (``ABC-123``) is matched —
+    used for JQL feeds whose output folder can span many projects (e.g. WPM).
+    """
     existing = {}
+    pattern = re.compile(
+        rf"({re.escape(project_key)}-\d+)" if project_key
+        else r"([A-Z][A-Z0-9_]+-\d+)"
+    )
     for md_file in output.rglob("*.md"):
         # Files are named like "WPM-123 - Some summary.md"
-        match = re.match(rf"({re.escape(project_key)}-\d+)", md_file.name)
+        match = pattern.match(md_file.name)
         if match:
             existing[match.group(1)] = md_file
     return existing
@@ -1040,12 +1049,34 @@ def sync_project(session, project_key, force_full=False):
     print()
 
 
-def sync_jql(session, jql, output_name):
+def _apply_incremental_filter(jql: str, since: str) -> str:
+    """Add ``AND updated >= "<since>"`` to a user-supplied JQL.
+
+    Wraps the user's clause in parentheses so any top-level ``OR`` is
+    preserved, and re-positions the filter before a trailing ``ORDER BY``
+    if one is present. ``since`` is a ``YYYY-MM-DD HH:MM`` UTC string
+    matching Jira's JQL datetime format."""
+    stripped = jql.strip()
+    # Split off ORDER BY (case-insensitive) so the AND lands in the WHERE.
+    match = re.search(r"\s+ORDER\s+BY\s+", stripped, flags=re.IGNORECASE)
+    if match:
+        where = stripped[: match.start()].rstrip()
+        order = stripped[match.start():].lstrip()
+        return f'({where}) AND updated >= "{since}" {order}'
+    return f'({stripped}) AND updated >= "{since}"'
+
+
+def sync_jql(session, jql, output_name, force_full=False):
     """Sync issues from a custom JQL query into a single output folder.
 
     Issues from different projects all land in the same folder, organized
     by issue type.  A MOC and Dashboard are generated using the output_name
     as the "project key".
+
+    Supports incremental syncs: the first run is a full export (no state
+    file). On subsequent runs the state file's timestamp is AND-ed into
+    the user's JQL so only changed issues are fetched. Pass
+    ``force_full=True`` to ignore the state file.
     """
     output = Path(VAULT_ROOT) / output_name
     output.mkdir(parents=True, exist_ok=True)
@@ -1056,15 +1087,39 @@ def sync_jql(session, jql, output_name):
     print(f"  JQL:     {jql[:120]}{'...' if len(jql) > 120 else ''}")
     print(f"{'=' * 60}")
 
-    print(f"\n📥 Fetching all issues matching JQL...")
-    issues, names_map = fetch_all_issues_jql(session, jql)
+    # ── Decide: full vs incremental sync ──
+    last_sync = None if force_full else load_sync_state(output)
 
-    if not issues:
-        print(f"⚠ No issues found for the JQL query.\n")
-        return
+    if last_sync:
+        effective_jql = _apply_incremental_filter(jql, last_sync)
+        print(f"🔄 Incremental sync — fetching issues updated since {last_sync}...")
+        print(f"   (pass fullRefresh=true to force a complete refresh)\n")
+        issues, names_map = fetch_all_issues_jql(session, effective_jql)
+
+        if not issues:
+            save_sync_state(output, output_name)
+            print("✅ No issues changed since last sync. Everything is up to date.\n")
+            return
+        print(f"   {len(issues)} issue(s) changed — updating those files...\n")
+    else:
+        print(f"\n📥 Full export — fetching all issues matching JQL...")
+        issues, names_map = fetch_all_issues_jql(session, jql)
+
+        if not issues:
+            print(f"⚠ No issues found for the JQL query.\n")
+            return
 
     # Build lookup for wikilinks
     issue_lookup = {i["key"]: i for i in issues}
+
+    # On incremental runs, remove old files for changed issues so an issue
+    # whose type changed (e.g. Story → Task) ends up in the correct folder
+    # instead of existing in both.
+    if last_sync:
+        existing = collect_existing_issues(output)
+        for key in issue_lookup:
+            if key in existing:
+                existing[key].unlink(missing_ok=True)
 
     # Group by issue type
     issues_by_type = {}
@@ -1072,7 +1127,8 @@ def sync_jql(session, jql, output_name):
         itype = issue["fields"].get("issuetype", {}).get("name", "Other")
         issues_by_type.setdefault(itype, []).append(issue)
 
-    # Also track which Jira projects are represented
+    # Track which Jira projects are represented (in this delta, not the
+    # whole vault — accurate for the message printed below).
     projects_seen = {}
     for issue in issues:
         proj = issue["key"].rsplit("-", 1)[0]
@@ -1108,22 +1164,63 @@ def sync_jql(session, jql, output_name):
             (type_dir / filename).write_text(md, encoding="utf-8")
             count += 1
 
-    # Build MOC and Dashboard
-    moc_md = build_moc(issues_by_type, output_name)
+    # Rebuild MOC/Dashboard from the delta + stubs of untouched existing
+    # files, so the index reflects the whole vault — same approach as
+    # sync_project.
+    if not last_sync:
+        all_issues_for_moc = issues
+    else:
+        print("   Rebuilding MOC from all vault files...")
+        all_issues_for_moc = list(issues)
+        existing_after = collect_existing_issues(output)
+        seen_keys = set(issue_lookup.keys())
+        for key, path in existing_after.items():
+            if key in seen_keys:
+                continue
+            try:
+                content = path.read_text(encoding="utf-8")
+                fm = {}
+                if content.startswith("---"):
+                    end = content.index("---", 3)
+                    for line in content[3:end].strip().split("\n"):
+                        if ": " in line:
+                            k, v = line.split(": ", 1)
+                            fm[k.strip()] = v.strip().strip('"')
+                stub = {
+                    "key": key,
+                    "fields": {
+                        "summary": fm.get("summary", ""),
+                        "issuetype": {"name": fm.get("type", "Other")},
+                        "status": {"name": fm.get("status", "")},
+                        "assignee": {"displayName": fm.get("assignee", "Unassigned")},
+                    },
+                }
+                all_issues_for_moc.append(stub)
+            except Exception:
+                pass
+
+    all_by_type = {}
+    for issue in all_issues_for_moc:
+        itype = issue["fields"].get("issuetype", {}).get("name", "Other")
+        all_by_type.setdefault(itype, {})[issue["key"]] = issue
+    all_by_type_list = {k: list(v.values()) for k, v in all_by_type.items()}
+
+    moc_md = build_moc(all_by_type_list, output_name)
     (output / f"{output_name} - Map of Content.md").write_text(moc_md, encoding="utf-8")
 
-    dash_md = build_dashboard(issues, output_name)
+    dash_md = build_dashboard(all_issues_for_moc, output_name)
     (output / f"{output_name} - Dashboard.md").write_text(dash_md, encoding="utf-8")
 
     # Save sync state
     save_sync_state(output, output_name)
 
+    mode = "Updated" if last_sync else "Generated"
     att_msg = f", {att_count} attachments downloaded" if att_count else ""
-    print(f"\n✅ {output_name}: Generated {count} issue files + MOC + Dashboard{att_msg}.")
+    print(f"\n✅ {output_name}: {mode} {count} issue files + MOC + Dashboard{att_msg}.")
     print(f"   📂 {output.resolve()}")
     for issue_type in sorted(issues_by_type.keys()):
         n = len(issues_by_type[issue_type])
-        print(f"      {sanitize_filename(issue_type)}/  ({n} files)")
+        print(f"      {sanitize_filename(issue_type)}/  ({n} files {mode.lower()})")
     if att_count:
         print(f"      {ATTACHMENTS_FOLDER}/  ({att_count} files)")
     print(f"      {output_name} - Map of Content.md")
