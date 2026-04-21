@@ -56,6 +56,7 @@ from exceptions import (
 )
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
+from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService
 from services.pagespeed_client import PageSpeedClient
 from routes import register_blueprints
@@ -117,7 +118,13 @@ def create_app() -> Flask:
     else:
         logging.info("BlazeMeter env vars not set — load testing disabled")
 
-    # ---- Obsidian bridge (always constructed; no-ops if PATs unset) ----
+    # ---- Obsidian bridge + Launch Command Center ----
+    # Both services read from the same vault on disk. The dashboard
+    # subscribes to the sync service so its cache auto-invalidates
+    # whenever a sync completes — no TTL wait.
+    migration_dashboard_service = MigrationDashboardService(
+        vault_root=OBSIDIAN_VAULT_ROOT,
+    )
     obsidian_sync_service = ObsidianSyncService(
         vault_root=OBSIDIAN_VAULT_ROOT,
         jira_pat=JIRA_PAT or '',
@@ -125,12 +132,14 @@ def create_app() -> Flask:
         asana_pat=ASANA_PAT or '',
         asana_project_map=ASANA_PROJECT_MAP,
         default_jira_projects=JIRA_DEFAULT_PROJECTS,
+        on_sync_complete=[lambda _job: migration_dashboard_service.invalidate_cache()],
     )
     caps = obsidian_sync_service.capabilities()
     logging.info(
-        "Obsidian bridge: vault=%s (exists=%s) jira=%s asana=%s",
+        "Obsidian bridge: vault=%s (exists=%s) jira=%s asana=%s dashboard=%s",
         caps['vaultRoot'], caps['vaultExists'],
         caps['jiraConfigured'], caps['asanaConfigured'],
+        migration_dashboard_service.is_available(),
     )
 
     # ---- Blueprints ----
@@ -141,6 +150,7 @@ def create_app() -> Flask:
         blazemeter_client=blazemeter_client,
         blazemeter_queue=blazemeter_queue,
         obsidian_sync_service=obsidian_sync_service,
+        migration_dashboard_service=migration_dashboard_service,
     )
 
     # ---- Centralized error handlers ----

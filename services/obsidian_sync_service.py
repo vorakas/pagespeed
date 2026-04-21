@@ -18,7 +18,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Sequence
 
 from services.obsidian_sync.sync_runner import (
     SyncResult,
@@ -96,6 +96,7 @@ class ObsidianSyncService:
         asana_pat: str,
         asana_project_map: Dict[str, str],
         default_jira_projects: Optional[List[str]] = None,
+        on_sync_complete: Optional[Sequence[Callable[[SyncJob], None]]] = None,
     ) -> None:
         self._vault_root: Path = Path(vault_root)
         self._jira_pat: str = jira_pat
@@ -105,6 +106,7 @@ class ObsidianSyncService:
         self._default_jira_projects: List[str] = list(
             default_jira_projects or DEFAULT_JIRA_PROJECTS
         )
+        self._on_sync_complete: List[Callable[[SyncJob], None]] = list(on_sync_complete or [])
         self._jobs: Dict[str, SyncJob] = {}
         self._job_order: List[str] = []
         self._active_job_id: Optional[str] = None
@@ -248,6 +250,11 @@ class ObsidianSyncService:
                 job.ended_at = time.time()
                 if self._active_job_id == job_id:
                     self._active_job_id = None
+            for hook in self._on_sync_complete:
+                try:
+                    hook(job)
+                except Exception:  # noqa: BLE001 — hooks must not break sync
+                    logger.exception("on_sync_complete hook failed for job %s", job_id)
 
     def _finalize(
         self,
