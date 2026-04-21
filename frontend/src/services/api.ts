@@ -34,6 +34,12 @@ import type {
   BlazemeterPresetInput,
   BlazemeterMasterReport,
   BlazemeterRunsResponse,
+  ObsidianCapabilities,
+  ObsidianSyncJob,
+  ObsidianSyncJobSummary,
+  ObsidianSyncRequest,
+  ObsidianVaultNode,
+  ObsidianVaultPage,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -633,6 +639,44 @@ class ApiClient {
 
   async listBlazemeterRuns(limit = 50, offset = 0): Promise<BlazemeterRunsResponse> {
     return this.request(`/api/blazemeter/runs?limit=${limit}&offset=${offset}`)
+  }
+
+  // ---------- Obsidian Bridge ----------
+
+  async getObsidianCapabilities(): Promise<ObsidianCapabilities> {
+    return this.request("/api/obsidian/capabilities")
+  }
+
+  async startObsidianSync(
+    body: ObsidianSyncRequest = {},
+  ): Promise<{ success: boolean; job: ObsidianSyncJob }> {
+    return this.request("/api/obsidian/sync", {
+      method: "POST",
+      body: JSON.stringify(body),
+    })
+  }
+
+  async getObsidianActiveSync(): Promise<{ active: ObsidianSyncJob | null }> {
+    return this.request("/api/obsidian/sync/active")
+  }
+
+  async getObsidianSyncHistory(limit = 20): Promise<{ jobs: ObsidianSyncJobSummary[] }> {
+    return this.request(`/api/obsidian/sync/history?limit=${limit}`)
+  }
+
+  async getObsidianSyncJob(jobId: string): Promise<{ job: ObsidianSyncJob }> {
+    return this.request(`/api/obsidian/sync/${jobId}`)
+  }
+
+  async getObsidianVaultTree(subdir = "", depth = 6): Promise<{ tree: ObsidianVaultNode }> {
+    const params = new URLSearchParams()
+    if (subdir) params.set("subdir", subdir)
+    params.set("depth", String(depth))
+    return this.request(`/api/obsidian/vault/tree?${params.toString()}`)
+  }
+
+  async getObsidianVaultPage(path: string): Promise<{ page: ObsidianVaultPage }> {
+    return this.request(`/api/obsidian/vault/page?path=${encodeURIComponent(path)}`)
   }
 }
 

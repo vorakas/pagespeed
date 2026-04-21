@@ -500,6 +500,65 @@ export interface BlazemeterMasterReport {
   fetchErrors: Record<string, string>
 }
 
+// ---------- Obsidian Bridge ----------
+
+export interface ObsidianCapabilities {
+  vaultRoot: string
+  vaultExists: boolean
+  jiraConfigured: boolean
+  asanaConfigured: boolean
+  jiraProjects: string[]
+  asanaProjects: string[]
+}
+
+export type ObsidianSyncStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "partial"
+
+export interface ObsidianSyncJob {
+  jobId: string
+  source: "jira" | "asana" | "both"
+  projectsJira: string[]
+  projectsAsana: string[]
+  fullRefresh: boolean
+  status: ObsidianSyncStatus
+  startedAt: number | null
+  endedAt: number | null
+  lineCount: number
+  lines: string[]
+  error: string | null
+}
+
+export type ObsidianSyncJobSummary = Omit<ObsidianSyncJob, "lines">
+
+export interface ObsidianSyncRequest {
+  source?: "jira" | "asana" | "both"
+  projectsJira?: string[]
+  projectsAsana?: string[]
+  fullRefresh?: boolean
+}
+
+export interface ObsidianVaultNode {
+  path: string
+  name: string
+  isDir: boolean
+  children?: ObsidianVaultNode[]
+}
+
+export interface ObsidianVaultPage {
+  path: string
+  name: string
+  raw: string
+  body: string
+  frontmatter: Record<string, string>
+  wikilinks: string[]
+  size: number
+  modified: number
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {
