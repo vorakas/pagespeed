@@ -17,9 +17,10 @@ type OrchestratorStatus =
   | { type: "error"; message: string }
 
 // Tracks the orchestrator run we just kicked off so follow-up messages
-// can be scoped to the WarmUp build that THIS run produces, not a
-// stale WarmUp still sitting at the top of recentBuilds.
+// can be scoped to this specific run. Polling stops when the
+// orchestrator build itself reaches a terminal status.
 interface OrchestratorTracking {
+  orchestratorBuildId: number      // ADO build id for pipeline 261
   orchestratorBuildNumber: string
   warmUpBaselineId: number | null  // WarmUp id observed at trigger time
   runWarmUpSelected: boolean       // was WarmUp included in this run?
@@ -59,6 +60,10 @@ export function OrchestratorPanel({
   const [triggering, setTriggering] = useState(false)
   const [status, setStatus] = useState<OrchestratorStatus | null>(null)
   const [tracking, setTracking] = useState<OrchestratorTracking | null>(null)
+  // Latest snapshot of the orchestrator build (pipeline 261). Polled
+  // independently from the 9 child builds since pipeline 261 isn't in
+  // the Builds page's role list. Cleared when tracking is cleared.
+  const [orchestratorBuild, setOrchestratorBuild] = useState<DevOpsBuild | null>(null)
 
   const handleTrigger = async () => {
     if (!config.orchestratorPipelineId) {
@@ -87,10 +92,12 @@ export function OrchestratorPanel({
       })
       if (result.success) {
         setTracking({
+          orchestratorBuildId: result.build.id,
           orchestratorBuildNumber: result.build.buildNumber,
           warmUpBaselineId: baselineId,
           runWarmUpSelected: runWarmUp,
         })
+        setOrchestratorBuild(result.build)
         setStatus({
           type: "success",
           message: runWarmUp
@@ -111,14 +118,76 @@ export function OrchestratorPanel({
     }
   }
 
-  // Follow the WarmUp build as it progresses through the orchestrator.
-  // Updates `status` with a live description of the gate:
-  //   queued → in progress → passed (remaining stages running)
-  //   or failed (orchestrator aborts remaining stages).
-  // Only active while we're tracking an orchestrator run that included
-  // WarmUp; otherwise the initial "queued" message stays put.
+  // Poll the orchestrator build (pipeline 261) while tracking is
+  // active. Runs until the orchestrator reaches a terminal status, at
+  // which point the status effect below clears tracking.
   useEffect(() => {
-    if (!tracking || !tracking.runWarmUpSelected) return
+    if (!tracking) return
+    let cancelled = false
+    const fetchOrchestratorBuild = async () => {
+      try {
+        const res = await api.getDevOpsBuild(config, tracking.orchestratorBuildId)
+        if (!cancelled && res.success) {
+          setOrchestratorBuild(res.build)
+        }
+      } catch {
+        // Transient errors are expected (rate limits, network blips);
+        // the next tick will retry.
+      }
+    }
+    // Kick off immediately so the first UI update doesn't wait 30s.
+    fetchOrchestratorBuild()
+    const interval = setInterval(fetchOrchestratorBuild, 30_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [tracking, config])
+
+  // Status message state machine. Priority:
+  //   1. Orchestrator build reached a terminal status → final message.
+  //   2. Otherwise, WarmUp progress (if WarmUp was included).
+  //   3. Otherwise, keep the initial "queued" message.
+  useEffect(() => {
+    if (!tracking) return
+
+    // --- (1) Orchestrator terminal ---
+    if (
+      orchestratorBuild &&
+      orchestratorBuild.id === tracking.orchestratorBuildId &&
+      orchestratorBuild.status === "completed"
+    ) {
+      const result = orchestratorBuild.result
+      let nextStatus: OrchestratorStatus
+      if (result === "succeeded") {
+        nextStatus = {
+          type: "success",
+          message: `Orchestrator #${tracking.orchestratorBuildNumber} succeeded — all builds passed.`,
+        }
+      } else if (result === "partiallySucceeded") {
+        nextStatus = {
+          type: "success",
+          message: `Orchestrator #${tracking.orchestratorBuildNumber} completed with issues — see individual build cards.`,
+        }
+      } else if (result === "canceled") {
+        nextStatus = {
+          type: "error",
+          message: `Orchestrator #${tracking.orchestratorBuildNumber} was canceled.`,
+        }
+      } else {
+        nextStatus = {
+          type: "error",
+          message: `Orchestrator #${tracking.orchestratorBuildNumber} ${result ?? "did not complete"}.`,
+        }
+      }
+      setStatus(nextStatus)
+      setTracking(null)
+      setOrchestratorBuild(null)
+      return
+    }
+
+    // --- (2) WarmUp progress ---
+    if (!tracking.runWarmUpSelected) return
     if (!warmUpBuild) return
     // Ignore the pre-trigger WarmUp still sitting on top of recentBuilds
     // until a fresher one replaces it.
@@ -149,7 +218,8 @@ export function OrchestratorPanel({
     }
     if (warmUpBuild.status !== "completed") return
 
-    // Completed — apply effective result (re-run aware) if available.
+    // WarmUp done. Interim message only — the final orchestrator
+    // status will replace this when pipeline 261 finishes.
     const effective = warmUpEffective?.effectiveResult ?? warmUpBuild.result
     const rerunSuffix = warmUpEffective?.hasRerun && effective === "succeeded" && warmUpBuild.result !== "succeeded"
       ? " (re-runs all passed)"
@@ -157,19 +227,16 @@ export function OrchestratorPanel({
 
     if (effective === "succeeded" || effective === "partiallySucceeded") {
       setStatus({
-        type: "success",
-        message: `Orchestrator #${tracking.orchestratorBuildNumber}: ${warmUpLabel} passed${rerunSuffix} — running Functional + Visual stages.`,
+        type: "info",
+        message: `Orchestrator #${tracking.orchestratorBuildNumber}: ${warmUpLabel} passed${rerunSuffix} — Functional + Visual stages running…`,
       })
-      setTracking(null) // done watching; message stays
       return
     }
-    // Anything else (failed, canceled, timedOut, null) — WarmUp did not pass.
     setStatus({
       type: "error",
-      message: `Orchestrator #${tracking.orchestratorBuildNumber}: ${warmUpLabel} ${effective ?? "did not complete"} — remaining stages aborted.`,
+      message: `Orchestrator #${tracking.orchestratorBuildNumber}: ${warmUpLabel} ${effective ?? "did not complete"} — waiting for orchestrator to finalize.`,
     })
-    setTracking(null)
-  }, [tracking, warmUpBuild, warmUpEffective])
+  }, [tracking, warmUpBuild, warmUpEffective, orchestratorBuild])
 
   return (
     <Card className="max-w-4xl">
