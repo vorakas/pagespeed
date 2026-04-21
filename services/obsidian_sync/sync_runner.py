@@ -232,6 +232,9 @@ def run_asana_sync(
             me = asana_sync.asana_get_single(session, "users/me", {"opt_fields": "name,email"})
             print(f"Authenticated as: {me.get('name', '?')} ({me.get('email', '?')})")
 
+            name_cache = asana_sync.load_user_cache(vault_root)
+            cache_start_size = len(name_cache)
+
             project_list = list(projects)
             synced = 0
             for name in project_list:
@@ -239,8 +242,15 @@ def run_asana_sync(
                 if not gid:
                     print(f"Skipping unknown project: {name}")
                     continue
-                asana_sync.sync_project(session, name, gid, full_refresh)
+                asana_sync.sync_project(
+                    session, name, gid, full_refresh, name_cache=name_cache
+                )
                 synced += 1
+
+            asana_sync.save_user_cache(vault_root, name_cache)
+            added = len(name_cache) - cache_start_size
+            if added > 0:
+                print(f"User cache: +{added} new name(s), {len(name_cache)} total.")
 
             print(f"All done! Synced {synced} project(s).")
             print(f"Output: {vault_root}")

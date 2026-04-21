@@ -219,6 +219,98 @@ def rich_text_to_md(notes, html_notes=None):
 
 
 # ──────────────────────────────────────────────
+# USER-NAME RESOLUTION (for @mention URLs in descriptions/comments)
+# ──────────────────────────────────────────────
+
+USERS_CACHE_FILE = ".asana_users_cache.json"
+
+_PROFILE_URL_RE = re.compile(r"https://app\.asana\.com/\d+/\d+/profile/(\d+)")
+_MD_LINK_PROFILE_RE = re.compile(
+    r"\[(https://app\.asana\.com/\d+/\d+/profile/\d+)\]"
+    r"\((https://app\.asana\.com/\d+/\d+/profile/(\d+))\)"
+)
+_BARE_PROFILE_RE = re.compile(
+    r"(?<!\]\()"
+    r"(?<!\()"
+    r"https://app\.asana\.com/\d+/\d+/profile/(\d+)"
+)
+
+
+def load_user_cache(vault_root):
+    """Load the persisted GID → name cache. Missing/corrupt file returns {}."""
+    path = Path(vault_root) / USERS_CACHE_FILE
+    if not path.is_file():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {str(k): v for k, v in data.items() if isinstance(v, str) and v}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_user_cache(vault_root, cache):
+    """Persist only positively-resolved entries (ignore sentinels)."""
+    path = Path(vault_root) / USERS_CACHE_FILE
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        clean = {gid: name for gid, name in cache.items() if name}
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(clean, f, indent=2, sort_keys=True)
+    except OSError as exc:
+        print(f"  Warning: could not persist user cache: {exc}")
+
+
+def resolve_profile_mentions(text, session, name_cache):
+    """Replace bare Asana profile URLs in text with [Name](url) markdown links.
+
+    Uses ``name_cache`` (GID → name, or GID → None for unresolvable) so each
+    unique GID is looked up at most once per sync. Handles two input shapes
+    that our HTML→MD converter produces:
+
+    1. ``[<profile-url>](<same-profile-url>)`` — the link text equals the href
+       because Asana's ``html_notes`` wraps @mentions without a visible label
+       and our regex copies the URL into both positions.
+    2. Bare ``https://app.asana.com/.../profile/<gid>`` URLs that never made
+       it into an anchor tag.
+
+    Unresolvable GIDs (deleted users, 403s) are left as plain URLs.
+    """
+    if not text or "/profile/" not in text:
+        return text
+
+    gids = set(_PROFILE_URL_RE.findall(text))
+    for gid in gids:
+        if gid in name_cache:
+            continue
+        try:
+            user = asana_get_single(session, f"users/{gid}", {"opt_fields": "name"})
+            name = (user or {}).get("name")
+            name_cache[gid] = name if name else None
+        except requests.HTTPError:
+            name_cache[gid] = None
+        except requests.RequestException:
+            name_cache[gid] = None
+
+    def _fix_link(match):
+        href = match.group(2)
+        gid = match.group(3)
+        name = name_cache.get(gid)
+        return f"[{name}]({href})" if name else match.group(0)
+
+    text = _MD_LINK_PROFILE_RE.sub(_fix_link, text)
+
+    def _wrap_bare(match):
+        url = match.group(0)
+        gid = match.group(1)
+        name = name_cache.get(gid)
+        return f"[{name}]({url})" if name else url
+
+    text = _BARE_PROFILE_RE.sub(_wrap_bare, text)
+    return text
+
+
+# ──────────────────────────────────────────────
 # DATA FETCHING
 # ──────────────────────────────────────────────
 
@@ -338,8 +430,20 @@ def download_task_attachments(session, task_gid, task_name, attachments, output_
     return downloaded
 
 
-def build_task_markdown(task, subtasks=None, stories=None, downloaded_attachments=None):
-    """Build full Obsidian markdown for a single Asana task."""
+def build_task_markdown(
+    task,
+    subtasks=None,
+    stories=None,
+    downloaded_attachments=None,
+    session=None,
+    name_cache=None,
+):
+    """Build full Obsidian markdown for a single Asana task.
+
+    When ``session`` and ``name_cache`` are supplied, any Asana profile URLs
+    in the task description and comments are rewritten as ``[Name](url)``
+    markdown links; missing resolutions fall through as plain URLs.
+    """
     if subtasks is None:
         subtasks = []
     if stories is None:
@@ -361,6 +465,8 @@ def build_task_markdown(task, subtasks=None, stories=None, downloaded_attachment
     notes = task.get("notes", "")
     html_notes = task.get("html_notes", "")
     description = rich_text_to_md(notes, html_notes)
+    if session is not None and name_cache is not None:
+        description = resolve_profile_mentions(description, session, name_cache)
 
     # Section from memberships
     section = ""
@@ -517,6 +623,8 @@ def build_task_markdown(task, subtasks=None, stories=None, downloaded_attachment
             author = person_name(comment.get("created_by"))
             date = format_datetime(comment.get("created_at"))
             text = comment.get("text", "")
+            if session is not None and name_cache is not None:
+                text = resolve_profile_mentions(text, session, name_cache)
             parts.append(f"### {author} — {date}")
             parts.append("")
             parts.append(text)
@@ -744,7 +852,7 @@ def save_file_index(project_dir, index):
 # MAIN
 # ──────────────────────────────────────────────
 
-def sync_project(session, project_name, project_gid, full_refresh=False):
+def sync_project(session, project_name, project_gid, full_refresh=False, name_cache=None):
     """Sync a single Asana project to markdown files."""
     print(f"\n{'='*60}")
     print(f"  Syncing: {project_name} (GID: {project_gid})")
@@ -865,7 +973,14 @@ def sync_project(session, project_name, project_gid, full_refresh=False):
         downloaded = download_task_attachments(session, gid, name, attachments, project_dir)
 
         # Build markdown
-        md_content = build_task_markdown(task, subtasks, stories, downloaded)
+        md_content = build_task_markdown(
+            task,
+            subtasks,
+            stories,
+            downloaded,
+            session=session,
+            name_cache=name_cache,
+        )
 
         # Write file — organized by section
         section_name = ""
@@ -974,10 +1089,20 @@ def main():
         print(f"ERROR: Authentication failed. Check your ASANA_PAT.\n{e}")
         sys.exit(1)
 
+    # Load user-name cache once so every project shares it within this run
+    # and across runs via the persisted JSON file.
+    name_cache = load_user_cache(VAULT_ROOT)
+    cache_start_size = len(name_cache)
+
     # Sync each project
     for name in project_names:
         gid = PROJECT_MAP[name]
-        sync_project(session, name, gid, full_refresh)
+        sync_project(session, name, gid, full_refresh, name_cache=name_cache)
+
+    save_user_cache(VAULT_ROOT, name_cache)
+    added = sum(1 for v in name_cache.values() if v) - cache_start_size
+    if added > 0:
+        print(f"  User cache: +{added} new name(s), {sum(1 for v in name_cache.values() if v)} total.")
 
     print(f"\n{'='*60}")
     print(f"  All done! Synced {len(project_names)} project(s).")
