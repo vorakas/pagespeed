@@ -264,6 +264,37 @@ def save_user_cache(vault_root, cache):
         print(f"  Warning: could not persist user cache: {exc}")
 
 
+def seed_cache_from_workspace(session, workspace_gid, name_cache):
+    """Pull every workspace member's (gid, name) in one paginated call.
+
+    This is the canonical GID Asana embeds in ``/profile/<gid>`` URLs
+    — the same user's ``created_by.gid`` on stories is a different,
+    workspace-agnostic representation that won't match those URLs.
+    Calling this once per workspace at the start of a sync covers
+    every @mentioned person (active or guest) without needing the
+    ``/users/<gid>`` endpoint, which 404s for users outside the PAT
+    owner's direct workspace.
+
+    Returns the number of new names added.
+    """
+    if not workspace_gid:
+        return 0
+    try:
+        users = asana_get(session, f"workspaces/{workspace_gid}/users", {"opt_fields": "name,gid"})
+    except requests.HTTPError as exc:
+        status = getattr(getattr(exc, "response", None), "status_code", "?")
+        print(f"    Workspace users fetch failed (ws={workspace_gid}, status={status})")
+        return 0
+    added = 0
+    for u in users or []:
+        gid = u.get("gid")
+        name = u.get("name")
+        if gid and name and not name_cache.get(gid):
+            name_cache[gid] = name
+            added += 1
+    return added
+
+
 def harvest_known_users(task, subtasks, stories, name_cache):
     """Populate name_cache with GID->name pairs we already have in-hand.
 
@@ -362,7 +393,7 @@ TASK_OPT_FIELDS = ",".join([
 def fetch_project_info(session, project_gid):
     """Fetch project metadata."""
     return asana_get_single(session, f"projects/{project_gid}", {
-        "opt_fields": "name,notes,owner.name,created_at,modified_at,team.name",
+        "opt_fields": "name,notes,owner.name,created_at,modified_at,team.name,workspace.gid",
     })
 
 
@@ -917,6 +948,15 @@ def sync_project(session, project_name, project_gid, full_refresh=False, name_ca
     project_info = fetch_project_info(session, project_gid)
     sections = fetch_sections(session, project_gid)
     print(f"  Found {len(sections)} sections")
+
+    # Seed the user-name cache with every workspace member so @mention URLs
+    # in task descriptions and comments resolve to real names.
+    if name_cache is not None:
+        workspace_gid = ((project_info or {}).get("workspace") or {}).get("gid")
+        if workspace_gid:
+            added = seed_cache_from_workspace(session, workspace_gid, name_cache)
+            if added:
+                print(f"  Seeded {added} workspace user name(s) into cache.")
 
     # Fetch all tasks
     tasks = fetch_project_tasks(session, project_gid, since=since)
