@@ -65,7 +65,7 @@
   font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow-x: clip;
   background:
     radial-gradient(60% 45% at 50% 105%, var(--aurora-4) 0%, transparent 60%),
     linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
@@ -189,7 +189,7 @@
   display: grid;
   grid-template-columns: var(--lcc-rail-w) 1fr var(--lcc-stream-w);
   gap: 14px;
-  padding: 14px 0;
+  padding: 14px;
 }
 
 @media (max-width: 1400px) {
