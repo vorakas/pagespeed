@@ -280,7 +280,10 @@ def seed_cache_from_workspace(session, workspace_gid, name_cache):
     if not workspace_gid:
         return 0
     try:
-        users = asana_get(session, f"workspaces/{workspace_gid}/users", {"opt_fields": "name"})
+        # Asana's /workspaces/<gid>/users is non-paginated and errors with 400
+        # for workspaces above a certain size. The recommended path is
+        # /users?workspace=<gid>, which supports pagination.
+        users = asana_get(session, "users", {"workspace": workspace_gid, "opt_fields": "name"})
     except requests.HTTPError as exc:
         resp = getattr(exc, "response", None)
         status = getattr(resp, "status_code", "?")
