@@ -224,15 +224,18 @@ def rich_text_to_md(notes, html_notes=None):
 
 USERS_CACHE_FILE = ".asana_users_cache.json"
 
-_PROFILE_URL_RE = re.compile(r"https://app\.asana\.com/\d+/\d+/profile/(\d+)")
+# Asana serves two profile-URL shapes in notes/html_notes/stories:
+#   /1/<workspace_gid>/profile/<user_gid>  (the user-facing URL in the address bar)
+#   /0/profile/<user_gid>                  (legacy form Asana still emits in comments)
+# Match either by accepting one or more numeric path segments before /profile/.
+_PROFILE_URL_RE = re.compile(r"https://app\.asana\.com/(?:\d+/)+profile/(\d+)")
 _MD_LINK_PROFILE_RE = re.compile(
-    r"\[(https://app\.asana\.com/\d+/\d+/profile/\d+)\]"
-    r"\((https://app\.asana\.com/\d+/\d+/profile/(\d+))\)"
+    r"\[(https://app\.asana\.com/(?:\d+/)+profile/\d+)\]"
+    r"\((https://app\.asana\.com/(?:\d+/)+profile/(\d+))\)"
 )
 _BARE_PROFILE_RE = re.compile(
     r"(?<!\]\()"
-    r"(?<!\()"
-    r"https://app\.asana\.com/\d+/\d+/profile/(\d+)"
+    r"https://app\.asana\.com/(?:\d+/)+profile/(\d+)"
 )
 
 
