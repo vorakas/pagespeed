@@ -41,6 +41,7 @@ def create_obsidian_blueprint(sync_service: ObsidianSyncService) -> Blueprint:
         source = str(data.get("source", "both"))
         projects_jira = data.get("projectsJira")
         projects_asana = data.get("projectsAsana")
+        jql_feeds = data.get("jqlFeeds")
         full_refresh = bool(data.get("fullRefresh", False))
 
         try:
@@ -48,6 +49,7 @@ def create_obsidian_blueprint(sync_service: ObsidianSyncService) -> Blueprint:
                 source=source,
                 projects_jira=projects_jira,
                 projects_asana=projects_asana,
+                jql_feeds=jql_feeds,
                 full_refresh=full_refresh,
             )
         except SyncAlreadyRunning as exc:

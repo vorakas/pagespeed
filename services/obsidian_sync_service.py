@@ -23,6 +23,7 @@ from typing import Callable, Dict, List, Optional, Sequence
 from services.obsidian_sync.sync_runner import (
     SyncResult,
     run_asana_sync,
+    run_jira_jql_sync,
     run_jira_sync,
 )
 
@@ -55,6 +56,7 @@ class SyncJob:
     source: str  # 'jira' | 'asana' | 'both'
     projects_jira: List[str]
     projects_asana: List[str]
+    jql_feeds: List[str]
     full_refresh: bool
     status: str = "queued"  # queued | running | succeeded | failed | partial
     started_at: Optional[float] = None
@@ -68,6 +70,7 @@ class SyncJob:
             "source": self.source,
             "projectsJira": list(self.projects_jira),
             "projectsAsana": list(self.projects_asana),
+            "jqlFeeds": list(self.jql_feeds),
             "fullRefresh": self.full_refresh,
             "status": self.status,
             "startedAt": self.started_at,
@@ -96,6 +99,7 @@ class ObsidianSyncService:
         asana_pat: str,
         asana_project_map: Dict[str, str],
         default_jira_projects: Optional[List[str]] = None,
+        jira_jql_queries: Optional[Dict[str, str]] = None,
         on_sync_complete: Optional[Sequence[Callable[[SyncJob], None]]] = None,
     ) -> None:
         self._vault_root: Path = Path(vault_root)
@@ -106,6 +110,7 @@ class ObsidianSyncService:
         self._default_jira_projects: List[str] = list(
             default_jira_projects or DEFAULT_JIRA_PROJECTS
         )
+        self._jira_jql_queries: Dict[str, str] = dict(jira_jql_queries or {})
         self._on_sync_complete: List[Callable[[SyncJob], None]] = list(on_sync_complete or [])
         self._jobs: Dict[str, SyncJob] = {}
         self._job_order: List[str] = []
@@ -126,6 +131,7 @@ class ObsidianSyncService:
             "jiraConfigured": bool(self._jira_pat and self._jira_base_url),
             "asanaConfigured": bool(self._asana_pat and self._asana_project_map),
             "jiraProjects": list(self._default_jira_projects),
+            "jiraJqlFeeds": list(self._jira_jql_queries.keys()),
             "asanaProjects": list(self._asana_project_map.keys()),
         }
 
@@ -136,9 +142,14 @@ class ObsidianSyncService:
         source: str = "both",
         projects_jira: Optional[List[str]] = None,
         projects_asana: Optional[List[str]] = None,
+        jql_feeds: Optional[List[str]] = None,
         full_refresh: bool = False,
     ) -> SyncJob:
-        """Kick off a sync job in a background thread. Returns the job."""
+        """Kick off a sync job in a background thread. Returns the job.
+
+        ``jql_feeds`` restricts which configured JQL feeds run (by name). If
+        omitted, all configured feeds run on any Jira-inclusive sync. Unknown
+        names are ignored."""
         source_lc = source.lower()
         if source_lc not in {"jira", "asana", "both"}:
             raise ValueError(f"Unknown sync source: {source!r}")
@@ -148,11 +159,17 @@ class ObsidianSyncService:
             if active is not None:
                 raise SyncAlreadyRunning(active.job_id)
 
+            if jql_feeds is None:
+                resolved_jql = list(self._jira_jql_queries.keys())
+            else:
+                resolved_jql = [name for name in jql_feeds if name in self._jira_jql_queries]
+
             job = SyncJob(
                 job_id=uuid.uuid4().hex[:12],
                 source=source_lc,
                 projects_jira=list(projects_jira) if projects_jira else list(self._default_jira_projects),
                 projects_asana=list(projects_asana) if projects_asana else list(self._asana_project_map.keys()),
+                jql_feeds=resolved_jql,
                 full_refresh=full_refresh,
             )
             self._register_job_locked(job)
@@ -209,6 +226,7 @@ class ObsidianSyncService:
 
         jira_result: Optional[SyncResult] = None
         asana_result: Optional[SyncResult] = None
+        jql_results: List[SyncResult] = []
 
         try:
             if job.source in {"jira", "both"}:
@@ -223,6 +241,20 @@ class ObsidianSyncService:
                         full_refresh=job.full_refresh,
                         progress_callback=on_line,
                     )
+                    for feed_name in job.jql_feeds:
+                        jql = self._jira_jql_queries.get(feed_name)
+                        if not jql:
+                            on_line(f"[jira-jql] skipped '{feed_name}' — not configured")
+                            continue
+                        on_line(f"[jira-jql] running feed '{feed_name}'")
+                        jql_results.append(run_jira_jql_sync(
+                            vault_root=str(self._vault_root / "raw"),
+                            pat=self._jira_pat,
+                            base_url=self._jira_base_url,
+                            jql=jql,
+                            output_name=feed_name,
+                            progress_callback=on_line,
+                        ))
 
             if job.source in {"asana", "both"}:
                 if not self._asana_pat:
@@ -239,7 +271,7 @@ class ObsidianSyncService:
                         progress_callback=on_line,
                     )
 
-            self._finalize(job, jira_result, asana_result)
+            self._finalize(job, jira_result, asana_result, jql_results)
         except Exception as exc:  # noqa: BLE001 — top-level safety net
             logger.exception("Obsidian sync job %s failed unexpectedly", job_id)
             with self._lock:
@@ -261,8 +293,11 @@ class ObsidianSyncService:
         job: SyncJob,
         jira_result: Optional[SyncResult],
         asana_result: Optional[SyncResult],
+        jql_results: Optional[List[SyncResult]] = None,
     ) -> None:
         results = [r for r in (jira_result, asana_result) if r is not None]
+        if jql_results:
+            results.extend(jql_results)
         with self._lock:
             if not results:
                 job.status = "failed"

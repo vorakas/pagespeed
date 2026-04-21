@@ -141,6 +141,57 @@ def run_jira_sync(
         return SyncResult(success=False, lines=buffer, error=str(exc))
 
 
+def run_jira_jql_sync(
+    vault_root: str,
+    pat: str,
+    base_url: str,
+    jql: str,
+    output_name: str,
+    progress_callback: Optional[ProgressCallback] = None,
+) -> SyncResult:
+    """Run a custom JQL Jira sync into ``<vault_root>/<output_name>/``.
+
+    Mirrors :func:`run_jira_sync` but invokes :func:`jira_sync.sync_jql`
+    instead of iterating projects. Used for curated feeds (e.g. the WPM
+    hierarchy) that don't map to a single Jira project key.
+    """
+    if not pat:
+        return SyncResult(success=False, lines=[], error="Missing Jira PAT")
+    if not vault_root:
+        return SyncResult(success=False, lines=[], error="Missing vault root")
+    if not jql:
+        return SyncResult(success=False, lines=[], error="Missing JQL")
+    if not output_name:
+        return SyncResult(success=False, lines=[], error="Missing output name")
+
+    jira_sync.VAULT_ROOT = vault_root
+    jira_sync.JIRA_PAT = pat
+    jira_sync.JIRA_BASE_URL = base_url
+
+    buffer, tee = _tee_callback(progress_callback)
+
+    try:
+        with _capture_stdout(tee):
+            print(f"🔌 Connecting to {base_url}...")
+            session = jira_sync.jira_session()
+            me = session.get(f"{base_url}/rest/api/2/myself")
+            me.raise_for_status()
+            user = me.json()
+            print(f"   Authenticated as: {user.get('displayName', user.get('name', '?'))}")
+            print(f"   Vault root: {vault_root}")
+            print(f"   Feed:       {output_name} (custom JQL)")
+            print()
+
+            jira_sync.sync_jql(session, jql, output_name)
+
+            print(f"🏁 JQL feed '{output_name}' synced!")
+        return SyncResult(success=True, lines=buffer)
+    except SystemExit as exc:
+        return SyncResult(success=False, lines=buffer, error=f"Sync aborted (exit {exc.code})")
+    except Exception as exc:  # noqa: BLE001 — library boundary
+        return SyncResult(success=False, lines=buffer, error=str(exc))
+
+
 def run_asana_sync(
     vault_root: str,
     pat: str,

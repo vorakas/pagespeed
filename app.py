@@ -36,6 +36,7 @@ from config import (
     BLAZEMETER_WORKSPACE_ID,
     JIRA_BASE_URL,
     JIRA_DEFAULT_PROJECTS,
+    JIRA_JQL_QUERIES,
     JIRA_PAT,
     OBSIDIAN_VAULT_ROOT,
     PAGESPEED_API_KEY,
@@ -135,13 +136,15 @@ def create_app() -> Flask:
         asana_pat=ASANA_PAT or '',
         asana_project_map=ASANA_PROJECT_MAP,
         default_jira_projects=JIRA_DEFAULT_PROJECTS,
+        jira_jql_queries=JIRA_JQL_QUERIES,
         on_sync_complete=[lambda _job: migration_dashboard_service.invalidate_cache()],
     )
     caps = obsidian_sync_service.capabilities()
     logging.info(
-        "Obsidian bridge: vault=%s (exists=%s) jira=%s asana=%s dashboard=%s",
+        "Obsidian bridge: vault=%s (exists=%s) jira=%s asana=%s jqlFeeds=%s dashboard=%s",
         caps['vaultRoot'], caps['vaultExists'],
         caps['jiraConfigured'], caps['asanaConfigured'],
+        caps['jiraJqlFeeds'],
         migration_dashboard_service.is_available(),
     )
 

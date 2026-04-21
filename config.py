@@ -205,3 +205,30 @@ JIRA_DEFAULT_PROJECTS: list[str] = [
     ).split(',') if p.strip()
 ]
 """Comma-separated Jira project keys to sync when none are specified."""
+
+
+def _parse_jql_queries(raw: str | None) -> dict[str, str]:
+    """Parse ``JIRA_JQL_QUERIES`` — JSON of ``{output_folder: jql_string}``.
+
+    Each entry runs a custom JQL pull alongside the regular project sync,
+    writing results into ``<vault>/raw/<output_folder>/``. Returns an empty
+    dict if unset or unparseable; the sync service treats that as "no
+    custom JQL feeds configured" rather than erroring."""
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        logging.warning('JIRA_JQL_QUERIES is not valid JSON; custom JQL feeds disabled')
+        return {}
+    if not isinstance(data, dict):
+        logging.warning('JIRA_JQL_QUERIES must be a JSON object; got %s', type(data))
+        return {}
+    return {str(k): str(v) for k, v in data.items() if k and v}
+
+
+JIRA_JQL_QUERIES: dict[str, str] = _parse_jql_queries(os.getenv('JIRA_JQL_QUERIES'))
+"""Map of output-folder name → JQL string. Set as JSON in ``JIRA_JQL_QUERIES``.
+
+Example: ``{"WPM": "key in (WPM-4610, childIssuesOf(WPM-4610)) AND ..."}``
+writes to ``<vault>/raw/WPM/``."""
