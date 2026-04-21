@@ -596,14 +596,22 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
         fm_lines.append(f"resolution: {resolution}")
     if story_points:
         fm_lines.append(f"story_points: {story_points}")
+    # Nested f-strings with escaped quotes break Python 3.11 (Railway),
+    # which forbids backslashes anywhere inside an f-string expression —
+    # including in a nested f-string that lives inside the outer expression.
+    # Build the joined YAML list outside the outer f-string.
     if sprints:
-        fm_lines.append(f"sprints: [{', '.join(f'\"{s}\"' for s in sprints)}]")
+        sprints_yaml = ", ".join('"' + s + '"' for s in sprints)
+        fm_lines.append(f"sprints: [{sprints_yaml}]")
     if labels:
-        fm_lines.append(f"labels: [{', '.join(f'\"{l}\"' for l in labels)}]")
+        labels_yaml = ", ".join('"' + l + '"' for l in labels)
+        fm_lines.append(f"labels: [{labels_yaml}]")
     if components:
-        fm_lines.append(f"components: [{', '.join(f'\"{c}\"' for c in components)}]")
+        components_yaml = ", ".join('"' + c + '"' for c in components)
+        fm_lines.append(f"components: [{components_yaml}]")
     if fix_versions:
-        fm_lines.append(f"fix_versions: [{', '.join(f'\"{v}\"' for v in fix_versions)}]")
+        fix_versions_yaml = ", ".join('"' + v + '"' for v in fix_versions)
+        fm_lines.append(f"fix_versions: [{fix_versions_yaml}]")
     if original_estimate:
         fm_lines.append(f"original_estimate: \"{original_estimate}\"")
     if time_spent:
@@ -611,7 +619,8 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
     if remaining:
         fm_lines.append(f"remaining_estimate: \"{remaining}\"")
     fm_lines.append(f"jira_url: {jira_url}")
-    fm_lines.append(f"tags: [{', '.join(f'\"{t}\"' for t in tags)}]")
+    tags_yaml = ", ".join('"' + t + '"' for t in tags)
+    fm_lines.append(f"tags: [{tags_yaml}]")
     fm_lines.append("---")
 
     parts = ["\n".join(fm_lines), ""]
