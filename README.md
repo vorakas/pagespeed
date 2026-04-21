@@ -1,6 +1,6 @@
-# PageSpeed Insights Monitor
+# Pharos — Operations Hub
 
-A comprehensive web performance monitoring dashboard for LampsPlus, built with Python/Flask and deployed on Railway. Integrates Google PageSpeed Insights, New Relic APM, Azure Log Analytics (IIS logs), and AI-powered analysis via Claude and OpenAI.
+A unified operations hub for Lamps Plus, branded **Pharos**. Covers web performance monitoring, APM, IIS log analysis, AI-powered analysis, Azure DevOps automation orchestration, BlazeMeter load testing, and (in progress) the Adobe Commerce migration dashboard. Built with Python/Flask + React and deployed on Railway.
 
 ## Features
 

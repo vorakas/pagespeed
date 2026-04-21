@@ -66,7 +66,7 @@ export function Sidebar() {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-sidebar-foreground truncate">Pharos</p>
-          <p className="text-[10px] text-muted-foreground">Performance Monitor</p>
+          <p className="text-[10px] text-muted-foreground">Operations Hub</p>
         </div>
       </div>
 

@@ -1,13 +1,13 @@
-# CLAUDE.md — Lamps Plus Pharos
+# CLAUDE.md — Pharos Operations Hub
 
 ## Context
-This file documents the full project state so a new session can pick up where we left off. The project is a web performance monitoring dashboard for **Lamps Plus** (branded as **Pharos**), deployed on **Railway** with manual deployment from the `master` branch.
+This file documents the full project state so a new session can pick up where we left off. The project is an internal operations hub for **Lamps Plus**, branded as **Pharos — Operations Hub** (sidebar subtitle). Deployed on **Railway** with manual deployment from the `master` branch. It started as a PageSpeed-only dashboard and has grown to cover multiple operations concerns; the Adobe Commerce migration dashboard is the next domain being added.
 
 ---
 
 ## Project Overview
 
-**Purpose:** Monitor website performance via Google PageSpeed Insights, New Relic APM, Azure IIS Logs, and AI-powered analysis (Claude + OpenAI side-by-side).
+**Purpose:** Unified operations hub covering web performance monitoring (Google PageSpeed Insights), APM (New Relic), IIS log analysis (Azure Log Analytics), AI-powered analysis (Claude + OpenAI side-by-side), Azure DevOps automation orchestration and build monitoring, BlazeMeter load testing, and (in progress) an Adobe Commerce migration dashboard.
 
 **Tech Stack:**
 - **Backend:** Python 3.11, Flask, Gunicorn, APScheduler
