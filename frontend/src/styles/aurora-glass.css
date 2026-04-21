@@ -1,0 +1,304 @@
+/*
+ * Aurora Glass — scoped theme for the Launch Command Center (/dashboard).
+ *
+ * Everything is namespaced under `.launch-dashboard` so it never touches
+ * the rest of Pharos. Token names mirror the design handoff's custom
+ * properties so future style work can follow the handoff 1:1.
+ */
+
+/* Inter + JetBrains Mono — loaded lazily; if CSP blocks them, ui-sans-serif
+ * / ui-monospace fall-throughs in the stacks keep things readable. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+
+.launch-dashboard {
+  /* ── Aurora palette ─────────────────────────────────────────────── */
+  --aurora-1: #0b1028;
+  --aurora-2: #151b3d;
+  --aurora-3: #1b1747;
+  --aurora-4: #0f2847;
+  --aurora-glow-teal:   rgba(56, 224, 208, 0.55);
+  --aurora-glow-violet: rgba(156, 108, 255, 0.55);
+  --aurora-glow-pink:   rgba(255, 110, 196, 0.45);
+  --aurora-glow-cyan:   rgba(100, 200, 255, 0.45);
+  --aurora-glow-lime:   rgba(130, 240, 170, 0.40);
+
+  /* ── Glass surfaces ─────────────────────────────────────────────── */
+  --glass-bg:         rgba(22, 28, 58, 0.48);
+  --glass-bg-strong:  rgba(28, 34, 68, 0.66);
+  --glass-bg-faint:   rgba(22, 28, 58, 0.30);
+  --glass-border:        rgba(255, 255, 255, 0.10);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
+  --glass-hi:            rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+  --glass-inner:  inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* ── Text ───────────────────────────────────────────────────────── */
+  --lcc-text:       #eef1ff;
+  --lcc-text-dim:   #a9b3d6;
+  --lcc-text-faint: #7a83a8;
+
+  /* ── Semantic colors (traffic palette is default) ───────────────── */
+  --lcc-red:     #ff6b8b;   --lcc-red-bg:     rgba(255, 107, 139, 0.14);
+  --lcc-amber:   #ffc46b;   --lcc-amber-bg:   rgba(255, 196, 107, 0.14);
+  --lcc-green:   #6ee7a8;   --lcc-green-bg:   rgba(110, 231, 168, 0.14);
+  --lcc-blue:    #6ec7ff;   --lcc-blue-bg:    rgba(110, 199, 255, 0.14);
+  --lcc-violet:  #b08cff;   --lcc-violet-bg:  rgba(176, 140, 255, 0.14);
+  --lcc-neutral: #7a83a8;   --lcc-neutral-bg: rgba(122, 131, 168, 0.14);
+
+  /* ── Type ───────────────────────────────────────────────────────── */
+  --font-sans: "Inter", ui-sans-serif, -apple-system, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Menlo", monospace;
+
+  /* ── Layout ─────────────────────────────────────────────────────── */
+  --lcc-radius:    14px;
+  --lcc-radius-sm: 8px;
+  --lcc-topbar-h:  60px;
+  --lcc-rail-w:    240px;
+  --lcc-stream-w:  360px;
+
+  /* Apply background + tokens on the wrapper itself.  */
+  position: relative;
+  min-height: 100vh;
+  color: var(--lcc-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  background:
+    radial-gradient(60% 45% at 50% 105%, var(--aurora-4) 0%, transparent 60%),
+    linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
+}
+
+/* ── Palette + density overrides ────────────────────────────────── */
+.launch-dashboard[data-palette="muted"] {
+  --lcc-red: #c78ea0; --lcc-amber: #d6b584; --lcc-green: #8ec7a9;
+  --lcc-blue: #9ebbd9; --lcc-violet: #b2a3d6;
+}
+.launch-dashboard[data-palette="mono"] {
+  --lcc-red: #d0d6e8; --lcc-amber: #bfc6dc; --lcc-green: #aeb6ce;
+  --lcc-blue: #9da6c2; --lcc-violet: #c8cfe0;
+  --lcc-red-bg: rgba(208,214,232,0.10); --lcc-amber-bg: rgba(208,214,232,0.10);
+  --lcc-green-bg: rgba(208,214,232,0.10); --lcc-blue-bg: rgba(208,214,232,0.10);
+  --lcc-violet-bg: rgba(208,214,232,0.10);
+}
+.launch-dashboard[data-density="compact"] { font-size: 12px; }
+.launch-dashboard[data-density="roomy"]   { font-size: 14px; }
+
+.launch-dashboard[data-theme="light"] {
+  --aurora-1: #e8ecff; --aurora-2: #dfe5ff; --aurora-3: #e4daff; --aurora-4: #d8eaff;
+  --aurora-glow-teal:   rgba(56, 224, 208, 0.35);
+  --aurora-glow-violet: rgba(156, 108, 255, 0.35);
+  --aurora-glow-pink:   rgba(255, 110, 196, 0.30);
+  --aurora-glow-cyan:   rgba(100, 200, 255, 0.30);
+  --glass-bg:        rgba(255,255,255,0.60);
+  --glass-bg-strong: rgba(255,255,255,0.78);
+  --glass-bg-faint:  rgba(255,255,255,0.40);
+  --glass-border:        rgba(20, 30, 70, 0.12);
+  --glass-border-strong: rgba(20, 30, 70, 0.22);
+  --glass-hi: rgba(255,255,255,0.55);
+  --lcc-text: #111632; --lcc-text-dim: #47507a; --lcc-text-faint: #7a83a8;
+  --lcc-red: #e23d66; --lcc-amber: #c88a26; --lcc-green: #229a5f;
+  --lcc-blue: #3a82d4; --lcc-violet: #7a5bd8;
+}
+
+/* ── Aurora blob animations ─────────────────────────────────────── */
+.launch-dashboard::before,
+.launch-dashboard::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(90px);
+  opacity: 0.85;
+}
+.launch-dashboard::before {
+  top: -20%;
+  left: -10%;
+  width: 70%;
+  height: 70%;
+  background:
+    radial-gradient(40% 40% at 30% 40%, var(--aurora-glow-violet) 0%, transparent 70%),
+    radial-gradient(45% 50% at 70% 30%, var(--aurora-glow-teal) 0%, transparent 70%);
+  animation: lcc-drift1 22s ease-in-out infinite alternate;
+}
+.launch-dashboard::after {
+  bottom: -25%;
+  right: -15%;
+  width: 80%;
+  height: 80%;
+  background:
+    radial-gradient(40% 45% at 70% 60%, var(--aurora-glow-pink) 0%, transparent 70%),
+    radial-gradient(45% 50% at 30% 60%, var(--aurora-glow-cyan) 0%, transparent 70%);
+  animation: lcc-drift2 28s ease-in-out infinite alternate;
+}
+@keyframes lcc-drift1 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(4vw, 3vh, 0) scale(1.08); }
+}
+@keyframes lcc-drift2 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(-4vw, -3vh, 0) scale(1.1); }
+}
+
+/* Dashboard children must sit above the blobs. */
+.launch-dashboard > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Glass surface primitive ────────────────────────────────────── */
+.launch-dashboard .panel,
+.launch-dashboard .lcc-topbar,
+.launch-dashboard .lcc-left-rail,
+.launch-dashboard .lcc-hero-strip,
+.launch-dashboard .lcc-incident-stream,
+.launch-dashboard .lcc-side-panel {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  border-radius: var(--lcc-radius);
+}
+
+/* If backdrop-filter isn't supported, fall back to a more opaque solid so
+ * the glass "feel" degrades gracefully without becoming unreadable. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .launch-dashboard .panel,
+  .launch-dashboard .lcc-topbar,
+  .launch-dashboard .lcc-left-rail,
+  .launch-dashboard .lcc-hero-strip,
+  .launch-dashboard .lcc-incident-stream,
+  .launch-dashboard .lcc-side-panel {
+    background: var(--glass-bg-strong);
+  }
+}
+
+/* Reduced motion: freeze aurora blobs so nothing drifts behind the glass. */
+@media (prefers-reduced-motion: reduce) {
+  .launch-dashboard::before,
+  .launch-dashboard::after {
+    animation: none;
+  }
+}
+
+/* ── Layout shell ────────────────────────────────────────────────── */
+.launch-dashboard .lcc-shell {
+  display: grid;
+  grid-template-columns: var(--lcc-rail-w) 1fr var(--lcc-stream-w);
+  gap: 14px;
+  padding: 14px;
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+@media (max-width: 1400px) {
+  .launch-dashboard .lcc-shell {
+    grid-template-columns: 200px 1fr 320px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .launch-dashboard .lcc-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.launch-dashboard .lcc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.launch-dashboard .lcc-left-rail {
+  position: sticky;
+  top: calc(var(--lcc-topbar-h) + 14px);
+  align-self: start;
+  max-height: calc(100vh - var(--lcc-topbar-h) - 28px);
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.launch-dashboard .lcc-incident-stream {
+  position: sticky;
+  top: calc(var(--lcc-topbar-h) + 14px);
+  align-self: start;
+  max-height: calc(100vh - var(--lcc-topbar-h) - 28px);
+  overflow-y: auto;
+}
+
+/* ── Micro primitives re-used across regions ────────────────────── */
+.launch-dashboard .lcc-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+}
+
+.launch-dashboard .lcc-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lcc-green);
+  box-shadow: 0 0 0 0 rgba(110, 231, 168, 0.55);
+  animation: lcc-pulse 2.2s ease-in-out infinite;
+}
+@keyframes lcc-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(110, 231, 168, 0.55); }
+  80%  { box-shadow: 0 0 0 10px rgba(110, 231, 168, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(110, 231, 168, 0); }
+}
+
+.launch-dashboard .lcc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--lcc-neutral-bg);
+  color: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-chip[data-health="at-risk"]       { background: var(--lcc-amber-bg); color: var(--lcc-amber); }
+.launch-dashboard .lcc-chip[data-health="blocked"]       { background: var(--lcc-red-bg);   color: var(--lcc-red); }
+.launch-dashboard .lcc-chip[data-health="in-progress"]   { background: var(--lcc-blue-bg);  color: var(--lcc-blue); }
+.launch-dashboard .lcc-chip[data-health="near-complete"] { background: var(--lcc-green-bg); color: var(--lcc-green); }
+.launch-dashboard .lcc-chip[data-health="improving"]     { background: var(--lcc-green-bg); color: var(--lcc-green); }
+.launch-dashboard .lcc-chip[data-health="groomed"]       { background: var(--lcc-neutral-bg); color: var(--lcc-neutral); }
+
+.launch-dashboard .lcc-chip[data-severity="critical"] { background: var(--lcc-red-bg);    color: var(--lcc-red); }
+.launch-dashboard .lcc-chip[data-severity="high"]     { background: var(--lcc-amber-bg);  color: var(--lcc-amber); }
+.launch-dashboard .lcc-chip[data-severity="medium"]   { background: var(--lcc-violet-bg); color: var(--lcc-violet); }
+.launch-dashboard .lcc-chip[data-severity="low"]      { background: var(--lcc-neutral-bg); color: var(--lcc-neutral); }
+
+.launch-dashboard .lcc-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-dot[data-health="at-risk"]       { background: var(--lcc-amber); }
+.launch-dashboard .lcc-dot[data-health="blocked"]       { background: var(--lcc-red); }
+.launch-dashboard .lcc-dot[data-health="in-progress"]   { background: var(--lcc-blue); }
+.launch-dashboard .lcc-dot[data-health="near-complete"] { background: var(--lcc-green); }
+
+/* Gradient-text utility (topbar countdown, hero headline, rail stat) */
+.launch-dashboard .lcc-gradient-text {
+  background: linear-gradient(90deg, #ffd57a 0%, #ff94bd 50%, #b08cff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  font-variant-numeric: tabular-nums;
+}

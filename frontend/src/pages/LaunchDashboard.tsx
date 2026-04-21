@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
+import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import type {
   MigrationHealthSnapshot,
   MigrationKpis,
@@ -49,26 +50,31 @@ export function LaunchDashboard() {
 
   if (error) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-semibold">Launch Command Center</h1>
-        <div className="mt-4 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
+      <LaunchShell>
+        <div className="p-6">
+          <h1 className="text-2xl font-semibold">Launch Command Center</h1>
+          <div className="mt-4 rounded border border-[var(--lcc-red-bg)] bg-[var(--lcc-red-bg)] p-3 text-sm" style={{ color: "var(--lcc-red)" }}>
+            {error}
+          </div>
         </div>
-      </div>
+      </LaunchShell>
     )
   }
 
   if (!health || !kpis || !workstreams) {
     return (
-      <div className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 size={14} className="animate-spin" />
-        Loading vault data…
-      </div>
+      <LaunchShell>
+        <div className="p-6 flex items-center gap-2 text-sm" style={{ color: "var(--lcc-text-dim)" }}>
+          <Loader2 size={14} className="animate-spin" />
+          Loading vault data…
+        </div>
+      </LaunchShell>
     )
   }
 
   return (
-    <div className="p-6 space-y-8">
+    <LaunchShell>
+      <div className="p-6 space-y-8">
       <header>
         <h1 className="text-2xl font-semibold">Launch Command Center</h1>
         <p className="text-sm text-muted-foreground">
@@ -168,15 +174,16 @@ export function LaunchDashboard() {
         )}
       </section>
 
-      <section id="graph" className="rounded-lg border bg-card p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-          Knowledge Graph
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          Workstream ↔ blocker ↔ task graph will render here.
-        </p>
-      </section>
-    </div>
+        <section id="graph" className="rounded-lg border bg-card p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+            Knowledge Graph
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Workstream ↔ blocker ↔ task graph will render here.
+          </p>
+        </section>
+      </div>
+    </LaunchShell>
   )
 }
 
