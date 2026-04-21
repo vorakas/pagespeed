@@ -559,6 +559,133 @@ export interface ObsidianVaultPage {
   modified: number
 }
 
+// ---------- Launch Command Center (migration dashboard) ----------
+
+export type MigrationHealth =
+  | "at-risk"
+  | "blocked"
+  | "in-progress"
+  | "near-complete"
+  | "improving"
+  | "groomed"
+
+export interface MigrationLaunchWindow {
+  start: string
+  end: string | null
+}
+
+export interface MigrationHealthSnapshot {
+  overall: MigrationHealth | null
+  launchWindow: MigrationLaunchWindow | null
+  lastSynced: string | null
+  headline: string | null
+  reasons: string[]
+}
+
+export interface MigrationKpis {
+  combinedUnique: number
+  combinedResolved: number
+  combinedActive: number
+  resolvedPct: number
+  productionFailures: number
+  openBlockers: number
+  criticalBlockers: number
+  newBugs24h: number
+  unassignedRate: number
+  failedQa: number
+}
+
+export interface MigrationSource {
+  key: string
+  kind: "jira" | "asana" | string
+  name: string
+  total: number
+  resolved: number
+  active: number
+  pct: number
+}
+
+export interface MigrationWorkstream {
+  id: string
+  name: string
+  area: string | null
+  status: MigrationHealth | string | null
+  tasks: number
+  closed: number
+  failedQa: number
+  inProgress: number
+  blockedCount: number
+  epics: string[]
+  blockers: string[]
+  note: string | null
+}
+
+export type BlockerSeverity = "critical" | "high" | "medium" | "low"
+
+export interface MigrationBlocker {
+  id: string
+  name: string
+  status: string
+  severity: BlockerSeverity | string | null
+  affects: string[]
+  note: string | null
+}
+
+export interface RawTaskRecord {
+  key: string
+  source: "jira" | "asana" | string
+  project: string
+  relPath: string
+  summary: string | null
+  type: string | null
+  status: string | null
+  priority: string | null
+  assignee: string | null
+  created: string | null
+  updated: string | null
+  resolved: string | null
+  taskStatus: string | null
+  uatStatus: string | null
+  completion: string | null
+  url: string | null
+}
+
+export interface MigrationTaskStatusRow {
+  status: string
+  count: number
+  color: "green" | "red" | "amber" | "blue" | "neutral" | string
+  group: "done" | "inProgress" | "blocked" | "backlog" | string
+}
+
+export interface MigrationTrendPoint {
+  date: string
+  overallHealth: MigrationHealth | string | null
+  resolved: number | null
+  active: number | null
+  total: number | null
+}
+
+export interface MigrationTeam {
+  id: string
+  name: string
+  project: string | null
+  lead: string | null
+  qaLead: string | null
+  devCount: number | null
+  qaCount: number | null
+  note: string | null
+  totalTasks?: number
+  assignedTasks?: number
+  unassignedRate?: number
+}
+
+export interface MigrationWorkstreamDetail {
+  workstream: MigrationWorkstream
+  blockers: MigrationBlocker[]
+  criticalTasks: RawTaskRecord[]
+  referencedKeyCount: number
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {

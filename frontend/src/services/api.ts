@@ -40,6 +40,16 @@ import type {
   ObsidianSyncRequest,
   ObsidianVaultNode,
   ObsidianVaultPage,
+  MigrationHealthSnapshot,
+  MigrationKpis,
+  MigrationSource,
+  MigrationWorkstream,
+  MigrationBlocker,
+  MigrationTaskStatusRow,
+  MigrationTrendPoint,
+  MigrationTeam,
+  MigrationWorkstreamDetail,
+  RawTaskRecord,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -677,6 +687,52 @@ class ApiClient {
 
   async getObsidianVaultPage(path: string): Promise<{ page: ObsidianVaultPage }> {
     return this.request(`/api/obsidian/vault/page?path=${encodeURIComponent(path)}`)
+  }
+
+  // ---------- Migration dashboard ----------
+
+  async getMigrationHealth(): Promise<MigrationHealthSnapshot> {
+    return this.request("/api/dashboard/health")
+  }
+
+  async getMigrationKpis(): Promise<MigrationKpis> {
+    return this.request("/api/dashboard/kpis")
+  }
+
+  async getMigrationSources(): Promise<MigrationSource[]> {
+    return this.request("/api/dashboard/sources")
+  }
+
+  async getMigrationWorkstreams(): Promise<MigrationWorkstream[]> {
+    return this.request("/api/dashboard/workstreams")
+  }
+
+  async getMigrationBlockers(): Promise<MigrationBlocker[]> {
+    return this.request("/api/dashboard/blockers")
+  }
+
+  async getMigrationProductionFailures(): Promise<RawTaskRecord[]> {
+    return this.request("/api/dashboard/production-failures")
+  }
+
+  async getMigrationNewBugs(windowDays = 7): Promise<RawTaskRecord[]> {
+    return this.request(`/api/dashboard/new-bugs?windowDays=${windowDays}`)
+  }
+
+  async getMigrationTaskStatus(): Promise<MigrationTaskStatusRow[]> {
+    return this.request("/api/dashboard/task-status")
+  }
+
+  async getMigrationTrend(): Promise<MigrationTrendPoint[]> {
+    return this.request("/api/dashboard/trend")
+  }
+
+  async getMigrationTeams(): Promise<MigrationTeam[]> {
+    return this.request("/api/dashboard/teams")
+  }
+
+  async getMigrationWorkstreamDetail(id: string): Promise<MigrationWorkstreamDetail> {
+    return this.request(`/api/dashboard/workstream/${encodeURIComponent(id)}`)
   }
 }
 
