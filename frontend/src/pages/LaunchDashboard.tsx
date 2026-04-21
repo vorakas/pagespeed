@@ -6,10 +6,24 @@ import { TopBar, type HealthFilter } from "@/components/launch-dashboard/TopBar"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import { HeroStrip } from "@/components/launch-dashboard/HeroStrip"
 import { ReadinessWall } from "@/components/launch-dashboard/ReadinessWall"
+import { TrendChart } from "@/components/launch-dashboard/TrendChart"
+import { TaskStatusStrip } from "@/components/launch-dashboard/TaskStatusStrip"
+import { TeamsStrip } from "@/components/launch-dashboard/TeamsStrip"
+import { SourcesStrip } from "@/components/launch-dashboard/SourcesStrip"
+import {
+  IncidentStream,
+  type IncidentFilter,
+  type IncidentItem,
+} from "@/components/launch-dashboard/IncidentStream"
+import { SidePanel, type SidePanelTarget } from "@/components/launch-dashboard/SidePanel"
 import type {
   MigrationBlocker,
   MigrationHealthSnapshot,
   MigrationKpis,
+  MigrationSource,
+  MigrationTaskStatusRow,
+  MigrationTeam,
+  MigrationTrendPoint,
   MigrationWorkstream,
   RawTaskRecord,
 } from "@/types"
@@ -20,26 +34,43 @@ export function LaunchDashboard() {
   const [workstreams, setWorkstreams] = useState<MigrationWorkstream[] | null>(null)
   const [blockers, setBlockers] = useState<MigrationBlocker[] | null>(null)
   const [prodFailures, setProdFailures] = useState<RawTaskRecord[] | null>(null)
+  const [newBugs, setNewBugs] = useState<RawTaskRecord[] | null>(null)
+  const [taskStatus, setTaskStatus] = useState<MigrationTaskStatusRow[] | null>(null)
+  const [trend, setTrend] = useState<MigrationTrendPoint[] | null>(null)
+  const [teams, setTeams] = useState<MigrationTeam[] | null>(null)
+  const [sources, setSources] = useState<MigrationSource[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const [filter, setFilter] = useState<HealthFilter>("all")
   const [activeArea, setActiveArea] = useState<string | null>(null)
+  const [streamFilter, setStreamFilter] = useState<IncidentFilter>("all")
+  const [sidePanelTarget, setSidePanelTarget] = useState<SidePanelTarget | null>(null)
 
   const loadAll = useCallback(async () => {
     setError(null)
     try {
-      const [h, k, ws, bl, pf] = await Promise.all([
+      const [h, k, ws, bl, pf, nb, ts, tr, tm, sr] = await Promise.all([
         api.getMigrationHealth(),
         api.getMigrationKpis(),
         api.getMigrationWorkstreams(),
         api.getMigrationBlockers(),
         api.getMigrationProductionFailures(),
+        api.getMigrationNewBugs(),
+        api.getMigrationTaskStatus(),
+        api.getMigrationTrend(),
+        api.getMigrationTeams(),
+        api.getMigrationSources(),
       ])
       setHealth(h)
       setKpis(k)
       setWorkstreams(ws)
       setBlockers(bl)
       setProdFailures(pf)
+      setNewBugs(nb)
+      setTaskStatus(ts)
+      setTrend(tr)
+      setTeams(tm)
+      setSources(sr)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard")
     }
@@ -49,12 +80,23 @@ export function LaunchDashboard() {
     void loadAll()
   }, [loadAll])
 
+  const openIncident = useCallback((item: IncidentItem) => {
+    if (item.kind === "blocker") {
+      setSidePanelTarget({ kind: "blocker", blocker: item.raw as MigrationBlocker })
+    } else {
+      setSidePanelTarget({ kind: "task", task: item.raw as RawTaskRecord })
+    }
+  }, [])
+
   if (error) {
     return (
       <LaunchShell>
         <div style={{ padding: 24 }}>
           <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Launch Command Center</h1>
-          <div className="panel" style={{ marginTop: 16, padding: "12px 16px", color: "var(--lcc-red)" }}>
+          <div
+            className="panel"
+            style={{ marginTop: 16, padding: "12px 16px", color: "var(--lcc-red)" }}
+          >
             {error}
           </div>
         </div>
@@ -65,7 +107,16 @@ export function LaunchDashboard() {
   if (!health || !kpis || !workstreams) {
     return (
       <LaunchShell>
-        <div style={{ padding: 24, display: "flex", alignItems: "center", gap: 8, color: "var(--lcc-text-dim)", fontSize: 13 }}>
+        <div
+          style={{
+            padding: 24,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            color: "var(--lcc-text-dim)",
+            fontSize: 13,
+          }}
+        >
           <Loader2 size={14} className="animate-spin" />
           Loading vault data…
         </div>
@@ -95,65 +146,46 @@ export function LaunchDashboard() {
 
           <ReadinessWall
             rows={workstreams}
-            onPick={() => {
-              /* phase d: opens side panel */
-            }}
+            onPick={(ws) => setSidePanelTarget({ kind: "workstream", workstream: ws })}
             areaFilter={activeArea}
             healthFilter={filter}
           />
 
-          <div id="incidents" className="panel" style={{ padding: "18px 20px" }}>
-            <h3 style={{ margin: 0, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--lcc-text-faint)", fontWeight: 600 }}>
-              Blockers &amp; Production Failures
-            </h3>
-            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-              {blockers?.map((b) => (
-                <div key={b.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12 }}>
-                  <span className="lcc-chip" data-severity={b.severity ?? undefined}>
-                    {b.severity ?? "—"}
-                  </span>
-                  <strong>{b.name}</strong>
-                  {b.note && <span style={{ color: "var(--lcc-text-dim)" }}>— {b.note}</span>}
-                </div>
-              ))}
-              {prodFailures && prodFailures.length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--lcc-text-faint)" }}>
-                    Production failures · {prodFailures.length}
-                  </div>
-                  {prodFailures.map((t) => (
-                    <div key={t.relPath} style={{ display: "flex", gap: 8, fontSize: 12, marginTop: 4 }}>
-                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--lcc-text-faint)" }}>
-                        {t.key}
-                      </span>
-                      <span>{t.summary ?? "(no summary)"}</span>
-                      {t.assignee && <span style={{ color: "var(--lcc-text-dim)" }}>— {t.assignee}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.6fr 1fr",
+              gap: 14,
+            }}
+          >
+            {trend && <TrendChart rows={trend} />}
+            {taskStatus && <TaskStatusStrip rows={taskStatus} />}
           </div>
 
-          <div id="graph" className="panel" style={{ padding: "18px 20px" }}>
-            <h3 style={{ margin: 0, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--lcc-text-faint)", fontWeight: 600 }}>
-              Knowledge Graph
-            </h3>
-            <p style={{ fontSize: 12, color: "var(--lcc-text-faint)", marginTop: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            {teams && <TeamsStrip rows={teams} />}
+            {sources && <SourcesStrip rows={sources} />}
+          </div>
+
+          <div id="graph" className="panel">
+            <h3>Knowledge Graph</h3>
+            <p style={{ fontSize: 12, color: "var(--lcc-text-faint)", margin: 0 }}>
               Workstream ↔ blocker ↔ task graph will render here in a later phase.
             </p>
           </div>
         </main>
 
-        <aside className="lcc-incident-stream" style={{ padding: "16px 18px" }}>
-          <h3 style={{ margin: 0, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--lcc-text-faint)", fontWeight: 600 }}>
-            Incidents <span style={{ float: "right", fontFamily: "var(--font-mono)", color: "var(--lcc-text-dim)", letterSpacing: 0, textTransform: "none" }}>{(blockers?.length ?? 0) + (prodFailures?.length ?? 0)}</span>
-          </h3>
-          <p style={{ fontSize: 12, color: "var(--lcc-text-faint)", marginTop: 8 }}>
-            Unified blockers / prod / bugs stream lands in phase (c4).
-          </p>
-        </aside>
+        <IncidentStream
+          blockers={blockers}
+          prodFailures={prodFailures}
+          newBugs={newBugs}
+          filter={streamFilter}
+          onFilterChange={setStreamFilter}
+          onPick={openIncident}
+        />
       </div>
+
+      <SidePanel target={sidePanelTarget} onClose={() => setSidePanelTarget(null)} />
     </LaunchShell>
   )
 }
