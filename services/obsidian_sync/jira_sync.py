@@ -571,10 +571,15 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
     for label in labels:
         tags.append(f"label/{label}")
 
+    # YAML-escape the summary — double quotes inside must become \" so the
+    # frontmatter parser treats the whole string as one value. Extracted
+    # outside the f-string because Python 3.11 (Railway) rejects backslashes
+    # inside f-string expressions.
+    summary_escaped = summary.replace('"', '\\"')
     fm_lines = [
         "---",
         f"key: {key}",
-        f"summary: \"{summary.replace('\"', '\\' + '\"')}\"",
+        f'summary: "{summary_escaped}"',
         f"type: {issue_type}",
         f"status: {status}",
         f"priority: {priority}",
