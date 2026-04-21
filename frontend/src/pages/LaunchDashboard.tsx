@@ -1,24 +1,17 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
+import { TopBar, type HealthFilter } from "@/components/launch-dashboard/TopBar"
+import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import type {
+  MigrationBlocker,
   MigrationHealthSnapshot,
   MigrationKpis,
   MigrationWorkstream,
-  MigrationBlocker,
   RawTaskRecord,
 } from "@/types"
 
-/**
- * Launch Command Center — phase (b) placeholder.
- *
- * Phase (c) will replace this with the full Aurora Glass layout: TopBar,
- * LeftRail, HeroStrip, ReadinessWall, TrendChart, TaskStatusStrip,
- * TeamsStrip, SourcesStrip, and IncidentStream. Anchor markers
- * (#graph, #workstreams, #incidents) are placed here so the sidebar
- * hash links already scroll to meaningful sections.
- */
 export function LaunchDashboard() {
   const [health, setHealth] = useState<MigrationHealthSnapshot | null>(null)
   const [kpis, setKpis] = useState<MigrationKpis | null>(null)
@@ -27,33 +20,39 @@ export function LaunchDashboard() {
   const [prodFailures, setProdFailures] = useState<RawTaskRecord[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const [h, k, ws, bl, pf] = await Promise.all([
-          api.getMigrationHealth(),
-          api.getMigrationKpis(),
-          api.getMigrationWorkstreams(),
-          api.getMigrationBlockers(),
-          api.getMigrationProductionFailures(),
-        ])
-        setHealth(h)
-        setKpis(k)
-        setWorkstreams(ws)
-        setBlockers(bl)
-        setProdFailures(pf)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load dashboard")
-      }
-    })()
+  const [filter, setFilter] = useState<HealthFilter>("all")
+  const [activeArea, setActiveArea] = useState<string | null>(null)
+
+  const loadAll = useCallback(async () => {
+    setError(null)
+    try {
+      const [h, k, ws, bl, pf] = await Promise.all([
+        api.getMigrationHealth(),
+        api.getMigrationKpis(),
+        api.getMigrationWorkstreams(),
+        api.getMigrationBlockers(),
+        api.getMigrationProductionFailures(),
+      ])
+      setHealth(h)
+      setKpis(k)
+      setWorkstreams(ws)
+      setBlockers(bl)
+      setProdFailures(pf)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load dashboard")
+    }
   }, [])
+
+  useEffect(() => {
+    void loadAll()
+  }, [loadAll])
 
   if (error) {
     return (
       <LaunchShell>
-        <div className="p-6">
-          <h1 className="text-2xl font-semibold">Launch Command Center</h1>
-          <div className="mt-4 rounded border border-[var(--lcc-red-bg)] bg-[var(--lcc-red-bg)] p-3 text-sm" style={{ color: "var(--lcc-red)" }}>
+        <div style={{ padding: 24 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Launch Command Center</h1>
+          <div className="panel" style={{ marginTop: 16, padding: "12px 16px", color: "var(--lcc-red)" }}>
             {error}
           </div>
         </div>
@@ -64,7 +63,7 @@ export function LaunchDashboard() {
   if (!health || !kpis || !workstreams) {
     return (
       <LaunchShell>
-        <div className="p-6 flex items-center gap-2 text-sm" style={{ color: "var(--lcc-text-dim)" }}>
+        <div style={{ padding: 24, display: "flex", alignItems: "center", gap: 8, color: "var(--lcc-text-dim)", fontSize: 13 }}>
           <Loader2 size={14} className="animate-spin" />
           Loading vault data…
         </div>
@@ -72,129 +71,107 @@ export function LaunchDashboard() {
     )
   }
 
+  const filteredWorkstreams = workstreams.filter((w) => {
+    if (activeArea && (w.area ?? "Unsorted") !== activeArea) return false
+    if (filter !== "all" && w.status !== filter) return false
+    return true
+  })
+
   return (
     <LaunchShell>
-      <div className="p-6 space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold">Launch Command Center</h1>
-        <p className="text-sm text-muted-foreground">
-          Executive view of the LP → Adobe Commerce migration. Redesign coming next.
-        </p>
-      </header>
+      <TopBar
+        health={health}
+        filter={filter}
+        onFilterChange={setFilter}
+        onRefresh={() => void loadAll()}
+      />
+      <div className="lcc-shell">
+        <LeftRail
+          kpis={kpis}
+          workstreams={workstreams}
+          activeArea={activeArea}
+          onPickArea={setActiveArea}
+          vaultLastSynced={health.lastSynced}
+        />
 
-      <section className="rounded-lg border bg-card p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-          Health
-        </h2>
-        <p className="text-sm">
-          Overall: <strong className="font-semibold">{health.overall ?? "—"}</strong>
-          {health.launchWindow && (
-            <>
-              {" · "}Launch window {health.launchWindow.start}
-              {health.launchWindow.end ? ` → ${health.launchWindow.end}` : ""}
-            </>
-          )}
-          {health.lastSynced && (
-            <span className="text-muted-foreground"> · synced {new Date(health.lastSynced).toLocaleString()}</span>
-          )}
-        </p>
-        {health.headline && <p className="mt-2 text-sm">{health.headline}</p>}
-        {health.reasons.length > 0 && (
-          <ul className="mt-3 list-disc pl-5 text-sm space-y-0.5">
-            {health.reasons.map((r, i) => (
-              <li key={i}>{r}</li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Kpi label="Combined Unique" value={kpis.combinedUnique} />
-        <Kpi label="Resolved" value={`${kpis.combinedResolved} (${kpis.resolvedPct}%)`} />
-        <Kpi label="Production Failures" value={kpis.productionFailures} tone="red" />
-        <Kpi label="Open Blockers" value={kpis.openBlockers} tone="amber" sub={`${kpis.criticalBlockers} critical`} />
-        <Kpi label="New Bugs / 24h" value={kpis.newBugs24h} tone="red" />
-      </section>
-
-      <section id="workstreams" className="rounded-lg border bg-card p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-          Workstreams ({workstreams.length})
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {workstreams.map((ws) => (
-            <div key={ws.id} className="rounded border p-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <div className="font-medium text-sm truncate">{ws.name}</div>
-                <span className="text-[10px] font-mono uppercase text-muted-foreground">
-                  {ws.status ?? "—"}
-                </span>
-              </div>
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                {ws.area ?? "unsorted"} · {ws.closed}/{ws.tasks} closed
-                {ws.blockers.length > 0 && ` · ${ws.blockers.length} blocker${ws.blockers.length === 1 ? "" : "s"}`}
-              </div>
+        <main className="lcc-main">
+          <div className="panel" style={{ padding: "18px 20px" }}>
+            <h3 style={{ margin: 0, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--lcc-text-faint)", fontWeight: 600 }}>
+              Workstreams · {filteredWorkstreams.length} / {workstreams.length}
+            </h3>
+            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
+              {filteredWorkstreams.map((w) => (
+                <div key={w.id} className="panel" style={{ padding: "10px 12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{w.name}</div>
+                    <span className="lcc-chip" data-health={w.status ?? undefined}>{w.status ?? "—"}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--lcc-text-faint)", marginTop: 4, fontFamily: "var(--font-mono)" }}>
+                    {w.area ?? "unsorted"} · {w.closed}/{w.tasks} closed
+                    {w.blockers.length > 0 && ` · ${w.blockers.length} blocker${w.blockers.length === 1 ? "" : "s"}`}
+                  </div>
+                </div>
+              ))}
+              {filteredWorkstreams.length === 0 && (
+                <div style={{ color: "var(--lcc-text-faint)", fontSize: 12, padding: 16 }}>
+                  No workstreams match the current filters.
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
 
-      <section id="incidents" className="rounded-lg border bg-card p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-          Blockers & Production Failures
-        </h2>
-        {blockers && blockers.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold mt-1 mb-1">Blockers ({blockers.length})</p>
-            <ul className="space-y-1 text-sm">
-              {blockers.map((b) => (
-                <li key={b.id} className="text-sm">
-                  <span className="font-mono text-[10px] uppercase text-muted-foreground mr-2">
+          <div id="incidents" className="panel" style={{ padding: "18px 20px" }}>
+            <h3 style={{ margin: 0, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--lcc-text-faint)", fontWeight: 600 }}>
+              Blockers &amp; Production Failures
+            </h3>
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+              {blockers?.map((b) => (
+                <div key={b.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12 }}>
+                  <span className="lcc-chip" data-severity={b.severity ?? undefined}>
                     {b.severity ?? "—"}
                   </span>
                   <strong>{b.name}</strong>
-                  {b.note && <span className="text-muted-foreground"> — {b.note}</span>}
-                </li>
+                  {b.note && <span style={{ color: "var(--lcc-text-dim)" }}>— {b.note}</span>}
+                </div>
               ))}
-            </ul>
+              {prodFailures && prodFailures.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--lcc-text-faint)" }}>
+                    Production failures · {prodFailures.length}
+                  </div>
+                  {prodFailures.map((t) => (
+                    <div key={t.relPath} style={{ display: "flex", gap: 8, fontSize: 12, marginTop: 4 }}>
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--lcc-text-faint)" }}>
+                        {t.key}
+                      </span>
+                      <span>{t.summary ?? "(no summary)"}</span>
+                      {t.assignee && <span style={{ color: "var(--lcc-text-dim)" }}>— {t.assignee}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-        {prodFailures && prodFailures.length > 0 && (
-          <div className="mt-4">
-            <p className="text-xs font-semibold mb-1">Production Failures ({prodFailures.length})</p>
-            <ul className="space-y-1 text-sm">
-              {prodFailures.map((t) => (
-                <li key={t.relPath}>
-                  <span className="font-mono text-[11px] text-muted-foreground mr-2">{t.key}</span>
-                  {t.summary ?? "(no summary)"}
-                  {t.assignee && <span className="text-muted-foreground"> — {t.assignee}</span>}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
 
-        <section id="graph" className="rounded-lg border bg-card p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            Knowledge Graph
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Workstream ↔ blocker ↔ task graph will render here.
+          <div id="graph" className="panel" style={{ padding: "18px 20px" }}>
+            <h3 style={{ margin: 0, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--lcc-text-faint)", fontWeight: 600 }}>
+              Knowledge Graph
+            </h3>
+            <p style={{ fontSize: 12, color: "var(--lcc-text-faint)", marginTop: 6 }}>
+              Workstream ↔ blocker ↔ task graph will render here in a later phase.
+            </p>
+          </div>
+        </main>
+
+        <aside className="lcc-incident-stream" style={{ padding: "16px 18px" }}>
+          <h3 style={{ margin: 0, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--lcc-text-faint)", fontWeight: 600 }}>
+            Incidents <span style={{ float: "right", fontFamily: "var(--font-mono)", color: "var(--lcc-text-dim)", letterSpacing: 0, textTransform: "none" }}>{(blockers?.length ?? 0) + (prodFailures?.length ?? 0)}</span>
+          </h3>
+          <p style={{ fontSize: 12, color: "var(--lcc-text-faint)", marginTop: 8 }}>
+            Unified blockers / prod / bugs stream lands in phase (c4).
           </p>
-        </section>
+        </aside>
       </div>
     </LaunchShell>
-  )
-}
-
-function Kpi({ label, value, sub, tone }: { label: string; value: string | number; sub?: string; tone?: "red" | "amber" | "green" }) {
-  const toneClass =
-    tone === "red" ? "text-red-500" : tone === "amber" ? "text-amber-500" : tone === "green" ? "text-emerald-500" : ""
-  return (
-    <div className="rounded-lg border bg-card p-3">
-      <div className={`text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">{label}</div>
-      {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
-    </div>
   )
 }
