@@ -254,6 +254,14 @@ def run_asana_sync(
                 f"User cache: {resolved} resolved, {unresolved} unresolved "
                 f"(total entries: {len(name_cache)}, was {cache_start_size} before run)."
             )
+            print("Resolved GIDs:")
+            for gid, name in sorted(name_cache.items()):
+                if name:
+                    print(f"  {gid} -> {name}")
+            print("Unresolved GIDs (404 from /users/<gid>):")
+            for gid, name in sorted(name_cache.items()):
+                if not name:
+                    print(f"  {gid}")
 
             print(f"All done! Synced {synced} project(s).")
             print(f"Output: {vault_root}")
