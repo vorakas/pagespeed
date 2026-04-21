@@ -24,9 +24,15 @@ logging.basicConfig(
 logging.getLogger('apscheduler').setLevel(logging.DEBUG)
 
 from config import (
+    ASANA_PAT,
+    ASANA_PROJECT_MAP,
     BLAZEMETER_API_KEY_ID,
     BLAZEMETER_API_SECRET,
     BLAZEMETER_WORKSPACE_ID,
+    JIRA_BASE_URL,
+    JIRA_DEFAULT_PROJECTS,
+    JIRA_PAT,
+    OBSIDIAN_VAULT_ROOT,
     PAGESPEED_API_KEY,
     PORT,
 )
@@ -50,6 +56,7 @@ from exceptions import (
 )
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
+from services.obsidian_sync_service import ObsidianSyncService
 from services.pagespeed_client import PageSpeedClient
 from routes import register_blueprints
 from services.site_service import SiteService
@@ -110,6 +117,22 @@ def create_app() -> Flask:
     else:
         logging.info("BlazeMeter env vars not set — load testing disabled")
 
+    # ---- Obsidian bridge (always constructed; no-ops if PATs unset) ----
+    obsidian_sync_service = ObsidianSyncService(
+        vault_root=OBSIDIAN_VAULT_ROOT,
+        jira_pat=JIRA_PAT or '',
+        jira_base_url=JIRA_BASE_URL,
+        asana_pat=ASANA_PAT or '',
+        asana_project_map=ASANA_PROJECT_MAP,
+        default_jira_projects=JIRA_DEFAULT_PROJECTS,
+    )
+    caps = obsidian_sync_service.capabilities()
+    logging.info(
+        "Obsidian bridge: vault=%s (exists=%s) jira=%s asana=%s",
+        caps['vaultRoot'], caps['vaultExists'],
+        caps['jiraConfigured'], caps['asanaConfigured'],
+    )
+
     # ---- Blueprints ----
     register_blueprints(
         flask_app, site_service, testing_service, test_result_repo, trigger_service,
@@ -117,6 +140,7 @@ def create_app() -> Flask:
         blazemeter_run_repo=blazemeter_run_repo,
         blazemeter_client=blazemeter_client,
         blazemeter_queue=blazemeter_queue,
+        obsidian_sync_service=obsidian_sync_service,
     )
 
     # ---- Centralized error handlers ----

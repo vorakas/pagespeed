@@ -5,6 +5,8 @@ Other modules import from here instead of calling os.getenv() directly,
 ensuring one source of truth for defaults and environment overrides.
 """
 
+import json
+import logging
 import os
 
 
@@ -151,3 +153,55 @@ BLAZEMETER_TIMEOUT_SECONDS: int = 30
 
 BLAZEMETER_POLL_SECONDS: int = 20
 """Interval at which the queue manager polls the active BlazeMeter run."""
+
+# ---------------------------------------------------------------------------
+# Obsidian Bridge (Jira + Asana → vault) defaults
+# ---------------------------------------------------------------------------
+
+OBSIDIAN_VAULT_ROOT: str = os.getenv(
+    'OBSIDIAN_VAULT_ROOT',
+    '/data/vault',
+)
+"""Absolute path to the Obsidian vault root on disk.
+
+Defaults to ``/data/vault`` which matches the Railway volume mount. Locally
+you can point this at the Desktop LPAdobe copy for dev."""
+
+JIRA_BASE_URL: str = os.getenv('JIRA_BASE_URL', 'https://lampstrack.lampsplus.com')
+"""Jira Data Center base URL used for the Obsidian sync."""
+
+JIRA_PAT: str | None = os.getenv('JIRA_PAT')
+"""Jira personal access token. None disables the Jira side of the sync."""
+
+ASANA_PAT: str | None = os.getenv('ASANA_PAT')
+"""Asana personal access token. None disables the Asana side of the sync."""
+
+
+def _parse_project_map(raw: str | None) -> dict[str, str]:
+    """Parse ``ASANA_PROJECT_MAP`` which is JSON of ``{name: gid}``.
+
+    Returns an empty dict if unset or unparseable — the sync service treats
+    an empty map as "Asana not configured" rather than erroring."""
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        logging.warning('ASANA_PROJECT_MAP is not valid JSON; Asana sync disabled')
+        return {}
+    if not isinstance(data, dict):
+        logging.warning('ASANA_PROJECT_MAP must be a JSON object; got %s', type(data))
+        return {}
+    return {str(k): str(v) for k, v in data.items()}
+
+
+ASANA_PROJECT_MAP: dict[str, str] = _parse_project_map(os.getenv('ASANA_PROJECT_MAP'))
+"""Map of Asana project name → GID. Set as JSON in ``ASANA_PROJECT_MAP``."""
+
+JIRA_DEFAULT_PROJECTS: list[str] = [
+    p.strip() for p in os.getenv(
+        'JIRA_DEFAULT_PROJECTS',
+        'ACE2E,ACEDS,ACAB,ACAQA,ACCMS,ACM',
+    ).split(',') if p.strip()
+]
+"""Comma-separated Jira project keys to sync when none are specified."""
