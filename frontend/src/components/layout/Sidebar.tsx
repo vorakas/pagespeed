@@ -13,6 +13,10 @@ import {
   Hammer,
   Waves,
   Network,
+  Share2,
+  ListTree,
+  AlertTriangle,
+  Rocket,
   Sun,
   Moon,
 } from "lucide-react"
@@ -30,11 +34,20 @@ interface NavSection {
 
 const navSections: NavSection[] = [
   {
+    title: "Migration",
+    items: [
+      { label: "Launch Dashboard", href: "/dashboard", icon: <Rocket size={16} /> },
+      { label: "Knowledge Graph", href: "/dashboard#graph", icon: <Share2 size={16} /> },
+      { label: "Workstreams", href: "/dashboard#workstreams", icon: <ListTree size={16} /> },
+      { label: "Blockers & Incidents", href: "/dashboard#incidents", icon: <AlertTriangle size={16} /> },
+    ],
+  },
+  {
     title: "Monitoring",
     items: [
-      { label: "Dashboard", href: "/", icon: <LayoutDashboard size={16} /> },
+      { label: "PageSpeed", href: "/", icon: <LayoutDashboard size={16} /> },
       { label: "Test URLs", href: "/test", icon: <Gauge size={16} /> },
-      { label: "Metrics", href: "/metrics", icon: <BarChart3 size={16} /> },
+      { label: "Performance Metrics", href: "/metrics", icon: <BarChart3 size={16} /> },
     ],
   },
   {
@@ -45,7 +58,7 @@ const navSections: NavSection[] = [
       { label: "AI Analysis", href: "/ai-analysis", icon: <Brain size={16} /> },
       { label: "Automation Builds", href: "/builds", icon: <Hammer size={16} /> },
       { label: "Load Testing", href: "/load-testing", icon: <Waves size={16} /> },
-      { label: "Obsidian Bridge", href: "/obsidian", icon: <Network size={16} /> },
+      { label: "Obsidian Vault", href: "/obsidian", icon: <Network size={16} /> },
     ],
   },
   {

@@ -13,6 +13,11 @@ from flask import Flask, Response, jsonify, send_from_directory
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 
+# Load .env BEFORE importing config — config reads env vars at module
+# load time, so dotenv must populate os.environ first or every .env
+# value silently falls back to its default.
+load_dotenv()
+
 # Configure logging so APScheduler errors are visible in Railway logs
 # (APScheduler catches job exceptions and logs them — without this config
 # those messages are silently dropped by Python's default NullHandler).
@@ -63,8 +68,6 @@ from routes import register_blueprints
 from services.site_service import SiteService
 from services.testing_service import TestingService
 from services.trigger_service import TriggerService
-
-load_dotenv()
 
 
 def create_app() -> Flask:

@@ -14,6 +14,7 @@ import { AiAnalysis } from "@/pages/AiAnalysis"
 import { Builds } from "@/pages/Builds"
 import { LoadTesting } from "@/pages/LoadTesting"
 import { Obsidian } from "@/pages/Obsidian"
+import { LaunchDashboard } from "@/pages/LaunchDashboard"
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
               <Route path="builds" element={<Builds />} />
               <Route path="load-testing" element={<LoadTesting />} />
               <Route path="obsidian" element={<Obsidian />} />
+              <Route path="dashboard" element={<LaunchDashboard />} />
               </Route>
             </Routes>
           </SitesProvider>
