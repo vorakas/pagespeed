@@ -290,9 +290,12 @@ def resolve_profile_mentions(text, session, name_cache):
             user = asana_get_single(session, f"users/{gid}", {"opt_fields": "name"})
             name = (user or {}).get("name")
             name_cache[gid] = name if name else None
-        except requests.HTTPError:
+        except requests.HTTPError as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", "?")
+            print(f"    Asana users/{gid}: {status} — leaving as bare URL")
             name_cache[gid] = None
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            print(f"    Asana users/{gid}: network error ({exc}) — leaving as bare URL")
             name_cache[gid] = None
 
     def _fix_link(match):

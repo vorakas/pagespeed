@@ -248,9 +248,12 @@ def run_asana_sync(
                 synced += 1
 
             asana_sync.save_user_cache(vault_root, name_cache)
-            added = len(name_cache) - cache_start_size
-            if added > 0:
-                print(f"User cache: +{added} new name(s), {len(name_cache)} total.")
+            resolved = sum(1 for v in name_cache.values() if v)
+            unresolved = sum(1 for v in name_cache.values() if not v)
+            print(
+                f"User cache: {resolved} resolved, {unresolved} unresolved "
+                f"(total entries: {len(name_cache)}, was {cache_start_size} before run)."
+            )
 
             print(f"All done! Synced {synced} project(s).")
             print(f"Output: {vault_root}")
