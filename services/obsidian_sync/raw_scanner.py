@@ -153,8 +153,9 @@ class RawTaskScanner:
         if not fm:
             return None
 
-        rel = path.relative_to(raw_root).as_posix()
-        parts = rel.split("/", 2)
+        rel_from_raw = path.relative_to(raw_root).as_posix()
+        rel = path.relative_to(self._vault.root).as_posix()
+        parts = rel_from_raw.split("/", 2)
         project = parts[0] if parts else ""
         source = "asana" if project == "asana" else "jira"
         if source == "asana" and len(parts) >= 2:

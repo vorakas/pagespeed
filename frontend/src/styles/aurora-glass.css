@@ -1054,3 +1054,97 @@
 .launch-dashboard-side-panel table.t .id {
   font-family: var(--font-mono); color: var(--lcc-text-dim); font-size: 11px;
 }
+
+.launch-dashboard-side-panel .sp-vault-md {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--lcc-text-dim);
+  padding: 14px 16px;
+  background: var(--glass-bg-faint);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  overflow-wrap: anywhere;
+}
+.launch-dashboard-side-panel .sp-vault-md h1,
+.launch-dashboard-side-panel .sp-vault-md h2,
+.launch-dashboard-side-panel .sp-vault-md h3,
+.launch-dashboard-side-panel .sp-vault-md h4,
+.launch-dashboard-side-panel .sp-vault-md h5,
+.launch-dashboard-side-panel .sp-vault-md h6 {
+  color: var(--lcc-text);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 16px 0 8px;
+  text-transform: none;
+}
+.launch-dashboard-side-panel .sp-vault-md h1 { font-size: 16px; }
+.launch-dashboard-side-panel .sp-vault-md h2 { font-size: 14.5px; }
+.launch-dashboard-side-panel .sp-vault-md h3 { font-size: 13.5px; }
+.launch-dashboard-side-panel .sp-vault-md h4,
+.launch-dashboard-side-panel .sp-vault-md h5,
+.launch-dashboard-side-panel .sp-vault-md h6 { font-size: 12.5px; }
+.launch-dashboard-side-panel .sp-vault-md h1:first-child,
+.launch-dashboard-side-panel .sp-vault-md h2:first-child,
+.launch-dashboard-side-panel .sp-vault-md h3:first-child { margin-top: 0; }
+.launch-dashboard-side-panel .sp-vault-md p { margin: 0 0 10px; }
+.launch-dashboard-side-panel .sp-vault-md a {
+  color: var(--lcc-blue);
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(110,199,255,0.4);
+}
+.launch-dashboard-side-panel .sp-vault-md a:hover { border-bottom-style: solid; }
+.launch-dashboard-side-panel .sp-vault-md strong { color: var(--lcc-text); }
+.launch-dashboard-side-panel .sp-vault-md ul,
+.launch-dashboard-side-panel .sp-vault-md ol { margin: 0 0 10px; padding-left: 20px; }
+.launch-dashboard-side-panel .sp-vault-md li { margin-bottom: 3px; }
+.launch-dashboard-side-panel .sp-vault-md code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--glass-hi);
+  color: var(--lcc-text);
+}
+.launch-dashboard-side-panel .sp-vault-md pre {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  overflow-x: auto;
+}
+.launch-dashboard-side-panel .sp-vault-md pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 11.5px;
+}
+.launch-dashboard-side-panel .sp-vault-md blockquote {
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-left: 2px solid var(--lcc-blue);
+  background: var(--glass-bg-faint);
+  color: var(--lcc-text-dim);
+}
+.launch-dashboard-side-panel .sp-vault-md table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  margin: 0 0 10px;
+}
+.launch-dashboard-side-panel .sp-vault-md th,
+.launch-dashboard-side-panel .sp-vault-md td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--glass-border);
+  vertical-align: top;
+}
+.launch-dashboard-side-panel .sp-vault-md th {
+  color: var(--lcc-text-faint);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.launch-dashboard-side-panel .sp-vault-md hr {
+  border: 0;
+  border-top: 1px solid var(--glass-border);
+  margin: 14px 0;
+}

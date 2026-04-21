@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { marked } from "marked"
 import { api } from "@/services/api"
 import type {
   MigrationBlocker,
   MigrationWorkstream,
   MigrationWorkstreamDetail,
+  ObsidianVaultPage,
   RawTaskRecord,
 } from "@/types"
 
@@ -193,6 +195,7 @@ function WorkstreamDetail({
 }
 
 function BlockerDetail({ blocker, onClose }: { blocker: MigrationBlocker; onClose: () => void }) {
+  const relPath = blocker.relPath ?? `wiki/blocker-${blocker.id}.md`
   return (
     <>
       <div className="sp-head">
@@ -222,6 +225,7 @@ function BlockerDetail({ blocker, onClose }: { blocker: MigrationBlocker; onClos
             </li>
           ))}
         </ul>
+        <VaultPageSection relPath={relPath} />
       </div>
     </>
   )
@@ -273,7 +277,72 @@ function TaskDetail({ task, onClose }: { task: RawTaskRecord; onClose: () => voi
             </a>
           </>
         )}
+        {task.relPath && <VaultPageSection relPath={task.relPath} />}
       </div>
+    </>
+  )
+}
+
+function VaultPageSection({ relPath }: { relPath: string }) {
+  const [page, setPage] = useState<ObsidianVaultPage | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setPage(null)
+    setError(null)
+    setLoading(true)
+    void api
+      .getObsidianVaultPage(relPath)
+      .then((res) => {
+        if (!cancelled) setPage(res.page)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load page")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [relPath])
+
+  const html = useMemo(() => {
+    if (!page) return ""
+    return marked.parse(page.body, { async: false }) as string
+  }, [page])
+
+  return (
+    <>
+      <h4 style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <span>Vault page</span>
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            fontWeight: 400,
+            letterSpacing: 0,
+            textTransform: "none",
+            color: "var(--lcc-text-faint)",
+          }}
+        >
+          {relPath}
+        </span>
+      </h4>
+      {loading && (
+        <div style={{ color: "var(--lcc-text-faint)", fontSize: 12 }}>Loading…</div>
+      )}
+      {error && (
+        <div style={{ color: "var(--lcc-red)", fontSize: 12 }}>{error}</div>
+      )}
+      {page && (
+        <div
+          className="sp-vault-md"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )}
     </>
   )
 }

@@ -629,6 +629,7 @@ export interface MigrationBlocker {
   severity: BlockerSeverity | string | null
   affects: string[]
   note: string | null
+  relPath: string | null
 }
 
 export interface RawTaskRecord {

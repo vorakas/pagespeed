@@ -120,6 +120,7 @@ class Blocker:
     affects: List[str]
     severity: Optional[str] = None
     note: Optional[str] = None
+    rel_path: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -129,6 +130,7 @@ class Blocker:
             "severity": self.severity,
             "affects": list(self.affects),
             "note": self.note,
+            "relPath": self.rel_path,
         }
 
 
@@ -330,6 +332,7 @@ def parse_blocker_page(vault: VaultReader, rel_path: str) -> Optional[Blocker]:
         affects=_extract_wikilink_targets(fm.get("affects")),
         severity=severity,
         note=note,
+        rel_path=rel_path,
     )
 
 
