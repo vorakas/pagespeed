@@ -254,14 +254,12 @@ def run_asana_sync(
                 f"User cache: {resolved} resolved, {unresolved} unresolved "
                 f"(total entries: {len(name_cache)}, was {cache_start_size} before run)."
             )
-            print("Resolved GIDs:")
-            for gid, name in sorted(name_cache.items()):
-                if name:
-                    print(f"  {gid} -> {name}")
-            print("Unresolved GIDs (404 from /users/<gid>):")
-            for gid, name in sorted(name_cache.items()):
-                if not name:
-                    print(f"  {gid}")
+            # Spot-check a few known @mention GIDs so we can see whether the
+            # seed actually covers the ones that matter.
+            probe = ["1212271406282734", "1208287698349214", "1206374361429565", "1206412539933464"]
+            print("Probe @mention GIDs in cache after sync:")
+            for g in probe:
+                print(f"  {g}: {name_cache.get(g, '<not in cache>')}")
 
             print(f"All done! Synced {synced} project(s).")
             print(f"Output: {vault_root}")
