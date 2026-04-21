@@ -280,10 +280,12 @@ def seed_cache_from_workspace(session, workspace_gid, name_cache):
     if not workspace_gid:
         return 0
     try:
-        users = asana_get(session, f"workspaces/{workspace_gid}/users", {"opt_fields": "name,gid"})
+        users = asana_get(session, f"workspaces/{workspace_gid}/users", {"opt_fields": "name"})
     except requests.HTTPError as exc:
-        status = getattr(getattr(exc, "response", None), "status_code", "?")
-        print(f"    Workspace users fetch failed (ws={workspace_gid}, status={status})")
+        resp = getattr(exc, "response", None)
+        status = getattr(resp, "status_code", "?")
+        body = getattr(resp, "text", "")[:300] if resp is not None else ""
+        print(f"    Workspace users fetch failed (ws={workspace_gid}, status={status}) body={body!r}")
         return 0
     added = 0
     for u in users or []:
