@@ -71,6 +71,40 @@ from services.testing_service import TestingService
 from services.trigger_service import TriggerService
 
 
+def _seed_vault_wiki(vault_root: str) -> None:
+    """Populate ``<vault_root>/wiki/`` from the shipped seed on first boot.
+
+    The curated wiki content (workstreams, blockers, status snapshots)
+    drives the Launch Command Center dashboard and isn't pulled from
+    Jira or Asana. We ship a snapshot in the Docker image at
+    ``/app/vault_seed/wiki/`` and copy it onto the Railway volume the
+    first time the container starts against an empty volume.
+
+    This only seeds: if ``<vault_root>/wiki/`` already exists (even empty),
+    we leave it alone so in-place edits survive subsequent deploys.
+    """
+    import shutil
+
+    target_wiki = os.path.join(vault_root, "wiki")
+    if os.path.isdir(target_wiki):
+        return
+
+    seed_source = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vault_seed", "wiki")
+    if not os.path.isdir(seed_source):
+        logging.warning(
+            "Vault wiki seed not found at %s — dashboard will be unavailable until wiki is populated.",
+            seed_source,
+        )
+        return
+
+    try:
+        os.makedirs(vault_root, exist_ok=True)
+        shutil.copytree(seed_source, target_wiki)
+        logging.info("Seeded vault wiki from %s → %s", seed_source, target_wiki)
+    except Exception:
+        logging.exception("Failed to seed vault wiki at %s", target_wiki)
+
+
 def create_app() -> Flask:
     """Application factory — builds a fully-configured Flask app."""
     flask_app = Flask(__name__)
@@ -126,6 +160,7 @@ def create_app() -> Flask:
     # Both services read from the same vault on disk. The dashboard
     # subscribes to the sync service so its cache auto-invalidates
     # whenever a sync completes — no TTL wait.
+    _seed_vault_wiki(OBSIDIAN_VAULT_ROOT)
     migration_dashboard_service = MigrationDashboardService(
         vault_root=OBSIDIAN_VAULT_ROOT,
     )
