@@ -203,9 +203,15 @@ def rich_text_to_md(notes, html_notes=None):
         text = re.sub(r"<a\b[^>]*?\shref=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", r"[\2](\1)", text, flags=re.DOTALL)
         text = re.sub(r"<br\s*/?>", "\n", text)
         text = re.sub(r"<hr\s*/?>", "\n---\n", text)
-        # Lists
-        text = re.sub(r"<li>(.*?)</li>", r"- \1", text, flags=re.DOTALL)
-        text = re.sub(r"</?[uo]l[^>]*>", "", text)
+        # Lists — ordered lists get sequential numbering; unordered/orphan <li> get dashes
+        def _number_ol(match):
+            items = re.findall(r"<li\b[^>]*>(.*?)</li>", match.group(1), flags=re.DOTALL)
+            if not items:
+                return match.group(0)
+            return "\n" + "\n".join(f"{i + 1}. {item.strip()}" for i, item in enumerate(items)) + "\n"
+        text = re.sub(r"<ol\b[^>]*>(.*?)</ol>", _number_ol, text, flags=re.DOTALL)
+        text = re.sub(r"<li\b[^>]*>(.*?)</li>", r"- \1", text, flags=re.DOTALL)
+        text = re.sub(r"</?[uo]l\b[^>]*>", "", text)
         # Strip remaining HTML tags
         text = re.sub(r"<[^>]+>", "", text)
         text = html.unescape(text)
