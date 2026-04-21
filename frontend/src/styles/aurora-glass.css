@@ -966,7 +966,7 @@
 
 .launch-dashboard-side-panel {
   position: fixed; top: 16px; right: 16px; bottom: 16px;
-  width: min(580px, calc(100vw - 32px));
+  width: min(870px, calc(100vw - 32px));
   border-radius: var(--lcc-radius);
   transform: translateX(calc(100% + 32px));
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
