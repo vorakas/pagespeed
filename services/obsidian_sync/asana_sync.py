@@ -61,9 +61,6 @@ load_dotenv(Path(__file__).parent / ".env")
 # CONFIGURATION
 # ──────────────────────────────────────────────
 ASANA_PAT = os.environ.get("ASANA_PAT", "")
-if not ASANA_PAT or ASANA_PAT == "paste-your-pat-here":
-    print("ERROR: Set ASANA_PAT in .env or as an environment variable.")
-    sys.exit(1)
 
 ASANA_BASE_URL = "https://app.asana.com/api/1.0"
 
@@ -945,6 +942,10 @@ def sync_project(session, project_name, project_gid, full_refresh=False):
 
 
 def main():
+    if not ASANA_PAT or ASANA_PAT == "paste-your-pat-here":
+        print("ERROR: Set ASANA_PAT in .env or as an environment variable.")
+        sys.exit(1)
+
     args = sys.argv[1:]
     full_refresh = "--full" in args
     if full_refresh:
