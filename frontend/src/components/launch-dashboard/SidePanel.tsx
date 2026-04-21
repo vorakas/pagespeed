@@ -1,3 +1,4 @@
+import type React from "react"
 import { useEffect, useMemo, useState } from "react"
 import { marked } from "marked"
 import { api } from "@/services/api"
@@ -283,10 +284,26 @@ function TaskDetail({ task, onClose }: { task: RawTaskRecord; onClose: () => voi
   )
 }
 
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i
+
+function transformImageWikilinks(body: string, basePath: string): string {
+  return body.replace(
+    /!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g,
+    (match, target) => {
+      const trimmed = String(target).trim()
+      if (!IMAGE_EXT_RE.test(trimmed)) return match
+      const src = `/api/obsidian/vault/asset?base=${encodeURIComponent(basePath)}&asset=${encodeURIComponent(trimmed)}`
+      const alt = trimmed.split("/").pop() ?? trimmed
+      return `<img src="${src}" alt="${alt.replace(/"/g, "&quot;")}" class="sp-vault-thumb" loading="lazy" />`
+    },
+  )
+}
+
 function VaultPageSection({ relPath }: { relPath: string }) {
   const [page, setPage] = useState<ObsidianVaultPage | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -311,8 +328,26 @@ function VaultPageSection({ relPath }: { relPath: string }) {
 
   const html = useMemo(() => {
     if (!page) return ""
-    return marked.parse(page.body, { async: false }) as string
-  }, [page])
+    const transformed = transformImageWikilinks(page.body, page.path ?? relPath)
+    return marked.parse(transformed, { async: false }) as string
+  }, [page, relPath])
+
+  useEffect(() => {
+    if (!lightbox) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightbox(null)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [lightbox])
+
+  const onMdClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.target as HTMLElement
+    if (el.tagName === "IMG" && el.classList.contains("sp-vault-thumb")) {
+      const img = el as HTMLImageElement
+      setLightbox({ src: img.src, alt: img.alt || "image" })
+    }
+  }
 
   return (
     <>
@@ -341,7 +376,18 @@ function VaultPageSection({ relPath }: { relPath: string }) {
         <div
           className="sp-vault-md"
           dangerouslySetInnerHTML={{ __html: html }}
+          onClick={onMdClick}
         />
+      )}
+      {lightbox && (
+        <div
+          className="sp-vault-lightbox"
+          role="dialog"
+          aria-label={lightbox.alt}
+          onClick={() => setLightbox(null)}
+        >
+          <img src={lightbox.src} alt={lightbox.alt} />
+        </div>
       )}
     </>
   )

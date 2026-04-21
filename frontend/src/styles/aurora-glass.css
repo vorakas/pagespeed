@@ -1100,6 +1100,40 @@
 .launch-dashboard-side-panel .sp-vault-md ol { list-style-type: decimal; }
 .launch-dashboard-side-panel .sp-vault-md li { margin-bottom: 3px; }
 .launch-dashboard-side-panel .sp-vault-md li::marker { color: var(--lcc-text-dim); }
+.launch-dashboard-side-panel .sp-vault-md img.sp-vault-thumb {
+  max-width: 180px;
+  max-height: 180px;
+  border-radius: var(--lcc-radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-hi);
+  margin: 4px 6px 4px 0;
+  cursor: zoom-in;
+  display: inline-block;
+  vertical-align: middle;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.launch-dashboard-side-panel .sp-vault-md img.sp-vault-thumb:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+.sp-vault-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  cursor: zoom-out;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+}
+.sp-vault-lightbox img {
+  max-width: 95vw;
+  max-height: 95vh;
+  border-radius: var(--lcc-radius-sm);
+  box-shadow: 0 10px 60px rgba(0, 0, 0, 0.6);
+}
 .launch-dashboard-side-panel .sp-vault-md code {
   font-family: var(--font-mono);
   font-size: 11.5px;

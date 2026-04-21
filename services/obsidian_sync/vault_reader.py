@@ -49,6 +49,16 @@ class VaultReader:
     """
 
     _ALLOWED_EXTS = frozenset({".md", ".markdown", ".txt"})
+    _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"})
+    _IMAGE_MIMES = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".svg": "image/svg+xml",
+        ".bmp": "image/bmp",
+    }
 
     def __init__(self, vault_root: str) -> None:
         self._root: Path = Path(vault_root).resolve()
@@ -92,6 +102,48 @@ class VaultReader:
             "size": target.stat().st_size,
             "modified": target.stat().st_mtime,
         }
+
+    def resolve_asset(self, base_rel_path: str, asset_rel_path: str) -> tuple[Path, str]:
+        """Find an image attachment referenced from a markdown page.
+
+        Obsidian wikilinks like ``![[_attachments/foo.png]]`` are path-ish but
+        not rooted. The Asana sync writes attachments to ``<project>/_attachments/``
+        and tasks to ``<project>/<section>/<task>.md``, so we walk up from the
+        task's parent directory and try ``<dir>/<asset_rel_path>`` at each level.
+
+        Returns ``(absolute_path, mime_type)`` for the first match whose extension
+        is in the image allowlist. Raises :class:`VaultPathError` otherwise.
+        """
+        if not self.exists():
+            raise VaultNotFoundError(str(self._root))
+        cleaned_asset = asset_rel_path.replace("\\", "/").lstrip("/")
+        if ".." in cleaned_asset.split("/"):
+            raise VaultPathError(f"Asset path must not traverse: {asset_rel_path}")
+
+        ext = Path(cleaned_asset).suffix.lower()
+        if ext not in self._IMAGE_EXTS:
+            raise VaultPathError(f"Unsupported asset type: {ext or '(none)'}")
+
+        base_resolved = self._resolve(base_rel_path)
+        start_dir = base_resolved.parent if base_resolved.is_file() else base_resolved
+
+        current = start_dir.resolve()
+        root = self._root.resolve()
+        while True:
+            candidate = (current / cleaned_asset).resolve()
+            try:
+                candidate.relative_to(root)
+            except ValueError:
+                break
+            if candidate.is_file():
+                return candidate, self._IMAGE_MIMES[ext]
+            if current == root:
+                break
+            if root not in current.parents:
+                break
+            current = current.parent
+
+        raise VaultPathError(f"Asset not found: {asset_rel_path}")
 
     # ── internals ────────────────────────────────────────────────────
 

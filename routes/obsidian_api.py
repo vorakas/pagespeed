@@ -9,7 +9,7 @@ Talks to:
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 
 from services.obsidian_sync.vault_reader import (
     VaultNotFoundError,
@@ -97,6 +97,20 @@ def create_obsidian_blueprint(sync_service: ObsidianSyncService) -> Blueprint:
         except VaultPathError as exc:
             return jsonify({"error": str(exc)}), 400
         return jsonify({"tree": tree.to_dict()})
+
+    @bp.route("/api/obsidian/vault/asset", methods=["GET"])
+    def vault_asset():
+        base = request.args.get("base", "")
+        asset = request.args.get("asset", "")
+        if not base or not asset:
+            return jsonify({"error": "base and asset are required"}), 400
+        try:
+            path, mimetype = _vault_reader().resolve_asset(base, asset)
+        except VaultNotFoundError:
+            return jsonify({"error": "vault not found"}), 404
+        except VaultPathError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return send_file(path, mimetype=mimetype, max_age=3600)
 
     @bp.route("/api/obsidian/vault/page", methods=["GET"])
     def vault_page():
