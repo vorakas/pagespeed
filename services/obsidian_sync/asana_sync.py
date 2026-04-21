@@ -264,6 +264,34 @@ def save_user_cache(vault_root, cache):
         print(f"  Warning: could not persist user cache: {exc}")
 
 
+def harvest_known_users(task, subtasks, stories, name_cache):
+    """Populate name_cache with GID->name pairs we already have in-hand.
+
+    The /users/<gid> endpoint 404s for users outside the PAT owner's
+    workspace, which covers most @mentioned people on migration tasks
+    (CNX team, vendor guests, etc.). But we already receive their GIDs
+    and names attached to task.assignee, subtask.assignee, and
+    story.created_by. Harvesting those makes the resolver work for
+    anyone who has ever commented on or been assigned to a task — no
+    extra API calls required.
+    """
+    def _add(user_obj):
+        if not user_obj:
+            return
+        gid = user_obj.get("gid")
+        name = user_obj.get("name")
+        # Only fill in if missing or previously recorded as "unresolvable";
+        # a positive resolution always wins.
+        if gid and name and not name_cache.get(gid):
+            name_cache[gid] = name
+
+    _add(task.get("assignee"))
+    for st in subtasks or []:
+        _add(st.get("assignee"))
+    for story in stories or []:
+        _add(story.get("created_by"))
+
+
 def resolve_profile_mentions(text, session, name_cache):
     """Replace bare Asana profile URLs in text with [Name](url) markdown links.
 
@@ -322,7 +350,7 @@ def resolve_profile_mentions(text, session, name_cache):
 
 TASK_OPT_FIELDS = ",".join([
     "name", "notes", "html_notes", "completed", "completed_at",
-    "assignee.name", "assignee.email",
+    "assignee.name", "assignee.email", "assignee.gid",
     "created_at", "modified_at", "due_on", "due_at", "start_on", "start_at",
     "tags.name", "memberships.section.name",
     "custom_fields.name", "custom_fields.display_value",
@@ -368,14 +396,14 @@ def fetch_project_tasks(session, project_gid, since=None):
 def fetch_subtasks(session, task_gid):
     """Fetch subtasks of a given task."""
     return asana_get(session, f"tasks/{task_gid}/subtasks", {
-        "opt_fields": "name,completed,assignee.name,due_on,permalink_url",
+        "opt_fields": "name,completed,assignee.name,assignee.gid,due_on,permalink_url",
     })
 
 
 def fetch_stories(session, task_gid):
     """Fetch comments/stories for a task."""
     return asana_get(session, f"tasks/{task_gid}/stories", {
-        "opt_fields": "type,text,html_text,created_by.name,created_at",
+        "opt_fields": "type,text,html_text,created_by.name,created_by.gid,created_at",
     })
 
 
@@ -472,6 +500,9 @@ def build_task_markdown(
     html_notes = task.get("html_notes", "")
     description = rich_text_to_md(notes, html_notes)
     if session is not None and name_cache is not None:
+        # Seed the cache with any identities we already have on this task
+        # so users outside the PAT's workspace still get resolved.
+        harvest_known_users(task, subtasks, stories, name_cache)
         description = resolve_profile_mentions(description, session, name_cache)
 
     # Section from memberships
