@@ -232,9 +232,6 @@ def run_asana_sync(
             me = asana_sync.asana_get_single(session, "users/me", {"opt_fields": "name,email"})
             print(f"Authenticated as: {me.get('name', '?')} ({me.get('email', '?')})")
 
-            name_cache = asana_sync.load_user_cache(vault_root)
-            cache_start_size = len(name_cache)
-
             project_list = list(projects)
             synced = 0
             for name in project_list:
@@ -242,24 +239,8 @@ def run_asana_sync(
                 if not gid:
                     print(f"Skipping unknown project: {name}")
                     continue
-                asana_sync.sync_project(
-                    session, name, gid, full_refresh, name_cache=name_cache
-                )
+                asana_sync.sync_project(session, name, gid, full_refresh)
                 synced += 1
-
-            asana_sync.save_user_cache(vault_root, name_cache)
-            resolved = sum(1 for v in name_cache.values() if v)
-            unresolved = sum(1 for v in name_cache.values() if not v)
-            print(
-                f"User cache: {resolved} resolved, {unresolved} unresolved "
-                f"(total entries: {len(name_cache)}, was {cache_start_size} before run)."
-            )
-            # Spot-check a few known @mention GIDs so we can see whether the
-            # seed actually covers the ones that matter.
-            probe = ["1212271406282734", "1208287698349214", "1206374361429565", "1206412539933464"]
-            print("Probe @mention GIDs in cache after sync:")
-            for g in probe:
-                print(f"  {g}: {name_cache.get(g, '<not in cache>')}")
 
             print(f"All done! Synced {synced} project(s).")
             print(f"Output: {vault_root}")

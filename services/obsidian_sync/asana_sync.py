@@ -200,7 +200,7 @@ def rich_text_to_md(notes, html_notes=None):
         text = re.sub(r"<s>(.*?)</s>", r"~~\1~~", text, flags=re.DOTALL)
         text = re.sub(r"<u>(.*?)</u>", r"\1", text, flags=re.DOTALL)
         text = re.sub(r"<code>(.*?)</code>", r"`\1`", text, flags=re.DOTALL)
-        text = re.sub(r"<a\s+href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", r"[\2](\1)", text, flags=re.DOTALL)
+        text = re.sub(r"<a\b[^>]*?\shref=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", r"[\2](\1)", text, flags=re.DOTALL)
         text = re.sub(r"<br\s*/?>", "\n", text)
         text = re.sub(r"<hr\s*/?>", "\n---\n", text)
         # Lists
@@ -219,174 +219,12 @@ def rich_text_to_md(notes, html_notes=None):
 
 
 # ──────────────────────────────────────────────
-# USER-NAME RESOLUTION (for @mention URLs in descriptions/comments)
-# ──────────────────────────────────────────────
-
-USERS_CACHE_FILE = ".asana_users_cache.json"
-
-# Asana serves two profile-URL shapes in notes/html_notes/stories:
-#   /1/<workspace_gid>/profile/<user_gid>  (the user-facing URL in the address bar)
-#   /0/profile/<user_gid>                  (legacy form Asana still emits in comments)
-# Match either by accepting one or more numeric path segments before /profile/.
-_PROFILE_URL_RE = re.compile(r"https://app\.asana\.com/(?:\d+/)+profile/(\d+)")
-_MD_LINK_PROFILE_RE = re.compile(
-    r"\[(https://app\.asana\.com/(?:\d+/)+profile/\d+)\]"
-    r"\((https://app\.asana\.com/(?:\d+/)+profile/(\d+))\)"
-)
-_BARE_PROFILE_RE = re.compile(
-    r"(?<!\]\()"
-    r"https://app\.asana\.com/(?:\d+/)+profile/(\d+)"
-)
-
-
-def load_user_cache(vault_root):
-    """Load the persisted GID → name cache. Missing/corrupt file returns {}."""
-    path = Path(vault_root) / USERS_CACHE_FILE
-    if not path.is_file():
-        return {}
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        return {str(k): v for k, v in data.items() if isinstance(v, str) and v}
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def save_user_cache(vault_root, cache):
-    """Persist only positively-resolved entries (ignore sentinels)."""
-    path = Path(vault_root) / USERS_CACHE_FILE
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        clean = {gid: name for gid, name in cache.items() if name}
-        with path.open("w", encoding="utf-8") as f:
-            json.dump(clean, f, indent=2, sort_keys=True)
-    except OSError as exc:
-        print(f"  Warning: could not persist user cache: {exc}")
-
-
-def seed_cache_from_workspace(session, workspace_gid, name_cache):
-    """Pull every workspace member's (gid, name) in one paginated call.
-
-    This is the canonical GID Asana embeds in ``/profile/<gid>`` URLs
-    — the same user's ``created_by.gid`` on stories is a different,
-    workspace-agnostic representation that won't match those URLs.
-    Calling this once per workspace at the start of a sync covers
-    every @mentioned person (active or guest) without needing the
-    ``/users/<gid>`` endpoint, which 404s for users outside the PAT
-    owner's direct workspace.
-
-    Returns the number of new names added.
-    """
-    if not workspace_gid:
-        return 0
-    try:
-        # Asana's /workspaces/<gid>/users is non-paginated and errors with 400
-        # for workspaces above a certain size. The recommended path is
-        # /users?workspace=<gid>, which supports pagination.
-        users = asana_get(session, "users", {"workspace": workspace_gid, "opt_fields": "name"})
-    except requests.HTTPError as exc:
-        resp = getattr(exc, "response", None)
-        status = getattr(resp, "status_code", "?")
-        body = getattr(resp, "text", "")[:300] if resp is not None else ""
-        print(f"    Workspace users fetch failed (ws={workspace_gid}, status={status}) body={body!r}")
-        return 0
-    added = 0
-    for u in users or []:
-        gid = u.get("gid")
-        name = u.get("name")
-        if gid and name and not name_cache.get(gid):
-            name_cache[gid] = name
-            added += 1
-    return added
-
-
-def harvest_known_users(task, subtasks, stories, name_cache):
-    """Populate name_cache with GID->name pairs we already have in-hand.
-
-    The /users/<gid> endpoint 404s for users outside the PAT owner's
-    workspace, which covers most @mentioned people on migration tasks
-    (CNX team, vendor guests, etc.). But we already receive their GIDs
-    and names attached to task.assignee, subtask.assignee, and
-    story.created_by. Harvesting those makes the resolver work for
-    anyone who has ever commented on or been assigned to a task — no
-    extra API calls required.
-    """
-    def _add(user_obj):
-        if not user_obj:
-            return
-        gid = user_obj.get("gid")
-        name = user_obj.get("name")
-        # Only fill in if missing or previously recorded as "unresolvable";
-        # a positive resolution always wins.
-        if gid and name and not name_cache.get(gid):
-            name_cache[gid] = name
-
-    _add(task.get("assignee"))
-    for st in subtasks or []:
-        _add(st.get("assignee"))
-    for story in stories or []:
-        _add(story.get("created_by"))
-
-
-def resolve_profile_mentions(text, session, name_cache):
-    """Replace bare Asana profile URLs in text with [Name](url) markdown links.
-
-    Uses ``name_cache`` (GID → name, or GID → None for unresolvable) so each
-    unique GID is looked up at most once per sync. Handles two input shapes
-    that our HTML→MD converter produces:
-
-    1. ``[<profile-url>](<same-profile-url>)`` — the link text equals the href
-       because Asana's ``html_notes`` wraps @mentions without a visible label
-       and our regex copies the URL into both positions.
-    2. Bare ``https://app.asana.com/.../profile/<gid>`` URLs that never made
-       it into an anchor tag.
-
-    Unresolvable GIDs (deleted users, 403s) are left as plain URLs.
-    """
-    if not text or "/profile/" not in text:
-        return text
-
-    gids = set(_PROFILE_URL_RE.findall(text))
-    for gid in gids:
-        if gid in name_cache:
-            continue
-        try:
-            user = asana_get_single(session, f"users/{gid}", {"opt_fields": "name"})
-            name = (user or {}).get("name")
-            name_cache[gid] = name if name else None
-        except requests.HTTPError as exc:
-            status = getattr(getattr(exc, "response", None), "status_code", "?")
-            print(f"    Asana users/{gid}: {status} — leaving as bare URL")
-            name_cache[gid] = None
-        except requests.RequestException as exc:
-            print(f"    Asana users/{gid}: network error ({exc}) — leaving as bare URL")
-            name_cache[gid] = None
-
-    def _fix_link(match):
-        href = match.group(2)
-        gid = match.group(3)
-        name = name_cache.get(gid)
-        return f"[{name}]({href})" if name else match.group(0)
-
-    text = _MD_LINK_PROFILE_RE.sub(_fix_link, text)
-
-    def _wrap_bare(match):
-        url = match.group(0)
-        gid = match.group(1)
-        name = name_cache.get(gid)
-        return f"[{name}]({url})" if name else url
-
-    text = _BARE_PROFILE_RE.sub(_wrap_bare, text)
-    return text
-
-
-# ──────────────────────────────────────────────
 # DATA FETCHING
 # ──────────────────────────────────────────────
 
 TASK_OPT_FIELDS = ",".join([
     "name", "notes", "html_notes", "completed", "completed_at",
-    "assignee.name", "assignee.email", "assignee.gid",
+    "assignee.name", "assignee.email",
     "created_at", "modified_at", "due_on", "due_at", "start_on", "start_at",
     "tags.name", "memberships.section.name",
     "custom_fields.name", "custom_fields.display_value",
@@ -398,7 +236,7 @@ TASK_OPT_FIELDS = ",".join([
 def fetch_project_info(session, project_gid):
     """Fetch project metadata."""
     return asana_get_single(session, f"projects/{project_gid}", {
-        "opt_fields": "name,notes,owner.name,created_at,modified_at,team.name,workspace.gid",
+        "opt_fields": "name,notes,owner.name,created_at,modified_at,team.name",
     })
 
 
@@ -432,14 +270,14 @@ def fetch_project_tasks(session, project_gid, since=None):
 def fetch_subtasks(session, task_gid):
     """Fetch subtasks of a given task."""
     return asana_get(session, f"tasks/{task_gid}/subtasks", {
-        "opt_fields": "name,completed,assignee.name,assignee.gid,due_on,permalink_url",
+        "opt_fields": "name,completed,assignee.name,due_on,permalink_url",
     })
 
 
 def fetch_stories(session, task_gid):
     """Fetch comments/stories for a task."""
     return asana_get(session, f"tasks/{task_gid}/stories", {
-        "opt_fields": "type,text,html_text,created_by.name,created_by.gid,created_at",
+        "opt_fields": "type,text,html_text,created_by.name,created_at",
     })
 
 
@@ -505,14 +343,13 @@ def build_task_markdown(
     subtasks=None,
     stories=None,
     downloaded_attachments=None,
-    session=None,
-    name_cache=None,
 ):
     """Build full Obsidian markdown for a single Asana task.
 
-    When ``session`` and ``name_cache`` are supplied, any Asana profile URLs
-    in the task description and comments are rewritten as ``[Name](url)``
-    markdown links; missing resolutions fall through as plain URLs.
+    @mentions in descriptions and comments are resolved by reading the
+    display name out of Asana's ``html_notes``/``html_text`` anchor tags
+    (``<a data-asana-gid="..." href="...">Name</a>``); no user-lookup
+    API calls are needed.
     """
     if subtasks is None:
         subtasks = []
@@ -535,11 +372,6 @@ def build_task_markdown(
     notes = task.get("notes", "")
     html_notes = task.get("html_notes", "")
     description = rich_text_to_md(notes, html_notes)
-    if session is not None and name_cache is not None:
-        # Seed the cache with any identities we already have on this task
-        # so users outside the PAT's workspace still get resolved.
-        harvest_known_users(task, subtasks, stories, name_cache)
-        description = resolve_profile_mentions(description, session, name_cache)
 
     # Section from memberships
     section = ""
@@ -688,19 +520,20 @@ def build_task_markdown(
             parts.append("")
 
     # ── Comments ──
-    comments = [s for s in stories if s.get("type") == "comment" and s.get("text")]
+    comments = [
+        s for s in stories
+        if s.get("type") == "comment" and (s.get("text") or s.get("html_text"))
+    ]
     if comments:
         parts.append("## Comments")
         parts.append("")
         for comment in comments:
             author = person_name(comment.get("created_by"))
             date = format_datetime(comment.get("created_at"))
-            text = comment.get("text", "")
-            if session is not None and name_cache is not None:
-                text = resolve_profile_mentions(text, session, name_cache)
+            body = rich_text_to_md(comment.get("text"), comment.get("html_text"))
             parts.append(f"### {author} — {date}")
             parts.append("")
-            parts.append(text)
+            parts.append(body)
             parts.append("")
 
     return "\n".join(parts)
@@ -925,7 +758,7 @@ def save_file_index(project_dir, index):
 # MAIN
 # ──────────────────────────────────────────────
 
-def sync_project(session, project_name, project_gid, full_refresh=False, name_cache=None):
+def sync_project(session, project_name, project_gid, full_refresh=False):
     """Sync a single Asana project to markdown files."""
     print(f"\n{'='*60}")
     print(f"  Syncing: {project_name} (GID: {project_gid})")
@@ -953,15 +786,6 @@ def sync_project(session, project_name, project_gid, full_refresh=False, name_ca
     project_info = fetch_project_info(session, project_gid)
     sections = fetch_sections(session, project_gid)
     print(f"  Found {len(sections)} sections")
-
-    # Seed the user-name cache with every workspace member so @mention URLs
-    # in task descriptions and comments resolve to real names.
-    if name_cache is not None:
-        workspace_gid = ((project_info or {}).get("workspace") or {}).get("gid")
-        if workspace_gid:
-            added = seed_cache_from_workspace(session, workspace_gid, name_cache)
-            if added:
-                print(f"  Seeded {added} workspace user name(s) into cache.")
 
     # Fetch all tasks
     tasks = fetch_project_tasks(session, project_gid, since=since)
@@ -1060,8 +884,6 @@ def sync_project(session, project_name, project_gid, full_refresh=False, name_ca
             subtasks,
             stories,
             downloaded,
-            session=session,
-            name_cache=name_cache,
         )
 
         # Write file — organized by section
@@ -1171,20 +993,10 @@ def main():
         print(f"ERROR: Authentication failed. Check your ASANA_PAT.\n{e}")
         sys.exit(1)
 
-    # Load user-name cache once so every project shares it within this run
-    # and across runs via the persisted JSON file.
-    name_cache = load_user_cache(VAULT_ROOT)
-    cache_start_size = len(name_cache)
-
     # Sync each project
     for name in project_names:
         gid = PROJECT_MAP[name]
-        sync_project(session, name, gid, full_refresh, name_cache=name_cache)
-
-    save_user_cache(VAULT_ROOT, name_cache)
-    added = sum(1 for v in name_cache.values() if v) - cache_start_size
-    if added > 0:
-        print(f"  User cache: +{added} new name(s), {sum(1 for v in name_cache.values() if v)} total.")
+        sync_project(session, name, gid, full_refresh)
 
     print(f"\n{'='*60}")
     print(f"  All done! Synced {len(project_names)} project(s).")
