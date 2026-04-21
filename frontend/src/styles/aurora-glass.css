@@ -55,7 +55,7 @@
   --lcc-radius-sm: 8px;
   --lcc-topbar-h:  60px;
   --lcc-rail-w:    240px;
-  --lcc-stream-w:  360px;
+  --lcc-stream-w:  400px;
 
   /* Apply background + tokens on the wrapper itself.  */
   position: relative;
@@ -189,14 +189,12 @@
   display: grid;
   grid-template-columns: var(--lcc-rail-w) 1fr var(--lcc-stream-w);
   gap: 14px;
-  padding: 14px;
-  max-width: 2000px;
-  margin: 0 auto;
+  padding: 14px 0;
 }
 
 @media (max-width: 1400px) {
   .launch-dashboard .lcc-shell {
-    grid-template-columns: 200px 1fr 320px;
+    grid-template-columns: 200px 1fr 340px;
   }
 }
 

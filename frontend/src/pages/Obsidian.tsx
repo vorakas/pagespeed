@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, RefreshCw, FolderTree, FileText } from "lucide-react"
+import { Loader2, RefreshCw, FolderTree, FileText, ChevronRight, ChevronDown } from "lucide-react"
 import { api } from "@/services/api"
 import type {
   ObsidianCapabilities,
@@ -276,8 +276,11 @@ interface TreeViewProps {
   depth?: number
 }
 
+const DEFAULT_OPEN_PATHS = new Set<string>(["raw", "raw/asana"])
+
 function TreeView({ node, selectedPath, onSelect, depth = 0 }: TreeViewProps) {
   const indent = useMemo(() => ({ paddingLeft: `${depth * 12}px` }), [depth])
+  const [open, setOpen] = useState(depth === 0 || DEFAULT_OPEN_PATHS.has(node.path))
 
   if (!node.isDir) {
     const isSelected = selectedPath === node.path
@@ -299,22 +302,31 @@ function TreeView({ node, selectedPath, onSelect, depth = 0 }: TreeViewProps) {
   return (
     <div>
       {depth > 0 && (
-        <div
-          className="text-xs font-medium text-muted-foreground px-1.5 py-0.5"
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center gap-1 text-left text-xs font-medium text-muted-foreground rounded px-1.5 py-0.5 hover:bg-muted/50"
           style={indent}
+          aria-expanded={open}
         >
-          {node.name}/
-        </div>
+          {open ? (
+            <ChevronDown size={12} className="shrink-0" />
+          ) : (
+            <ChevronRight size={12} className="shrink-0" />
+          )}
+          <span>{node.name}/</span>
+        </button>
       )}
-      {node.children?.map((child) => (
-        <TreeView
-          key={child.path}
-          node={child}
-          selectedPath={selectedPath}
-          onSelect={onSelect}
-          depth={depth + 1}
-        />
-      ))}
+      {open &&
+        node.children?.map((child) => (
+          <TreeView
+            key={child.path}
+            node={child}
+            selectedPath={selectedPath}
+            onSelect={onSelect}
+            depth={depth + 1}
+          />
+        ))}
     </div>
   )
 }

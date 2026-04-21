@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import { useTheme } from "@/hooks/use-theme"
 
 import { cn } from "@/lib/utils"
@@ -69,8 +69,22 @@ const navSections: NavSection[] = [
   },
 ]
 
+function isItemActive(
+  href: string,
+  pathname: string,
+  hash: string,
+): boolean {
+  const [linkPath, linkHash = ""] = href.split("#")
+  const currentHash = hash.startsWith("#") ? hash.slice(1) : hash
+  if (linkPath === "/") {
+    return pathname === "/" && !currentHash
+  }
+  return pathname === linkPath && currentHash === linkHash
+}
+
 export function Sidebar() {
   const { theme, toggleTheme } = useTheme()
+  const location = useLocation()
 
   return (
     <aside className="fixed left-3 top-3 bottom-3 z-50 flex w-[220px] flex-col rounded-xl border border-sidebar-border bg-sidebar shadow-lg">
@@ -95,24 +109,24 @@ export function Sidebar() {
             <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               {section.title}
             </p>
-            {section.items.map((item) => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                end={item.href === "/"}
-                className={({ isActive }) =>
-                  cn(
+            {section.items.map((item) => {
+              const active = isItemActive(item.href, location.pathname, location.hash)
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={cn(
                     "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors",
-                    isActive
+                    active
                       ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                  )
-                }
-              >
-                {item.icon}
-                {item.label}
-              </NavLink>
-            ))}
+                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+                  )}
+                >
+                  {item.icon}
+                  {item.label}
+                </Link>
+              )
+            })}
           </div>
         ))}
       </nav>
