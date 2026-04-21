@@ -4,6 +4,8 @@ import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { TopBar, type HealthFilter } from "@/components/launch-dashboard/TopBar"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
+import { HeroStrip } from "@/components/launch-dashboard/HeroStrip"
+import { ReadinessWall } from "@/components/launch-dashboard/ReadinessWall"
 import type {
   MigrationBlocker,
   MigrationHealthSnapshot,
@@ -71,12 +73,6 @@ export function LaunchDashboard() {
     )
   }
 
-  const filteredWorkstreams = workstreams.filter((w) => {
-    if (activeArea && (w.area ?? "Unsorted") !== activeArea) return false
-    if (filter !== "all" && w.status !== filter) return false
-    return true
-  })
-
   return (
     <LaunchShell>
       <TopBar
@@ -95,30 +91,16 @@ export function LaunchDashboard() {
         />
 
         <main className="lcc-main">
-          <div className="panel" style={{ padding: "18px 20px" }}>
-            <h3 style={{ margin: 0, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--lcc-text-faint)", fontWeight: 600 }}>
-              Workstreams · {filteredWorkstreams.length} / {workstreams.length}
-            </h3>
-            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
-              {filteredWorkstreams.map((w) => (
-                <div key={w.id} className="panel" style={{ padding: "10px 12px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{w.name}</div>
-                    <span className="lcc-chip" data-health={w.status ?? undefined}>{w.status ?? "—"}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--lcc-text-faint)", marginTop: 4, fontFamily: "var(--font-mono)" }}>
-                    {w.area ?? "unsorted"} · {w.closed}/{w.tasks} closed
-                    {w.blockers.length > 0 && ` · ${w.blockers.length} blocker${w.blockers.length === 1 ? "" : "s"}`}
-                  </div>
-                </div>
-              ))}
-              {filteredWorkstreams.length === 0 && (
-                <div style={{ color: "var(--lcc-text-faint)", fontSize: 12, padding: 16 }}>
-                  No workstreams match the current filters.
-                </div>
-              )}
-            </div>
-          </div>
+          <HeroStrip health={health} />
+
+          <ReadinessWall
+            rows={workstreams}
+            onPick={() => {
+              /* phase d: opens side panel */
+            }}
+            areaFilter={activeArea}
+            healthFilter={filter}
+          />
 
           <div id="incidents" className="panel" style={{ padding: "18px 20px" }}>
             <h3 style={{ margin: 0, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--lcc-text-faint)", fontWeight: 600 }}>
