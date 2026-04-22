@@ -185,6 +185,15 @@ def create_app() -> Flask:
 
     def _post_sync(_job):
         migration_dashboard_service.invalidate_cache()
+        # Touch a sentinel so the dashboard's "synced X ago" advances even
+        # when an incremental sync found no upstream changes (directory
+        # mtimes don't update if no files were written).
+        try:
+            sentinel = os.path.join(OBSIDIAN_VAULT_ROOT, ".last_sync")
+            with open(sentinel, "w", encoding="utf-8") as fh:
+                fh.write("")
+        except OSError:
+            logging.exception("Failed to touch sentinel after sync")
         try:
             snapshot_service.ingest_vault()
         except Exception:

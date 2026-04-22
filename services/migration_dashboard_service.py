@@ -450,6 +450,7 @@ class MigrationDashboardService:
             f"wiki/archive/status-{date_str}.md",
             "raw/asana",
             "raw/jira",
+            ".last_sync",
         ):
             path = self._vault.root / rel
             if path.exists():
