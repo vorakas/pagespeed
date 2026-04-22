@@ -1184,25 +1184,26 @@
   position: fixed;
   pointer-events: none;
   z-index: 0;
-  filter: blur(90px);
-  opacity: 0.7;
+  /* Smaller blur + tighter gradient stops = less banding. Dropping blur
+   * from 90px to 60px sharpens the gradient enough that each color step
+   * covers fewer pixels, which keeps 8-bit banding below the perceptual
+   * threshold on most displays. */
+  filter: blur(60px);
+  opacity: 0.65;
 }
 .aurora-app-shell::before {
   top: -20%; left: -10%;
   width: 70%; height: 70%;
   background:
-    radial-gradient(40% 40% at 30% 40%, var(--aurora-glow-violet) 0%, transparent 70%),
-    radial-gradient(45% 50% at 70% 30%, var(--aurora-glow-teal) 0%, transparent 70%);
-  /* Animation intentionally disabled: animated large-radius blurred
-   * gradients quantize into visible banding on many GPUs. Keeping the
-   * static gradient for the aurora look without the shimmer. */
+    radial-gradient(40% 40% at 30% 40%, var(--aurora-glow-violet) 0%, transparent 55%),
+    radial-gradient(45% 50% at 70% 30%, var(--aurora-glow-teal) 0%, transparent 55%);
 }
 .aurora-app-shell::after {
   bottom: -25%; right: -15%;
   width: 80%; height: 80%;
   background:
-    radial-gradient(40% 45% at 70% 60%, var(--aurora-glow-pink) 0%, transparent 70%),
-    radial-gradient(45% 50% at 30% 60%, var(--aurora-glow-cyan) 0%, transparent 70%);
+    radial-gradient(40% 45% at 70% 60%, var(--aurora-glow-pink) 0%, transparent 55%),
+    radial-gradient(45% 50% at 30% 60%, var(--aurora-glow-cyan) 0%, transparent 55%);
 }
 /* Keep main above the blob backdrop without overriding the sidebar's
  * Tailwind `.fixed` class (equal specificity; later-loaded rule wins). */
