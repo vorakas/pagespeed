@@ -53,6 +53,12 @@ class SnapshotPayload:
     new_items: List[Dict[str, Any]] = field(default_factory=list)
     status_changes: List[Dict[str, Any]] = field(default_factory=list)
     positives: List[Dict[str, Any]] = field(default_factory=list)
+    retest: List[Dict[str, Any]] = field(default_factory=list)
+    analytics_blockers: List[Dict[str, Any]] = field(default_factory=list)
+    open_high_pri: List[Dict[str, Any]] = field(default_factory=list)
+    mao: List[Dict[str, Any]] = field(default_factory=list)
+    private_link_gaps: List[Dict[str, Any]] = field(default_factory=list)
+    lpwe_unestimated: List[Dict[str, Any]] = field(default_factory=list)
     change_summary: Dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -69,6 +75,12 @@ class SnapshotPayload:
             "newItems": list(self.new_items),
             "statusChanges": list(self.status_changes),
             "positives": list(self.positives),
+            "retest": list(self.retest),
+            "analyticsBlockers": list(self.analytics_blockers),
+            "openHighPri": list(self.open_high_pri),
+            "mao": list(self.mao),
+            "privateLinkGaps": list(self.private_link_gaps),
+            "lpweUnestimated": list(self.lpwe_unestimated),
             "changeSummary": dict(self.change_summary),
         }
 
@@ -96,6 +108,11 @@ def parse_status_markdown(text: str, fallback_date: Optional[str] = None) -> Sna
     new_items = _parse_new_items(body)
     status_changes = _parse_status_changes(body)
     positives = _parse_positives(body)
+    retest = _parse_retest(body)
+    analytics_blockers = _parse_analytics_blockers(body)
+    open_high_pri = _parse_open_high_pri(body)
+    order_int = _parse_order_integration(body)
+    lpwe_unestimated = _parse_lpwe_unestimated(body)
 
     kpis = _derive_kpis(
         source_coverage=source_coverage,
@@ -126,6 +143,12 @@ def parse_status_markdown(text: str, fallback_date: Optional[str] = None) -> Sna
         new_items=new_items,
         status_changes=status_changes,
         positives=positives,
+        retest=retest,
+        analytics_blockers=analytics_blockers,
+        open_high_pri=open_high_pri,
+        mao=order_int["mao"],
+        private_link_gaps=order_int["privateLink"],
+        lpwe_unestimated=lpwe_unestimated,
         change_summary=change_summary,
     )
 
@@ -261,6 +284,13 @@ _HEADING_POSITIVE = re.compile(r"^#{2,}\s*Positive Developments\b", re.IGNORECAS
 _HEADING_BLOCKED = re.compile(r"^#{2,}\s*Blocked Workstreams\b", re.IGNORECASE)
 _SUBHEADING_CRIT_BUGS = re.compile(r"^#{3,}\s*.*Critical Bugs\b", re.IGNORECASE)
 _SUBHEADING_PROD = re.compile(r"^#{3,}\s*.*Production Failures\b", re.IGNORECASE)
+_SUBHEADING_RETEST = re.compile(r"^#{3,}\s*.*Awaiting Retest\b", re.IGNORECASE)
+_SUBHEADING_ANALYTICS = re.compile(r"^#{3,}\s*.*Analytics Blocker", re.IGNORECASE)
+_SUBHEADING_OPEN_HIGH = re.compile(r"^#{3,}\s*.*Open High-Priority", re.IGNORECASE)
+_SUBHEADING_ORDER_INT = re.compile(r"^#{3,}\s*.*Order Integration", re.IGNORECASE)
+_SUBHEADING_LPWE_UNEST = re.compile(r"^#{3,}\s*.*Unestimated", re.IGNORECASE)
+
+_BOLD_LABEL_RE = re.compile(r"^\*\*([^*]+?):\*\*\s*$")
 
 
 def _extract_headline(body: str) -> Optional[str]:
@@ -482,6 +512,152 @@ def _parse_positives(body: str) -> List[Dict[str, Any]]:
     return out
 
 
+def _row_id_title(cell: str) -> Tuple[str, str]:
+    """Extract (id, title) from a table cell, tolerating non-wikilink rows.
+
+    Preferred path: a ``[[id - title|id]]`` wikilink. Fallback: plain
+    text starting with a recognizable task identifier (``LAMPSPLUS-123``
+    or a 3+ digit numeric Asana id); anything after the id becomes the
+    title. This keeps rows like ``548034 (no raw file …)`` usable instead
+    of collapsing the whole cell into the id field.
+    """
+    if _WIKILINK_RE.search(cell):
+        return _wikilink_target(cell)
+    plain = _strip_markup(cell)
+    m = re.match(r"^([A-Z][A-Z0-9]*-\d+|\d{3,})\b", plain)
+    if m:
+        leading = m.group(1)
+        rest = plain[len(leading):].strip(" -—(\"'")
+        return leading, rest or leading
+    return plain, plain
+
+
+def _parse_retest(body: str) -> List[Dict[str, Any]]:
+    """Rows under the ``Awaiting Retest`` sub-heading (Cybersource, etc.)."""
+    crit_lines = _section_lines(body, _HEADING_CRIT)
+    sub_lines = _subsection_lines(crit_lines, _SUBHEADING_RETEST)
+    out: List[Dict[str, Any]] = []
+    for cells in _iter_table_rows(sub_lines):
+        if len(cells) < 2:
+            continue
+        task_id, _ = _row_id_title(cells[0])
+        title = _strip_markup(cells[1])
+        who = _strip_markup(cells[2]) if len(cells) > 2 else ""
+        status = _strip_markup(cells[3]) if len(cells) > 3 else ""
+        entry: Dict[str, Any] = {"id": task_id, "title": title}
+        if who:
+            entry["who"] = who
+        if status:
+            entry["status"] = status
+        out.append(entry)
+    return out
+
+
+def _parse_analytics_blockers(body: str) -> List[Dict[str, Any]]:
+    """Rows under ``Analytics Blocker(s)`` sub-heading."""
+    crit_lines = _section_lines(body, _HEADING_CRIT)
+    sub_lines = _subsection_lines(crit_lines, _SUBHEADING_ANALYTICS)
+    out: List[Dict[str, Any]] = []
+    for cells in _iter_table_rows(sub_lines):
+        if len(cells) < 2:
+            continue
+        task_id, _ = _row_id_title(cells[0])
+        title = _strip_markup(cells[1])
+        who = _strip_markup(cells[2]) if len(cells) > 2 else ""
+        priority = _strip_markup(cells[3]) if len(cells) > 3 else ""
+        entry: Dict[str, Any] = {"id": task_id, "title": title}
+        if who:
+            entry["who"] = who
+        if priority:
+            entry["priority"] = priority
+        out.append(entry)
+    return out
+
+
+def _parse_open_high_pri(body: str) -> List[Dict[str, Any]]:
+    """Bold-labeled subsections under ``Open High-Priority Bugs``.
+
+    Returns a list of ``{label, items: [{id, title, priority, status?}]}``
+    preserving source order (PDP Issues → Cart / Checkout Issues → …).
+    """
+    crit_lines = _section_lines(body, _HEADING_CRIT)
+    sub_lines = _subsection_lines(crit_lines, _SUBHEADING_OPEN_HIGH)
+    groups = _parse_bold_subsections(sub_lines)
+    out: List[Dict[str, Any]] = []
+    for label, rows in groups:
+        items: List[Dict[str, Any]] = []
+        for cells in rows:
+            if len(cells) < 2:
+                continue
+            task_id, _ = _row_id_title(cells[0])
+            title = _strip_markup(cells[1])
+            priority = _strip_markup(cells[2]) if len(cells) > 2 else ""
+            status = _strip_markup(cells[3]) if len(cells) > 3 else ""
+            entry: Dict[str, Any] = {"id": task_id, "title": title}
+            if priority:
+                entry["priority"] = priority
+            if status:
+                entry["status"] = status
+            items.append(entry)
+        if items:
+            out.append({"label": label, "items": items})
+    return out
+
+
+def _parse_order_integration(body: str) -> Dict[str, List[Dict[str, Any]]]:
+    """Bold-labeled subsections under ``Order Integration Bugs``.
+
+    Splits into ``mao`` (MAO Interface table: id/title/status) and
+    ``privateLink`` (Private Link Order History table: id/field).
+    """
+    crit_lines = _section_lines(body, _HEADING_CRIT)
+    sub_lines = _subsection_lines(crit_lines, _SUBHEADING_ORDER_INT)
+    groups = _parse_bold_subsections(sub_lines)
+    mao: List[Dict[str, Any]] = []
+    pl: List[Dict[str, Any]] = []
+    for label, rows in groups:
+        label_lower = label.lower()
+        if label_lower.startswith("mao"):
+            for cells in rows:
+                if len(cells) < 2:
+                    continue
+                task_id, _ = _row_id_title(cells[0])
+                title = _strip_markup(cells[1])
+                status = _strip_markup(cells[2]) if len(cells) > 2 else ""
+                entry: Dict[str, Any] = {"id": task_id, "title": title}
+                if status:
+                    entry["status"] = status
+                    if "uat" in status.lower() and "stage" in status.lower():
+                        entry["ok"] = True
+                mao.append(entry)
+        elif label_lower.startswith("private link"):
+            for cells in rows:
+                if len(cells) < 2:
+                    continue
+                task_id, _ = _row_id_title(cells[0])
+                field = _strip_markup(cells[1])
+                pl.append({"id": task_id, "field": field})
+    return {"mao": mao, "privateLink": pl}
+
+
+def _parse_lpwe_unestimated(body: str) -> List[Dict[str, Any]]:
+    """Rows under ``Unestimated Critical LPWE Tasks``."""
+    crit_lines = _section_lines(body, _HEADING_CRIT)
+    sub_lines = _subsection_lines(crit_lines, _SUBHEADING_LPWE_UNEST)
+    out: List[Dict[str, Any]] = []
+    for cells in _iter_table_rows(sub_lines):
+        if len(cells) < 2:
+            continue
+        task_id, _ = _row_id_title(cells[0])
+        title = _strip_markup(cells[1])
+        estimate = _strip_markup(cells[2]) if len(cells) > 2 else ""
+        entry: Dict[str, Any] = {"id": task_id, "title": title}
+        if estimate:
+            entry["estimate"] = estimate
+        out.append(entry)
+    return out
+
+
 def _subsection_lines(parent_lines: List[str], subheading_pattern: re.Pattern) -> List[str]:
     """Slice a section's lines by an inner subheading pattern."""
     out: List[str] = []
@@ -500,6 +676,31 @@ def _subsection_lines(parent_lines: List[str], subheading_pattern: re.Pattern) -
                 break
         out.append(line)
     return out
+
+
+def _parse_bold_subsections(section_lines: List[str]) -> List[Tuple[str, List[List[str]]]]:
+    """Split a section's lines by ``**Label:**`` markers into ordered groups.
+
+    Used for sections like *Open High-Priority Bugs* that use bold inline
+    labels (``**PDP Issues:**``, ``**Cart / Checkout Issues:**``) between
+    inline tables instead of nested ``####`` sub-headings. Returns a list
+    of ``(label, table_rows)`` tuples preserving source order.
+    """
+    groups: List[Tuple[str, List[str]]] = []
+    current_label: Optional[str] = None
+    current_lines: List[str] = []
+    for line in section_lines:
+        m = _BOLD_LABEL_RE.match(line.strip())
+        if m:
+            if current_label is not None:
+                groups.append((current_label, current_lines))
+            current_label = m.group(1).strip()
+            current_lines = []
+        elif current_label is not None:
+            current_lines.append(line)
+    if current_label is not None:
+        groups.append((current_label, current_lines))
+    return [(label, _iter_table_rows(lines)) for label, lines in groups]
 
 
 # ── Derivations & normalization ────────────────────────────────────────

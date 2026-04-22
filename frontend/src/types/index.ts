@@ -881,6 +881,50 @@ export interface SnapshotChangeSummary {
   onHold: number
 }
 
+export interface SnapshotRetestItem {
+  id: string
+  title: string
+  who?: string
+  status?: string
+}
+
+export interface SnapshotAnalyticsBlocker {
+  id: string
+  title: string
+  who?: string
+  priority?: string
+}
+
+export interface SnapshotOpenHighPriItem {
+  id: string
+  title: string
+  priority?: string
+  status?: string
+}
+
+export interface SnapshotOpenHighPriGroup {
+  label: string
+  items: SnapshotOpenHighPriItem[]
+}
+
+export interface SnapshotMaoItem {
+  id: string
+  title: string
+  status?: string
+  ok?: boolean
+}
+
+export interface SnapshotPrivateLinkGap {
+  id: string
+  field: string
+}
+
+export interface SnapshotLpweUnestimated {
+  id: string
+  title: string
+  estimate?: string
+}
+
 export interface MigrationSnapshot {
   date: string
   overall: string | null
@@ -894,6 +938,12 @@ export interface MigrationSnapshot {
   newItems: SnapshotTaskItem[]
   statusChanges: SnapshotStatusChange[]
   positives: SnapshotPositive[]
+  retest: SnapshotRetestItem[]
+  analyticsBlockers: SnapshotAnalyticsBlocker[]
+  openHighPri: SnapshotOpenHighPriGroup[]
+  mao: SnapshotMaoItem[]
+  privateLinkGaps: SnapshotPrivateLinkGap[]
+  lpweUnestimated: SnapshotLpweUnestimated[]
   changeSummary: SnapshotChangeSummary
   sourcePath?: string | null
   ingestedAt?: string | null
