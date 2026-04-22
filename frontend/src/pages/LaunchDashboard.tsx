@@ -44,15 +44,25 @@ export function LaunchDashboard() {
   const [sources, setSources] = useState<MigrationSource[] | null>(null)
   const [snapshotDiff, setSnapshotDiff] = useState<MigrationSnapshotDiffResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   const [filter, setFilter] = useState<HealthFilter>("all")
   const [activeArea, setActiveArea] = useState<string | null>(null)
   const [streamFilter, setStreamFilter] = useState<IncidentFilter>("all")
   const [sidePanelTarget, setSidePanelTarget] = useState<SidePanelTarget | null>(null)
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (force: boolean = false) => {
     setError(null)
+    if (force) setRefreshing(true)
     try {
+      if (force) {
+        // Drop the in-process service cache and re-parse status files so
+        // the next reads hit the vault fresh. Errors swallowed — if the
+        // endpoints 404 (e.g. no snapshots yet) we still want the rest to
+        // proceed.
+        await fetch("/api/dashboard/cache/invalidate", { method: "POST" }).catch(() => null)
+        await fetch("/api/dashboard/snapshots/reingest", { method: "POST" }).catch(() => null)
+      }
       const [h, k, ws, bl, pf, nb, ts, tr, tm, sr, sd] = await Promise.all([
         api.getMigrationHealth(),
         api.getMigrationKpis(),
@@ -80,6 +90,8 @@ export function LaunchDashboard() {
       setSnapshotDiff(sd)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard")
+    } finally {
+      setRefreshing(false)
     }
   }, [])
 
@@ -137,7 +149,8 @@ export function LaunchDashboard() {
         health={health}
         filter={filter}
         onFilterChange={setFilter}
-        onRefresh={() => void loadAll()}
+        onRefresh={() => void loadAll(true)}
+        refreshing={refreshing}
       />
       <div className="lcc-shell">
         <LeftRail

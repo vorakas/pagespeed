@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { Loader2, RotateCw } from "lucide-react"
 import type { MigrationHealthSnapshot } from "@/types"
 
 const HEALTH_LABEL: Record<string, string> = {
@@ -18,6 +19,7 @@ interface TopBarProps {
   filter: HealthFilter
   onFilterChange: (next: HealthFilter) => void
   onRefresh?: () => void
+  refreshing?: boolean
 }
 
 /**
@@ -26,7 +28,7 @@ interface TopBarProps {
  * The days-to-launch number is derived from real `Date.now()` — no
  * hardcoded anchor. "synced Nm ago" ticks every 30s.
  */
-export function TopBar({ health, filter, onFilterChange, onRefresh }: TopBarProps) {
+export function TopBar({ health, filter, onFilterChange, onRefresh, refreshing }: TopBarProps) {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -83,16 +85,31 @@ export function TopBar({ health, filter, onFilterChange, onRefresh }: TopBarProp
       <div className="lcc-sync">
         <span className="lcc-pulse" />
         <div>
-          <div>synced {syncedAgo ?? "—"}</div>
+          <div>{refreshing ? "refreshing…" : `synced ${syncedAgo ?? "—"}`}</div>
           <div className="lcc-sync-sub">
-            {health?.lastSynced ? new Date(health.lastSynced).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"} · auto 5m
+            {health?.lastSynced
+              ? new Date(health.lastSynced).toLocaleString([], {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "—"}
           </div>
         </div>
       </div>
 
       {onRefresh && (
-        <button type="button" className="lcc-tb-btn" onClick={onRefresh} aria-label="Refresh" title="Refresh">
-          ↻
+        <button
+          type="button"
+          className="lcc-tb-btn"
+          onClick={onRefresh}
+          disabled={refreshing}
+          aria-label="Refresh dashboard from vault"
+          title="Refresh — re-parse the vault and update all panels"
+          style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          {refreshing ? <Loader2 size={15} className="animate-spin" /> : <RotateCw size={14} />}
         </button>
       )}
     </div>
