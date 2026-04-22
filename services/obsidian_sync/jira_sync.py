@@ -189,8 +189,16 @@ def fetch_all_issues_jql(session, jql):
 
 
 def sanitize_filename(text):
-    """Remove characters that are problematic in file paths."""
-    return re.sub(r'[\\/:*?"<>|]', "-", text).strip()
+    """Strip characters problematic in file paths.
+
+    Handles NTFS-illegal characters and whitespace controls (newlines, CR,
+    tabs) that would produce filenames Windows cannot check out. Runs of
+    spaces and dashes are collapsed to singles for readability.
+    """
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[\\/:*?"<>|]', "-", text)
+    text = re.sub(r'-+', '-', text)
+    return text.strip().strip('-').strip()
 
 
 def format_date(iso_str):

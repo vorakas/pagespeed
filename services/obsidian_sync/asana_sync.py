@@ -127,8 +127,19 @@ def asana_get_single(session, endpoint, params=None):
 
 
 def sanitize_filename(text):
-    """Remove characters that are problematic in file paths or Obsidian wikilinks."""
-    return re.sub(r'[\\/:*?"<>|\[\]]', "-", text).strip()
+    """Strip characters problematic in file paths or Obsidian wikilinks.
+
+    Handles three classes of problems:
+    1. NTFS-illegal characters (\\ / : * ? " < > |) and wikilink brackets ([, ]).
+    2. Whitespace controls (newlines, carriage returns, tabs) that create
+       filenames Windows cannot check out even when git is happy to store them.
+    3. Runs of spaces or dashes introduced by steps 1 and 2 — collapsed to
+       singles so filenames stay readable.
+    """
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[\\/:*?"<>|\[\]]', "-", text)
+    text = re.sub(r'-+', '-', text)
+    return text.strip().strip('-').strip()
 
 
 def task_filename(gid, name):
