@@ -426,11 +426,29 @@ class MigrationDashboardService:
     # ── Helpers ──────────────────────────────────────────────────────
 
     def _status_file_mtime(self, date_str: str) -> Optional[str]:
-        for rel in (f"wiki/status-{date_str}.md", f"wiki/archive/status-{date_str}.md"):
+        """Most recent mtime across the status doc and the raw sync trees.
+
+        The dashboard's "last synced" should reflect when the vault last
+        received data from upstream — that's the sync writes under raw/,
+        not the human-authored status doc. We take the max of all signals
+        so an edit to the status doc still counts.
+        """
+        candidates: List[float] = []
+        for rel in (
+            f"wiki/status-{date_str}.md",
+            f"wiki/archive/status-{date_str}.md",
+            "raw/asana",
+            "raw/jira",
+        ):
             path = self._vault.root / rel
-            if path.is_file():
-                return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
-        return None
+            if path.exists():
+                try:
+                    candidates.append(path.stat().st_mtime)
+                except OSError:
+                    continue
+        if not candidates:
+            return None
+        return datetime.fromtimestamp(max(candidates), tz=timezone.utc).isoformat()
 
     def _read_status_body(self, rel_path: str) -> Optional[str]:
         path = self._vault.root / rel_path

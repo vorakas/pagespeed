@@ -43,7 +43,7 @@ export function TopBar({ health, filter, onFilterChange, onRefresh }: TopBarProp
         <div className="lcc-brand-dot" />
         <div>
           <div className="lcc-brand-name">LP / Adobe Migration</div>
-          <div className="lcc-brand-sub">Launch command center</div>
+          <div className="lcc-brand-sub">Dashboard</div>
         </div>
       </div>
 
