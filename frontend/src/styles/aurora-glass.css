@@ -93,9 +93,9 @@
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow-x: clip;
-  background:
-    radial-gradient(60% 45% at 50% 105%, var(--aurora-4) 0%, transparent 60%),
-    linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
+  /* Transparent so the app shell's gradient + aurora blobs show through,
+   * giving one continuous backdrop between the sidebar and the main. */
+  background: transparent;
 }
 
 /* ── Palette + density overrides ────────────────────────────────── */
@@ -114,35 +114,9 @@
 .launch-dashboard[data-density="roomy"]   { font-size: 14px; }
 
 /* ── Aurora blob animations ─────────────────────────────────────── */
-.launch-dashboard::before,
-.launch-dashboard::after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
-  z-index: 0;
-  filter: blur(90px);
-  opacity: 0.85;
-}
-.launch-dashboard::before {
-  top: -20%;
-  left: -10%;
-  width: 70%;
-  height: 70%;
-  background:
-    radial-gradient(40% 40% at 30% 40%, var(--aurora-glow-violet) 0%, transparent 70%),
-    radial-gradient(45% 50% at 70% 30%, var(--aurora-glow-teal) 0%, transparent 70%);
-  animation: lcc-drift1 22s ease-in-out infinite alternate;
-}
-.launch-dashboard::after {
-  bottom: -25%;
-  right: -15%;
-  width: 80%;
-  height: 80%;
-  background:
-    radial-gradient(40% 45% at 70% 60%, var(--aurora-glow-pink) 0%, transparent 70%),
-    radial-gradient(45% 50% at 30% 60%, var(--aurora-glow-cyan) 0%, transparent 70%);
-  animation: lcc-drift2 28s ease-in-out infinite alternate;
-}
+/* Blobs are now provided by .aurora-app-shell so the backdrop is
+ * continuous between the sidebar and the main content. Keyframes stay
+ * here because both .aurora-app-shell::before/::after use them. */
 @keyframes lcc-drift1 {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
   100% { transform: translate3d(4vw, 3vh, 0) scale(1.08); }
@@ -186,13 +160,8 @@
   }
 }
 
-/* Reduced motion: freeze aurora blobs so nothing drifts behind the glass. */
-@media (prefers-reduced-motion: reduce) {
-  .launch-dashboard::before,
-  .launch-dashboard::after {
-    animation: none;
-  }
-}
+/* Reduced-motion behavior for blobs now lives next to
+ * .aurora-app-shell::before/::after further down this file. */
 
 /* ── Layout shell ────────────────────────────────────────────────── */
 .launch-dashboard .lcc-shell {
@@ -318,12 +287,9 @@
   align-items: center;
   gap: 14px;
   padding: 0 18px;
-  border-radius: 0;
-  border-left: none;
-  border-right: none;
-  border-top: none;
+  margin: 14px 14px 0;
   position: sticky;
-  top: 0;
+  top: 14px;
   z-index: 50;
 }
 .launch-dashboard .lcc-brand { display: flex; align-items: center; gap: 12px; }
