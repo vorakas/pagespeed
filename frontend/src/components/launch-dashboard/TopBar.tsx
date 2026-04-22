@@ -85,9 +85,11 @@ export function TopBar({ health, filter, onFilterChange, onRefresh, refreshing }
       <div className="lcc-sync">
         <span className="lcc-pulse" />
         <div>
-          <div>{refreshing ? "refreshing…" : `synced ${syncedAgo ?? "—"}`}</div>
+          <div>{refreshing ? "syncing vault…" : `synced ${syncedAgo ?? "—"}`}</div>
           <div className="lcc-sync-sub">
-            {health?.lastSynced
+            {refreshing
+              ? "pulling Jira + Asana"
+              : health?.lastSynced
               ? new Date(health.lastSynced).toLocaleString([], {
                   month: "short",
                   day: "numeric",
@@ -105,8 +107,8 @@ export function TopBar({ health, filter, onFilterChange, onRefresh, refreshing }
           className="lcc-tb-btn"
           onClick={onRefresh}
           disabled={refreshing}
-          aria-label="Refresh dashboard from vault"
-          title="Refresh — re-parse the vault and update all panels"
+          aria-label="Sync vault and refresh dashboard"
+          title="Sync — pull Jira+Asana into the vault and re-parse every panel"
           style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
         >
           {refreshing ? <Loader2 size={15} className="animate-spin" /> : <RotateCw size={14} />}

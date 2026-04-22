@@ -56,10 +56,24 @@ export function LaunchDashboard() {
     if (force) setRefreshing(true)
     try {
       if (force) {
+        // Kick off a full vault sync (Jira + Asana → disk) and wait for
+        // completion. If a sync is already running we skip the start and
+        // just poll. Errors swallowed — if sync fails (no creds, network,
+        // etc.) we still want to re-parse whatever's on disk.
+        try {
+          const start = await api.startObsidianSync({ source: "both" }).catch(() => null)
+          if (start?.success || start === null) {
+            for (let i = 0; i < 180; i++) {
+              await new Promise((r) => setTimeout(r, 2_000))
+              const active = await api.getObsidianActiveSync().catch(() => ({ active: null }))
+              if (!active.active) break
+            }
+          }
+        } catch {
+          // Non-fatal; fall through to local refresh.
+        }
         // Drop the in-process service cache and re-parse status files so
-        // the next reads hit the vault fresh. Errors swallowed — if the
-        // endpoints 404 (e.g. no snapshots yet) we still want the rest to
-        // proceed.
+        // the next reads hit the vault fresh.
         await fetch("/api/dashboard/cache/invalidate", { method: "POST" }).catch(() => null)
         await fetch("/api/dashboard/snapshots/reingest", { method: "POST" }).catch(() => null)
       }
