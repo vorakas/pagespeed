@@ -1193,7 +1193,9 @@
   background:
     radial-gradient(40% 40% at 30% 40%, var(--aurora-glow-violet) 0%, transparent 70%),
     radial-gradient(45% 50% at 70% 30%, var(--aurora-glow-teal) 0%, transparent 70%);
-  animation: lcc-drift1 22s ease-in-out infinite alternate;
+  /* Animation intentionally disabled: animated large-radius blurred
+   * gradients quantize into visible banding on many GPUs. Keeping the
+   * static gradient for the aurora look without the shimmer. */
 }
 .aurora-app-shell::after {
   bottom: -25%; right: -15%;
@@ -1201,7 +1203,6 @@
   background:
     radial-gradient(40% 45% at 70% 60%, var(--aurora-glow-pink) 0%, transparent 70%),
     radial-gradient(45% 50% at 30% 60%, var(--aurora-glow-cyan) 0%, transparent 70%);
-  animation: lcc-drift2 28s ease-in-out infinite alternate;
 }
 /* Keep main above the blob backdrop without overriding the sidebar's
  * Tailwind `.fixed` class (equal specificity; later-loaded rule wins). */
