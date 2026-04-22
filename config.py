@@ -176,6 +176,25 @@ JIRA_PAT: str | None = os.getenv('JIRA_PAT')
 ASANA_PAT: str | None = os.getenv('ASANA_PAT')
 """Asana personal access token. None disables the Asana side of the sync."""
 
+VAULT_REPO_URL: str | None = os.getenv('VAULT_REPO_URL')
+"""HTTPS clone URL of the GitHub-hosted vault (``lpadobe-vault``).
+
+When set alongside ``VAULT_BOT_TOKEN``, the Obsidian bridge commits and
+pushes every completed sync to this repo. When unset, the bridge falls
+back to the Docker-image seed and leaves the vault volume-local."""
+
+VAULT_BOT_TOKEN: str | None = os.getenv('VAULT_BOT_TOKEN')
+"""Fine-grained GitHub PAT with contents:write on the vault repo.
+
+Embedded in the remote URL after clone so subsequent push/pull run
+without per-call credential plumbing."""
+
+VAULT_COMMITTER_NAME: str = os.getenv('VAULT_COMMITTER_NAME', 'pharos-sync-bot')
+"""Display name on commits created by the Railway sync hook."""
+
+VAULT_COMMITTER_EMAIL: str = os.getenv('VAULT_COMMITTER_EMAIL', 'sync@pharos.local')
+"""Email on commits created by the Railway sync hook."""
+
 
 def _parse_project_map(raw: str | None) -> dict[str, str]:
     """Parse ``ASANA_PROJECT_MAP`` which is JSON of ``{name: gid}``.

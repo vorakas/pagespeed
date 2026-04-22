@@ -41,6 +41,10 @@ from config import (
     OBSIDIAN_VAULT_ROOT,
     PAGESPEED_API_KEY,
     PORT,
+    VAULT_BOT_TOKEN,
+    VAULT_COMMITTER_EMAIL,
+    VAULT_COMMITTER_NAME,
+    VAULT_REPO_URL,
 )
 from data_access import (
     BlazemeterPresetRepository,
@@ -68,6 +72,7 @@ from services.obsidian_sync_service import ObsidianSyncService
 from services.obsidian_sync.vault_reader import VaultReader
 from services.snapshot_service import SnapshotService
 from services.pagespeed_client import PageSpeedClient
+from services.vault_git_service import VaultGitService
 from routes import register_blueprints
 from services.site_service import SiteService
 from services.testing_service import TestingService
@@ -163,7 +168,29 @@ def create_app() -> Flask:
     # Both services read from the same vault on disk. The dashboard
     # subscribes to the sync service so its cache auto-invalidates
     # whenever a sync completes — no TTL wait.
-    _seed_vault_wiki(OBSIDIAN_VAULT_ROOT)
+    #
+    # Vault provisioning: when VAULT_REPO_URL + VAULT_BOT_TOKEN are set,
+    # the vault is a clone of the lpadobe-vault GitHub repo — every sync
+    # commits and pushes, and the orchestrator agent pushes wiki edits
+    # back. When unset, fall back to the Docker-image seed (legacy path).
+    vault_git: VaultGitService | None = None
+    if VAULT_REPO_URL and VAULT_BOT_TOKEN:
+        try:
+            vault_git = VaultGitService(
+                vault_root=OBSIDIAN_VAULT_ROOT,
+                repo_url=VAULT_REPO_URL,
+                token=VAULT_BOT_TOKEN,
+                committer_name=VAULT_COMMITTER_NAME,
+                committer_email=VAULT_COMMITTER_EMAIL,
+            )
+            vault_git.ensure_cloned()
+        except Exception:
+            logging.exception("Vault git bootstrap failed — falling back to seed")
+            vault_git = None
+
+    if vault_git is None:
+        _seed_vault_wiki(OBSIDIAN_VAULT_ROOT)
+
     migration_dashboard_service = MigrationDashboardService(
         vault_root=OBSIDIAN_VAULT_ROOT,
     )
@@ -199,6 +226,17 @@ def create_app() -> Flask:
         except Exception:
             logging.exception("Snapshot ingest after sync failed")
 
+    def _push_vault(job):
+        # Runs after _post_sync, so the .last_sync sentinel is included
+        # in the commit. Guard with `if vault_git` so unset env vars
+        # leave the hook chain inert.
+        if vault_git is None:
+            return
+        label = f"{job.source} sync — job {job.job_id[:8]}"
+        vault_git.commit_and_push(label)
+
+    sync_hooks = [_post_sync, _push_vault]
+
     obsidian_sync_service = ObsidianSyncService(
         vault_root=OBSIDIAN_VAULT_ROOT,
         jira_pat=JIRA_PAT or '',
@@ -207,7 +245,7 @@ def create_app() -> Flask:
         asana_project_map=ASANA_PROJECT_MAP,
         default_jira_projects=JIRA_DEFAULT_PROJECTS,
         jira_jql_queries=JIRA_JQL_QUERIES,
-        on_sync_complete=[_post_sync],
+        on_sync_complete=sync_hooks,
     )
     caps = obsidian_sync_service.capabilities()
     logging.info(

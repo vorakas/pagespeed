@@ -115,3 +115,7 @@ class AuthenticationError(ExternalAPIError):
 
 class SchedulerError(AppError):
     """Failure related to APScheduler job management (add, remove, sync)."""
+
+
+class VaultGitError(AppError):
+    """Failure during a vault git operation (clone, pull, commit, push)."""
