@@ -40,6 +40,12 @@ class VaultGitService:
     _REMOTE = "origin"
     _BRANCH = "main"
 
+    # Filesystem entries to ignore when deciding whether the vault
+    # directory is "empty enough" to bootstrap. ``lost+found`` is created
+    # automatically by ext4 on a persistent volume; ``.git`` is handled
+    # separately by the is_git_repo check.
+    _IGNORED_ENTRIES = frozenset({"lost+found", ".git"})
+
     def __init__(
         self,
         vault_root: str,
@@ -72,37 +78,55 @@ class VaultGitService:
     # ── Public operations ────────────────────────────────────────────
 
     def ensure_cloned(self) -> None:
-        """Clone the remote vault into ``vault_root`` if needed.
+        """Bootstrap the vault directory as a clone of the remote repo.
 
         Idempotent and non-destructive:
         - If ``vault_root`` is already a git repo, no-op.
-        - If ``vault_root`` exists and is non-empty but has no ``.git``,
-          skip with a warning (protects existing data; cutover requires
-          manually clearing the directory).
-        - Otherwise clone.
+        - If ``vault_root`` has meaningful content but no ``.git``, skip
+          with a warning (protects existing data; cutover requires
+          clearing the directory first).
+        - Otherwise initialize the directory as a git repo in place and
+          reset its tree to the remote's ``main`` branch. In-place init
+          instead of ``git clone`` because ``vault_root`` is typically a
+          persistent-volume mount point that can't be removed or cloned
+          over directly.
         """
         if self.is_git_repo:
-            logger.info("Vault at %s already a git repo; skip clone", self._vault_root)
+            logger.info("Vault at %s already a git repo; skip bootstrap", self._vault_root)
             return
 
-        if self._vault_root.exists() and any(self._vault_root.iterdir()):
+        if self._has_user_content():
             logger.warning(
-                "Vault at %s is populated but not a git repo — skipping clone to "
-                "protect existing data. Clear the directory to enable git-backed vault.",
+                "Vault at %s has user content but no .git — skipping bootstrap "
+                "to protect existing data. Clear raw/, wiki/, and sentinels to "
+                "enable the git-backed vault.",
                 self._vault_root,
             )
             return
 
-        self._vault_root.parent.mkdir(parents=True, exist_ok=True)
-        if self._vault_root.exists():
-            self._vault_root.rmdir()
-        logger.info("Cloning %s into %s", self._scrub(self._repo_url), self._vault_root)
-        self._run(
-            ["git", "clone", self._authenticated_url(), str(self._vault_root)],
-            cwd=str(self._vault_root.parent),
+        self._vault_root.mkdir(parents=True, exist_ok=True)
+        logger.info(
+            "Bootstrapping vault at %s from %s",
+            self._vault_root,
+            self._scrub(self._repo_url),
         )
-        self._configure_repo()
-        logger.info("Vault cloned into %s", self._vault_root)
+        self._run(["git", "init", "-b", self._BRANCH])
+        self._run(["git", "remote", "add", self._REMOTE, self._authenticated_url()])
+        self._run(["git", "fetch", self._REMOTE, self._BRANCH])
+        self._run(["git", "reset", "--hard", f"{self._REMOTE}/{self._BRANCH}"])
+        self._run(["git", "branch", "--set-upstream-to", f"{self._REMOTE}/{self._BRANCH}", self._BRANCH])
+        self._configure_committer()
+        logger.info("Vault bootstrapped into %s", self._vault_root)
+
+    def _has_user_content(self) -> bool:
+        """True if ``vault_root`` has entries other than filesystem artifacts."""
+        if not self._vault_root.exists():
+            return False
+        for entry in self._vault_root.iterdir():
+            if entry.name in self._IGNORED_ENTRIES:
+                continue
+            return True
+        return False
 
     def commit_and_push(self, label: str) -> None:
         """Stage, commit, and push any pending changes in the vault.
@@ -144,11 +168,10 @@ class VaultGitService:
         output = self._run(["git", "status", "--porcelain"], capture=True)
         return [line for line in output.splitlines() if line.strip()]
 
-    def _configure_repo(self) -> None:
-        """Set committer identity and embed token in remote URL post-clone."""
+    def _configure_committer(self) -> None:
+        """Set the committer identity for future commits in this repo."""
         self._run(["git", "config", "user.name", self._committer_name])
         self._run(["git", "config", "user.email", self._committer_email])
-        self._run(["git", "remote", "set-url", self._REMOTE, self._authenticated_url()])
 
     def _authenticated_url(self) -> str:
         """Inject the bot token into the repo URL for HTTPS auth."""
