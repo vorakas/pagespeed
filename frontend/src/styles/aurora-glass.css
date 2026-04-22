@@ -1237,7 +1237,9 @@
     radial-gradient(45% 50% at 30% 60%, var(--aurora-glow-cyan) 0%, transparent 70%);
   animation: lcc-drift2 28s ease-in-out infinite alternate;
 }
-.aurora-app-shell > * { position: relative; z-index: 1; }
+/* Keep main above the blob backdrop without overriding the sidebar's
+ * Tailwind `.fixed` class (equal specificity; later-loaded rule wins). */
+.aurora-app-shell > main { position: relative; z-index: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .aurora-app-shell::before,
