@@ -19,9 +19,7 @@ export function HeroStrip({ health }: HeroStripProps) {
           <span className="lcc-health-badge lg" data-health={health.overall ?? undefined}>
             {(health.overall ?? "unknown").replace("-", " ")}
           </span>
-          <div className="lcc-hs-headline">
-            {stripEmphasis(health.headline) ?? "No status summary available."}
-          </div>
+          <div className="lcc-hs-headline">Project Status as of {formatToday()}</div>
         </div>
         <ul className="lcc-hs-reasons">
           {health.reasons.slice(0, 3).map((r, i) => (
@@ -55,6 +53,14 @@ function computeDaysUntil(iso: string | null | undefined): number | null {
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(100, value))
+}
+
+function formatToday(): string {
+  return new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
 }
 
 function stripEmphasis<T extends string | null | undefined>(text: T): T {
