@@ -1,7 +1,6 @@
 import { Link, useLocation } from "react-router-dom"
 import { useTheme } from "@/hooks/use-theme"
 
-import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
   Gauge,
@@ -87,58 +86,48 @@ export function Sidebar() {
   const location = useLocation()
 
   return (
-    <aside className="fixed left-3 top-3 bottom-3 z-50 flex w-[220px] flex-col rounded-xl border border-sidebar-border bg-sidebar shadow-lg">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-sidebar-border">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
-          <Gauge size={16} className="text-sidebar-primary-foreground" />
-        </div>
+    <aside className="aurora-sidebar fixed left-3 top-3 bottom-3 z-50 flex w-[220px] flex-col">
+      <div className="aurora-sidebar-head">
+        <div className="aurora-sidebar-brand-dot" aria-hidden />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-sidebar-foreground truncate">Pharos</p>
-          <p className="text-[10px] text-muted-foreground">Operations Hub</p>
+          <p className="aurora-sidebar-brand-name truncate">Pharos</p>
+          <p className="aurora-sidebar-brand-sub">Operations Hub</p>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 pb-3 pt-2">
+      <nav className="aurora-sidebar-nav">
         {navSections.map((section, sectionIndex) => (
           <div key={section.title}>
-            {sectionIndex > 0 && (
-              <div className="mx-1 my-2 h-px bg-sidebar-border" />
-            )}
-            <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {section.title}
-            </p>
-            {section.items.map((item) => {
-              const active = isItemActive(item.href, location.pathname, location.hash)
-              return (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors",
-                    active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
-                  )}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              )
-            })}
+            {sectionIndex > 0 && <div className="aurora-sidebar-separator mb-3" />}
+            <p className="aurora-sidebar-section-label">{section.title}</p>
+            <div className="flex flex-col gap-0.5">
+              {section.items.map((item) => {
+                const active = isItemActive(item.href, location.pathname, location.hash)
+                return (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    className="aurora-sidebar-item"
+                    data-active={active}
+                  >
+                    {item.icon}
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
           </div>
         ))}
       </nav>
 
-      {/* Theme toggle at bottom */}
-      <div className="border-t border-sidebar-border px-3 py-2.5">
+      <div className="aurora-sidebar-footer">
         <button
+          type="button"
           onClick={toggleTheme}
-          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+          className="aurora-sidebar-item w-full"
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-          {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
         </button>
       </div>
     </aside>
