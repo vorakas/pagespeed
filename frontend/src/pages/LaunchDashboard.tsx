@@ -61,7 +61,9 @@ export function LaunchDashboard() {
         // just poll. Errors swallowed — if sync fails (no creds, network,
         // etc.) we still want to re-parse whatever's on disk.
         try {
-          const start = await api.startObsidianSync({ source: "both" }).catch(() => null)
+          const start = await api
+            .startObsidianSync({ source: "both", fullRefresh: true })
+            .catch(() => null)
           if (start?.success || start === null) {
             for (let i = 0; i < 180; i++) {
               await new Promise((r) => setTimeout(r, 2_000))
