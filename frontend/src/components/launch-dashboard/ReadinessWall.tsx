@@ -43,7 +43,7 @@ export function ReadinessWall({ rows, onPick, areaFilter, healthFilter }: Readin
   const groupEntries = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
 
   return (
-    <div className="panel lcc-wall-panel">
+    <div id="workstreams" className="panel lcc-wall-panel" style={{ scrollMarginTop: 16 }}>
       <div className="lcc-wall-head">
         <h3>
           Launch readiness

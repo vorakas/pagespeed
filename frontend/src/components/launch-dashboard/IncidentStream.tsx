@@ -90,7 +90,7 @@ export function IncidentStream({
   const total = (blockers?.length ?? 0) + (prodFailures?.length ?? 0) + (newBugs?.length ?? 0)
 
   return (
-    <aside className="lcc-incident-stream">
+    <aside id="incidents" className="lcc-incident-stream" style={{ scrollMarginTop: 16 }}>
       <div className="lcc-is-head">
         <h3>
           Incidents <span className="count">{items.length}</span>

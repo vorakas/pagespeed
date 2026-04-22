@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
+import { useLocation } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
@@ -48,6 +49,15 @@ export function LaunchDashboard() {
 
   const [filter, setFilter] = useState<HealthFilter>("all")
   const [activeArea, setActiveArea] = useState<string | null>(null)
+  const location = useLocation()
+
+  useEffect(() => {
+    if (!location.hash) return
+    if (!workstreams || !blockers) return
+    const id = location.hash.slice(1)
+    const el = document.getElementById(id)
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [location.hash, location.key, workstreams, blockers])
   const [streamFilter, setStreamFilter] = useState<IncidentFilter>("all")
   const [sidePanelTarget, setSidePanelTarget] = useState<SidePanelTarget | null>(null)
 
