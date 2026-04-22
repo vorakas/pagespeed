@@ -24,6 +24,7 @@ from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService
 from services.site_service import SiteService
+from services.snapshot_service import SnapshotService
 from services.testing_service import TestingService
 from services.trigger_service import TriggerService
 
@@ -40,6 +41,7 @@ def register_blueprints(
     blazemeter_queue: "BlazemeterQueueService | None" = None,
     obsidian_sync_service: "ObsidianSyncService | None" = None,
     migration_dashboard_service: "MigrationDashboardService | None" = None,
+    snapshot_service: "SnapshotService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -70,4 +72,6 @@ def register_blueprints(
     if obsidian_sync_service is not None:
         app.register_blueprint(create_obsidian_blueprint(obsidian_sync_service))
     if migration_dashboard_service is not None:
-        app.register_blueprint(create_dashboard_blueprint(migration_dashboard_service))
+        app.register_blueprint(
+            create_dashboard_blueprint(migration_dashboard_service, snapshot_service),
+        )

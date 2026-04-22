@@ -1,5 +1,6 @@
 import type React from "react"
 import { useEffect, useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import { marked } from "marked"
 import { api } from "@/services/api"
 import type {
@@ -104,9 +105,29 @@ function WorkstreamDetail({
             </div>
           )}
         </div>
-        <button type="button" className="sp-close" aria-label="Close" onClick={onClose}>
-          ×
-        </button>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <Link
+            to={`/dashboard/workstreams/${ws.id}`}
+            onClick={onClose}
+            style={{
+              fontSize: 10.5,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              padding: "4px 10px",
+              borderRadius: 999,
+              border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.1))",
+              color: "var(--lcc-text-dim)",
+              textDecoration: "none",
+              fontFamily: "var(--font-mono, monospace)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Full page →
+          </Link>
+          <button type="button" className="sp-close" aria-label="Close" onClick={onClose}>
+            ×
+          </button>
+        </div>
       </div>
       <div className="sp-body">
         <div className="sp-stats">

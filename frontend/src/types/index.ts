@@ -680,11 +680,273 @@ export interface MigrationTeam {
   unassignedRate?: number
 }
 
+export interface WorkstreamMdMeta {
+  type: string
+  status: string | null
+  taskCount: number | null
+  blockedCount: number
+  title: string
+  lastUpdate: string | null
+}
+
+export interface WorkstreamMdSource {
+  key: string
+  kind: string
+  name: string
+  issues?: number
+  note?: string
+}
+
+export interface WorkstreamMdScopeItem {
+  label: string
+  note: string
+}
+
+export interface WorkstreamMdEpic {
+  id: string
+  title: string
+}
+
+export interface WorkstreamMdProgressBucket {
+  label: string
+  count: number
+  tone: string
+  kind: string
+}
+
+export interface WorkstreamMdProgress {
+  total: number | null
+  completion: string | null
+  buckets: WorkstreamMdProgressBucket[]
+}
+
+export interface WorkstreamMdActiveItem {
+  id: string
+  title: string
+  assignee: string | null
+  note?: string
+  overdue?: boolean
+  isNew?: boolean
+}
+
+export interface WorkstreamMdActive {
+  blocked: WorkstreamMdActiveItem[]
+  inProgress: WorkstreamMdActiveItem[]
+  onHold: WorkstreamMdActiveItem[]
+  approvedReview: WorkstreamMdActiveItem[]
+  codeReview: WorkstreamMdActiveItem[]
+  openUnassigned: WorkstreamMdActiveItem[]
+  evaluating: WorkstreamMdActiveItem[]
+  evaluated: WorkstreamMdActiveItem[]
+}
+
+export interface WorkstreamMdRisk {
+  tone: "red" | "amber" | string
+  text: string
+}
+
+export interface WorkstreamMdBurndown {
+  month: string
+  closed: number
+  cum: number
+  partial: boolean
+}
+
+export interface WorkstreamMdVelocity {
+  q1avg: number | null
+  marRate: number | null
+  remaining: number | null
+  projection: string | null
+  projectionNote: string | null
+}
+
+export interface WorkstreamMdDev {
+  name: string
+  inProgress: number
+  codeReview: number
+  pipeline: number
+  backlog: number
+  total: number
+  unassigned: boolean
+}
+
+export interface WorkstreamMdRecent {
+  id: string
+  title: string
+  status: string
+  tone: string
+  assignee: string
+  updated: string
+  highlight: boolean
+}
+
+export interface WorkstreamMdDecision {
+  date: string
+  id: string
+  decision: string
+  status: string
+  impact: string
+}
+
+export interface WorkstreamMdCrossRef {
+  area: string
+  ws: string
+}
+
+export interface WorkstreamMdPayload {
+  meta: WorkstreamMdMeta
+  sources: WorkstreamMdSource[]
+  overviewParagraph: string
+  scope: WorkstreamMdScopeItem[]
+  epics: WorkstreamMdEpic[]
+  progress: WorkstreamMdProgress
+  active: WorkstreamMdActive
+  keyRisks: WorkstreamMdRisk[]
+  burndown: WorkstreamMdBurndown[]
+  velocity: WorkstreamMdVelocity
+  devs: WorkstreamMdDev[]
+  devObservations: string[]
+  recentActivity: WorkstreamMdRecent[]
+  activitySummary: string | null
+  decisions: WorkstreamMdDecision[]
+  decisionContext: string | null
+  crossRefs: WorkstreamMdCrossRef[]
+  team: { leads: string[] }
+}
+
 export interface MigrationWorkstreamDetail {
   workstream: MigrationWorkstream
   blockers: MigrationBlocker[]
   criticalTasks: RawTaskRecord[]
   referencedKeyCount: number
+  markdown: WorkstreamMdPayload | null
+}
+
+// ---------- Snapshots (status-YYYY-MM-DD.md rollups) ----------
+
+export interface SnapshotKpis {
+  combinedUnique?: number | null
+  combinedResolved?: number | null
+  combinedActive?: number | null
+  resolvedPct?: number | null
+  productionFailures?: number | null
+  openBlockers?: number | null
+  criticalBlockers?: number | null
+  newBugs24h?: number | null
+  criticalBugCount?: number | null
+  wpm?: number | null
+  [k: string]: number | null | undefined
+}
+
+export interface SnapshotSource {
+  key: string
+  total: number
+  resolved: number
+  active: number
+  approx?: boolean
+}
+
+export interface SnapshotTaskItem {
+  id: string
+  title?: string
+  sev?: string
+  due?: string
+  who?: string
+  status?: string
+  tag?: string
+  regression?: boolean
+  isNew?: boolean
+  type?: string
+  workstream?: string
+  note?: string
+}
+
+export interface SnapshotStatusChange {
+  id: string
+  change: string
+  detail: string
+}
+
+export interface SnapshotPositive {
+  id: string
+  title: string
+  detail: string
+}
+
+export interface SnapshotChangeSummary {
+  new: number
+  resolved: number
+  reassigned: number
+  regressed: number
+  onHold: number
+}
+
+export interface MigrationSnapshot {
+  date: string
+  overall: string | null
+  headline: string | null
+  kpis: SnapshotKpis
+  sourceCoverage: SnapshotSource[]
+  areaStatuses: Record<string, string>
+  criticalBugs: SnapshotTaskItem[]
+  prodFailures: SnapshotTaskItem[]
+  openBlockers: SnapshotTaskItem[]
+  newItems: SnapshotTaskItem[]
+  statusChanges: SnapshotStatusChange[]
+  positives: SnapshotPositive[]
+  changeSummary: SnapshotChangeSummary
+  sourcePath?: string | null
+  ingestedAt?: string | null
+}
+
+export interface SnapshotKpiDelta {
+  prev: number | null
+  curr: number | null
+  delta: number | null
+}
+
+export interface SnapshotAreaChange {
+  ws: string
+  from: string
+  to: string
+}
+
+export interface SnapshotSourceDelta {
+  key: string
+  total: SnapshotKpiDelta
+  resolved: SnapshotKpiDelta
+  active: SnapshotKpiDelta
+}
+
+export interface MigrationSnapshotDiff {
+  from: string
+  to: string
+  kpis: Record<string, SnapshotKpiDelta>
+  sources: SnapshotSourceDelta[]
+  areaStatuses: SnapshotAreaChange[]
+  criticalBugs: { added: SnapshotTaskItem[]; removed: SnapshotTaskItem[] }
+  prodFailures: {
+    added: SnapshotTaskItem[]
+    removed: SnapshotTaskItem[]
+    reassigned: (SnapshotTaskItem & { from?: string })[]
+    regressed: SnapshotTaskItem[]
+  }
+  openBlockers: { added: SnapshotTaskItem[]; removed: SnapshotTaskItem[] }
+  newItems: { added: SnapshotTaskItem[]; removed: SnapshotTaskItem[] }
+}
+
+export interface MigrationSnapshotDiffResponse {
+  latest: MigrationSnapshot | null
+  previous: MigrationSnapshot | null
+  diff: MigrationSnapshotDiff | null
+}
+
+export interface MigrationHistoryEntry {
+  from: string
+  to: string
+  currentPayload: MigrationSnapshot
+  previousPayload: MigrationSnapshot
+  diff: MigrationSnapshotDiff
 }
 
 // ---------- API Responses ----------

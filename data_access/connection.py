@@ -279,6 +279,18 @@ class ConnectionManager:
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP")
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_status TEXT")
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS migration_snapshots (
+                id SERIAL PRIMARY KEY,
+                snapshot_date DATE NOT NULL UNIQUE,
+                overall TEXT,
+                headline TEXT,
+                payload TEXT NOT NULL,
+                source_path TEXT,
+                ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
     def _init_sqlite_schema(self, cursor: Any) -> None:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sites (
@@ -395,6 +407,18 @@ class ConnectionManager:
                 started_at TIMESTAMP,
                 ended_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS migration_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_date TEXT NOT NULL UNIQUE,
+                overall TEXT,
+                headline TEXT,
+                payload TEXT NOT NULL,
+                source_path TEXT,
+                ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 

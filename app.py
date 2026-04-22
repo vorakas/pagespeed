@@ -47,6 +47,7 @@ from data_access import (
     BlazemeterRunRepository,
     ConnectionManager,
     SiteRepository,
+    SnapshotRepository,
     UrlRepository,
     TestResultRepository,
     TriggerRepository,
@@ -64,6 +65,8 @@ from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService
+from services.obsidian_sync.vault_reader import VaultReader
+from services.snapshot_service import SnapshotService
 from services.pagespeed_client import PageSpeedClient
 from routes import register_blueprints
 from services.site_service import SiteService
@@ -164,6 +167,29 @@ def create_app() -> Flask:
     migration_dashboard_service = MigrationDashboardService(
         vault_root=OBSIDIAN_VAULT_ROOT,
     )
+
+    # ---- Migration status snapshots (history + what-changed-today) ----
+    snapshot_repo = SnapshotRepository(conn_mgr)
+    snapshot_service = SnapshotService(
+        repository=snapshot_repo,
+        vault_reader=VaultReader(OBSIDIAN_VAULT_ROOT),
+    )
+    # Seed the DB on boot so the dashboard has history even before the
+    # first sync cycle runs.
+    try:
+        seeded = snapshot_service.ingest_vault()
+        if seeded:
+            logging.info("Snapshot ingest seeded %d dates: %s", len(seeded), ", ".join(seeded))
+    except Exception:
+        logging.exception("Snapshot ingest on startup failed")
+
+    def _post_sync(_job):
+        migration_dashboard_service.invalidate_cache()
+        try:
+            snapshot_service.ingest_vault()
+        except Exception:
+            logging.exception("Snapshot ingest after sync failed")
+
     obsidian_sync_service = ObsidianSyncService(
         vault_root=OBSIDIAN_VAULT_ROOT,
         jira_pat=JIRA_PAT or '',
@@ -172,7 +198,7 @@ def create_app() -> Flask:
         asana_project_map=ASANA_PROJECT_MAP,
         default_jira_projects=JIRA_DEFAULT_PROJECTS,
         jira_jql_queries=JIRA_JQL_QUERIES,
-        on_sync_complete=[lambda _job: migration_dashboard_service.invalidate_cache()],
+        on_sync_complete=[_post_sync],
     )
     caps = obsidian_sync_service.capabilities()
     logging.info(
@@ -192,6 +218,7 @@ def create_app() -> Flask:
         blazemeter_queue=blazemeter_queue,
         obsidian_sync_service=obsidian_sync_service,
         migration_dashboard_service=migration_dashboard_service,
+        snapshot_service=snapshot_service,
     )
 
     # ---- Centralized error handlers ----

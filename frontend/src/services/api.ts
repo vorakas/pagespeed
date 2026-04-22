@@ -49,6 +49,10 @@ import type {
   MigrationTrendPoint,
   MigrationTeam,
   MigrationWorkstreamDetail,
+  MigrationSnapshot,
+  MigrationSnapshotDiff,
+  MigrationSnapshotDiffResponse,
+  MigrationHistoryEntry,
   RawTaskRecord,
 } from "@/types"
 
@@ -733,6 +737,26 @@ class ApiClient {
 
   async getMigrationWorkstreamDetail(id: string): Promise<MigrationWorkstreamDetail> {
     return this.request(`/api/dashboard/workstream/${encodeURIComponent(id)}`)
+  }
+
+  async getMigrationSnapshots(): Promise<MigrationSnapshot[]> {
+    return this.request("/api/dashboard/snapshots")
+  }
+
+  async getMigrationSnapshotLatest(): Promise<MigrationSnapshot> {
+    return this.request("/api/dashboard/snapshots/latest")
+  }
+
+  async getMigrationSnapshotDiff(): Promise<MigrationSnapshotDiffResponse> {
+    return this.request("/api/dashboard/snapshots/diff")
+  }
+
+  async getMigrationSnapshotHistory(): Promise<MigrationHistoryEntry[]> {
+    return this.request("/api/dashboard/snapshots/history")
+  }
+
+  async reingestMigrationSnapshots(): Promise<{ ingested: string[] }> {
+    return this.request("/api/dashboard/snapshots/reingest", { method: "POST" })
   }
 }
 

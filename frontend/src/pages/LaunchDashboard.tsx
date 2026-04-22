@@ -16,10 +16,13 @@ import {
   type IncidentItem,
 } from "@/components/launch-dashboard/IncidentStream"
 import { SidePanel, type SidePanelTarget } from "@/components/launch-dashboard/SidePanel"
+import { WhatChangedToday } from "@/components/launch-dashboard/WhatChangedToday"
+import { DailyStatusSummary } from "@/components/launch-dashboard/DailyStatusSummary"
 import type {
   MigrationBlocker,
   MigrationHealthSnapshot,
   MigrationKpis,
+  MigrationSnapshotDiffResponse,
   MigrationSource,
   MigrationTaskStatusRow,
   MigrationTeam,
@@ -39,6 +42,7 @@ export function LaunchDashboard() {
   const [trend, setTrend] = useState<MigrationTrendPoint[] | null>(null)
   const [teams, setTeams] = useState<MigrationTeam[] | null>(null)
   const [sources, setSources] = useState<MigrationSource[] | null>(null)
+  const [snapshotDiff, setSnapshotDiff] = useState<MigrationSnapshotDiffResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const [filter, setFilter] = useState<HealthFilter>("all")
@@ -49,7 +53,7 @@ export function LaunchDashboard() {
   const loadAll = useCallback(async () => {
     setError(null)
     try {
-      const [h, k, ws, bl, pf, nb, ts, tr, tm, sr] = await Promise.all([
+      const [h, k, ws, bl, pf, nb, ts, tr, tm, sr, sd] = await Promise.all([
         api.getMigrationHealth(),
         api.getMigrationKpis(),
         api.getMigrationWorkstreams(),
@@ -60,6 +64,8 @@ export function LaunchDashboard() {
         api.getMigrationTrend(),
         api.getMigrationTeams(),
         api.getMigrationSources(),
+        // Snapshots may be empty on a fresh DB — swallow 503/404 and keep the rest.
+        api.getMigrationSnapshotDiff().catch(() => null),
       ])
       setHealth(h)
       setKpis(k)
@@ -71,6 +77,7 @@ export function LaunchDashboard() {
       setTrend(tr)
       setTeams(tm)
       setSources(sr)
+      setSnapshotDiff(sd)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard")
     }
@@ -144,6 +151,12 @@ export function LaunchDashboard() {
         <main className="lcc-main">
           <HeroStrip health={health} />
 
+          {snapshotDiff?.latest && snapshotDiff.diff && (
+            <WhatChangedToday latest={snapshotDiff.latest} diff={snapshotDiff.diff} />
+          )}
+
+          {snapshotDiff?.latest && <DailyStatusSummary snapshot={snapshotDiff.latest} />}
+
           <ReadinessWall
             rows={workstreams}
             onPick={(ws) => setSidePanelTarget({ kind: "workstream", workstream: ws })}
@@ -165,13 +178,6 @@ export function LaunchDashboard() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             {teams && <TeamsStrip rows={teams} />}
             {sources && <SourcesStrip rows={sources} />}
-          </div>
-
-          <div id="graph" className="panel">
-            <h3>Knowledge Graph</h3>
-            <p style={{ fontSize: 12, color: "var(--lcc-text-faint)", margin: 0 }}>
-              Workstream ↔ blocker ↔ task graph will render here in a later phase.
-            </p>
           </div>
         </main>
 

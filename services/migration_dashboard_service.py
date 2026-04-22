@@ -44,6 +44,7 @@ from services.obsidian_sync.vault_parser import (
     parse_workstream_page,
 )
 from services.obsidian_sync.vault_reader import VaultReader
+from services.obsidian_sync.workstream_md_parser import parse_workstream_markdown
 
 
 logger = logging.getLogger(__name__)
@@ -416,11 +417,21 @@ class MigrationDashboardService:
 
         blockers = [b for b in list_blockers(self._vault) if workstream_id in b.affects]
 
+        markdown_payload: Optional[dict] = None
+        raw_path = self._vault.root / rel
+        try:
+            raw_text = raw_path.read_text(encoding="utf-8", errors="replace") if raw_path.is_file() else ""
+            if raw_text:
+                markdown_payload = parse_workstream_markdown(raw_text, workstream_id)
+        except Exception:
+            logger.exception("Workstream markdown parse failed for %s", workstream_id)
+
         return {
             "workstream": ws.to_dict(),
             "blockers": [b.to_dict() for b in blockers],
             "criticalTasks": [t.to_dict() for t in relevant[:12]],
             "referencedKeyCount": len(referenced_keys),
+            "markdown": markdown_payload,
         }
 
     # ── Helpers ──────────────────────────────────────────────────────
