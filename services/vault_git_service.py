@@ -144,14 +144,19 @@ class VaultGitService:
             return
 
         try:
-            self._pull_rebase()
+            # Stage first. git refuses to pull --rebase with unstaged
+            # changes, so we must snapshot the sync output into a local
+            # commit before trying to incorporate remote history.
+            self._run(["git", "add", "-A"])
             changed_files = self._pending_changes()
             if not changed_files:
                 logger.info("Vault clean; nothing to push (label=%s)", label)
                 return
-            self._run(["git", "add", "-A"])
             message = f"[sync] {label} — {len(changed_files)} file(s)"
             self._run(["git", "commit", "-m", message])
+            # Now rebase our commit onto any remote changes (e.g. from
+            # the orchestration agent), then push the combined history.
+            self._pull_rebase()
             self._run(["git", "push", self._REMOTE, self._BRANCH])
             logger.info("Vault push succeeded: %s", message)
         except VaultGitError as exc:
