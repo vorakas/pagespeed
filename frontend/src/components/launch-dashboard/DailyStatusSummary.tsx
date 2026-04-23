@@ -49,7 +49,7 @@ export function DailyStatusSummary({ snapshot: input }: Props) {
         )}
       </div>
 
-      {snapshot.headline && <p style={headlineStyle}>{snapshot.headline}</p>}
+      {snapshot.headline && <HeadlineBullets text={snapshot.headline} />}
 
       <div style={tabBarStyle} role="tablist">
         {tabs.map((t) => {
@@ -491,6 +491,33 @@ function EmptyHint({ children }: { children: React.ReactNode }) {
   return <div style={emptyStyle}>{children}</div>
 }
 
+function HeadlineBullets({ text }: { text: string }) {
+  const bullets = splitIntoSentences(text)
+  if (bullets.length === 0) return null
+  if (bullets.length === 1) return <p style={headlineSingleStyle}>{bullets[0]}</p>
+  return (
+    <ul style={headlineListStyle}>
+      {bullets.map((b, i) => (
+        <li key={i} style={headlineItemStyle}>
+          <span style={headlineBulletDotStyle} aria-hidden />
+          <span>{b}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function splitIntoSentences(text: string): string[] {
+  // Split on sentence terminators followed by whitespace + a capital or
+  // digit start. Digits are included so sentences that begin with an
+  // Asana task id (e.g. "919491 (Blocker) COMPLETED …") still split
+  // cleanly off the previous period.
+  return text
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 function joinMeta(...parts: Array<string | undefined>): string | undefined {
@@ -525,17 +552,42 @@ const eyebrowFile: React.CSSProperties = {
   letterSpacing: "0.02em",
 }
 
-const headlineStyle: React.CSSProperties = {
+const headlineSingleStyle: React.CSSProperties = {
   fontSize: 13.5,
   lineHeight: 1.5,
-  color: "var(--lcc-text-dim)",
+  color: "var(--lcc-text)",
   margin: "0 0 14px",
-  fontWeight: 400,
+  fontWeight: 500,
   letterSpacing: "-0.005em",
-  display: "-webkit-box",
-  WebkitLineClamp: 3,
-  WebkitBoxOrient: "vertical",
-  overflow: "hidden",
+}
+
+const headlineListStyle: React.CSSProperties = {
+  listStyle: "none",
+  padding: 0,
+  margin: "0 0 14px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+}
+
+const headlineItemStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 10,
+  fontSize: 13,
+  lineHeight: 1.45,
+  color: "var(--lcc-text)",
+  fontWeight: 500,
+}
+
+const headlineBulletDotStyle: React.CSSProperties = {
+  display: "inline-block",
+  width: 4,
+  height: 4,
+  borderRadius: 999,
+  background: "var(--lcc-accent, #6366f1)",
+  flexShrink: 0,
+  marginTop: 8,
 }
 
 const tabBarStyle: React.CSSProperties = {
