@@ -107,6 +107,22 @@ export function LeftRail({
             </button>
           ))
         )}
+        <div className="lcc-lr-legend">
+          <div className="lcc-lr-legend-row">
+            <span className="lcc-lr-dot" data-tone="red" aria-hidden />
+            <span>blocked</span>
+            <span className="lcc-lr-dot" data-tone="amber" aria-hidden />
+            <span>at-risk</span>
+            <span className="lcc-lr-dot" data-tone="green" aria-hidden />
+            <span>on-track</span>
+          </div>
+          <div className="lcc-lr-legend-row">
+            <span className="lcc-lr-area-risk">N</span>
+            <span>blockers</span>
+            <span className="lcc-lr-area-count" data-tone="amber">N</span>
+            <span>failed QA</span>
+          </div>
+        </div>
       </div>
 
       <div className="lcc-lr-section">

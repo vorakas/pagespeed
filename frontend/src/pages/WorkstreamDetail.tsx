@@ -158,6 +158,8 @@ export function WorkstreamDetail() {
 
         {md?.asanaCoverage ? <AsanaCoveragePanel coverage={md.asanaCoverage} /> : null}
 
+        {md ? <SourcesAndScopePanel md={md} /> : null}
+
         <CriticalTasksPanel tasks={detail.criticalTasks} />
         </div>
       </div>
@@ -172,7 +174,6 @@ function Hero({ workstream, md }: { workstream: MigrationWorkstream; md: Workstr
   const title = md?.meta.title || workstream.name
   const taskCount = md?.meta.taskCount ?? workstream.tasks
   const blocked = md?.meta.blockedCount ?? workstream.blockedCount
-  const hasSourcesOrScope = !!(md?.sources?.length || md?.scope?.length)
   return (
     <section className="panel" style={{ padding: 22 }}>
       <div style={heroTopStyle}>
@@ -217,12 +218,20 @@ function Hero({ workstream, md }: { workstream: MigrationWorkstream; md: Workstr
           </div>
         </div>
       </div>
-      {hasSourcesOrScope && (
-        <div style={heroGridStyle}>
-          {md?.sources?.length ? <SourcesPanel md={md} /> : null}
-          {md?.scope?.length ? <ScopePanel md={md} /> : null}
-        </div>
-      )}
+    </section>
+  )
+}
+
+function SourcesAndScopePanel({ md }: { md: WorkstreamMdPayload }) {
+  const hasSources = !!md.sources?.length
+  const hasScope = !!md.scope?.length
+  if (!hasSources && !hasScope) return null
+  return (
+    <section className="panel" style={{ padding: 22 }}>
+      <div style={heroGridStyle}>
+        {hasSources ? <SourcesPanel md={md} /> : null}
+        {hasScope ? <ScopePanel md={md} /> : null}
+      </div>
     </section>
   )
 }

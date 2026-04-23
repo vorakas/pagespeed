@@ -1143,8 +1143,8 @@ const healthAreaHeadStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 10,
-  marginBottom: 2,
-  fontSize: 10,
+  marginBottom: 4,
+  fontSize: 12,
   textTransform: "uppercase",
   letterSpacing: "0.16em",
   fontFamily: "var(--font-mono, monospace)",
@@ -1152,7 +1152,7 @@ const healthAreaHeadStyle: React.CSSProperties = {
 }
 
 const healthAreaLabelStyle: React.CSSProperties = {
-  color: "var(--lcc-accent, #6366f1)",
+  color: "var(--lcc-blue)",
 }
 
 const healthAreaSepStyle: React.CSSProperties = {

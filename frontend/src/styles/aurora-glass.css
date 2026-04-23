@@ -289,7 +289,7 @@
   padding: 0 18px;
   margin: 14px 14px 0;
   position: sticky;
-  top: 14px;
+  top: 0;
   z-index: 50;
 }
 .launch-dashboard .lcc-brand { display: flex; align-items: center; gap: 12px; }
@@ -467,6 +467,25 @@
   color: var(--lcc-text-faint);
   padding: 6px 2px;
   font-style: italic;
+}
+.launch-dashboard .lcc-lr-legend {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.launch-dashboard .lcc-lr-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--lcc-text-faint);
+  flex-wrap: wrap;
+}
+.launch-dashboard .lcc-lr-legend-row > span:not(.lcc-lr-dot):not(.lcc-lr-area-risk):not(.lcc-lr-area-count) {
+  margin-right: 4px;
 }
 .launch-dashboard .lcc-lr-dot {
   width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0;
