@@ -53,6 +53,7 @@ class SnapshotPayload:
     new_items: List[Dict[str, Any]] = field(default_factory=list)
     status_changes: List[Dict[str, Any]] = field(default_factory=list)
     positives: List[Dict[str, Any]] = field(default_factory=list)
+    area_health: List[Dict[str, Any]] = field(default_factory=list)
     retest: List[Dict[str, Any]] = field(default_factory=list)
     analytics_blockers: List[Dict[str, Any]] = field(default_factory=list)
     open_high_pri: List[Dict[str, Any]] = field(default_factory=list)
@@ -75,6 +76,7 @@ class SnapshotPayload:
             "newItems": list(self.new_items),
             "statusChanges": list(self.status_changes),
             "positives": list(self.positives),
+            "areaHealth": list(self.area_health),
             "retest": list(self.retest),
             "analyticsBlockers": list(self.analytics_blockers),
             "openHighPri": list(self.open_high_pri),
@@ -108,6 +110,7 @@ def parse_status_markdown(text: str, fallback_date: Optional[str] = None) -> Sna
     new_items = _parse_new_items(body)
     status_changes = _parse_status_changes(body)
     positives = _parse_positives(body)
+    area_health = _parse_area_health(body)
     retest = _parse_retest(body)
     analytics_blockers = _parse_analytics_blockers(body)
     open_high_pri = _parse_open_high_pri(body)
@@ -143,6 +146,7 @@ def parse_status_markdown(text: str, fallback_date: Optional[str] = None) -> Sna
         new_items=new_items,
         status_changes=status_changes,
         positives=positives,
+        area_health=area_health,
         retest=retest,
         analytics_blockers=analytics_blockers,
         open_high_pri=open_high_pri,
@@ -385,6 +389,39 @@ def _parse_area_statuses(body: str) -> Dict[str, str]:
         status = _normalize_status(status_text)
         if status:
             out[ws_id] = status
+    return out
+
+
+def _parse_area_health(body: str) -> List[Dict[str, Any]]:
+    """Extract the full ``Project Health by Area`` table.
+
+    Returns ``[{area, ws, status, concern}]`` in source order. The Area
+    column uses rowspan-like empty cells for consecutive workstreams in
+    the same area — propagate the last non-empty area into subsequent
+    rows. Workstream rows whose wikilink doesn't resolve to ``ws-*``
+    are skipped so this table stays scoped to workstream health.
+    """
+    lines = _section_lines(body, _HEADING_AREA)
+    out: List[Dict[str, Any]] = []
+    last_area = ""
+    for cells in _iter_table_rows(lines):
+        if len(cells) < 4:
+            continue
+        area_raw = _strip_markup(cells[0])
+        if area_raw:
+            last_area = area_raw
+        ws_id, _ = _wikilink_target(cells[1])
+        if not ws_id.startswith("ws-"):
+            continue
+        status_text = _strip_markup(cells[2])
+        status = _normalize_status(status_text) or ""
+        concern = _strip_markup(cells[3])
+        out.append({
+            "area": last_area,
+            "ws": ws_id,
+            "status": status,
+            "concern": concern,
+        })
     return out
 
 

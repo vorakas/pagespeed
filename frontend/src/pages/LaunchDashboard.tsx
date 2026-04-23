@@ -6,7 +6,6 @@ import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { TopBar, type HealthFilter } from "@/components/launch-dashboard/TopBar"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import { HeroStrip } from "@/components/launch-dashboard/HeroStrip"
-import { ReadinessWall } from "@/components/launch-dashboard/ReadinessWall"
 import { TrendChart } from "@/components/launch-dashboard/TrendChart"
 import { TaskStatusStrip } from "@/components/launch-dashboard/TaskStatusStrip"
 import { TeamsStrip } from "@/components/launch-dashboard/TeamsStrip"
@@ -192,14 +191,9 @@ export function LaunchDashboard() {
             <WhatChangedToday latest={snapshotDiff.latest} diff={snapshotDiff.diff} />
           )}
 
-          {snapshotDiff?.latest && <DailyStatusSummary snapshot={snapshotDiff.latest} />}
-
-          <ReadinessWall
-            rows={workstreams}
-            onPick={(ws) => setSidePanelTarget({ kind: "workstream", workstream: ws })}
-            areaFilter={activeArea}
-            healthFilter={filter}
-          />
+          {snapshotDiff?.latest && (
+            <DailyStatusSummary snapshot={snapshotDiff.latest} workstreams={workstreams} />
+          )}
 
           <div
             style={{

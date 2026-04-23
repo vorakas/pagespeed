@@ -881,6 +881,13 @@ export interface SnapshotChangeSummary {
   onHold: number
 }
 
+export interface SnapshotAreaHealthRow {
+  area: string
+  ws: string
+  status: string
+  concern: string
+}
+
 export interface SnapshotRetestItem {
   id: string
   title: string
@@ -938,6 +945,7 @@ export interface MigrationSnapshot {
   newItems: SnapshotTaskItem[]
   statusChanges: SnapshotStatusChange[]
   positives: SnapshotPositive[]
+  areaHealth: SnapshotAreaHealthRow[]
   retest: SnapshotRetestItem[]
   analyticsBlockers: SnapshotAnalyticsBlocker[]
   openHighPri: SnapshotOpenHighPriGroup[]
