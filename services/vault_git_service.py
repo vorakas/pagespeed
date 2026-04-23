@@ -342,6 +342,67 @@ class VaultGitService:
 
         return state
 
+    def reset_to_origin(self) -> dict:
+        """Hard-reset the clone to ``origin/main`` and clean the tree.
+
+        Diagnostic recovery path for when the clone is wedged in a
+        rebase-in-progress state. Aborts any active rebase, fetches
+        origin, hard-resets HEAD, and removes untracked files (except
+        ``.git``). Destructive — discards uncommitted sync output and
+        any local-only commits, so the caller must accept that data is
+        gone. Safe here only because the canonical source of truth is
+        either the remote repo or the Jira/Asana APIs, both of which a
+        subsequent Full Refresh will re-fetch.
+        """
+        if not self.is_git_repo:
+            return {"ok": False, "error": "vault is not a git repo"}
+
+        import io as _io
+
+        buffer = _io.StringIO()
+        handler = logging.StreamHandler(buffer)
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(
+            logging.Formatter("%(levelname)s %(name)s: %(message)s")
+        )
+        root_logger = logging.getLogger()
+        root_logger.addHandler(handler)
+        previous_level = root_logger.level
+        if previous_level > logging.INFO:
+            root_logger.setLevel(logging.INFO)
+
+        pre_state = self.diagnose_state()
+        steps: List[dict] = []
+
+        def _step(name: str, argv: List[str]) -> None:
+            try:
+                out = self._run(argv, capture=True)
+                steps.append({"step": name, "ok": True, "output": out.strip()[:500]})
+            except VaultGitError as exc:
+                steps.append({"step": name, "ok": False, "error": exc.message})
+
+        try:
+            # Abort any stuck rebase before we touch anything else.
+            git_dir = self._vault_root / ".git"
+            if (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists():
+                _step("rebase-abort", ["git", "rebase", "--abort"])
+
+            _step("fetch", ["git", "fetch", self._REMOTE, self._BRANCH])
+            _step("reset-hard", ["git", "reset", "--hard", f"{self._REMOTE}/{self._BRANCH}"])
+            _step("clean", ["git", "clean", "-fdx", "-e", ".health"])
+        finally:
+            root_logger.removeHandler(handler)
+            root_logger.setLevel(previous_level)
+
+        post_state = self.diagnose_state()
+        return {
+            "ok": all(s["ok"] for s in steps),
+            "preState": pre_state,
+            "postState": post_state,
+            "steps": steps,
+            "log": buffer.getvalue().splitlines(),
+        }
+
     def ping(self) -> dict:
         """End-to-end smoke test of the commit-and-push pipeline.
 

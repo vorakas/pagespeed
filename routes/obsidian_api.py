@@ -111,6 +111,16 @@ def create_obsidian_blueprint(
         except Exception as exc:
             return jsonify({"enabled": True, "error": str(exc)}), 500
 
+    @bp.route("/api/obsidian/vault/reset-to-origin", methods=["POST"])
+    def vault_reset_to_origin():
+        """Destructive: abort rebase, hard-reset, clean tree. Diagnostic only."""
+        if vault_git_service is None:
+            return jsonify({"enabled": False}), 400
+        try:
+            return jsonify({"enabled": True, **vault_git_service.reset_to_origin()})
+        except Exception as exc:
+            return jsonify({"enabled": True, "error": str(exc)}), 500
+
     @bp.route("/api/obsidian/vault/ping", methods=["POST"])
     def vault_ping():
         """Write a sentinel and exercise the commit-and-push pipeline."""
