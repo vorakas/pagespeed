@@ -27,6 +27,7 @@ from services.site_service import SiteService
 from services.snapshot_service import SnapshotService
 from services.testing_service import TestingService
 from services.trigger_service import TriggerService
+from services.vault_git_service import VaultGitService
 
 
 def register_blueprints(
@@ -40,6 +41,7 @@ def register_blueprints(
     blazemeter_client: "BlazemeterClient | None" = None,
     blazemeter_queue: "BlazemeterQueueService | None" = None,
     obsidian_sync_service: "ObsidianSyncService | None" = None,
+    vault_git_service: "VaultGitService | None" = None,
     migration_dashboard_service: "MigrationDashboardService | None" = None,
     snapshot_service: "SnapshotService | None" = None,
 ) -> None:
@@ -70,7 +72,9 @@ def register_blueprints(
         ),
     )
     if obsidian_sync_service is not None:
-        app.register_blueprint(create_obsidian_blueprint(obsidian_sync_service))
+        app.register_blueprint(
+            create_obsidian_blueprint(obsidian_sync_service, vault_git_service)
+        )
     if migration_dashboard_service is not None:
         app.register_blueprint(
             create_dashboard_blueprint(migration_dashboard_service, snapshot_service),

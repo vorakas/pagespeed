@@ -20,9 +20,13 @@ from services.obsidian_sync_service import (
     ObsidianSyncService,
     SyncAlreadyRunning,
 )
+from services.vault_git_service import VaultGitService
 
 
-def create_obsidian_blueprint(sync_service: ObsidianSyncService) -> Blueprint:
+def create_obsidian_blueprint(
+    sync_service: ObsidianSyncService,
+    vault_git_service: VaultGitService | None = None,
+) -> Blueprint:
     """Factory that wires the Obsidian sync service into a Flask blueprint."""
     bp = Blueprint("obsidian_api", __name__)
 
@@ -83,6 +87,19 @@ def create_obsidian_blueprint(sync_service: ObsidianSyncService) -> Blueprint:
         if job is None:
             return jsonify({"error": "unknown job"}), 404
         return jsonify({"job": job.to_dict()})
+
+    @bp.route("/api/obsidian/pending-orchestration", methods=["GET"])
+    def pending_orchestration():
+        """Summary of raw-file changes awaiting the next orchestrator run."""
+        if vault_git_service is None:
+            return jsonify({"enabled": False})
+        try:
+            payload = vault_git_service.pending_for_orchestration()
+        except Exception as exc:
+            return jsonify({"enabled": True, "error": str(exc)}), 500
+        if not payload:
+            return jsonify({"enabled": False})
+        return jsonify({"enabled": True, **payload})
 
     # ── Vault browse ──────────────────────────────────────────────────
 

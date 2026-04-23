@@ -3,6 +3,7 @@ import { Loader2, RefreshCw, FolderTree, FileText, ChevronRight, ChevronDown } f
 import { api } from "@/services/api"
 import type {
   ObsidianCapabilities,
+  ObsidianPendingOrchestration,
   ObsidianSyncJob,
   ObsidianVaultNode,
   ObsidianVaultPage,
@@ -29,7 +30,19 @@ export function Obsidian() {
   const [page, setPage] = useState<ObsidianVaultPage | null>(null)
   const [pageError, setPageError] = useState<string | null>(null)
   const [isStarting, setIsStarting] = useState(false)
+  const [pending, setPending] = useState<ObsidianPendingOrchestration | null>(null)
+  const [showPendingFiles, setShowPendingFiles] = useState(false)
   const logEndRef = useRef<HTMLDivElement | null>(null)
+
+  const loadPending = useCallback(async () => {
+    try {
+      const res = await api.getObsidianPendingOrchestration()
+      setPending(res)
+    } catch {
+      // non-fatal; the panel hides on error
+      setPending(null)
+    }
+  }, [])
 
   const loadCapabilities = useCallback(async () => {
     try {
@@ -54,7 +67,8 @@ export function Obsidian() {
   useEffect(() => {
     void loadCapabilities()
     void loadTree()
-  }, [loadCapabilities, loadTree])
+    void loadPending()
+  }, [loadCapabilities, loadTree, loadPending])
 
   // Poll active job while it's running
   useEffect(() => {
@@ -66,6 +80,7 @@ export function Obsidian() {
             setActiveJob(res.job)
             if (res.job.status !== "running") {
               void loadTree()
+              void loadPending()
             }
           } else {
             const res = await api.getObsidianActiveSync()
@@ -77,7 +92,7 @@ export function Obsidian() {
       }, 1500)
       return () => window.clearInterval(interval)
     }
-  }, [activeJob, loadTree])
+  }, [activeJob, loadTree, loadPending])
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -222,6 +237,15 @@ export function Obsidian() {
         )}
       </section>
 
+      {pending?.enabled && (
+        <PendingOrchestrationCard
+          data={pending}
+          showFiles={showPendingFiles}
+          onToggleFiles={() => setShowPendingFiles((v) => !v)}
+          onRefresh={() => void loadPending()}
+        />
+      )}
+
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-lg border bg-card p-4 space-y-2 min-h-[20rem] max-h-[32rem] overflow-y-auto">
           <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -267,6 +291,163 @@ function statusClass(status: ObsidianSyncJob["status"]): string {
     default:
       return "bg-muted text-muted-foreground"
   }
+}
+
+interface PendingOrchestrationCardProps {
+  data: ObsidianPendingOrchestration
+  showFiles: boolean
+  onToggleFiles: () => void
+  onRefresh: () => void
+}
+
+function PendingOrchestrationCard({
+  data,
+  showFiles,
+  onToggleFiles,
+  onRefresh,
+}: PendingOrchestrationCardProps) {
+  const total = data.total ?? 0
+  const pendingSyncs = data.pendingSyncCommits ?? 0
+  const lastOrch = data.lastOrchestrate
+  const lastSync = data.lastSync
+  const bySource = data.bySource ?? []
+  const files = data.files ?? []
+
+  const headlineTone =
+    total === 0
+      ? "text-muted-foreground"
+      : total > 0
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-muted-foreground"
+
+  return (
+    <section className="rounded-lg border bg-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Pending for Orchestration
+        </h2>
+        <Button variant="ghost" size="sm" onClick={onRefresh} title="Refresh">
+          <RefreshCw size={14} />
+        </Button>
+      </div>
+
+      {data.error && (
+        <p className="text-xs text-destructive">{data.error}</p>
+      )}
+
+      {!data.error && (
+        <>
+          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+            <div>
+              <span className={cn("text-2xl font-semibold font-mono", headlineTone)}>
+                {total}
+              </span>
+              <span className="ml-1.5 text-xs text-muted-foreground">
+                raw file{total === 1 ? "" : "s"} changed since last orchestration
+              </span>
+            </div>
+            {total > 0 && (
+              <div className="text-xs text-muted-foreground font-mono">
+                <span className="text-green-500 dark:text-green-400">+{data.added ?? 0}</span>{" "}
+                <span className="text-sky-500 dark:text-sky-400">~{data.modified ?? 0}</span>{" "}
+                <span className="text-rose-500 dark:text-rose-400">−{data.deleted ?? 0}</span>
+                {pendingSyncs > 0 && (
+                  <span className="ml-3">
+                    across {pendingSyncs} sync commit{pendingSyncs === 1 ? "" : "s"}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {total === 0 && (
+            <p className="text-xs text-muted-foreground">
+              The vault is caught up — the last {"[orchestrate]"} commit is at or after the latest sync.
+              The next orchestrator run will no-op until a new sync lands.
+            </p>
+          )}
+
+          {total > 0 && bySource.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {bySource.slice(0, 12).map((s) => (
+                <div
+                  key={s.key}
+                  className="rounded border bg-muted/30 px-2.5 py-1.5 text-xs font-mono flex items-center justify-between gap-2"
+                >
+                  <span className="truncate">{s.key}</span>
+                  <span className="shrink-0 text-muted-foreground">
+                    <span className="text-green-500 dark:text-green-400">+{s.added}</span>{" "}
+                    <span className="text-sky-500 dark:text-sky-400">~{s.modified}</span>
+                    {s.deleted > 0 && (
+                      <>
+                        {" "}
+                        <span className="text-rose-500 dark:text-rose-400">−{s.deleted}</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+            <dt className="text-muted-foreground">Last sync</dt>
+            <dd className="font-mono truncate">
+              {lastSync
+                ? `${lastSync.shortHash} · ${formatRelative(lastSync.timestamp)}`
+                : "—"}
+            </dd>
+            <dt className="text-muted-foreground">Last orchestration</dt>
+            <dd className="font-mono truncate">
+              {data.hasOrchestrateAnchor && lastOrch
+                ? `${lastOrch.shortHash} · ${formatRelative(lastOrch.timestamp)}`
+                : "never"}
+            </dd>
+          </dl>
+
+          {total > 0 && (
+            <button
+              type="button"
+              onClick={onToggleFiles}
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              {showFiles ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {showFiles ? "Hide" : "Show"} file list ({files.length})
+            </button>
+          )}
+          {showFiles && files.length > 0 && (
+            <div className="rounded border bg-muted/20 max-h-48 overflow-y-auto px-2 py-1.5 font-mono text-[11px] leading-relaxed space-y-0.5">
+              {files.map((f) => (
+                <div key={f.path} className="flex gap-2">
+                  <span
+                    className={cn(
+                      "shrink-0 w-3",
+                      f.change === "A" && "text-green-500 dark:text-green-400",
+                      f.change === "M" && "text-sky-500 dark:text-sky-400",
+                      f.change === "D" && "text-rose-500 dark:text-rose-400",
+                    )}
+                  >
+                    {f.change}
+                  </span>
+                  <span className="truncate">{f.path}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+function formatRelative(ts: number | null | undefined): string {
+  if (!ts) return "—"
+  const now = Date.now() / 1000
+  const diff = now - ts
+  if (diff < 60) return "just now"
+  if (diff < 3600) return `${Math.round(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.round(diff / 3600)}h ago`
+  return `${Math.round(diff / 86400)}d ago`
 }
 
 interface TreeViewProps {

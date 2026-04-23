@@ -164,6 +164,100 @@ class VaultGitService:
         except Exception:
             logger.exception("Vault push raised unexpectedly (label=%s)", label)
 
+    def pending_for_orchestration(self) -> dict:
+        """Summarize what the next orchestrator run will process.
+
+        Walks from HEAD back to the most recent ``[orchestrate]`` commit
+        and reports the raw-file delta in between — i.e. everything
+        Railway synced that the local orchestrator hasn't turned into
+        wiki updates yet. If HEAD itself is the last ``[orchestrate]``
+        commit (no new syncs since), counts are zero.
+
+        Returns ``{}`` if this vault isn't a git repo (legacy seed-only
+        mode); the API layer should render an empty state in that case.
+        """
+        if not self.is_git_repo:
+            return {}
+
+        # Find the most recent [orchestrate] commit by SUBJECT ONLY —
+        # avoid matching body mentions of [orchestrate] (the same guard
+        # the orchestrator prompt uses).
+        log = self._run(
+            ["git", "log", "--format=%H%x09%ct%x09%s", "-500"],
+            capture=True,
+        )
+        last_orch_hash: Optional[str] = None
+        last_orch_ts: Optional[int] = None
+        last_orch_subject: Optional[str] = None
+        last_sync_hash: Optional[str] = None
+        last_sync_ts: Optional[int] = None
+        last_sync_subject: Optional[str] = None
+        for line in log.splitlines():
+            parts = line.split("\t", 2)
+            if len(parts) != 3:
+                continue
+            h, ts_s, subj = parts
+            try:
+                ts = int(ts_s)
+            except ValueError:
+                continue
+            if last_orch_hash is None and subj.startswith("[orchestrate]"):
+                last_orch_hash, last_orch_ts, last_orch_subject = h, ts, subj
+            if last_sync_hash is None and subj.startswith("[sync]"):
+                last_sync_hash, last_sync_ts = h, ts
+                last_sync_subject = subj
+            if last_orch_hash and last_sync_hash:
+                break
+
+        head = self._run(["git", "rev-parse", "HEAD"], capture=True).strip()
+
+        # When we have no [orchestrate] anchor yet, treat the whole raw
+        # tree as pending — common on first boot before the orchestrator
+        # has committed anything.
+        if last_orch_hash is None:
+            name_status_out = self._run(
+                ["git", "ls-files", "raw"],
+                capture=True,
+            )
+            files = [
+                {"path": p, "change": "A"}
+                for p in name_status_out.splitlines()
+                if p.strip()
+            ]
+            pending_sync_commits = _count_sync_commits(self._run, None)
+            return {
+                "hasOrchestrateAnchor": False,
+                "lastOrchestrate": None,
+                "lastSync": _commit_meta(last_sync_hash, last_sync_ts, last_sync_subject),
+                "head": head,
+                "pendingSyncCommits": pending_sync_commits,
+                **_summarize_files(files),
+            }
+
+        # Diff between last [orchestrate] and HEAD, scoped to raw/ —
+        # that's the input the orchestrator will process on its next run.
+        name_status_out = self._run(
+            ["git", "diff", "--name-status", f"{last_orch_hash}..HEAD", "--", "raw"],
+            capture=True,
+        )
+        files: List[dict] = []
+        for row in name_status_out.splitlines():
+            if not row.strip():
+                continue
+            cols = row.split("\t")
+            change = cols[0][0] if cols[0] else "?"
+            path = cols[-1]
+            files.append({"path": path, "change": change})
+
+        return {
+            "hasOrchestrateAnchor": True,
+            "lastOrchestrate": _commit_meta(last_orch_hash, last_orch_ts, last_orch_subject),
+            "lastSync": _commit_meta(last_sync_hash, last_sync_ts, last_sync_subject),
+            "head": head,
+            "pendingSyncCommits": _count_sync_commits(self._run, last_orch_hash),
+            **_summarize_files(files),
+        }
+
     def pull_latest(self) -> None:
         """Fast-forward the local clone to the remote tip.
 
@@ -240,3 +334,65 @@ class VaultGitService:
         except FileNotFoundError as exc:
             raise VaultGitError("git executable not found on PATH") from exc
         return result.stdout if capture else ""
+
+
+# ── Module helpers for pending_for_orchestration ────────────────────────
+
+
+def _commit_meta(
+    sha: Optional[str],
+    ts: Optional[int],
+    subject: Optional[str],
+) -> Optional[dict]:
+    if not sha:
+        return None
+    return {"hash": sha, "shortHash": sha[:8], "timestamp": ts, "subject": subject}
+
+
+def _count_sync_commits(runner, since_hash: Optional[str]) -> int:
+    """Count ``[sync]`` commits between ``since_hash`` and HEAD (or all)."""
+    range_spec = f"{since_hash}..HEAD" if since_hash else "HEAD"
+    subjects = runner(
+        ["git", "log", "--format=%s", range_spec],
+        capture=True,
+    )
+    return sum(1 for line in subjects.splitlines() if line.startswith("[sync]"))
+
+
+def _summarize_files(files: List[dict]) -> dict:
+    """Derive totals + per-source breakdown from raw/ file paths.
+
+    Paths look like ``raw/jira/ACE2E/…`` or ``raw/asana/LAMPSPLUS/…``;
+    group by the slug immediately after ``raw/``.
+    """
+    adds = sum(1 for f in files if f["change"] == "A")
+    mods = sum(1 for f in files if f["change"] == "M")
+    dels = sum(1 for f in files if f["change"] == "D")
+    by_source: dict = {}
+    for f in files:
+        parts = f["path"].split("/", 3)
+        if len(parts) < 3 or parts[0] != "raw":
+            key = "other"
+        else:
+            key = f"{parts[1]}/{parts[2]}"  # e.g. "jira/ACE2E", "asana/LAMPSPLUS"
+        bucket = by_source.setdefault(key, {"added": 0, "modified": 0, "deleted": 0})
+        if f["change"] == "A":
+            bucket["added"] += 1
+        elif f["change"] == "M":
+            bucket["modified"] += 1
+        elif f["change"] == "D":
+            bucket["deleted"] += 1
+    # Stable, descending by total-touched count for UI ordering.
+    sources = [
+        {"key": k, **v, "total": v["added"] + v["modified"] + v["deleted"]}
+        for k, v in by_source.items()
+    ]
+    sources.sort(key=lambda s: (-s["total"], s["key"]))
+    return {
+        "files": files,
+        "added": adds,
+        "modified": mods,
+        "deleted": dels,
+        "total": len(files),
+        "bySource": sources,
+    }

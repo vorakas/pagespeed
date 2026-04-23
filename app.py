@@ -270,6 +270,7 @@ def create_app() -> Flask:
         blazemeter_client=blazemeter_client,
         blazemeter_queue=blazemeter_queue,
         obsidian_sync_service=obsidian_sync_service,
+        vault_git_service=vault_git,
         migration_dashboard_service=migration_dashboard_service,
         snapshot_service=snapshot_service,
     )

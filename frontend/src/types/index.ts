@@ -511,6 +511,42 @@ export interface ObsidianCapabilities {
   asanaProjects: string[]
 }
 
+export interface ObsidianCommitMeta {
+  hash: string
+  shortHash: string
+  timestamp: number | null
+  subject: string | null
+}
+
+export interface ObsidianPendingSource {
+  key: string
+  added: number
+  modified: number
+  deleted: number
+  total: number
+}
+
+export interface ObsidianPendingFile {
+  path: string
+  change: string
+}
+
+export interface ObsidianPendingOrchestration {
+  enabled: boolean
+  error?: string
+  hasOrchestrateAnchor?: boolean
+  lastOrchestrate?: ObsidianCommitMeta | null
+  lastSync?: ObsidianCommitMeta | null
+  head?: string
+  pendingSyncCommits?: number
+  files?: ObsidianPendingFile[]
+  added?: number
+  modified?: number
+  deleted?: number
+  total?: number
+  bySource?: ObsidianPendingSource[]
+}
+
 export type ObsidianSyncStatus =
   | "queued"
   | "running"

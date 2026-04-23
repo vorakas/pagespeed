@@ -35,6 +35,7 @@ import type {
   BlazemeterMasterReport,
   BlazemeterRunsResponse,
   ObsidianCapabilities,
+  ObsidianPendingOrchestration,
   ObsidianSyncJob,
   ObsidianSyncJobSummary,
   ObsidianSyncRequest,
@@ -659,6 +660,10 @@ class ApiClient {
 
   async getObsidianCapabilities(): Promise<ObsidianCapabilities> {
     return this.request("/api/obsidian/capabilities")
+  }
+
+  async getObsidianPendingOrchestration(): Promise<ObsidianPendingOrchestration> {
+    return this.request("/api/obsidian/pending-orchestration")
   }
 
   async startObsidianSync(
