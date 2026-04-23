@@ -507,6 +507,12 @@ class VaultGitService:
 
         ``.health/`` is preserved so diagnostic ping files survive a
         restart — they're useful breadcrumbs when debugging.
+
+        Uses ``clean -fd`` (not ``-fdx``) so ignored files survive. The
+        Jira/Asana sync pipelines store their ``last_sync`` timestamps
+        in gitignored ``.jira_sync_state.json`` / ``.asana_sync_state.json``
+        markers; wiping those on every pull forces the next sync to run
+        as a full refresh instead of a delta.
         """
         if not self.is_git_repo:
             return
@@ -514,7 +520,7 @@ class VaultGitService:
             self._cleanup_rebase_state()
             self._run(["git", "fetch", self._REMOTE, self._BRANCH])
             self._run(["git", "reset", "--hard", f"{self._REMOTE}/{self._BRANCH}"])
-            self._run(["git", "clean", "-fdx", "-e", ".health"])
+            self._run(["git", "clean", "-fd", "-e", ".health"])
             logger.info("Vault reset to %s/%s at boot", self._REMOTE, self._BRANCH)
         except Exception:
             logger.exception("Vault pull_latest failed — continuing with local state")
