@@ -164,6 +164,20 @@ class VaultGitService:
         except Exception:
             logger.exception("Vault push raised unexpectedly (label=%s)", label)
 
+    def pull_latest(self) -> None:
+        """Fast-forward the local clone to the remote tip.
+
+        Safe to call when no orchestrator/sync is in-flight — used at
+        boot so the DB snapshot ingest reads the current remote state
+        (e.g. overnight orchestrator commits) instead of a stale clone.
+        """
+        if not self.is_git_repo:
+            return
+        try:
+            self._pull_rebase()
+        except Exception:
+            logger.exception("Vault pull_latest failed — continuing with local state")
+
     # ── Internals ────────────────────────────────────────────────────
 
     def _pull_rebase(self) -> None:

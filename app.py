@@ -201,6 +201,12 @@ def create_app() -> Flask:
         repository=snapshot_repo,
         vault_reader=VaultReader(OBSIDIAN_VAULT_ROOT),
     )
+    # Pull the latest vault state before the first ingest so we pick up
+    # orchestrator commits pushed between syncs (otherwise the DB lags
+    # one sync cycle behind the remote).
+    if vault_git is not None:
+        vault_git.pull_latest()
+
     # Seed the DB on boot so the dashboard has history even before the
     # first sync cycle runs.
     try:

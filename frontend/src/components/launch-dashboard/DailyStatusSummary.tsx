@@ -159,8 +159,7 @@ function CriticalTab({ snapshot }: { snapshot: MigrationSnapshot }) {
               key={b.id}
               id={b.id}
               title={b.title}
-              meta={b.sev ? b.sev.toUpperCase() : undefined}
-              right={b.due ? `due ${b.due}` : undefined}
+              meta={b.due ? `due ${b.due}` : undefined}
               tone="red"
               tag={b.tag ?? "CRITICAL"}
             />
@@ -527,12 +526,16 @@ const eyebrowFile: React.CSSProperties = {
 }
 
 const headlineStyle: React.CSSProperties = {
-  fontSize: 15,
-  lineHeight: 1.4,
-  color: "var(--lcc-text)",
-  margin: "0 0 16px",
-  fontWeight: 500,
+  fontSize: 13.5,
+  lineHeight: 1.5,
+  color: "var(--lcc-text-dim)",
+  margin: "0 0 14px",
+  fontWeight: 400,
   letterSpacing: "-0.005em",
+  display: "-webkit-box",
+  WebkitLineClamp: 3,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
 }
 
 const tabBarStyle: React.CSSProperties = {
@@ -550,7 +553,9 @@ const tabStyle: React.CSSProperties = {
   gap: 6,
   padding: "6px 10px",
   borderRadius: 6,
-  border: "1px solid transparent",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "transparent",
   background: "transparent",
   color: "var(--lcc-text-dim)",
   fontSize: 11,
@@ -580,7 +585,7 @@ const tabBodyStyle: React.CSSProperties = { minHeight: 100 }
 
 const columnsStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
   gap: 18,
 }
 
@@ -633,7 +638,8 @@ const rowIdStyle: React.CSSProperties = {
   color: "var(--lcc-text-faint)",
   flexShrink: 0,
   paddingTop: 2,
-  minWidth: 90,
+  minWidth: 74,
+  wordBreak: "break-word",
 }
 
 const rowTitleStyle: React.CSSProperties = {
@@ -665,7 +671,8 @@ const chipStyle: React.CSSProperties = {
   textTransform: "uppercase",
   padding: "2px 7px",
   borderRadius: 999,
-  border: "1px solid",
+  borderWidth: 1,
+  borderStyle: "solid",
   whiteSpace: "nowrap",
   flexShrink: 0,
 }
