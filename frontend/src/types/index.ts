@@ -848,6 +848,58 @@ export interface WorkstreamMdPayload {
   decisionContext: string | null
   crossRefs: WorkstreamMdCrossRef[]
   team: { leads: string[] }
+  crossDeps?: WorkstreamMdCrossDep[]
+  internalChains?: WorkstreamMdInternalChain[]
+  criticalBlocker?: WorkstreamMdCriticalBlocker | null
+  asanaJira?: WorkstreamMdAsanaJira[]
+  asanaJiraNotes?: WorkstreamMdRisk[]
+  asanaCoverage?: WorkstreamMdAsanaCoverage | null
+}
+
+export interface WorkstreamMdCrossDep {
+  from: string
+  fromTitle: string
+  fromStatus: string | null
+  relation: string
+  to: string
+  toTitle: string
+  area: string
+}
+
+export interface WorkstreamMdInternalChain {
+  blocked: string
+  blockedTitle: string
+  blockedBy: string
+  blockerTitle: string
+  blockerStatus: string
+  resolved: boolean
+}
+
+export interface WorkstreamMdCriticalBlocker {
+  id: string
+  title: string
+  note: string
+}
+
+export interface WorkstreamMdAsanaJira {
+  asana: string
+  asanaTitle: string
+  jira: string | null
+  asanaStatus: string | null
+  jiraStatus: string | null
+  aligned: "yes" | "no" | "no-link" | "unknown"
+}
+
+export interface WorkstreamMdAsanaCoverageCard {
+  count: number
+  note: string
+  tasks?: string[]
+}
+
+export interface WorkstreamMdAsanaCoverage {
+  implementation: WorkstreamMdAsanaCoverageCard
+  actionItems: WorkstreamMdAsanaCoverageCard
+  lpwe: WorkstreamMdAsanaCoverageCard
 }
 
 export interface MigrationWorkstreamDetail {

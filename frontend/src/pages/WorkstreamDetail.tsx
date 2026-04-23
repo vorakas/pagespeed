@@ -10,11 +10,17 @@ import type {
   RawTaskRecord,
   WorkstreamMdActive,
   WorkstreamMdActiveItem,
+  WorkstreamMdAsanaCoverage,
+  WorkstreamMdAsanaJira,
   WorkstreamMdBurndown,
+  WorkstreamMdCriticalBlocker,
+  WorkstreamMdCrossDep,
   WorkstreamMdDev,
+  WorkstreamMdInternalChain,
   WorkstreamMdPayload,
   WorkstreamMdProgressBucket,
   WorkstreamMdRecent,
+  WorkstreamMdRisk,
 } from "@/types"
 
 // Matches handoff/design/workstream-md.jsx — full markdown-driven detail
@@ -62,32 +68,67 @@ export function WorkstreamDetail() {
   }
 
   const md = detail.markdown
+  const hasCrossDeps = !!(md?.crossDeps?.length || md?.internalChains?.length || md?.criticalBlocker)
+  const hasRightRail = !!(md?.decisions?.length || md?.crossRefs?.length || md?.team?.leads?.length)
   return (
     <LaunchShell>
       <div style={pageStyle}>
         <BackLink />
         <Hero workstream={detail.workstream} md={md} />
 
-        {md?.sources?.length || md?.scope?.length ? (
+        {detail.blockers.length > 0 && <BlockersPanel blockers={detail.blockers} />}
+
+        {md?.progress?.buckets?.length ? <ProgressPanel md={md} /> : null}
+
+        {/* Active Items + Key Risks side-by-side per mockup */}
+        {md?.active || md?.keyRisks?.length ? (
           <div style={twoColStyle}>
-            {md?.sources?.length ? <SourcesPanel md={md} /> : null}
-            {md?.scope?.length ? <ScopePanel md={md} /> : null}
+            {md?.active ? <ActiveItemsPanel active={md.active} /> : <div />}
+            {md?.keyRisks?.length ? <KeyRisksPanel md={md} /> : <div />}
           </div>
         ) : null}
 
-        <StatGrid ws={detail.workstream} referencedKeyCount={detail.referencedKeyCount} md={md} />
+        {/* Dev Workload + Epics side-by-side */}
+        {md?.devs?.length || md?.epics?.length ? (
+          <div style={twoColStyle}>
+            {md?.devs?.length ? <DevsPanel md={md} /> : <div />}
+            {md?.epics?.length ? <EpicsPanel md={md} /> : <div />}
+          </div>
+        ) : null}
 
-        {detail.blockers.length > 0 && <BlockersPanel blockers={detail.blockers} />}
-
-        {md?.epics?.length ? <EpicsPanel md={md} /> : null}
-        {md?.progress?.buckets?.length ? <ProgressPanel md={md} /> : null}
-        {md?.active ? <ActiveItemsPanel active={md.active} /> : null}
-        {md?.keyRisks?.length ? <KeyRisksPanel md={md} /> : null}
         {md?.burndown?.length ? <BurndownPanel md={md} /> : null}
-        {md?.devs?.length ? <DevsPanel md={md} /> : null}
+
         {md?.recentActivity?.length ? <RecentActivityPanel md={md} /> : null}
-        {md?.decisions?.length ? <DecisionsPanel md={md} /> : null}
-        {md?.crossRefs?.length ? <CrossRefsPanel md={md} /> : null}
+
+        {/* Dependencies & Blockers spans two-thirds; Decisions/Related/Team stack right */}
+        {hasCrossDeps || hasRightRail ? (
+          <div style={twoColStyle}>
+            {hasCrossDeps ? (
+              <DependenciesPanel
+                crossDeps={md?.crossDeps || []}
+                chains={md?.internalChains || []}
+                critical={md?.criticalBlocker || null}
+              />
+            ) : (
+              <div />
+            )}
+            {hasRightRail ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {md?.decisions?.length ? <DecisionsPanel md={md} /> : null}
+                {md?.crossRefs?.length ? <CrossRefsPanel md={md} /> : null}
+                {md?.team?.leads?.length ? <TeamPanel leads={md.team.leads} /> : null}
+              </div>
+            ) : (
+              <div />
+            )}
+          </div>
+        ) : null}
+
+        {md?.asanaJira?.length ? (
+          <AsanaJiraPanel rows={md.asanaJira} notes={md.asanaJiraNotes || []} />
+        ) : null}
+
+        {md?.asanaCoverage ? <AsanaCoveragePanel coverage={md.asanaCoverage} /> : null}
 
         <CriticalTasksPanel tasks={detail.criticalTasks} />
       </div>
@@ -102,10 +143,11 @@ function Hero({ workstream, md }: { workstream: MigrationWorkstream; md: Workstr
   const title = md?.meta.title || workstream.name
   const taskCount = md?.meta.taskCount ?? workstream.tasks
   const blocked = md?.meta.blockedCount ?? workstream.blockedCount
+  const hasSourcesOrScope = !!(md?.sources?.length || md?.scope?.length)
   return (
     <section className="panel" style={{ padding: 22 }}>
       <div style={heroTopStyle}>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={eyebrowStyle}>
             Workstream · type {md?.meta.type || "workstream"}
             {md?.meta.lastUpdate ? <> · last update {md.meta.lastUpdate}</> : null}
@@ -146,14 +188,20 @@ function Hero({ workstream, md }: { workstream: MigrationWorkstream; md: Workstr
           </div>
         </div>
       </div>
+      {hasSourcesOrScope && (
+        <div style={heroGridStyle}>
+          {md?.sources?.length ? <SourcesPanel md={md} /> : null}
+          {md?.scope?.length ? <ScopePanel md={md} /> : null}
+        </div>
+      )}
     </section>
   )
 }
 
 function SourcesPanel({ md }: { md: WorkstreamMdPayload }) {
   return (
-    <section className="panel">
-      <h3 style={panelHeadStyle}>Jira / source projects</h3>
+    <div>
+      <h3 style={subSectionHeadStyle}>Jira / source projects</h3>
       <ul style={listResetStyle}>
         {md.sources.map((s) => (
           <li key={s.key} style={sourceRowStyle}>
@@ -167,21 +215,23 @@ function SourcesPanel({ md }: { md: WorkstreamMdPayload }) {
               {s.kind}
             </span>
             <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600 }}>{s.key}</span>
-            <span style={{ color: "var(--lcc-text-dim)", fontSize: 12 }}>{s.name}</span>
+            {s.name && s.name !== s.key && (
+              <span style={{ color: "var(--lcc-text-dim)", fontSize: 12 }}>{s.name}</span>
+            )}
             <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono, monospace)", fontSize: 11, color: "var(--lcc-text-faint)" }}>
               {s.issues != null ? `${s.issues} issues` : s.note || ""}
             </span>
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   )
 }
 
 function ScopePanel({ md }: { md: WorkstreamMdPayload }) {
   return (
-    <section className="panel">
-      <h3 style={panelHeadStyle}>Scope</h3>
+    <div>
+      <h3 style={subSectionHeadStyle}>Scope</h3>
       <ul style={listResetStyle}>
         {md.scope.map((s) => (
           <li key={s.label} style={scopeRowStyle}>
@@ -190,30 +240,6 @@ function ScopePanel({ md }: { md: WorkstreamMdPayload }) {
           </li>
         ))}
       </ul>
-    </section>
-  )
-}
-
-// ── Stats row ─────────────────────────────────────────────────────────
-
-function StatGrid({
-  ws,
-  referencedKeyCount,
-  md,
-}: {
-  ws: MigrationWorkstream
-  referencedKeyCount: number
-  md: WorkstreamMdPayload | null
-}) {
-  const total = md?.progress.total ?? ws.tasks
-  return (
-    <div style={statsGridStyle}>
-      <Stat label="Total" value={total ?? "—"} />
-      <Stat label="Closed" value={ws.closed} tone="green" />
-      <Stat label="In Progress" value={ws.inProgress} tone="blue" />
-      <Stat label="Failed QA" value={ws.failedQa} tone="red" />
-      <Stat label="Blocked" value={md?.meta.blockedCount ?? ws.blockedCount} tone="amber" />
-      <Stat label="Referenced" value={referencedKeyCount} />
     </div>
   )
 }
@@ -772,6 +798,270 @@ function CrossRefsPanel({ md }: { md: WorkstreamMdPayload }) {
   )
 }
 
+// ── Dependencies & Blockers ───────────────────────────────────────────
+
+function DependenciesPanel({
+  crossDeps,
+  chains,
+  critical,
+}: {
+  crossDeps: WorkstreamMdCrossDep[]
+  chains: WorkstreamMdInternalChain[]
+  critical: WorkstreamMdCriticalBlocker | null
+}) {
+  return (
+    <section className="panel">
+      <h3 style={panelHeadStyle}>
+        Dependencies & Blockers
+        <span style={panelCountStyle}>
+          {crossDeps.length} cross-project · {chains.length} internal chains
+        </span>
+      </h3>
+      {crossDeps.length > 0 && (
+        <>
+          <div style={subSectionHeadStyle}>Cross-project (blocking OUT)</div>
+          <ul style={listResetStyle}>
+            {crossDeps.map((d, i) => (
+              <li key={`${d.from}-${d.to}-${i}`} style={depRowStyle}>
+                <span style={depIdStyle}>{d.from}</span>
+                {d.fromStatus && <span style={depStatusChipStyle}>{d.fromStatus}</span>}
+                <span style={depArrowStyle}>→ blocks →</span>
+                <span style={{ ...depIdStyle, color: "var(--lcc-violet)" }}>{d.to}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--lcc-text)" }}>
+                  {d.toTitle}
+                </span>
+                <span style={depAreaStyle}>{d.area}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {chains.length > 0 && (
+        <>
+          <div style={{ ...subSectionHeadStyle, marginTop: 16 }}>Internal blocking chains</div>
+          <ul style={listResetStyle}>
+            {chains.map((c, i) => (
+              <li
+                key={`${c.blocked}-${c.blockedBy}-${i}`}
+                style={{ ...depRowStyle, opacity: c.resolved ? 0.65 : 1 }}
+              >
+                <span style={depIdStyle}>{c.blocked}</span>
+                <span style={{ flex: "0 0 180px", minWidth: 0, fontSize: 12, color: "var(--lcc-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {c.blockedTitle}
+                </span>
+                <span style={depArrowStyle}>blocked by</span>
+                <span style={{ ...depIdStyle, color: "var(--lcc-violet)" }}>{c.blockedBy}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--lcc-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {c.blockerTitle}
+                </span>
+                <span style={{ ...depStatusChipStyle, color: c.resolved ? "var(--lcc-green)" : "var(--lcc-text-dim)", borderColor: c.resolved ? "var(--lcc-green)" : "rgba(255,255,255,0.15)" }}>
+                  {c.blockerStatus}{c.resolved ? " ✓" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {critical && (
+        <div style={criticalBlockerStyle}>
+          <span style={{ ...chipStyle, color: "var(--lcc-red)", borderColor: "var(--lcc-red)" }}>
+            critical
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, color: "var(--lcc-text)", fontWeight: 600, marginBottom: 3 }}>
+              {critical.title}
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--lcc-text-dim)", lineHeight: 1.45 }}>
+              {critical.note}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── Team ──────────────────────────────────────────────────────────────
+
+function TeamPanel({ leads }: { leads: string[] }) {
+  return (
+    <section className="panel">
+      <h3 style={panelHeadStyle}>
+        Team <span style={panelCountStyle}>{leads.length} leads</span>
+      </h3>
+      <div style={teamGridStyle}>
+        {leads.map((name) => {
+          const initials = name
+            .split(/\s+/)
+            .map((w) => w[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase()
+          return (
+            <div key={name} style={teamAvatarStyle}>
+              <div style={avatarCircleStyle}>{initials}</div>
+              <div style={avatarNameStyle}>{name}</div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+// ── Asana ↔ Jira ──────────────────────────────────────────────────────
+
+function AsanaJiraPanel({
+  rows,
+  notes,
+}: {
+  rows: WorkstreamMdAsanaJira[]
+  notes: WorkstreamMdRisk[]
+}) {
+  return (
+    <section className="panel">
+      <h3 style={panelHeadStyle}>
+        Asana ↔ Jira cross-references
+        <span style={panelCountStyle}>{rows.length} mapped</span>
+      </h3>
+      <div style={ajHeaderStyle}>
+        <span>Asana ID</span>
+        <span>Task</span>
+        <span>Jira</span>
+        <span>Asana status</span>
+        <span>Jira status</span>
+        <span>Aligned?</span>
+      </div>
+      {rows.map((r, i) => (
+        <div key={`${r.asana}-${i}`} style={ajRowStyle}>
+          <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 11, color: "var(--lcc-text-faint)" }}>
+            {r.asana}
+          </span>
+          <span style={{ fontSize: 12, color: "var(--lcc-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {r.asanaTitle}
+          </span>
+          <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 11, color: r.jira ? "var(--lcc-blue)" : "var(--lcc-text-faint)" }}>
+            {r.jira || "—"}
+          </span>
+          <span style={{ fontSize: 11, color: "var(--lcc-text-dim)" }}>{r.asanaStatus || "—"}</span>
+          <span style={{ fontSize: 11, color: r.jiraStatus === "Closed" ? "var(--lcc-green)" : "var(--lcc-text-dim)" }}>
+            {r.jiraStatus || "—"}
+          </span>
+          <span>
+            {r.aligned === "yes" && (
+              <span style={{ ...chipStyle, color: "var(--lcc-green)", borderColor: "var(--lcc-green)" }}>✓</span>
+            )}
+            {r.aligned === "no" && (
+              <span style={{ ...chipStyle, color: "var(--lcc-red)", borderColor: "var(--lcc-red)" }}>misaligned</span>
+            )}
+            {r.aligned === "no-link" && (
+              <span style={{ ...chipStyle, color: "var(--lcc-text-dim)", borderColor: "rgba(255,255,255,0.15)" }}>no jira link</span>
+            )}
+            {r.aligned === "unknown" && (
+              <span style={{ ...chipStyle, color: "var(--lcc-amber)", borderColor: "var(--lcc-amber)" }}>unknown</span>
+            )}
+          </span>
+        </div>
+      ))}
+      {notes.length > 0 && (
+        <ul style={{ ...listResetStyle, marginTop: 12 }}>
+          {notes.map((n, i) => (
+            <li
+              key={i}
+              style={{
+                ...riskRowStyle,
+                borderLeft: `3px solid var(--lcc-${n.tone})`,
+              }}
+            >
+              {n.text}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+// ── Asana Coverage ────────────────────────────────────────────────────
+
+function AsanaCoveragePanel({ coverage }: { coverage: WorkstreamMdAsanaCoverage }) {
+  return (
+    <section className="panel">
+      <h3 style={panelHeadStyle}>
+        Asana coverage
+        <span style={panelCountStyle}>implementation · action items · LPWE</span>
+      </h3>
+      <div style={coverageGridStyle}>
+        <CoverageCard
+          label="Implementation"
+          count={coverage.implementation.count}
+          note={coverage.implementation.note}
+          tone="blue"
+        />
+        <CoverageCard
+          label="Action items"
+          count={coverage.actionItems.count}
+          note={coverage.actionItems.note}
+          tasks={coverage.actionItems.tasks}
+          tone="amber"
+        />
+        <CoverageCard
+          label="LPWE"
+          count={coverage.lpwe.count}
+          note={coverage.lpwe.note}
+          tone="green"
+        />
+      </div>
+    </section>
+  )
+}
+
+function CoverageCard({
+  label,
+  count,
+  note,
+  tasks,
+  tone,
+}: {
+  label: string
+  count: number
+  note: string
+  tasks?: string[]
+  tone: "blue" | "amber" | "green"
+}) {
+  const color = `var(--lcc-${tone})`
+  return (
+    <div
+      style={{
+        padding: 16,
+        borderRadius: 10,
+        background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
+        border: `1px solid ${color}`,
+      }}
+    >
+      <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        {count}
+      </div>
+      <div style={{ ...statLabelStyle, marginTop: 6 }}>{label}</div>
+      {note && (
+        <div style={{ fontSize: 12, color: "var(--lcc-text-dim)", lineHeight: 1.4, marginTop: 8 }}>
+          {note}
+        </div>
+      )}
+      {tasks && tasks.length > 0 && (
+        <ul style={{ margin: "10px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+          {tasks.slice(0, 9).map((t, i) => (
+            <li key={i} style={{ fontSize: 11.5, color: "var(--lcc-text-dim)", paddingLeft: 12, position: "relative" }}>
+              <span style={{ position: "absolute", left: 0, color }}>•</span>
+              {t}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // ── Blockers + Critical tasks ─────────────────────────────────────────
 
 function BlockersPanel({ blockers }: { blockers: MigrationBlocker[] }) {
@@ -1179,7 +1469,9 @@ const rowIdStyle: React.CSSProperties = {
   fontFamily: "var(--font-mono, monospace)",
   fontSize: 10.5,
   color: "var(--lcc-text-faint)",
-  flex: "0 0 130px",
+  flex: "0 0 auto",
+  minWidth: 90,
+  maxWidth: 140,
   paddingTop: 2,
 }
 const rowTitleStyle: React.CSSProperties = {
@@ -1261,4 +1553,130 @@ const crossRefLinkStyle: React.CSSProperties = {
   fontFamily: "var(--font-mono, monospace)",
   fontSize: 12,
   flex: "0 0 220px",
+}
+const heroGridStyle: React.CSSProperties = {
+  marginTop: 20,
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 24,
+  borderTop: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.08))",
+  paddingTop: 18,
+}
+const subSectionHeadStyle: React.CSSProperties = {
+  margin: "0 0 10px",
+  fontSize: 9.5,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase",
+  color: "var(--lcc-text-faint)",
+  fontWeight: 600,
+  fontFamily: "var(--font-mono, monospace)",
+}
+const depRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "8px 10px",
+  background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
+  borderRadius: 6,
+  fontSize: 12,
+}
+const depIdStyle: React.CSSProperties = {
+  fontFamily: "var(--font-mono, monospace)",
+  fontSize: 11,
+  color: "var(--lcc-blue)",
+  flex: "0 0 110px",
+}
+const depStatusChipStyle: React.CSSProperties = {
+  fontSize: 10,
+  padding: "2px 8px",
+  border: "1px solid rgba(255,255,255,0.15)",
+  borderRadius: 999,
+  color: "var(--lcc-text-dim)",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  fontFamily: "var(--font-mono, monospace)",
+  whiteSpace: "nowrap",
+}
+const depArrowStyle: React.CSSProperties = {
+  fontSize: 10.5,
+  color: "var(--lcc-text-faint)",
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+  fontFamily: "var(--font-mono, monospace)",
+  whiteSpace: "nowrap",
+}
+const depAreaStyle: React.CSSProperties = {
+  fontSize: 10.5,
+  color: "var(--lcc-text-dim)",
+  fontFamily: "var(--font-mono, monospace)",
+  whiteSpace: "nowrap",
+}
+const criticalBlockerStyle: React.CSSProperties = {
+  marginTop: 16,
+  padding: "12px 14px",
+  display: "flex",
+  gap: 12,
+  alignItems: "flex-start",
+  background: "var(--lcc-red-bg, rgba(255,107,139,0.08))",
+  border: "1px solid var(--lcc-red)",
+  borderRadius: 8,
+}
+const teamGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(86px, 1fr))",
+  gap: 12,
+}
+const teamAvatarStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 6,
+}
+const avatarCircleStyle: React.CSSProperties = {
+  width: 48,
+  height: 48,
+  borderRadius: "50%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue))",
+  color: "#fff",
+  fontWeight: 700,
+  fontSize: 14,
+  letterSpacing: "0.03em",
+  fontFamily: "var(--font-mono, monospace)",
+  boxShadow: "0 0 10px rgba(176,140,255,0.25)",
+}
+const avatarNameStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: "var(--lcc-text-dim)",
+  textAlign: "center",
+  lineHeight: 1.3,
+}
+const ajHeaderStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "80px 1fr 110px 100px 100px 110px",
+  gap: 10,
+  padding: "6px 10px",
+  fontSize: 9.5,
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  color: "var(--lcc-text-faint)",
+  fontFamily: "var(--font-mono, monospace)",
+  borderBottom: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.08))",
+  marginBottom: 4,
+}
+const ajRowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "80px 1fr 110px 100px 100px 110px",
+  gap: 10,
+  padding: "8px 10px",
+  alignItems: "center",
+  borderBottom: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.04))",
+}
+const coverageGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 2fr 1fr",
+  gap: 14,
+  alignItems: "stretch",
 }

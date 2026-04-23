@@ -68,6 +68,13 @@ def parse_workstream_markdown(text: str, ws_id: str) -> Dict[str, Any]:
     decisions, decision_context = _parse_decisions(sections.get("decisions", []))
     cross_refs = _parse_cross_refs(sections.get("cross-references", []))
     team_leads = _parse_team(sections.get("team", []))
+    cross_deps, internal_chains, critical_blocker = _parse_dependencies_and_blockers(
+        sections.get("dependencies & blockers", [])
+    )
+    asana_jira, asana_jira_notes = _parse_asana_jira(
+        sections.get("asana ↔ jira cross-references", [])
+    )
+    asana_coverage = _parse_asana_coverage(sections.get("asana coverage", []))
 
     return {
         "meta": {
@@ -95,6 +102,12 @@ def parse_workstream_markdown(text: str, ws_id: str) -> Dict[str, Any]:
         "decisionContext": decision_context,
         "crossRefs": cross_refs,
         "team": {"leads": team_leads},
+        "crossDeps": cross_deps,
+        "internalChains": internal_chains,
+        "criticalBlocker": critical_blocker,
+        "asanaJira": asana_jira,
+        "asanaJiraNotes": asana_jira_notes,
+        "asanaCoverage": asana_coverage,
     }
 
 
@@ -243,11 +256,16 @@ def _split_dash(text: str) -> (tuple[str, str]):  # type: ignore[valid-type]
 # ── Sources blockquote (above Overview) ───────────────────────────────
 
 
-_SOURCE_TOKEN_RE = re.compile(r"\*\*([A-Z]+)\*\*\s*(?:\((\d+)\s*issues?\))?")
+_SOURCE_TOKEN_RE = re.compile(r"\*\*([A-Z][A-Z0-9]*)\*\*\s*(?:\(([^)]+)\))?")
 
 
 def _extract_sources(body: str) -> List[Dict[str, Any]]:
-    """Pull ``> Jira Projects: **DBADMIN** (459 issues), ...`` tokens."""
+    """Pull ``> Jira Projects: **DBADMIN** (459 issues), **WPM** (WUP epics), ...`` tokens.
+
+    The parenthetical can be either a count (``459 issues``, ``15``) or a
+    free-form note (``WUP epics``); we split on the first numeric leading
+    token to decide which.
+    """
     out: List[Dict[str, Any]] = []
     for line in body.splitlines():
         stripped = line.strip()
@@ -255,10 +273,19 @@ def _extract_sources(body: str) -> List[Dict[str, Any]]:
             continue
         if "Jira Projects" not in stripped and "Source" not in stripped:
             continue
-        for key, issues in _SOURCE_TOKEN_RE.findall(stripped):
+        for key, parens in _SOURCE_TOKEN_RE.findall(stripped):
             entry: Dict[str, Any] = {"key": key, "kind": "jira", "name": key}
-            if issues:
-                entry["issues"] = int(issues)
+            parens = (parens or "").strip()
+            if parens:
+                m = re.match(r"^(\d+)\s*(.*)$", parens)
+                if m:
+                    entry["issues"] = int(m.group(1))
+                    trailing = m.group(2).strip()
+                    # "459 issues" → drop the word; "17 WUP epics" → keep "WUP epics"
+                    if trailing and trailing.lower() not in {"issue", "issues"}:
+                        entry["note"] = trailing
+                else:
+                    entry["note"] = parens
             out.append(entry)
     return out
 
@@ -575,14 +602,14 @@ def _parse_recent_activity(lines: List[str]) -> (tuple[List[Dict[str, Any]], Opt
         first = _strip_markup(cells[0])
         if not first or first.lower() == "task" or first.startswith("-"):
             continue
-        task_id, display = _wikilink_target(cells[0])
+        task_id, title = _wikilink_id_and_title(cells[0])
         status = _strip_markup(cells[1])
         assignee = _strip_markup(cells[2])
         updated = _strip_markup(cells[3])
         rows.append(
             {
                 "id": task_id,
-                "title": display,
+                "title": title,
                 "status": status,
                 "tone": _tone_for(status),
                 "assignee": assignee,
@@ -591,6 +618,293 @@ def _parse_recent_activity(lines: List[str]) -> (tuple[List[Dict[str, Any]], Opt
             }
         )
     return rows, summary
+
+
+# ── Wikilink helpers ─────────────────────────────────────────────────
+
+
+# Non-greedy to stop at the first ``]]`` — ``[^\]]+`` breaks on nested
+# single brackets (e.g. ``[Private Link]`` inside a title segment).
+_WIKILINK_FULL_RE = re.compile(r"\[\[(.+?)\]\]")
+
+
+def _wikilink_id_and_title(text: str) -> (tuple[str, str]):  # type: ignore[valid-type]
+    """Return ``(id, title)`` from a ``[[ID - Long Title|Display]]`` wikilink.
+
+    ``_wikilink_target`` is designed for compact link rendering (it returns
+    ``display`` which is typically the bare ID), but recent-activity rows
+    want the human-readable title from the target side. Splitting the
+    target on the first ``" - "`` yields the id prefix and the rest of
+    the title. Falls back to the display text or stripped plaintext.
+    """
+    m = _WIKILINK_FULL_RE.search(text)
+    if not m:
+        plain = _strip_markup(text)
+        return plain, plain
+    inner = m.group(1)
+    target, _, display = inner.partition("|")
+    target = target.strip()
+    display = (display or target).strip()
+    wid, sep, rest = target.partition(" - ")
+    if sep:
+        title = rest.strip()
+        # A trailing ``.md`` is leftover from filename-style links.
+        if title.endswith(".md"):
+            title = title[:-3]
+        return wid.strip(), _strip_markup(title) or display
+    return target, display
+
+
+# ── Dependencies & Blockers ──────────────────────────────────────────
+
+
+def _parse_dependencies_and_blockers(
+    lines: List[str],
+) -> (tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[Dict[str, str]]]):  # type: ignore[valid-type]
+    """Split the ``## Dependencies & Blockers`` section into three payloads.
+
+    - Cross-project table (``### Active Cross-Project Dependencies``) —
+      columns: This Task | Relationship | External Task | External Workstream.
+    - Internal chains table (``### Active Internal Chains``) —
+      columns: Blocked Task | Blocked By | Status of Blocker.
+    - Trailing ``**Critical:** [[blocker-data-syncing]] — note`` line
+      captured as ``criticalBlocker`` metadata.
+    """
+    cross: List[Dict[str, Any]] = []
+    chains: List[Dict[str, Any]] = []
+    critical: Optional[Dict[str, str]] = None
+
+    sub: Optional[str] = None
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("###"):
+            heading = _strip_markup(stripped.lstrip("#")).strip(": ").lower()
+            if "cross-project" in heading:
+                sub = "cross"
+            elif "internal" in heading:
+                sub = "chains"
+            else:
+                sub = None
+            continue
+        if stripped.startswith("**Critical"):
+            # `**Critical:** [[blocker-…]] — data syncing scope at risk...`
+            m = re.search(r"\*\*Critical:\*\*\s*(.*)", stripped)
+            if m:
+                rest = m.group(1)
+                bid, _ = _wikilink_id_and_title(rest)
+                left, sep, note = rest.partition("—")
+                if not sep:
+                    left, sep, note = rest.partition(" - ")
+                title_text = _strip_markup(note).strip()
+                critical = {
+                    "id": bid,
+                    "title": title_text or _strip_markup(left).strip() or bid,
+                    "note": title_text or _strip_markup(rest),
+                }
+            continue
+        if not stripped.startswith("|") or sub is None:
+            continue
+        cells = _split_table_row(stripped)
+        if len(cells) < 3:
+            continue
+        first = _strip_markup(cells[0])
+        if not first or first.startswith("-") or first.lower() in {"this task", "blocked task"}:
+            continue
+        if sub == "cross" and len(cells) >= 4:
+            from_id, from_title = _wikilink_id_and_title(cells[0])
+            from_status = _parenthetical(cells[0])
+            relation = _strip_markup(cells[1])
+            to_id, to_title = _wikilink_id_and_title(cells[2])
+            area_raw = _strip_markup(cells[3])
+            area = _first_wikilink_id(cells[3]) or area_raw
+            cross.append(
+                {
+                    "from": from_id,
+                    "fromTitle": from_title,
+                    "fromStatus": from_status,
+                    "relation": relation,
+                    "to": to_id,
+                    "toTitle": to_title,
+                    "area": area,
+                }
+            )
+        elif sub == "chains" and len(cells) >= 3:
+            blocked_id, blocked_title = _wikilink_id_and_title(cells[0])
+            blocker_id, blocker_title = _wikilink_id_and_title(cells[1])
+            blocker_status_raw = _strip_markup(cells[2])
+            resolved = ("✅" in blocker_status_raw) or ("✓" in blocker_status_raw)
+            blocker_status = (
+                blocker_status_raw.replace("✅", "").replace("✓", "").strip(" —-")
+                or blocker_status_raw
+            )
+            chains.append(
+                {
+                    "blocked": blocked_id,
+                    "blockedTitle": blocked_title,
+                    "blockedBy": blocker_id,
+                    "blockerTitle": blocker_title,
+                    "blockerStatus": blocker_status,
+                    "resolved": resolved,
+                }
+            )
+
+    return cross, chains, critical
+
+
+_PARENTHETICAL_RE = re.compile(r"\(([^()]+)\)")
+
+
+def _parenthetical(text: str) -> Optional[str]:
+    """Return the first parenthesised fragment (e.g. ``(QA on PPE)``)."""
+    m = _PARENTHETICAL_RE.search(text)
+    return _strip_markup(m.group(1)).strip() if m else None
+
+
+def _first_wikilink_id(text: str) -> Optional[str]:
+    wid, _ = _wikilink_id_and_title(text)
+    return wid if wid and wid.startswith("ws-") else None
+
+
+# ── Asana ↔ Jira cross-references ─────────────────────────────────────
+
+
+def _parse_asana_jira(
+    lines: List[str],
+) -> (tuple[List[Dict[str, Any]], List[Dict[str, str]]]):  # type: ignore[valid-type]
+    """Parse the Asana ↔ Jira cross-reference table + its trailing notes."""
+    rows: List[Dict[str, Any]] = []
+    notes: List[Dict[str, str]] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("**"):
+            note = _strip_markup(stripped)
+            if not note:
+                continue
+            tone = "red" if ("misalignment" in note.lower() or "⚠️" in stripped) else "amber"
+            # Only surface the two summary notes from the MD; footnotes
+            # (``★ Same Asana task``) stay inline with the row.
+            if "misalignment" in note.lower() or "not in the WPM" in note or "not in export" in note.lower():
+                notes.append({"tone": tone, "text": note})
+            continue
+        if not stripped.startswith("|"):
+            continue
+        cells = _split_table_row(stripped)
+        if len(cells) < 6:
+            continue
+        first = _strip_markup(cells[0])
+        if not first or first.startswith("-") or first.lower() in {"asana task", "asana"}:
+            continue
+        asana_id, asana_link_title = _wikilink_id_and_title(cells[0])
+        description = _strip_markup(cells[1]) or asana_link_title
+        jira_id, _ = _wikilink_id_and_title(cells[2])
+        if jira_id.lower() in {"", "—", "-"}:
+            jira_id = None
+        asana_status = _strip_markup(cells[3]) or None
+        jira_status = _strip_markup(cells[4]) or None
+        aligned_raw = _strip_markup(cells[5]).lower()
+        aligned = "unknown"
+        if "no jira link" in aligned_raw:
+            aligned = "no-link"
+        elif "no" in aligned_raw or "misaligned" in aligned_raw or "⚠️ no" in aligned_raw:
+            aligned = "no"
+        elif "yes" in aligned_raw or "✓" in aligned_raw:
+            aligned = "yes"
+        rows.append(
+            {
+                "asana": asana_id,
+                "asanaTitle": description,
+                "jira": jira_id,
+                "asanaStatus": asana_status,
+                "jiraStatus": jira_status,
+                "aligned": aligned,
+            }
+        )
+
+    return rows, notes
+
+
+# ── Asana Coverage ───────────────────────────────────────────────────
+
+
+_LPWE_COUNT_RE = re.compile(r"\*\*LPWE[^*]*\*\*\s*[:—-]?\s*(\d+)\s*tasks?", re.IGNORECASE)
+_LAMPS_IMPL_RE = re.compile(r"\*\*LAMPSPLUS Implementation:\*\*\s*~?(\d+)\s*tasks?", re.IGNORECASE)
+_LAMPS_ACTION_RE = re.compile(r"\*\*LAMPSPLUS Action Items:\*\*\s*(\d+)\s*open", re.IGNORECASE)
+
+
+def _parse_asana_coverage(lines: List[str]) -> Optional[Dict[str, Any]]:
+    """Summarise the ``## Asana Coverage`` section into three cards.
+
+    Returns None when the section is missing so the UI can skip the
+    panel entirely rather than render empty scaffolding.
+    """
+    if not lines:
+        return None
+
+    joined = "\n".join(lines)
+
+    impl_count: Optional[int] = None
+    impl_note = ""
+    action_count: Optional[int] = None
+    action_note = ""
+    action_tasks: List[str] = []
+    lpwe_count: Optional[int] = None
+    lpwe_note = ""
+
+    m = _LAMPS_IMPL_RE.search(joined)
+    if m:
+        impl_count = int(m.group(1))
+        # Note is the content immediately after "(LAMPSPLUS Implementation: …)"
+        impl_note = _trail_after(joined, m.end())
+
+    m = _LAMPS_ACTION_RE.search(joined)
+    if m:
+        action_count = int(m.group(1))
+        action_note = _trail_after(joined, m.end())
+
+    m = _LPWE_COUNT_RE.search(joined)
+    if m:
+        lpwe_count = int(m.group(1))
+        lpwe_note = _trail_after(joined, m.end())
+
+    # Collect sub-bullets under Key Tasks / Action Items
+    in_key_tasks = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("###"):
+            heading = _strip_markup(stripped.lstrip("#")).strip(": ").lower()
+            in_key_tasks = "key tasks" in heading
+            continue
+        if in_key_tasks and stripped.startswith(("-", "*")):
+            text = _strip_bullet_prefix(stripped)
+            # Collapse any [[target|display]] to the display text so the
+            # UI renders a readable label instead of wikilink markup.
+            text = _WIKILINK_FULL_RE.sub(
+                lambda m: (m.group(1).split("|", 1)[-1]).strip(), text
+            )
+            text = _strip_markup(text)
+            if text:
+                action_tasks.append(text)
+
+    if impl_count is None and action_count is None and lpwe_count is None:
+        return None
+
+    return {
+        "implementation": {"count": impl_count or 0, "note": impl_note.strip(" .")},
+        "actionItems": {
+            "count": action_count or 0,
+            "note": action_note.strip(" ."),
+            "tasks": action_tasks,
+        },
+        "lpwe": {"count": lpwe_count or 0, "note": lpwe_note.strip(" .")},
+    }
+
+
+def _trail_after(text: str, start: int) -> str:
+    """Return the first line of text starting at ``start``, stripped."""
+    tail = text[start:]
+    first_line = tail.split("\n", 1)[0]
+    return _strip_markup(first_line)
 
 
 # ── Decisions ─────────────────────────────────────────────────────────
