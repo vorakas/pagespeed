@@ -37,7 +37,7 @@ const navSections: NavSection[] = [
     items: [
       { label: "Launch Dashboard", href: "/dashboard", icon: <Rocket size={16} /> },
       { label: "Status History", href: "/dashboard/history", icon: <History size={16} /> },
-      { label: "Workstreams", href: "/dashboard#workstreams", icon: <ListTree size={16} /> },
+      { label: "Workstreams", href: "/dashboard/workstreams/ws-data-platform", icon: <ListTree size={16} /> },
       { label: "Blockers & Incidents", href: "/dashboard#incidents", icon: <AlertTriangle size={16} /> },
     ],
   },

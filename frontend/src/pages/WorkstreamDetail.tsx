@@ -827,7 +827,18 @@ function DependenciesPanel({
                 {d.fromStatus && <span style={depStatusChipStyle}>{d.fromStatus}</span>}
                 <span style={depArrowStyle}>→ blocks →</span>
                 <span style={{ ...depIdStyle, color: "var(--lcc-violet)" }}>{d.to}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--lcc-text)" }}>
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 12,
+                    color: "var(--lcc-text)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={d.toTitle}
+                >
                   {d.toTitle}
                 </span>
                 <span style={depAreaStyle}>{d.area}</span>
