@@ -116,6 +116,12 @@
   height: 88px;
   z-index: 49;
   background: linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
+  /* Fade the last 10px to transparent so the mask's bottom edge blends
+   * into the aurora blobs + animated backdrop rather than stopping at
+   * a sharp line. Content can just start peeking in the fade region,
+   * which is fine — by the time it's readable the mask is gone anyway. */
+  -webkit-mask-image: linear-gradient(to bottom, black 78px, transparent 88px);
+  mask-image: linear-gradient(to bottom, black 78px, transparent 88px);
   pointer-events: none;
 }
 
