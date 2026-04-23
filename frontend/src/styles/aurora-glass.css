@@ -98,22 +98,24 @@
   background: transparent;
 }
 
-/* Scroll mask — a sticky 14px strip at the viewport top that heavily
- * blurs whatever main content scrolls beneath it, so the topbar can
- * sit 14px below the edge (floating-card aesthetic) without exposing
- * scrolling content in that gap. Pointer-events:none so it never
- * steals clicks. Sits at z-index 49 — below the topbar (50) and
- * above main content children (1). */
+/* Scroll mask — an opaque fixed strip covering the 88px band from the
+ * viewport top through the bottom of the topbar-plus-gap. Sits at
+ * z-index 49, below the sticky topbar (50) and above content (1), so
+ * it hides anything that would otherwise scroll up into that region.
+ *
+ * Uses the same solid gradient as the app shell base layer so it reads
+ * as "the background continues up here" rather than "new surface". The
+ * Pharos sidebar is fixed at x=12..232 with its own z-index 50, so the
+ * mask starts at x=232 to avoid stacking on top of it. */
 .launch-dashboard::before {
   content: "";
-  position: sticky;
+  position: fixed;
   top: 0;
-  display: block;
-  height: 14px;
+  left: 232px;
+  right: 0;
+  height: 88px;
   z-index: 49;
-  backdrop-filter: blur(28px) saturate(140%);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  background: transparent;
+  background: linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
   pointer-events: none;
 }
 
@@ -306,10 +308,11 @@
   align-items: center;
   gap: 14px;
   padding: 0 18px;
-  /* Top margin comes from the .launch-dashboard::before mask strip
-   * which occupies 14px of flow height. Side margins stay so the bar
-   * keeps its inset floating-card look. */
-  margin: 0 14px 0;
+  /* 14px top margin keeps the bar's flow position aligned with the
+   * sticky pin point and with shell padding below, so first-row
+   * shell content lands at y=88 — flush with the fixed mask's
+   * bottom edge (see .launch-dashboard::before above). */
+  margin: 14px 14px 0;
   position: sticky;
   top: 14px;
   z-index: 50;
