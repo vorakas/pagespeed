@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, RefreshCw, FolderTree, FileText, ChevronRight, ChevronDown } from "lucide-react"
+import { Loader2, RefreshCw, FolderTree, FileText, ChevronRight, ChevronDown, StopCircle } from "lucide-react"
 import { api } from "@/services/api"
 import type {
   ObsidianCapabilities,
@@ -30,6 +30,7 @@ export function Obsidian() {
   const [page, setPage] = useState<ObsidianVaultPage | null>(null)
   const [pageError, setPageError] = useState<string | null>(null)
   const [isStarting, setIsStarting] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
   const [pending, setPending] = useState<ObsidianPendingOrchestration | null>(null)
   const [showPendingFiles, setShowPendingFiles] = useState(false)
   const [fullRefresh, setFullRefresh] = useState(false)
@@ -140,7 +141,22 @@ export function Obsidian() {
     [fullRefresh],
   )
 
+  const handleCancel = useCallback(async () => {
+    if (!activeJob?.jobId) return
+    setIsCancelling(true)
+    setSyncError(null)
+    try {
+      const res = await api.cancelObsidianSync(activeJob.jobId)
+      setActiveJob(res.job)
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : "Failed to stop sync")
+    } finally {
+      setIsCancelling(false)
+    }
+  }, [activeJob?.jobId])
+
   const isRunning = activeJob?.status === "running"
+  const isCancelRequested = !!activeJob?.cancelRequested
   const canSyncJira = !!capabilities?.jiraConfigured
   const canSyncAsana = !!capabilities?.asanaConfigured
   const canSyncBoth = canSyncJira && canSyncAsana
@@ -224,6 +240,21 @@ export function Obsidian() {
           >
             Asana only
           </Button>
+          {isRunning && (
+            <Button
+              onClick={handleCancel}
+              disabled={isCancelling || isCancelRequested}
+              variant="destructive"
+              size="sm"
+            >
+              {isCancelling || isCancelRequested ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <StopCircle size={14} />
+              )}
+              {isCancelRequested ? "Stopping…" : "Stop Sync"}
+            </Button>
+          )}
         </div>
         <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
           <input
@@ -304,6 +335,8 @@ function statusClass(status: ObsidianSyncJob["status"]): string {
       return "bg-amber-500/15 text-amber-600 dark:text-amber-400"
     case "running":
       return "bg-sky-500/15 text-sky-600 dark:text-sky-400"
+    case "cancelled":
+      return "bg-muted text-muted-foreground"
     default:
       return "bg-muted text-muted-foreground"
   }

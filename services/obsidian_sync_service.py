@@ -48,6 +48,17 @@ class SyncAlreadyRunning(Exception):
     """Raised when a sync is requested while another is in progress."""
 
 
+class _SyncCancelled(BaseException):
+    """Signals cooperative cancellation from inside the sync pipeline.
+
+    Inherits from :class:`BaseException` (not :class:`Exception`) so it
+    bypasses the library-boundary ``except Exception`` clauses in
+    :mod:`services.obsidian_sync.sync_runner` and propagates cleanly up
+    to :meth:`ObsidianSyncService._run_job`, where it's turned into a
+    ``status="cancelled"`` terminal state.
+    """
+
+
 @dataclass
 class SyncJob:
     """Snapshot of a single sync run, returned to the API layer."""
@@ -58,11 +69,12 @@ class SyncJob:
     projects_asana: List[str]
     jql_feeds: List[str]
     full_refresh: bool
-    status: str = "queued"  # queued | running | succeeded | failed | partial
+    status: str = "queued"  # queued | running | succeeded | failed | partial | cancelled
     started_at: Optional[float] = None
     ended_at: Optional[float] = None
     lines: List[str] = field(default_factory=list)
     error: Optional[str] = None
+    cancel_requested: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -78,6 +90,7 @@ class SyncJob:
             "lineCount": len(self.lines),
             "lines": list(self.lines),
             "error": self.error,
+            "cancelRequested": self.cancel_requested,
         }
 
 
@@ -197,6 +210,25 @@ class ObsidianSyncService:
             ids = list(reversed(self._job_order))[:limit]
             return [self._jobs[jid] for jid in ids]
 
+    def cancel_job(self, job_id: str) -> Optional[SyncJob]:
+        """Request cooperative cancellation of a running job.
+
+        Sets a flag the running worker checks on every progress line;
+        the next log line raises :class:`_SyncCancelled` inside the
+        sync pipeline, which unwinds up to :meth:`_run_job` and marks
+        the job ``status="cancelled"``. Returns the job on success, or
+        ``None`` if the id is unknown or the job isn't actively
+        running. Does not kill any threads — cancellation is bounded
+        by whatever HTTP request is mid-flight when the flag is set,
+        which typically resolves in a few seconds.
+        """
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.status != "running":
+                return None
+            job.cancel_requested = True
+            return job
+
     # ── Internals ────────────────────────────────────────────────────
 
     def _active_running_locked(self) -> Optional[SyncJob]:
@@ -223,6 +255,8 @@ class ObsidianSyncService:
         def on_line(line: str) -> None:
             with self._lock:
                 job.lines.append(line)
+                if job.cancel_requested:
+                    raise _SyncCancelled()
 
         jira_result: Optional[SyncResult] = None
         asana_result: Optional[SyncResult] = None
@@ -273,6 +307,12 @@ class ObsidianSyncService:
                     )
 
             self._finalize(job, jira_result, asana_result, jql_results)
+        except _SyncCancelled:
+            logger.info("Obsidian sync job %s cancelled by user", job_id)
+            with self._lock:
+                job.status = "cancelled"
+                job.error = "Cancelled by user"
+                job.lines.append("[cancelled] sync stopped by user request")
         except Exception as exc:  # noqa: BLE001 — top-level safety net
             logger.exception("Obsidian sync job %s failed unexpectedly", job_id)
             with self._lock:

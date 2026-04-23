@@ -110,6 +110,25 @@ def create_obsidian_blueprint(
             return jsonify({"error": "unknown job"}), 404
         return jsonify({"job": job.to_dict()})
 
+    @bp.route("/api/obsidian/sync/<job_id>/cancel", methods=["POST"])
+    def cancel_sync(job_id: str):
+        """Request cooperative cancellation of a running sync job.
+
+        Returns 202 Accepted with the updated job snapshot while the
+        worker winds down (next progress line unwinds the pipeline).
+        404 if the id is unknown. 409 if the job is already terminal.
+        """
+        existing = sync_service.get_job(job_id)
+        if existing is None:
+            return jsonify({"error": "unknown job"}), 404
+        job = sync_service.cancel_job(job_id)
+        if job is None:
+            return (
+                jsonify({"error": "job is not running", "status": existing.status}),
+                409,
+            )
+        return jsonify({"success": True, "job": job.to_dict()}), 202
+
     @bp.route("/api/obsidian/pending-orchestration", methods=["GET"])
     def pending_orchestration():
         """Summary of raw-file changes awaiting the next orchestrator run."""

@@ -687,6 +687,14 @@ class ApiClient {
     return this.request(`/api/obsidian/sync/${jobId}`)
   }
 
+  async cancelObsidianSync(
+    jobId: string,
+  ): Promise<{ success: boolean; job: ObsidianSyncJob }> {
+    return this.request(`/api/obsidian/sync/${jobId}/cancel`, {
+      method: "POST",
+    })
+  }
+
   async getObsidianVaultTree(subdir = "", depth = 6): Promise<{ tree: ObsidianVaultNode }> {
     const params = new URLSearchParams()
     if (subdir) params.set("subdir", subdir)

@@ -553,6 +553,7 @@ export type ObsidianSyncStatus =
   | "succeeded"
   | "failed"
   | "partial"
+  | "cancelled"
 
 export interface ObsidianSyncJob {
   jobId: string
@@ -566,6 +567,7 @@ export interface ObsidianSyncJob {
   lineCount: number
   lines: string[]
   error: string | null
+  cancelRequested?: boolean
 }
 
 export type ObsidianSyncJobSummary = Omit<ObsidianSyncJob, "lines">
