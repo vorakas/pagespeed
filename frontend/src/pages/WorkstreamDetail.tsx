@@ -1342,7 +1342,7 @@ const twoColStyle: React.CSSProperties = {
 }
 const activeRiskRowStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "2fr 1fr",
+  gridTemplateColumns: "5fr 3fr",
   gap: 14,
 }
 const panelHeadStyle: React.CSSProperties = {
