@@ -312,7 +312,26 @@ class VaultGitService:
 
     # ── Internals ────────────────────────────────────────────────────
 
+    def _cleanup_rebase_state(self) -> None:
+        """Abort any leftover rebase-in-progress on the vault clone.
+
+        A prior ``git pull --rebase`` that aborted mid-conflict (or got
+        SIGKILLed) leaves ``.git/rebase-merge/`` or ``.git/rebase-apply/``
+        sitting around. Every subsequent rebase then fails with ``fatal:
+        It seems that there is already a rebase-merge directory`` — which
+        silently strands sync commits on the Railway clone.
+        """
+        git_dir = self._vault_root / ".git"
+        if not ((git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists()):
+            return
+        logger.warning("Vault has leftover rebase state; aborting before pull")
+        try:
+            self._run(["git", "rebase", "--abort"])
+        except VaultGitError as exc:
+            logger.error("git rebase --abort failed: %s — continuing", exc.message)
+
     def _pull_rebase(self) -> None:
+        self._cleanup_rebase_state()
         self._run(["git", "pull", "--rebase", self._REMOTE, self._BRANCH])
 
     def _pending_changes(self) -> List[str]:
