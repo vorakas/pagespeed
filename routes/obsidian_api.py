@@ -133,6 +133,16 @@ def create_obsidian_blueprint(
         except Exception as exc:
             return jsonify({"enabled": True, "error": str(exc)}), 500
 
+    @bp.route("/api/obsidian/vault/auto-refresh-status", methods=["GET"])
+    def vault_auto_refresh_status():
+        """Lightweight poll endpoint — reports the last auto-pull timestamp."""
+        if vault_git_service is None:
+            return jsonify({"enabled": False})
+        try:
+            return jsonify({"enabled": True, **vault_git_service.auto_refresh_status()})
+        except Exception as exc:
+            return jsonify({"enabled": True, "error": str(exc)}), 500
+
     @bp.route("/api/obsidian/vault/reset-to-origin", methods=["POST"])
     def vault_reset_to_origin():
         """Destructive: abort rebase, hard-reset, clean tree. Diagnostic only.

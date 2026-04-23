@@ -716,6 +716,15 @@ class ApiClient {
     return this.request("/api/dashboard/workstreams")
   }
 
+  async getVaultAutoRefreshStatus(): Promise<{
+    enabled: boolean
+    lastRefreshedAt?: number | null
+    lastRefreshedOk?: boolean | null
+    lastRefreshedHead?: string | null
+  }> {
+    return this.request("/api/obsidian/vault/auto-refresh-status")
+  }
+
   async getMigrationBlockers(): Promise<MigrationBlocker[]> {
     return this.request("/api/dashboard/blockers")
   }

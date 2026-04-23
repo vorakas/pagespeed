@@ -13,7 +13,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://localhost:5000",
+      "/api": {
+        target: "https://pagespeed-production.up.railway.app",
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
   build: {

@@ -8,6 +8,7 @@ error handlers.
 import logging
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask, Response, jsonify, send_from_directory
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -273,6 +274,30 @@ def create_app() -> Flask:
             snapshot_service.ingest_vault()
         except Exception:
             logging.exception("Snapshot ingest after vault refresh failed")
+
+    # Schedule a periodic pull from origin so orchestrator commits land
+    # on the Railway clone without waiting for the user to click refresh.
+    # 10 minutes is responsive enough for hourly orchestration without
+    # hammering the git remote. When the pull reports a new HEAD, the
+    # same refresh hooks used by reset-to-origin fire so the dashboard
+    # cache and snapshot DB follow along automatically.
+    if vault_git is not None:
+        AUTO_REFRESH_INTERVAL_MIN = int(os.environ.get("VAULT_AUTO_REFRESH_MINUTES", "10"))
+
+        def _vault_auto_refresh_tick() -> None:
+            prev_head = vault_git.auto_refresh_status().get("lastRefreshedHead")
+            result = vault_git.auto_refresh()
+            if result.get("ok") and result.get("head") and result["head"] != prev_head:
+                _on_vault_refreshed()
+
+        scheduler.add_job(
+            _vault_auto_refresh_tick,
+            trigger="interval",
+            minutes=AUTO_REFRESH_INTERVAL_MIN,
+            id="vault-auto-refresh",
+            replace_existing=True,
+            next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30),
+        )
 
     # ---- Blueprints ----
     register_blueprints(

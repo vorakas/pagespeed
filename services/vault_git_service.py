@@ -66,6 +66,9 @@ class VaultGitService:
         self._token: str = token
         self._committer_name: str = committer_name
         self._committer_email: str = committer_email
+        self._last_auto_refresh_ts: Optional[float] = None
+        self._last_auto_refresh_ok: Optional[bool] = None
+        self._last_auto_refresh_head: Optional[str] = None
 
     @property
     def vault_root(self) -> Path:
@@ -447,6 +450,48 @@ class VaultGitService:
             "preState": pre_state,
             "postState": post_state,
             "log": captured,
+        }
+
+    def auto_refresh(self) -> dict:
+        """Periodic pull + record a timestamp.
+
+        Wraps :meth:`pull_latest` so a scheduled job can keep the Railway
+        vault clone in lockstep with what the orchestrator pushes to
+        ``origin/main`` between user-triggered syncs. The timestamp is
+        exposed via :meth:`auto_refresh_status` so the UI can show when
+        the dashboard data was last pulled without the user doing
+        anything. Never raises.
+        """
+        import time as _time
+
+        if not self.is_git_repo:
+            self._last_auto_refresh_ts = _time.time()
+            self._last_auto_refresh_ok = False
+            return {"ok": False, "error": "vault is not a git repo"}
+
+        ok = True
+        head: Optional[str] = None
+        try:
+            self.pull_latest()
+            try:
+                head = self._run(["git", "rev-parse", "HEAD"], capture=True).strip()
+            except VaultGitError:
+                head = None
+        except Exception:  # noqa: BLE001 — scheduled job must not propagate
+            logger.exception("Vault auto-refresh failed")
+            ok = False
+
+        self._last_auto_refresh_ts = _time.time()
+        self._last_auto_refresh_ok = ok
+        self._last_auto_refresh_head = head
+        return {"ok": ok, "head": head, "timestamp": self._last_auto_refresh_ts}
+
+    def auto_refresh_status(self) -> dict:
+        """Return the last-pull timestamp for UI display."""
+        return {
+            "lastRefreshedAt": self._last_auto_refresh_ts,
+            "lastRefreshedOk": self._last_auto_refresh_ok,
+            "lastRefreshedHead": self._last_auto_refresh_head,
         }
 
     def pull_latest(self) -> None:

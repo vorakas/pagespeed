@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Loader2, RotateCw } from "lucide-react"
+import { api } from "@/services/api"
 import type { MigrationHealthSnapshot } from "@/types"
 
 const HEALTH_LABEL: Record<string, string> = {
@@ -30,10 +31,34 @@ interface TopBarProps {
  */
 export function TopBar({ health, filter, onFilterChange, onRefresh, refreshing }: TopBarProps) {
   const [now, setNow] = useState(() => Date.now())
+  const [autoRefreshedAt, setAutoRefreshedAt] = useState<number | null>(null)
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 30_000)
     return () => window.clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    // Poll the backend's auto-refresh timestamp so we can display when
+    // Railway last pulled orchestrator commits from origin. The backend
+    // job runs every 10 min; polling once a minute is plenty.
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const s = await api.getVaultAutoRefreshStatus()
+        if (!cancelled && s.enabled && typeof s.lastRefreshedAt === "number") {
+          setAutoRefreshedAt(s.lastRefreshedAt * 1000)
+        }
+      } catch {
+        // Endpoint may be disabled in local dev — silent fallback.
+      }
+    }
+    void tick()
+    const id = window.setInterval(tick, 60_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
   }, [])
 
   const daysToLaunch = computeDaysUntil(health?.launchWindow?.start, now)
@@ -98,6 +123,15 @@ export function TopBar({ health, filter, onFilterChange, onRefresh, refreshing }
                 })
               : "—"}
           </div>
+          {autoRefreshedAt && (
+            <div
+              className="lcc-sync-sub"
+              style={{ marginTop: 2, color: "var(--lcc-text-faint)" }}
+              title="Last automatic vault pull from origin"
+            >
+              auto-refreshed {formatPacific(autoRefreshedAt)}
+            </div>
+          )}
         </div>
       </div>
 
@@ -123,6 +157,23 @@ function computeDaysUntil(iso: string | null | undefined, now: number): number |
   const target = new Date(iso).getTime()
   if (Number.isNaN(target)) return null
   return Math.ceil((target - now) / 86_400_000)
+}
+
+/** Formats a UTC epoch-ms timestamp as `HH:MM PT` in Pacific time. */
+function formatPacific(epochMs: number): string {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZoneName: "short",
+    })
+    // `short` yields e.g. "PST" or "PDT" — good enough; we keep it inline.
+    return fmt.format(new Date(epochMs))
+  } catch {
+    return new Date(epochMs).toLocaleTimeString()
+  }
 }
 
 function computeSyncedAgo(iso: string | null | undefined, now: number): string | null {
