@@ -9,6 +9,9 @@ Talks to:
 
 from __future__ import annotations
 
+import logging
+from typing import Callable, Sequence
+
 from flask import Blueprint, jsonify, request, send_file
 
 from services.obsidian_sync.vault_reader import (
@@ -23,12 +26,31 @@ from services.obsidian_sync_service import (
 from services.vault_git_service import VaultGitService
 
 
+logger = logging.getLogger(__name__)
+
+
 def create_obsidian_blueprint(
     sync_service: ObsidianSyncService,
     vault_git_service: VaultGitService | None = None,
+    on_vault_refreshed: Sequence[Callable[[], None]] | None = None,
 ) -> Blueprint:
-    """Factory that wires the Obsidian sync service into a Flask blueprint."""
+    """Factory that wires the Obsidian sync service into a Flask blueprint.
+
+    ``on_vault_refreshed`` callbacks are invoked whenever an operation
+    mutates the vault's working tree outside the normal sync pipeline —
+    currently just ``POST /vault/reset-to-origin``. Wire these to the
+    same cache-invalidate + snapshot-reingest hooks the sync service
+    runs so any caller sees consistent downstream state.
+    """
     bp = Blueprint("obsidian_api", __name__)
+    refresh_hooks = list(on_vault_refreshed or [])
+
+    def _fire_refresh_hooks() -> None:
+        for hook in refresh_hooks:
+            try:
+                hook()
+            except Exception:  # noqa: BLE001 — hooks must not break the endpoint
+                logger.exception("on_vault_refreshed hook failed")
 
     def _vault_reader() -> VaultReader:
         return VaultReader(str(sync_service.vault_root))
@@ -113,13 +135,21 @@ def create_obsidian_blueprint(
 
     @bp.route("/api/obsidian/vault/reset-to-origin", methods=["POST"])
     def vault_reset_to_origin():
-        """Destructive: abort rebase, hard-reset, clean tree. Diagnostic only."""
+        """Destructive: abort rebase, hard-reset, clean tree. Diagnostic only.
+
+        Fires ``on_vault_refreshed`` hooks after a successful reset so the
+        dashboard cache and snapshot ingest don't drift out of sync with
+        the refreshed working tree.
+        """
         if vault_git_service is None:
             return jsonify({"enabled": False}), 400
         try:
-            return jsonify({"enabled": True, **vault_git_service.reset_to_origin()})
+            payload = vault_git_service.reset_to_origin()
         except Exception as exc:
             return jsonify({"enabled": True, "error": str(exc)}), 500
+        if payload.get("ok"):
+            _fire_refresh_hooks()
+        return jsonify({"enabled": True, **payload})
 
     @bp.route("/api/obsidian/vault/ping", methods=["POST"])
     def vault_ping():

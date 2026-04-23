@@ -4,6 +4,8 @@ Each blueprint is created via a factory function that receives its
 dependencies (services, repositories) through explicit arguments.
 """
 
+from typing import Callable, Sequence
+
 from flask import Flask
 
 from data_access import BlazemeterPresetRepository, BlazemeterRunRepository, TestResultRepository
@@ -44,6 +46,7 @@ def register_blueprints(
     vault_git_service: "VaultGitService | None" = None,
     migration_dashboard_service: "MigrationDashboardService | None" = None,
     snapshot_service: "SnapshotService | None" = None,
+    on_vault_refreshed: "Sequence[Callable[[], None]] | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -73,7 +76,11 @@ def register_blueprints(
     )
     if obsidian_sync_service is not None:
         app.register_blueprint(
-            create_obsidian_blueprint(obsidian_sync_service, vault_git_service)
+            create_obsidian_blueprint(
+                obsidian_sync_service,
+                vault_git_service,
+                on_vault_refreshed=on_vault_refreshed,
+            )
         )
     if migration_dashboard_service is not None:
         app.register_blueprint(

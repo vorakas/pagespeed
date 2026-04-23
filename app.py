@@ -262,6 +262,18 @@ def create_app() -> Flask:
         migration_dashboard_service.is_available(),
     )
 
+    def _on_vault_refreshed() -> None:
+        # Fires after diagnostic refreshes (e.g. reset-to-origin) that
+        # update the vault's working tree without going through the
+        # sync pipeline. The sync's `_post_sync` already does the same
+        # two things — keep these in lockstep so cache and DB stay
+        # consistent with the on-disk vault.
+        migration_dashboard_service.invalidate_cache()
+        try:
+            snapshot_service.ingest_vault()
+        except Exception:
+            logging.exception("Snapshot ingest after vault refresh failed")
+
     # ---- Blueprints ----
     register_blueprints(
         flask_app, site_service, testing_service, test_result_repo, trigger_service,
@@ -273,6 +285,7 @@ def create_app() -> Flask:
         vault_git_service=vault_git,
         migration_dashboard_service=migration_dashboard_service,
         snapshot_service=snapshot_service,
+        on_vault_refreshed=[_on_vault_refreshed],
     )
 
     # ---- Centralized error handlers ----
