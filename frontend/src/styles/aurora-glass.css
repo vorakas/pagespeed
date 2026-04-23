@@ -98,40 +98,22 @@
   background: transparent;
 }
 
-/* Scroll mask — an opaque fixed strip covering the 88px band from the
- * viewport top through the bottom of the topbar-plus-gap. Sits at
- * z-index 49, below the sticky topbar (50) and above content (1), so
- * it hides anything that would otherwise scroll up into that region.
- *
- * Uses the same solid gradient as the app shell base layer so it reads
- * as "the background continues up here" rather than "new surface". The
- * Pharos sidebar is fixed at x=12..232 with its own z-index 50, so the
- * mask starts at x=232 to avoid stacking on top of it. */
+/* Scroll mask — a sticky 14px strip at the viewport top that heavily
+ * blurs whatever main content scrolls beneath it, so the topbar can
+ * sit 14px below the edge (floating-card aesthetic) without exposing
+ * scrolling content in that gap. Pointer-events:none so it never
+ * steals clicks. Sits at z-index 49 — below the topbar (50) and
+ * above main content children (1). */
 .launch-dashboard::before {
   content: "";
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 232px;
-  right: 0;
-  height: 88px;
+  display: block;
+  height: 14px;
   z-index: 49;
-  /* Translucent fill + heavy backdrop-blur lets the aurora blob tints
-   * bleed through faintly so the mask colour-matches its surroundings
-   * instead of reading as a flat rectangle. Scrolled content behind
-   * still gets ~88% covered and ~40px blurred, which is enough to
-   * make text unreadable — i.e. it's hidden but the ambient backdrop
-   * colour continuity is preserved. */
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--aurora-1) 88%, transparent) 0%,
-    color-mix(in srgb, var(--aurora-2) 88%, transparent) 100%
-  );
-  -webkit-backdrop-filter: blur(40px) saturate(140%);
-  backdrop-filter: blur(40px) saturate(140%);
-  /* Fade the last 10px so the mask's bottom edge dissolves into the
-   * live backdrop rather than stopping at a hard line. */
-  -webkit-mask-image: linear-gradient(to bottom, black 78px, transparent 88px);
-  mask-image: linear-gradient(to bottom, black 78px, transparent 88px);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  background: transparent;
   pointer-events: none;
 }
 
@@ -324,11 +306,10 @@
   align-items: center;
   gap: 14px;
   padding: 0 18px;
-  /* 14px top margin keeps the bar's flow position aligned with the
-   * sticky pin point and with shell padding below, so first-row
-   * shell content lands at y=88 — flush with the fixed mask's
-   * bottom edge (see .launch-dashboard::before above). */
-  margin: 14px 14px 0;
+  /* Top margin comes from the .launch-dashboard::before mask strip
+   * which occupies 14px of flow height. Side margins stay so the bar
+   * keeps its inset floating-card look. */
+  margin: 0 14px 0;
   position: sticky;
   top: 14px;
   z-index: 50;
