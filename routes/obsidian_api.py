@@ -101,6 +101,26 @@ def create_obsidian_blueprint(
             return jsonify({"enabled": False})
         return jsonify({"enabled": True, **payload})
 
+    @bp.route("/api/obsidian/vault/git-state", methods=["GET"])
+    def vault_git_state():
+        """Read-only snapshot of the vault clone's git state."""
+        if vault_git_service is None:
+            return jsonify({"enabled": False})
+        try:
+            return jsonify({"enabled": True, **vault_git_service.diagnose_state()})
+        except Exception as exc:
+            return jsonify({"enabled": True, "error": str(exc)}), 500
+
+    @bp.route("/api/obsidian/vault/ping", methods=["POST"])
+    def vault_ping():
+        """Write a sentinel and exercise the commit-and-push pipeline."""
+        if vault_git_service is None:
+            return jsonify({"enabled": False}), 400
+        try:
+            return jsonify({"enabled": True, **vault_git_service.ping()})
+        except Exception as exc:
+            return jsonify({"enabled": True, "error": str(exc)}), 500
+
     # ── Vault browse ──────────────────────────────────────────────────
 
     @bp.route("/api/obsidian/vault/tree", methods=["GET"])

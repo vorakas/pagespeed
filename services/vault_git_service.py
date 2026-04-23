@@ -281,6 +281,122 @@ class VaultGitService:
             **_summarize_files(files),
         }
 
+    def diagnose_state(self) -> dict:
+        """Report the vault clone's current git state for debugging.
+
+        Read-only — runs ``git status``, counts commits ahead/behind
+        ``origin/main``, lists the most recent subjects, and reports
+        whether any leftover rebase directories are blocking the push
+        pipeline. Used by the diagnostic endpoint so we can see what the
+        Railway clone looks like without running a full sync.
+        """
+        if not self.is_git_repo:
+            return {"isGitRepo": False}
+
+        git_dir = self._vault_root / ".git"
+        state: dict = {
+            "isGitRepo": True,
+            "vaultRoot": str(self._vault_root),
+            "rebaseMergePresent": (git_dir / "rebase-merge").exists(),
+            "rebaseApplyPresent": (git_dir / "rebase-apply").exists(),
+        }
+
+        try:
+            state["head"] = self._run(
+                ["git", "rev-parse", "HEAD"], capture=True
+            ).strip()
+            status_out = self._run(
+                ["git", "status", "--porcelain"], capture=True
+            )
+            status_lines = [ln for ln in status_out.splitlines() if ln.strip()]
+            state["workingTreeDirty"] = bool(status_lines)
+            state["workingTreeCount"] = len(status_lines)
+            state["workingTreeSample"] = status_lines[:20]
+
+            self._run(["git", "fetch", self._REMOTE, self._BRANCH])
+            ahead = self._run(
+                ["git", "rev-list", "--count", f"{self._REMOTE}/{self._BRANCH}..HEAD"],
+                capture=True,
+            ).strip()
+            behind = self._run(
+                ["git", "rev-list", "--count", f"HEAD..{self._REMOTE}/{self._BRANCH}"],
+                capture=True,
+            ).strip()
+            state["ahead"] = int(ahead or "0")
+            state["behind"] = int(behind or "0")
+
+            log_out = self._run(
+                ["git", "log", "--format=%h %s", "-10"], capture=True
+            )
+            state["recentCommits"] = [
+                ln for ln in log_out.splitlines() if ln.strip()
+            ]
+
+            remote_tip = self._run(
+                ["git", "rev-parse", f"{self._REMOTE}/{self._BRANCH}"],
+                capture=True,
+            ).strip()
+            state["remoteTip"] = remote_tip
+        except VaultGitError as exc:
+            state["error"] = exc.message
+
+        return state
+
+    def ping(self) -> dict:
+        """End-to-end smoke test of the commit-and-push pipeline.
+
+        Writes a throwaway timestamped file under ``.health/`` and runs
+        :meth:`commit_and_push`. Captures the logger output emitted by
+        that method so the caller can see whether the commit was made,
+        whether the push succeeded, and what git said along the way.
+
+        Returns a dict with the pre/post git state and the captured log
+        lines. Meant for manual diagnostics — not a scheduled job.
+        """
+        if not self.is_git_repo:
+            return {"ok": False, "error": "vault is not a git repo"}
+
+        import time as _time
+        import io as _io
+
+        health_dir = self._vault_root / ".health"
+        health_dir.mkdir(exist_ok=True)
+        ts = int(_time.time())
+        ping_file = health_dir / f"ping-{ts}.txt"
+        ping_file.write_text(
+            f"vault-git-service ping at {ts}\n",
+            encoding="utf-8",
+        )
+
+        buffer = _io.StringIO()
+        handler = logging.StreamHandler(buffer)
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(
+            logging.Formatter("%(levelname)s %(name)s: %(message)s")
+        )
+        root_logger = logging.getLogger()
+        root_logger.addHandler(handler)
+        previous_level = root_logger.level
+        if previous_level > logging.INFO:
+            root_logger.setLevel(logging.INFO)
+
+        pre_state = self.diagnose_state()
+        try:
+            self.commit_and_push(f"ping test {ts}")
+        finally:
+            root_logger.removeHandler(handler)
+            root_logger.setLevel(previous_level)
+
+        post_state = self.diagnose_state()
+        captured = buffer.getvalue().splitlines()
+        return {
+            "ok": True,
+            "pingFile": str(ping_file.relative_to(self._vault_root)),
+            "preState": pre_state,
+            "postState": post_state,
+            "log": captured,
+        }
+
     def pull_latest(self) -> None:
         """Reach parity with the remote: rebase latest, then push ahead.
 
