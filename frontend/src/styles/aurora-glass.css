@@ -115,11 +115,21 @@
   right: 0;
   height: 88px;
   z-index: 49;
-  background: linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
-  /* Fade the last 10px to transparent so the mask's bottom edge blends
-   * into the aurora blobs + animated backdrop rather than stopping at
-   * a sharp line. Content can just start peeking in the fade region,
-   * which is fine — by the time it's readable the mask is gone anyway. */
+  /* Translucent fill + heavy backdrop-blur lets the aurora blob tints
+   * bleed through faintly so the mask colour-matches its surroundings
+   * instead of reading as a flat rectangle. Scrolled content behind
+   * still gets ~88% covered and ~40px blurred, which is enough to
+   * make text unreadable — i.e. it's hidden but the ambient backdrop
+   * colour continuity is preserved. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--aurora-1) 88%, transparent) 0%,
+    color-mix(in srgb, var(--aurora-2) 88%, transparent) 100%
+  );
+  -webkit-backdrop-filter: blur(40px) saturate(140%);
+  backdrop-filter: blur(40px) saturate(140%);
+  /* Fade the last 10px so the mask's bottom edge dissolves into the
+   * live backdrop rather than stopping at a hard line. */
   -webkit-mask-image: linear-gradient(to bottom, black 78px, transparent 88px);
   mask-image: linear-gradient(to bottom, black 78px, transparent 88px);
   pointer-events: none;
