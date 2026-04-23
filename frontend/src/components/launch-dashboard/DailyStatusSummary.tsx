@@ -321,6 +321,7 @@ function ServicesTab({ snapshot }: { snapshot: MigrationSnapshot }) {
 
 function CoverageTab({ sources }: { sources: SnapshotSource[] }) {
   if (!sources.length) return <EmptyHint>No source coverage on this snapshot.</EmptyHint>
+
   const totals = sources.reduce(
     (acc, s) => {
       acc.total += s.total
@@ -333,41 +334,162 @@ function CoverageTab({ sources }: { sources: SnapshotSource[] }) {
   const totalPct = totals.total > 0 ? Math.round((totals.resolved / totals.total) * 100) : 0
 
   return (
-    <div style={tableWrapStyle}>
-      <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th style={thStyle}>Source</th>
-            <th style={thNumStyle}>Total</th>
-            <th style={thNumStyle}>Resolved</th>
-            <th style={thNumStyle}>Active</th>
-            <th style={thNumStyle}>% Resolved</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sources.map((s) => {
-            const pct = s.total > 0 ? Math.round((s.resolved / s.total) * 100) : 0
-            return (
-              <tr key={s.key}>
-                <td style={tdStyle}>{s.key}</td>
-                <td style={tdNumStyle}>{fmt(s.total, s.approx)}</td>
-                <td style={tdNumStyle}>{fmt(s.resolved, s.approx)}</td>
-                <td style={tdNumStyle}>{fmt(s.active, s.approx)}</td>
-                <td style={tdNumStyle}>{pct}%</td>
-              </tr>
-            )
-          })}
-          <tr style={totalRowStyle}>
-            <td style={{ ...tdStyle, fontWeight: 700 }}>Combined</td>
-            <td style={{ ...tdNumStyle, fontWeight: 700 }}>{fmt(totals.total, true)}</td>
-            <td style={{ ...tdNumStyle, fontWeight: 700 }}>{fmt(totals.resolved, true)}</td>
-            <td style={{ ...tdNumStyle, fontWeight: 700 }}>{fmt(totals.active, true)}</td>
-            <td style={{ ...tdNumStyle, fontWeight: 700 }}>{totalPct}%</td>
-          </tr>
-        </tbody>
-      </table>
+    <div style={coverageTableStyle}>
+      <div style={coverageHeaderStyle}>
+        <span>Source</span>
+        <span style={coverageNumHeadStyle}>Resolved</span>
+        <span style={coverageNumHeadStyle}>Active</span>
+        <span style={coverageNumHeadStyle}>Total</span>
+        <span style={coverageBarHeadStyle}>Coverage</span>
+      </div>
+      {sources.map((s) => {
+        const pct = s.total > 0 ? Math.round((s.resolved / s.total) * 100) : 0
+        return (
+          <CoverageRow
+            key={s.key}
+            kind={sourceKind(s.key)}
+            label={sourceLabel(s.key)}
+            resolved={s.resolved}
+            active={s.active}
+            total={s.total}
+            pct={pct}
+            approx={s.approx}
+          />
+        )
+      })}
+      <CoverageRow
+        kind="all"
+        label="Combined unique"
+        resolved={totals.resolved}
+        active={totals.active}
+        total={totals.total}
+        pct={totalPct}
+        approx
+        emphasize
+      />
     </div>
   )
+}
+
+function CoverageRow({
+  kind,
+  label,
+  resolved,
+  active,
+  total,
+  pct,
+  approx,
+  emphasize,
+}: {
+  kind: SourceKind
+  label: string
+  resolved: number
+  active: number
+  total: number
+  pct: number
+  approx?: boolean
+  emphasize?: boolean
+}) {
+  return (
+    <div style={emphasize ? coverageRowEmphStyle : coverageRowStyle}>
+      <div style={coverageSourceCellStyle}>
+        <SourceBadge kind={kind} />
+        <span
+          style={{
+            ...coverageLabelStyle,
+            fontWeight: emphasize ? 700 : 500,
+            color: emphasize ? "var(--lcc-text)" : "var(--lcc-text)",
+          }}
+        >
+          {label}
+        </span>
+      </div>
+      <span style={{ ...coverageNumStyle, color: "var(--lcc-green, #22c55e)" }}>
+        {fmt(resolved, approx)}
+      </span>
+      <span style={{ ...coverageNumStyle, color: "var(--lcc-amber, #f59e0b)" }}>
+        {fmt(active, approx)}
+      </span>
+      <span style={{ ...coverageNumStyle, fontWeight: emphasize ? 700 : 500 }}>
+        {fmt(total, approx)}
+      </span>
+      <CoverageBar pct={pct} approx={approx} />
+    </div>
+  )
+}
+
+function SourceBadge({ kind }: { kind: SourceKind }) {
+  const palette: Record<SourceKind, { bg: string; color: string; border: string }> = {
+    jira: {
+      bg: "rgba(59, 130, 246, 0.14)",
+      color: "#60a5fa",
+      border: "rgba(59, 130, 246, 0.5)",
+    },
+    asana: {
+      bg: "rgba(167, 139, 250, 0.14)",
+      color: "#c4b5fd",
+      border: "rgba(167, 139, 250, 0.5)",
+    },
+    all: {
+      bg: "rgba(34, 197, 94, 0.14)",
+      color: "#4ade80",
+      border: "rgba(34, 197, 94, 0.5)",
+    },
+  }
+  const p = palette[kind]
+  return (
+    <span
+      style={{
+        ...sourceBadgeStyle,
+        background: p.bg,
+        color: p.color,
+        borderColor: p.border,
+      }}
+    >
+      {kind.toUpperCase()}
+    </span>
+  )
+}
+
+function CoverageBar({ pct, approx }: { pct: number; approx?: boolean }) {
+  const clamped = Math.max(0, Math.min(100, pct))
+  return (
+    <div style={coverageBarTrackStyle}>
+      <div
+        style={{
+          ...coverageBarFillStyle,
+          width: `${clamped}%`,
+        }}
+      >
+        {clamped >= 20 && (
+          <span style={coverageBarLabelStyle}>
+            {approx ? `~${clamped}%` : `${clamped}%`}
+          </span>
+        )}
+      </div>
+      {clamped < 20 && (
+        <span style={coverageBarLabelOutsideStyle}>
+          {approx ? `~${clamped}%` : `${clamped}%`}
+        </span>
+      )}
+    </div>
+  )
+}
+
+type SourceKind = "jira" | "asana" | "all"
+
+const ASANA_KEYS = new Set(["LAMPSPLUS", "LPWE"])
+
+function sourceKind(key: string): SourceKind {
+  return ASANA_KEYS.has(key) ? "asana" : "jira"
+}
+
+function sourceLabel(key: string): string {
+  // The badge already conveys the source type (JIRA / ASANA), so the
+  // label can drop the "Jira " / "Asana " prefix. Saves ~35px of
+  // horizontal space in a cramped panel.
+  if (key === "WPM") return "WPM (28 projects)"
+  return key
 }
 
 function HealthTab({ areaStatuses }: { areaStatuses: Record<string, string> }) {
@@ -739,43 +861,120 @@ const emptyStyle: React.CSSProperties = {
   borderRadius: 6,
 }
 
-const tableWrapStyle: React.CSSProperties = {
+const coverageTableStyle: React.CSSProperties = {
+  borderRadius: 10,
+  border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.08))",
   overflowX: "auto",
 }
 
-const tableStyle: React.CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-  fontSize: 12,
-}
+const coverageGridColumns =
+  "minmax(150px, 1.3fr) 58px 58px 58px minmax(110px, 1fr)"
 
-const thStyle: React.CSSProperties = {
-  textAlign: "left",
-  padding: "6px 10px",
+const coverageHeaderStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: coverageGridColumns,
+  alignItems: "center",
+  gap: 12,
+  padding: "10px 12px",
+  background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.35))",
   fontSize: 10,
+  letterSpacing: "0.14em",
   textTransform: "uppercase",
-  letterSpacing: "0.12em",
   color: "var(--lcc-text-dim)",
   fontFamily: "var(--font-mono, monospace)",
-  borderBottom: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.08))",
+  fontWeight: 700,
 }
 
-const thNumStyle: React.CSSProperties = { ...thStyle, textAlign: "right" }
+const coverageNumHeadStyle: React.CSSProperties = { textAlign: "right" }
+const coverageBarHeadStyle: React.CSSProperties = { textAlign: "left" }
 
-const tdStyle: React.CSSProperties = {
-  padding: "7px 10px",
+const coverageRowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: coverageGridColumns,
+  alignItems: "center",
+  gap: 10,
+  padding: "9px 12px",
+  borderTop: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.05))",
+  fontSize: 12.5,
+}
+
+const coverageRowEmphStyle: React.CSSProperties = {
+  ...coverageRowStyle,
+  background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.25))",
+  fontWeight: 700,
+}
+
+const coverageSourceCellStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  minWidth: 0,
+}
+
+const coverageLabelStyle: React.CSSProperties = {
   color: "var(--lcc-text)",
-  borderBottom: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.05))",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
 }
 
-const tdNumStyle: React.CSSProperties = {
-  ...tdStyle,
+const coverageNumStyle: React.CSSProperties = {
   textAlign: "right",
   fontFamily: "var(--font-mono, monospace)",
+  fontWeight: 500,
 }
 
-const totalRowStyle: React.CSSProperties = {
-  background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.25))",
+const sourceBadgeStyle: React.CSSProperties = {
+  fontSize: 9.5,
+  fontWeight: 700,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  padding: "2px 9px",
+  borderRadius: 999,
+  borderWidth: 1,
+  borderStyle: "solid",
+  fontFamily: "var(--font-mono, monospace)",
+  flexShrink: 0,
+}
+
+const coverageBarTrackStyle: React.CSSProperties = {
+  position: "relative",
+  height: 22,
+  background: "rgba(255,255,255,0.04)",
+  borderRadius: 999,
+  overflow: "hidden",
+  display: "flex",
+  alignItems: "center",
+}
+
+const coverageBarFillStyle: React.CSSProperties = {
+  height: "100%",
+  background:
+    "linear-gradient(90deg, rgba(34,197,94,0.55) 0%, rgba(34,197,94,0.85) 100%)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  paddingRight: 8,
+  borderRadius: 999,
+  transition: "width 220ms ease",
+}
+
+const coverageBarLabelStyle: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  color: "#0b1220",
+  fontFamily: "var(--font-mono, monospace)",
+  letterSpacing: "0.04em",
+}
+
+const coverageBarLabelOutsideStyle: React.CSSProperties = {
+  position: "absolute",
+  right: 10,
+  fontSize: 10,
+  fontWeight: 700,
+  color: "var(--lcc-text-dim)",
+  fontFamily: "var(--font-mono, monospace)",
+  letterSpacing: "0.04em",
 }
 
 const healthGridStyle: React.CSSProperties = {
