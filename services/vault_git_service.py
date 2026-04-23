@@ -149,16 +149,39 @@ class VaultGitService:
             # commit before trying to incorporate remote history.
             self._run(["git", "add", "-A"])
             changed_files = self._pending_changes()
-            if not changed_files:
-                logger.info("Vault clean; nothing to push (label=%s)", label)
+            if changed_files:
+                message = f"[sync] {label} — {len(changed_files)} file(s)"
+                self._run(["git", "commit", "-m", message])
+                logger.info("Vault commit created: %s", message)
+
+            # Always attempt to reach origin — regardless of whether we
+            # just made a new commit or were called with a clean tree.
+            # A prior sync may have committed locally but failed to push
+            # (non-fast-forward race, transient network error); if we
+            # only push when there are new file changes those commits
+            # languish on this clone forever. Retrying on every call
+            # keeps the remote eventually-consistent.
+            self._run(["git", "fetch", self._REMOTE, self._BRANCH])
+            ahead_out = self._run(
+                ["git", "rev-list", "--count", f"{self._REMOTE}/{self._BRANCH}..HEAD"],
+                capture=True,
+            )
+            try:
+                ahead = int(ahead_out.strip() or "0")
+            except ValueError:
+                ahead = 0
+
+            if ahead == 0 and not changed_files:
+                logger.info("Vault clean and in sync with origin (label=%s)", label)
                 return
-            message = f"[sync] {label} — {len(changed_files)} file(s)"
-            self._run(["git", "commit", "-m", message])
-            # Now rebase our commit onto any remote changes (e.g. from
-            # the orchestration agent), then push the combined history.
+
             self._pull_rebase()
             self._run(["git", "push", self._REMOTE, self._BRANCH])
-            logger.info("Vault push succeeded: %s", message)
+            logger.info(
+                "Vault push succeeded (label=%s, ahead before push=%d)",
+                label,
+                ahead,
+            )
         except VaultGitError as exc:
             logger.error("Vault push failed (label=%s): %s", label, exc.message)
         except Exception:
@@ -259,18 +282,33 @@ class VaultGitService:
         }
 
     def pull_latest(self) -> None:
-        """Fast-forward the local clone to the remote tip.
+        """Reach parity with the remote: rebase latest, then push ahead.
 
-        Safe to call when no orchestrator/sync is in-flight — used at
-        boot so the DB snapshot ingest reads the current remote state
-        (e.g. overnight orchestrator commits) instead of a stale clone.
+        Called at boot so the DB snapshot ingest reads the current remote
+        state (e.g. overnight orchestrator commits) instead of a stale
+        clone. Also flushes any local-only commits from prior pushes
+        that failed mid-sync — those commits can stack up invisibly
+        until a boot clears them.
         """
         if not self.is_git_repo:
             return
         try:
+            self._run(["git", "fetch", self._REMOTE, self._BRANCH])
             self._pull_rebase()
         except Exception:
             logger.exception("Vault pull_latest failed — continuing with local state")
+            return
+        try:
+            ahead_out = self._run(
+                ["git", "rev-list", "--count", f"{self._REMOTE}/{self._BRANCH}..HEAD"],
+                capture=True,
+            )
+            ahead = int(ahead_out.strip() or "0")
+            if ahead > 0:
+                self._run(["git", "push", self._REMOTE, self._BRANCH])
+                logger.info("Vault push at boot flushed %d stuck commit(s)", ahead)
+        except Exception:
+            logger.exception("Vault boot-time push failed — will retry on next sync")
 
     # ── Internals ────────────────────────────────────────────────────
 
