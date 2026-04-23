@@ -106,9 +106,11 @@ export function WorkstreamDetail() {
 
         {md?.progress?.buckets?.length ? <ProgressPanel md={md} /> : null}
 
-        {/* Active Items + Key Risks side-by-side per mockup */}
+        {/* Active Items + Key Risks side-by-side per mockup. Active Items
+            needs more width than Key Risks (8-tab bar + row details),
+            so this row uses a 3:2 split instead of the default 1:1. */}
         {md?.active || md?.keyRisks?.length ? (
-          <div style={twoColStyle}>
+          <div style={activeRiskRowStyle}>
             {md?.active ? <ActiveItemsPanel active={md.active} /> : <div />}
             {md?.keyRisks?.length ? <KeyRisksPanel md={md} /> : <div />}
           </div>
@@ -399,9 +401,9 @@ function ActiveItemsPanel({ active }: { active: WorkstreamMdActive }) {
               {t.label}
               <span
                 style={{
-                  marginLeft: 6,
-                  fontSize: 9.5,
-                  padding: "1px 6px",
+                  marginLeft: 5,
+                  fontSize: 8.5,
+                  padding: "1px 5px",
                   borderRadius: 999,
                   background: isActive ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.06)",
                   color: isActive ? "#fff" : "var(--lcc-text-faint)",
@@ -1338,6 +1340,11 @@ const twoColStyle: React.CSSProperties = {
   gridTemplateColumns: "1fr 1fr",
   gap: 14,
 }
+const activeRiskRowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "2fr 1fr",
+  gap: 14,
+}
 const panelHeadStyle: React.CSSProperties = {
   margin: "0 0 14px",
   fontSize: 10.5,
@@ -1464,29 +1471,31 @@ const progressCardsStyle: React.CSSProperties = {
 }
 const tabsRowStyle: React.CSSProperties = {
   display: "flex",
-  gap: 6,
+  gap: 3,
   flexWrap: "wrap",
   marginBottom: 14,
-  padding: 4,
+  padding: 3,
   background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
   border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.08))",
   borderRadius: 999,
   width: "fit-content",
+  maxWidth: "100%",
 }
 const tabStyle: React.CSSProperties = {
   background: "transparent",
   border: "none",
   color: "var(--lcc-text-dim)",
   font: "inherit",
-  fontSize: 11,
-  padding: "5px 12px",
+  fontSize: 9.5,
+  padding: "4px 9px",
   borderRadius: 999,
   cursor: "pointer",
-  letterSpacing: "0.04em",
+  letterSpacing: "0.02em",
   textTransform: "uppercase",
   fontWeight: 600,
   display: "flex",
   alignItems: "center",
+  whiteSpace: "nowrap",
 }
 const tabActiveStyle: React.CSSProperties = {
   background: "linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue))",
