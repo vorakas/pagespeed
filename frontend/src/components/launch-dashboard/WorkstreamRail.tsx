@@ -58,7 +58,11 @@ export function WorkstreamRail({ workstreams, activeId }: WorkstreamRailProps) {
   const active = workstreams?.find((w) => w.id === activeId) ?? null
 
   return (
-    <aside className="lcc-left-rail">
+    // This page has no Launch Dashboard topbar, so override the default
+    // sticky offset that the shared `.lcc-left-rail` class inherits
+    // (`top: calc(--lcc-topbar-h + 14px)` = 74px) to align with the
+    // outer Pharos sidebar.
+    <aside className="lcc-left-rail" style={{ top: 14, maxHeight: "calc(100vh - 28px)" }}>
       <div className="lcc-lr-section">
         <div className="lcc-lr-label">Selected workstream</div>
         <div className="lcc-lr-stat">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ChevronLeft, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { WorkstreamRail } from "@/components/launch-dashboard/WorkstreamRail"
@@ -72,8 +72,7 @@ export function WorkstreamDetail() {
         <div style={shellStyle}>
           <WorkstreamRail workstreams={workstreams} activeId={id} />
           <div style={pageStyle}>
-            <BackLink />
-            <div className="panel" style={{ marginTop: 16, color: "var(--lcc-red)" }}>{error}</div>
+                <div className="panel" style={{ marginTop: 16, color: "var(--lcc-red)" }}>{error}</div>
           </div>
         </div>
       </LaunchShell>
@@ -101,7 +100,6 @@ export function WorkstreamDetail() {
       <div style={shellStyle}>
         <WorkstreamRail workstreams={workstreams} activeId={id} />
         <div style={pageStyle}>
-        <BackLink />
         <Hero workstream={detail.workstream} md={md} />
 
         {detail.blockers.length > 0 && <BlockersPanel blockers={detail.blockers} />}
@@ -1180,14 +1178,6 @@ function Stat({
   )
 }
 
-function BackLink() {
-  return (
-    <Link to="/dashboard" style={backLinkStyle}>
-      <ChevronLeft size={14} /> Dashboard
-    </Link>
-  )
-}
-
 function stripEmphasis(text: string): string {
   return text.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1")
 }
@@ -1261,11 +1251,11 @@ const shellStyle: React.CSSProperties = {
   alignItems: "start",
 }
 const pageStyle: React.CSSProperties = {
-  padding: "10px 10px 24px",
   display: "flex",
   flexDirection: "column",
   gap: 14,
   minWidth: 0,
+  paddingBottom: 24,
 }
 const loadingStyle: React.CSSProperties = {
   padding: 24,
