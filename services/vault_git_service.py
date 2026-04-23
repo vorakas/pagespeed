@@ -144,44 +144,35 @@ class VaultGitService:
             return
 
         try:
-            # Stage first. git refuses to pull --rebase with unstaged
-            # changes, so we must snapshot the sync output into a local
-            # commit before trying to incorporate remote history.
+            # Strategy: replay the sync's on-disk output as a fresh commit
+            # on top of origin/main. Avoids `git pull --rebase`, which
+            # conflicts unresolvably whenever the orchestrator touches
+            # files under the same paths sync is about to write.
+            #
+            # 1. Fetch the remote tip.
+            # 2. `git reset --mixed origin/main` — moves HEAD and the
+            #    index to origin's tree but leaves the working tree
+            #    (where the sync just wrote its files) untouched.
+            # 3. Stage everything — now git sees only the delta between
+            #    sync output and origin's tree, cleanly.
+            # 4. Commit + push. Sync output wins on files it touched;
+            #    origin's content is preserved everywhere else (most
+            #    notably in wiki/, which only the orchestrator writes).
+            self._cleanup_rebase_state()
+            self._run(["git", "fetch", self._REMOTE, self._BRANCH])
+            self._run(["git", "reset", "--mixed", f"{self._REMOTE}/{self._BRANCH}"])
+
             self._run(["git", "add", "-A"])
             changed_files = self._pending_changes()
-            if changed_files:
-                message = f"[sync] {label} — {len(changed_files)} file(s)"
-                self._run(["git", "commit", "-m", message])
-                logger.info("Vault commit created: %s", message)
-
-            # Always attempt to reach origin — regardless of whether we
-            # just made a new commit or were called with a clean tree.
-            # A prior sync may have committed locally but failed to push
-            # (non-fast-forward race, transient network error); if we
-            # only push when there are new file changes those commits
-            # languish on this clone forever. Retrying on every call
-            # keeps the remote eventually-consistent.
-            self._run(["git", "fetch", self._REMOTE, self._BRANCH])
-            ahead_out = self._run(
-                ["git", "rev-list", "--count", f"{self._REMOTE}/{self._BRANCH}..HEAD"],
-                capture=True,
-            )
-            try:
-                ahead = int(ahead_out.strip() or "0")
-            except ValueError:
-                ahead = 0
-
-            if ahead == 0 and not changed_files:
+            if not changed_files:
                 logger.info("Vault clean and in sync with origin (label=%s)", label)
                 return
 
-            self._pull_rebase()
+            message = f"[sync] {label} — {len(changed_files)} file(s)"
+            self._run(["git", "commit", "-m", message])
+            logger.info("Vault commit created: %s", message)
             self._run(["git", "push", self._REMOTE, self._BRANCH])
-            logger.info(
-                "Vault push succeeded (label=%s, ahead before push=%d)",
-                label,
-                ahead,
-            )
+            logger.info("Vault push succeeded (label=%s)", label)
         except VaultGitError as exc:
             logger.error("Vault push failed (label=%s): %s", label, exc.message)
         except Exception:
@@ -459,33 +450,29 @@ class VaultGitService:
         }
 
     def pull_latest(self) -> None:
-        """Reach parity with the remote: rebase latest, then push ahead.
+        """Hard-reset the clone to the remote tip at boot.
 
-        Called at boot so the DB snapshot ingest reads the current remote
-        state (e.g. overnight orchestrator commits) instead of a stale
-        clone. Also flushes any local-only commits from prior pushes
-        that failed mid-sync — those commits can stack up invisibly
-        until a boot clears them.
+        The vault clone holds no durable human work — sync output is
+        regenerated each cycle from Jira/Asana, and anything committed
+        locally has either already pushed or is being re-synced. So at
+        boot we discard whatever weird mid-rebase/dirty-tree state the
+        previous process may have left and force parity with origin.
+        Mirrors the pattern the orchestrator's ``run-orchestrator.sh``
+        uses for the same reason.
+
+        ``.health/`` is preserved so diagnostic ping files survive a
+        restart — they're useful breadcrumbs when debugging.
         """
         if not self.is_git_repo:
             return
         try:
+            self._cleanup_rebase_state()
             self._run(["git", "fetch", self._REMOTE, self._BRANCH])
-            self._pull_rebase()
+            self._run(["git", "reset", "--hard", f"{self._REMOTE}/{self._BRANCH}"])
+            self._run(["git", "clean", "-fdx", "-e", ".health"])
+            logger.info("Vault reset to %s/%s at boot", self._REMOTE, self._BRANCH)
         except Exception:
             logger.exception("Vault pull_latest failed — continuing with local state")
-            return
-        try:
-            ahead_out = self._run(
-                ["git", "rev-list", "--count", f"{self._REMOTE}/{self._BRANCH}..HEAD"],
-                capture=True,
-            )
-            ahead = int(ahead_out.strip() or "0")
-            if ahead > 0:
-                self._run(["git", "push", self._REMOTE, self._BRANCH])
-                logger.info("Vault push at boot flushed %d stuck commit(s)", ahead)
-        except Exception:
-            logger.exception("Vault boot-time push failed — will retry on next sync")
 
     # ── Internals ────────────────────────────────────────────────────
 
