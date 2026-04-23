@@ -1,41 +1,38 @@
 import { useMemo } from "react"
+import { useNavigate } from "react-router-dom"
 import type { MigrationKpis, MigrationWorkstream } from "@/types"
 
 interface LeftRailProps {
   kpis: MigrationKpis | null
   workstreams: MigrationWorkstream[] | null
-  activeArea: string | null
-  onPickArea: (area: string | null) => void
   vaultLastSynced: string | null
 }
 
 /**
- * Sticky left rail: at-a-glance KPIs + workstream picker grouped by area.
+ * Sticky left rail: at-a-glance KPIs + a ranked "Needs attention" shortlist.
  *
- * The area list comes from the workstream payload itself (grouped by
- * `ws.area`), with workstreams whose area wasn't set by the status page
- * bucketed under "Unsorted" so nothing disappears.
+ * The shortlist replaces the old Areas filter — most workstreams fell under
+ * "Unsorted" because the status page's Project Health by Area table only
+ * categorized ~8 of 34, and the Workstreams picker rail already covers
+ * per-area navigation. This surfaces the top handful of workstreams with
+ * open blockers / failed QA / risky status so the dashboard gives an
+ * actionable triage queue instead of a cold filter list.
  */
 export function LeftRail({
   kpis,
   workstreams,
-  activeArea,
-  onPickArea,
   vaultLastSynced,
 }: LeftRailProps) {
-  const grouped = useMemo(() => {
-    const groups: Record<string, MigrationWorkstream[]> = {}
-    for (const ws of workstreams ?? []) {
-      const key = ws.area && ws.area.trim() ? ws.area : "Unsorted"
-      ;(groups[key] ||= []).push(ws)
-    }
-    return groups
-  }, [workstreams])
+  const navigate = useNavigate()
 
-  const areaEntries = useMemo(
-    () => Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)),
-    [grouped],
-  )
+  const needsAttention = useMemo(() => {
+    if (!workstreams) return []
+    const scored = workstreams
+      .map((ws) => ({ ws, score: attentionScore(ws) }))
+      .filter(({ score }) => score > 0)
+    scored.sort((a, b) => b.score - a.score)
+    return scored.slice(0, 7)
+  }, [workstreams])
 
   return (
     <aside className="lcc-left-rail">
@@ -68,34 +65,48 @@ export function LeftRail({
       </div>
 
       <div className="lcc-lr-section">
-        <div className="lcc-lr-label">Areas</div>
-        <button
-          type="button"
-          className={`lcc-lr-area${activeArea === null ? " active" : ""}`}
-          onClick={() => onPickArea(null)}
-        >
-          <span className="lcc-lr-area-name">All areas</span>
-          <span className="lcc-lr-area-meta">
-            <span className="lcc-lr-area-count">{workstreams?.length ?? 0}</span>
-          </span>
-        </button>
-        {areaEntries.map(([area, list]) => {
-          const risky = list.filter((w) => w.status === "at-risk" || w.status === "blocked").length
-          return (
+        <div className="lcc-lr-label">
+          Needs attention
+          {needsAttention.length > 0 && (
+            <span className="lcc-lr-label-count">{needsAttention.length}</span>
+          )}
+        </div>
+        {needsAttention.length === 0 ? (
+          <div className="lcc-lr-empty">No open blockers or at-risk streams.</div>
+        ) : (
+          needsAttention.map(({ ws }) => (
             <button
-              key={area}
+              key={ws.id}
               type="button"
-              className={`lcc-lr-area${activeArea === area ? " active" : ""}`}
-              onClick={() => onPickArea(area)}
+              className="lcc-lr-area"
+              onClick={() => navigate(`/dashboard/workstreams/${ws.id}`)}
+              title={ws.name}
             >
-              <span className="lcc-lr-area-name">{area}</span>
+              <span
+                className="lcc-lr-dot"
+                data-tone={toneForStatus(ws.status)}
+                aria-hidden
+              />
+              <span className="lcc-lr-area-name">{ws.name}</span>
               <span className="lcc-lr-area-meta">
-                {risky > 0 && <span className="lcc-lr-area-risk">{risky}</span>}
-                <span className="lcc-lr-area-count">{list.length}</span>
+                {ws.blockedCount > 0 && (
+                  <span className="lcc-lr-area-risk" title={`${ws.blockedCount} blocker(s)`}>
+                    {ws.blockedCount}
+                  </span>
+                )}
+                {ws.failedQa > 0 && (
+                  <span
+                    className="lcc-lr-area-count"
+                    data-tone="amber"
+                    title={`${ws.failedQa} failed QA`}
+                  >
+                    {ws.failedQa}
+                  </span>
+                )}
               </span>
             </button>
-          )
-        })}
+          ))
+        )}
       </div>
 
       <div className="lcc-lr-section">
@@ -113,4 +124,20 @@ export function LeftRail({
 function fmt(n: number | null | undefined): string {
   if (n == null) return "—"
   return Number(n).toLocaleString()
+}
+
+function attentionScore(ws: MigrationWorkstream): number {
+  let score = 0
+  if (ws.status === "blocked") score += 100
+  if (ws.status === "at-risk") score += 40
+  score += (ws.blockedCount ?? 0) * 10
+  score += (ws.failedQa ?? 0) * 2
+  return score
+}
+
+function toneForStatus(status: MigrationWorkstream["status"]): string {
+  if (status === "blocked") return "red"
+  if (status === "at-risk") return "amber"
+  if (status === "on-track") return "green"
+  return "muted"
 }

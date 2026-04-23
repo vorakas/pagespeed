@@ -47,7 +47,6 @@ export function LaunchDashboard() {
   const [refreshing, setRefreshing] = useState(false)
 
   const [filter, setFilter] = useState<HealthFilter>("all")
-  const [activeArea, setActiveArea] = useState<string | null>(null)
   const location = useLocation()
 
   useEffect(() => {
@@ -179,8 +178,6 @@ export function LaunchDashboard() {
         <LeftRail
           kpis={kpis}
           workstreams={workstreams}
-          activeArea={activeArea}
-          onPickArea={setActiveArea}
           vaultLastSynced={health.lastSynced}
         />
 
