@@ -32,6 +32,7 @@ export function Obsidian() {
   const [isStarting, setIsStarting] = useState(false)
   const [pending, setPending] = useState<ObsidianPendingOrchestration | null>(null)
   const [showPendingFiles, setShowPendingFiles] = useState(false)
+  const [fullRefresh, setFullRefresh] = useState(false)
   const logEndRef = useRef<HTMLDivElement | null>(null)
 
   const loadPending = useCallback(async () => {
@@ -123,18 +124,21 @@ export function Obsidian() {
     }
   }, [selectedPath])
 
-  const handleSync = useCallback(async (source: "jira" | "asana" | "both") => {
-    setIsStarting(true)
-    setSyncError(null)
-    try {
-      const res = await api.startObsidianSync({ source })
-      setActiveJob(res.job)
-    } catch (err) {
-      setSyncError(err instanceof Error ? err.message : "Failed to start sync")
-    } finally {
-      setIsStarting(false)
-    }
-  }, [])
+  const handleSync = useCallback(
+    async (source: "jira" | "asana" | "both") => {
+      setIsStarting(true)
+      setSyncError(null)
+      try {
+        const res = await api.startObsidianSync({ source, fullRefresh })
+        setActiveJob(res.job)
+      } catch (err) {
+        setSyncError(err instanceof Error ? err.message : "Failed to start sync")
+      } finally {
+        setIsStarting(false)
+      }
+    },
+    [fullRefresh],
+  )
 
   const isRunning = activeJob?.status === "running"
   const canSyncJira = !!capabilities?.jiraConfigured
@@ -221,6 +225,18 @@ export function Obsidian() {
             Asana only
           </Button>
         </div>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
+          <input
+            type="checkbox"
+            checked={fullRefresh}
+            onChange={(e) => setFullRefresh(e.target.checked)}
+            disabled={isRunning || isStarting}
+            className="h-3.5 w-3.5 accent-amber-500"
+          />
+          <span>
+            <strong className="text-amber-600 dark:text-amber-400">Full refresh</strong> — bypass sync state files and re-fetch every task (slow; use to recover from lost commits)
+          </span>
+        </label>
         {syncError && <p className="text-xs text-destructive">{syncError}</p>}
         {activeJob && (
           <div className="mt-2 rounded bg-muted/40 p-2 max-h-56 overflow-y-auto font-mono text-[11px] leading-relaxed">
