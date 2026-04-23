@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom"
 import { ChevronLeft, Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
+import { WorkstreamRail } from "@/components/launch-dashboard/WorkstreamRail"
 import type {
   MigrationBlocker,
   MigrationWorkstream,
@@ -31,6 +32,7 @@ import type {
 export function WorkstreamDetail() {
   const { id = "" } = useParams<{ id: string }>()
   const [detail, setDetail] = useState<MigrationWorkstreamDetail | null>(null)
+  const [workstreams, setWorkstreams] = useState<MigrationWorkstream[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -46,12 +48,33 @@ export function WorkstreamDetail() {
     void load()
   }, [load])
 
+  // Workstream list for the picker rail; loaded once and reused across
+  // navigations between workstreams so the rail doesn't flicker on each
+  // route change. Silently ignores failure — the rail simply stays empty.
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getMigrationWorkstreams()
+      .then((list) => {
+        if (!cancelled) setWorkstreams(list)
+      })
+      .catch(() => {
+        if (!cancelled) setWorkstreams([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   if (error) {
     return (
       <LaunchShell>
-        <div style={pageStyle}>
-          <BackLink />
-          <div className="panel" style={{ marginTop: 16, color: "var(--lcc-red)" }}>{error}</div>
+        <div style={shellStyle}>
+          <WorkstreamRail workstreams={workstreams} activeId={id} />
+          <div style={pageStyle}>
+            <BackLink />
+            <div className="panel" style={{ marginTop: 16, color: "var(--lcc-red)" }}>{error}</div>
+          </div>
         </div>
       </LaunchShell>
     )
@@ -60,8 +83,11 @@ export function WorkstreamDetail() {
   if (!detail) {
     return (
       <LaunchShell>
-        <div style={loadingStyle}>
-          <Loader2 size={14} className="animate-spin" /> Loading workstream…
+        <div style={shellStyle}>
+          <WorkstreamRail workstreams={workstreams} activeId={id} />
+          <div style={loadingStyle}>
+            <Loader2 size={14} className="animate-spin" /> Loading workstream…
+          </div>
         </div>
       </LaunchShell>
     )
@@ -72,7 +98,9 @@ export function WorkstreamDetail() {
   const hasRightRail = !!(md?.decisions?.length || md?.crossRefs?.length || md?.team?.leads?.length)
   return (
     <LaunchShell>
-      <div style={pageStyle}>
+      <div style={shellStyle}>
+        <WorkstreamRail workstreams={workstreams} activeId={id} />
+        <div style={pageStyle}>
         <BackLink />
         <Hero workstream={detail.workstream} md={md} />
 
@@ -131,6 +159,7 @@ export function WorkstreamDetail() {
         {md?.asanaCoverage ? <AsanaCoveragePanel coverage={md.asanaCoverage} /> : null}
 
         <CriticalTasksPanel tasks={detail.criticalTasks} />
+        </div>
       </div>
     </LaunchShell>
   )
@@ -1224,13 +1253,19 @@ function toneText(tone: string): string {
 
 // ── Styles ────────────────────────────────────────────────────────────
 
+const shellStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "260px 1fr",
+  gap: 14,
+  padding: 14,
+  alignItems: "start",
+}
 const pageStyle: React.CSSProperties = {
-  padding: 24,
-  maxWidth: 1400,
-  margin: "0 auto",
+  padding: "10px 10px 24px",
   display: "flex",
   flexDirection: "column",
   gap: 14,
+  minWidth: 0,
 }
 const loadingStyle: React.CSSProperties = {
   padding: 24,
