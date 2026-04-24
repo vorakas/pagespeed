@@ -35,6 +35,7 @@ from config import (
     BLAZEMETER_API_KEY_ID,
     BLAZEMETER_API_SECRET,
     BLAZEMETER_WORKSPACE_ID,
+    GITHUB_WEBHOOK_SECRET,
     JIRA_BASE_URL,
     JIRA_DEFAULT_PROJECTS,
     JIRA_JQL_QUERIES,
@@ -311,6 +312,7 @@ def create_app() -> Flask:
         migration_dashboard_service=migration_dashboard_service,
         snapshot_service=snapshot_service,
         on_vault_refreshed=[_on_vault_refreshed],
+        github_webhook_secret=GITHUB_WEBHOOK_SECRET,
     )
 
     # ---- Centralized error handlers ----

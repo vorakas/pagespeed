@@ -14,6 +14,7 @@ from routes.azure_api import create_azure_blueprint
 from routes.blazemeter_api import create_blazemeter_blueprint
 from routes.dashboard_api import create_dashboard_blueprint
 from routes.devops_api import create_devops_blueprint
+from routes.github_webhook_api import create_github_webhook_blueprint
 from routes.metrics_api import create_metrics_blueprint
 from routes.newrelic_api import create_newrelic_blueprint
 from routes.obsidian_api import create_obsidian_blueprint
@@ -47,6 +48,7 @@ def register_blueprints(
     migration_dashboard_service: "MigrationDashboardService | None" = None,
     snapshot_service: "SnapshotService | None" = None,
     on_vault_refreshed: "Sequence[Callable[[], None]] | None" = None,
+    github_webhook_secret: "str | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -85,4 +87,12 @@ def register_blueprints(
     if migration_dashboard_service is not None:
         app.register_blueprint(
             create_dashboard_blueprint(migration_dashboard_service, snapshot_service),
+        )
+    if vault_git_service is not None:
+        app.register_blueprint(
+            create_github_webhook_blueprint(
+                vault_git_service,
+                webhook_secret=github_webhook_secret,
+                on_vault_refreshed=on_vault_refreshed,
+            )
         )

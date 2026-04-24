@@ -195,6 +195,14 @@ VAULT_COMMITTER_NAME: str = os.getenv('VAULT_COMMITTER_NAME', 'pharos-sync-bot')
 VAULT_COMMITTER_EMAIL: str = os.getenv('VAULT_COMMITTER_EMAIL', 'sync@pharos.local')
 """Email on commits created by the Railway sync hook."""
 
+GITHUB_WEBHOOK_SECRET: str | None = os.getenv('GITHUB_WEBHOOK_SECRET')
+"""Shared secret for verifying GitHub webhook HMAC signatures.
+
+When set, ``POST /api/github-webhook/lpadobe-vault`` verifies incoming
+``X-Hub-Signature-256`` headers and, on a push that touches ``wiki/``,
+runs a vault pull + dashboard refresh. When unset the endpoint 503s so
+a misconfigured deploy fails loudly rather than silently skipping auth."""
+
 
 def _parse_project_map(raw: str | None) -> dict[str, str]:
     """Parse ``ASANA_PROJECT_MAP`` which is JSON of ``{name: gid}``.
