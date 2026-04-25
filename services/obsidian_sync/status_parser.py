@@ -193,6 +193,8 @@ def _wikilink_target(text: str) -> Tuple[str, str]:
         plain = _strip_markup(text)
         return plain, plain
     inner = m.group(1)
+    # Strip backslash-escaped pipes (table-cell form) before partitioning.
+    inner = inner.replace("\\|", "|")
     target, _, display = inner.partition("|")
     target = target.strip()
     display = (display or target).strip()
@@ -201,6 +203,27 @@ def _wikilink_target(text: str) -> Tuple[str, str]:
     if token.endswith(".md"):
         token = token[:-3]
     return token, display
+
+
+def _resolve_wikilinks_for_prose(text: str) -> str:
+    """Replace ``[[Stem|ID]]`` (and the table-cell form ``[[Stem\\|ID]]``)
+    with the display portion (``ID``) for fields that get rendered as
+    prose — e.g. the status-page headline paragraph that feeds the
+    dashboard's Daily Status bullets. Without this, raw Obsidian markup
+    leaks into the UI as ``[[904692 - Title\\|904692]]``.
+
+    Substitutes every wikilink in the input. If a link has no display
+    alias (``[[X - Y]]``), keep the leading ID token (everything before
+    the first `` - `` separator) so the prose stays readable.
+    """
+    def _sub(match: "re.Match[str]") -> str:
+        inner = match.group(1).replace("\\|", "|")
+        target, _, display = inner.partition("|")
+        if display.strip():
+            return display.strip()
+        token = target.split(" - ", 1)[0].strip()
+        return token or target.strip()
+    return _WIKILINK_RE.sub(_sub, text)
 
 
 def _section_lines(body: str, heading_pattern: re.Pattern) -> List[str]:
@@ -318,6 +341,7 @@ def _extract_headline(body: str) -> Optional[str]:
     if not paragraph:
         return None
     text = _strip_markup(" ".join(paragraph))
+    text = _resolve_wikilinks_for_prose(text)
     return text or None
 
 
