@@ -1,13 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-
 interface MetricThreshold {
   name: string
   fullName: string
@@ -28,44 +18,44 @@ export function CwvReferenceSection() {
   return (
     <div className="space-y-3">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Core Web Vitals Reference</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="aurora-section-title">Core Web Vitals Reference</h2>
+        <p className="aurora-section-subtitle">
           Understanding metric thresholds based on Google's Web Vitals initiative
         </p>
       </div>
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="h-9 text-xs font-medium">Metric</TableHead>
-                <TableHead className="h-9 text-xs font-medium">Good</TableHead>
-                <TableHead className="h-9 text-xs font-medium">Needs Improvement</TableHead>
-                <TableHead className="h-9 text-xs font-medium">Poor</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      <div className="aurora-panel overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="aurora-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Good</th>
+                <th>Needs Improvement</th>
+                <th>Poor</th>
+              </tr>
+            </thead>
+            <tbody>
               {metrics.map((metric) => (
-                <TableRow key={metric.name}>
-                  <TableCell className="py-2.5 text-sm">
-                    <span className="font-semibold text-foreground">{metric.name}</span>
-                    <span className="text-muted-foreground"> ({metric.fullName})</span>
-                  </TableCell>
-                  <TableCell className="py-2.5 text-sm font-medium text-score-good">
+                <tr key={metric.name}>
+                  <td>
+                    <span className="aurora-text font-semibold">{metric.name}</span>
+                    <span className="aurora-text-faint"> ({metric.fullName})</span>
+                  </td>
+                  <td className="font-medium" style={{ color: "var(--lcc-green)" }}>
                     {metric.good}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-sm font-medium text-score-average">
+                  </td>
+                  <td className="font-medium" style={{ color: "var(--lcc-amber)" }}>
                     {metric.needsImprovement}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-sm font-medium text-score-poor">
+                  </td>
+                  <td className="font-medium" style={{ color: "var(--lcc-red)" }}>
                     {metric.poor}
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }

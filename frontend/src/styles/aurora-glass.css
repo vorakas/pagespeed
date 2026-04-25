@@ -1401,3 +1401,266 @@
   font-family: var(--aurora-font-sans);
   margin-top: 2px;
 }
+
+/* ── Reusable content primitives (any page under .aurora-app-shell) ── */
+
+/* Section heading + subtitle pair, used above panels on regular pages. */
+.aurora-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora-section-subtitle {
+  font-size: 12px;
+  color: var(--lcc-text-dim);
+  font-family: var(--aurora-font-sans);
+  margin-top: 2px;
+}
+
+/* Eyebrow row above a panel (small uppercase mono label). */
+.aurora-eyebrow {
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+}
+
+/* Inline text-color helpers so component code can pick the aurora token
+ * without restyling the surrounding shadcn class soup. */
+.aurora-text       { color: var(--lcc-text); }
+.aurora-text-dim   { color: var(--lcc-text-dim); }
+.aurora-text-faint { color: var(--lcc-text-faint); }
+
+/* Sub-header strip inside a panel (e.g. "Site name" above a table). */
+.aurora-panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+
+/* Tables that live inside an .aurora-panel. Headers get the mono eyebrow
+ * treatment; rows get glass dividers and a subtle hover sheen. */
+.aurora-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+  font-size: 12.5px;
+}
+.aurora-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+  border-bottom: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+.aurora-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--lcc-text);
+  vertical-align: middle;
+}
+.aurora-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.aurora-table tbody tr:hover td {
+  background: var(--glass-hi);
+}
+.aurora-table .aurora-num {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--aurora-font-mono);
+  font-size: 12px;
+  color: var(--lcc-text-dim);
+}
+
+/* Icon tile for category cards (Lighthouse explanation, Setup, etc.). */
+.aurora-icon-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--lcc-radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-hi);
+  color: var(--lcc-text);
+  flex-shrink: 0;
+}
+.aurora-icon-tile[data-tone="violet"] { color: var(--lcc-violet); background: var(--lcc-violet-bg); border-color: transparent; }
+.aurora-icon-tile[data-tone="blue"]   { color: var(--lcc-blue);   background: var(--lcc-blue-bg);   border-color: transparent; }
+.aurora-icon-tile[data-tone="green"]  { color: var(--lcc-green);  background: var(--lcc-green-bg);  border-color: transparent; }
+.aurora-icon-tile[data-tone="amber"]  { color: var(--lcc-amber);  background: var(--lcc-amber-bg);  border-color: transparent; }
+.aurora-icon-tile[data-tone="pink"]   { color: var(--lcc-red);    background: var(--lcc-red-bg);    border-color: transparent; }
+
+/* Tabs strip styled like the lcc topbar filters. Apply to TabsList +
+ * TabsTrigger via className overrides so the shadcn defaults stop
+ * leaking through. */
+.aurora-tabs-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  height: auto;
+}
+.aurora-tabs-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--lcc-text-dim);
+  white-space: nowrap;
+  transition: all 0.12s;
+  cursor: pointer;
+}
+.aurora-tabs-trigger:hover {
+  color: var(--lcc-text);
+  background: var(--glass-hi);
+}
+.aurora-tabs-trigger[data-active="true"],
+.aurora-tabs-trigger[data-state="active"] {
+  background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 14px rgba(176, 140, 255, 0.4);
+}
+
+/* Progress bar: dim glass track + violet gradient fill. */
+.aurora-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--glass-hi);
+  overflow: hidden;
+  width: 100%;
+}
+.aurora-progress > [data-slot="progress-track"],
+.aurora-progress [data-slot="progress-track"] {
+  height: 100%;
+  background: transparent;
+  border-radius: inherit;
+}
+.aurora-progress [data-slot="progress-indicator"] {
+  height: 100%;
+  background: linear-gradient(90deg, var(--lcc-blue), var(--lcc-violet));
+  box-shadow: 0 0 12px rgba(176, 140, 255, 0.45);
+  border-radius: inherit;
+}
+
+/* Dialog content as a glass surface. The base-ui dialog uses
+ * data-slot="dialog-content"; layering on aurora-dialog ensures
+ * targeted shadcn classes don't fight us. */
+.aurora-dialog[data-slot="dialog-content"],
+[data-slot="dialog-content"].aurora-dialog {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  color: var(--lcc-text);
+}
+.aurora-dialog [data-slot="dialog-title"] {
+  color: var(--lcc-text);
+}
+.aurora-dialog [data-slot="dialog-description"] {
+  color: var(--lcc-text-dim);
+}
+
+/* Native form controls in glass aesthetic. Apply directly to <select>,
+ * <input>, <label> on regular pages — no wrapper required. */
+.aurora-label {
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+}
+.aurora-select,
+.aurora-input {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  font-family: var(--aurora-font-sans);
+  color: var(--lcc-text);
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  outline: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+.aurora-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--lcc-text-dim) 50%),
+    linear-gradient(135deg, var(--lcc-text-dim) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) center,
+    calc(100% - 9px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.aurora-select:hover,
+.aurora-input:hover { border-color: var(--glass-border-strong); }
+.aurora-select:focus,
+.aurora-input:focus {
+  border-color: var(--lcc-violet);
+  background: var(--glass-bg-strong);
+}
+.aurora-select:disabled,
+.aurora-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.aurora-select option {
+  background: var(--aurora-2);
+  color: var(--lcc-text);
+}
+
+/* Subtle inset banner — diff summaries, callouts. */
+.aurora-callout {
+  border: 1px solid var(--glass-border);
+  background: var(--glass-hi);
+  border-radius: var(--lcc-radius-sm);
+  padding: 10px 14px;
+  color: var(--lcc-text);
+}
+
+/* Comparison bar track for radar/CWV bars. */
+.aurora-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--glass-hi);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+}
+.aurora-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.2s ease;
+}
