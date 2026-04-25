@@ -1662,8 +1662,8 @@
   height: 22px;
   padding: 0 6px;
   border-radius: 6px;
-  font-family: var(--aurora-font-mono);
-  font-size: 12px;
+  font-family: var(--aurora-font-sans);
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
