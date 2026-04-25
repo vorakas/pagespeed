@@ -1,4 +1,5 @@
 import type { MigrationHealthSnapshot } from "@/types"
+import { renderHeadlineSegments } from "./headlineWikilinks"
 
 interface HeroStripProps {
   health: MigrationHealthSnapshot
@@ -23,7 +24,7 @@ export function HeroStrip({ health }: HeroStripProps) {
         </div>
         <ul className="lcc-hs-reasons">
           {health.reasons.slice(0, 3).map((r, i) => (
-            <li key={i}>{stripEmphasis(r)}</li>
+            <li key={i}>{renderHeadlineSegments(stripEmphasis(r) ?? "")}</li>
           ))}
         </ul>
       </div>
