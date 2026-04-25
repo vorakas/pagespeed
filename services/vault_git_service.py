@@ -156,16 +156,20 @@ class VaultGitService:
             # 2. `git reset --mixed origin/main` — moves HEAD and the
             #    index to origin's tree but leaves the working tree
             #    (where the sync just wrote its files) untouched.
-            # 3. Stage everything — now git sees only the delta between
-            #    sync output and origin's tree, cleanly.
-            # 4. Commit + push. Sync output wins on files it touched;
-            #    origin's content is preserved everywhere else (most
-            #    notably in wiki/, which only the orchestrator writes).
+            # 3. Stage ONLY paths the sync actually owns (``raw/``).
+            #    A bare ``git add -A`` would also stage drift between
+            #    Railway's working tree and origin in directories the
+            #    sync never touches (``.agent/``, ``wiki/``, root files),
+            #    which manifests as a silent revert of any change that
+            #    landed on origin between Railway's last pull and this
+            #    sync. Scoping the add closes that hole — sync owns
+            #    ``raw/``; everything else is origin-authoritative.
+            # 4. Commit + push.
             self._cleanup_rebase_state()
             self._run(["git", "fetch", self._REMOTE, self._BRANCH])
             self._run(["git", "reset", "--mixed", f"{self._REMOTE}/{self._BRANCH}"])
 
-            self._run(["git", "add", "-A"])
+            self._run(["git", "add", "-A", "raw/"])
             changed_files = self._pending_changes()
             if not changed_files:
                 logger.info("Vault clean and in sync with origin (label=%s)", label)
