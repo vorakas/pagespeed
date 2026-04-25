@@ -781,12 +781,15 @@ function HeadlineBullets({ text }: { text: string }) {
 }
 
 function splitIntoSentences(text: string): string[] {
-  // Split on sentence terminators followed by whitespace + a capital or
-  // digit start. Digits are included so sentences that begin with an
-  // Asana task id (e.g. "919491 (Blocker) COMPLETED …") still split
-  // cleanly off the previous period.
+  // Split on sentence terminators followed by whitespace + a capital,
+  // digit, or `[` start. Digits cover sentences that begin with an
+  // Asana task id ("919491 (Blocker) COMPLETED …"); `[` covers
+  // sentences that open with an Obsidian wikilink ("[[LAMPSPLUS-1521 -
+  // …|LAMPSPLUS-1521]] Multishipping …") which would otherwise glue
+  // onto the previous bullet because `[` isn't a capital letter.
+  // Mirrors the backend `_extract_reasons_from_headline` regex.
   return text
-    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9\[])/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
 }
