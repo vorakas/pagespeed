@@ -963,13 +963,23 @@ const rowStyle: React.CSSProperties = {
 }
 
 const rowIdStyle: React.CSSProperties = {
+  // Chip styling mirrors `inlineTaskIdStyle` from headlineWikilinks so
+  // task IDs read consistently across the headline, HeroStrip reasons,
+  // and every tab row in the panel below. minWidth keeps row titles
+  // visually aligned even when IDs vary in length (904692 vs
+  // LAMPSPLUS-1521); textAlign centers short IDs in the wider chip.
   fontFamily: "var(--font-mono, monospace)",
   fontSize: 10.5,
-  color: "var(--lcc-text-faint)",
+  color: "var(--lcc-text)",
   flexShrink: 0,
-  paddingTop: 2,
-  minWidth: 74,
-  wordBreak: "break-word",
+  padding: "2px 7px",
+  borderRadius: 4,
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.1))",
+  minWidth: 78,
+  textAlign: "center",
+  whiteSpace: "nowrap",
+  marginTop: 1,
 }
 
 const rowTitleStyle: React.CSSProperties = {
