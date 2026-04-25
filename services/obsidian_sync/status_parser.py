@@ -341,7 +341,13 @@ def _extract_headline(body: str) -> Optional[str]:
     if not paragraph:
         return None
     text = _strip_markup(" ".join(paragraph))
-    text = _resolve_wikilinks_for_prose(text)
+    # Deliberately leave wikilink syntax intact. The frontend
+    # `renderHeadlineSegments` (in `headlineWikilinks.tsx`) parses
+    # `[[Stem|ID]]` and renders the display portion as a styled chip,
+    # giving consistent task-ID rendering across the headline bullets,
+    # the HeroStrip "Project Status" reasons, and the row chips below.
+    # Stripping wikilinks here would defeat that — by the time the
+    # frontend sees the text, it would already be plain.
     return text or None
 
 
