@@ -1865,8 +1865,11 @@
  * pages that still render shadcn Card/Input/Select/Table inherit the
  * Aurora Glass aesthetic without rewriting every JSX file. */
 
-/* Card → glass panel */
-.aurora-app-shell [data-slot="card"] {
+/* Card → glass panel. Targets both the shadcn Card primitive AND any
+ * raw Tailwind .bg-card wrapper used in unconverted pages (e.g. the
+ * Load Testing page hand-rolls <section class="bg-card border-border">). */
+.aurora-app-shell [data-slot="card"],
+.aurora-app-shell .bg-card {
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(22px) saturate(140%);
   backdrop-filter: blur(22px) saturate(140%);
@@ -1876,7 +1879,29 @@
   color: var(--lcc-text);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .aurora-app-shell [data-slot="card"] { background: var(--glass-bg-strong); }
+  .aurora-app-shell [data-slot="card"],
+  .aurora-app-shell .bg-card { background: var(--glass-bg-strong); }
+}
+
+/* Standalone Tailwind utility overrides — for hand-rolled wrappers
+ * that don't go through the shadcn primitives. These make sure any
+ * unconverted page picks up the aurora palette automatically. */
+.aurora-app-shell .border-border {
+  border-color: var(--glass-border);
+}
+.aurora-app-shell .bg-input {
+  background: var(--glass-hi);
+}
+.aurora-app-shell .bg-muted,
+.aurora-app-shell .bg-muted\/50,
+.aurora-app-shell .bg-muted\/30 {
+  background: var(--glass-hi);
+}
+.aurora-app-shell .text-foreground {
+  color: var(--lcc-text);
+}
+.aurora-app-shell .text-muted-foreground {
+  color: var(--lcc-text-dim);
 }
 
 .aurora-app-shell [data-slot="card-title"] {
