@@ -1704,3 +1704,95 @@
   border-radius: inherit;
   transition: width 0.2s ease;
 }
+
+/* ── shadcn Switch / Checkbox aurora overrides ─────────────────────
+ * These are scoped to .aurora-app-shell so the whole app inherits
+ * them automatically. Targeting base-ui's data-slot attributes keeps
+ * the override resilient to className changes in shadcn defaults. */
+.aurora-app-shell [data-slot="switch"] {
+  background: var(--glass-hi);
+  border-color: var(--glass-border);
+  height: 20px;
+  width: 36px;
+}
+.aurora-app-shell [data-slot="switch"][data-checked] {
+  background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
+  border-color: transparent;
+  box-shadow: 0 0 12px rgba(176, 140, 255, 0.4);
+}
+.aurora-app-shell [data-slot="switch-thumb"] {
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.aurora-app-shell [data-slot="checkbox"] {
+  border-color: var(--glass-border-strong);
+  background: var(--glass-hi);
+}
+.aurora-app-shell [data-slot="checkbox"][data-checked],
+.aurora-app-shell [data-slot="checkbox"][data-indeterminate] {
+  background: var(--lcc-violet);
+  border-color: var(--lcc-violet);
+  color: #fff;
+}
+
+/* ── Expandable site row (Setup) ─────────────────────────────────── */
+.aurora-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+  transition: background 0.12s;
+}
+.aurora-row:hover { background: var(--glass-hi); }
+
+.aurora-divider {
+  height: 1px;
+  background: var(--glass-border);
+}
+
+/* Aurora kbd / inline code for the cron syntax reference. */
+.aurora-code {
+  font-family: var(--aurora-font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  color: var(--lcc-text);
+}
+
+/* Strategy radio group — pill-style segmented control. */
+.aurora-radio-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--lcc-text-dim);
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+}
+.aurora-radio-pill:hover {
+  color: var(--lcc-text);
+  border-color: var(--glass-border-strong);
+}
+.aurora-radio-pill[data-checked="true"] {
+  background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 12px rgba(176, 140, 255, 0.4);
+}
+.aurora-radio-pill input { position: absolute; opacity: 0; pointer-events: none; }

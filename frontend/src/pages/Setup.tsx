@@ -71,8 +71,8 @@ export function Setup() {
         {/* Triggers Section */}
         <div className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Scheduled Test Triggers</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="aurora-section-title">Scheduled Test Triggers</h2>
+            <p className="aurora-section-subtitle">
               Set up automatic PageSpeed testing on a schedule
             </p>
           </div>
@@ -84,7 +84,7 @@ export function Setup() {
             onCancel={() => setEditingTrigger(null)}
           />
 
-          <h3 className="text-sm font-semibold text-foreground">Active Triggers</h3>
+          <h3 className="aurora-text text-sm font-semibold">Active Triggers</h3>
           <TriggerList
             triggers={triggers}
             loading={triggersLoading}

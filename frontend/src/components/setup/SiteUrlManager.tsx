@@ -1,16 +1,6 @@
 import { useState } from "react"
 import { Plus, ChevronRight, Trash2, Globe } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { api } from "@/services/api"
 import type { SiteWithUrls } from "@/types"
@@ -94,95 +84,91 @@ export function SiteUrlManager({ sites, onDataChanged }: SiteUrlManagerProps) {
     <div className="space-y-6">
       {/* Add Site / Add URL forms */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Add Site</h3>
-            <form onSubmit={handleAddSite} className="flex gap-2">
-              <Input
-                value={siteName}
-                onChange={(e) => setSiteName(e.target.value)}
-                placeholder="Site name (e.g., Production)"
+        <div className="aurora-panel p-4">
+          <h3 className="aurora-text mb-3 text-sm font-semibold">Add Site</h3>
+          <form onSubmit={handleAddSite} className="flex gap-2">
+            <input
+              className="aurora-input flex-1"
+              value={siteName}
+              onChange={(e) => setSiteName(e.target.value)}
+              placeholder="Site name (e.g., Production)"
+              required
+            />
+            <Button type="submit" disabled={addingSite} className="shrink-0">
+              <Plus className="h-4 w-4" />
+              Add
+            </Button>
+          </form>
+        </div>
+
+        <div className="aurora-panel p-4">
+          <h3 className="aurora-text mb-3 text-sm font-semibold">Add URL</h3>
+          <form onSubmit={handleAddUrl} className="space-y-2">
+            <select
+              className="aurora-select w-full"
+              value={selectedSiteId}
+              onChange={(e) => setSelectedSiteId(e.target.value)}
+            >
+              <option value="">Select a site...</option>
+              {sites.map((site) => (
+                <option key={site.id} value={site.id.toString()}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <input
+                className="aurora-input flex-1"
+                type="url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="https://example.com"
                 required
               />
-              <Button type="submit" disabled={addingSite} className="shrink-0">
+              <Button type="submit" disabled={addingUrl || !selectedSiteId} className="shrink-0">
                 <Plus className="h-4 w-4" />
                 Add
               </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Add URL</h3>
-            <form onSubmit={handleAddUrl} className="space-y-2">
-              <Select value={selectedSiteId} onValueChange={setSelectedSiteId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a site..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {sites.map((site) => (
-                    <SelectItem key={site.id} value={site.id.toString()}>
-                      {site.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex gap-2">
-                <Input
-                  type="url"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="https://example.com"
-                  required
-                />
-                <Button type="submit" disabled={addingUrl || !selectedSiteId} className="shrink-0">
-                  <Plus className="h-4 w-4" />
-                  Add
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            </div>
+          </form>
+        </div>
       </div>
 
       {/* Sites and URLs list */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-3">Current Sites and URLs</h2>
+        <h2 className="aurora-section-title mb-3">Current Sites and URLs</h2>
         {sites.length === 0 ? (
-          <Card>
-            <CardContent className="p-0">
-              <EmptyState
-                icon={<Globe size={40} />}
-                title="No Sites Created Yet"
-                description="Use the forms above to add your first site and start tracking URLs."
-              />
-            </CardContent>
-          </Card>
+          <div className="aurora-panel overflow-hidden">
+            <EmptyState
+              icon={<Globe size={40} />}
+              title="No Sites Created Yet"
+              description="Use the forms above to add your first site and start tracking URLs."
+            />
+          </div>
         ) : (
           <div className="space-y-2">
             {sites.map((site) => {
               const isExpanded = expandedSites.has(site.id)
               return (
-                <Card key={site.id}>
+                <div key={site.id} className="aurora-panel overflow-hidden">
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    className="aurora-row"
                     onClick={() => toggleSite(site.id)}
                   >
                     <div className="flex items-center gap-2">
                       <ChevronRight
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                        className={`aurora-text-faint h-4 w-4 transition-transform ${isExpanded ? "rotate-90" : ""}`}
                       />
-                      <span className="text-sm font-semibold text-foreground">{site.name}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="aurora-text text-sm font-semibold">{site.name}</span>
+                      <span className="aurora-text-faint text-xs">
                         ({site.urls.length} URL{site.urls.length !== 1 ? "s" : ""})
                       </span>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      className="text-destructive hover:text-destructive"
+                      style={{ color: "var(--lcc-red)" }}
                       onClick={(e) => {
                         e.stopPropagation()
                         handleDeleteSite(site.id, site.name)
@@ -193,34 +179,38 @@ export function SiteUrlManager({ sites, onDataChanged }: SiteUrlManagerProps) {
                     </Button>
                   </button>
                   {isExpanded && (
-                    <div className="border-t border-border px-4 py-2">
-                      {site.urls.length === 0 ? (
-                        <p className="py-3 text-center text-sm text-muted-foreground">
-                          No URLs added yet
-                        </p>
-                      ) : (
-                        <ul className="divide-y divide-border">
-                          {site.urls.map((url) => (
-                            <li key={url.id} className="flex items-center justify-between py-2">
-                              <span className="text-sm text-foreground truncate mr-2" title={url.url}>
-                                {url.url}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="icon-xs"
-                                className="shrink-0 text-destructive hover:text-destructive"
-                                onClick={() => handleDeleteUrl(url.id)}
-                                title="Delete URL"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                    <>
+                      <div className="aurora-divider" />
+                      <div className="px-4 py-2">
+                        {site.urls.length === 0 ? (
+                          <p className="aurora-text-faint py-3 text-center text-sm">
+                            No URLs added yet
+                          </p>
+                        ) : (
+                          <ul className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
+                            {site.urls.map((url) => (
+                              <li key={url.id} className="flex items-center justify-between py-2">
+                                <span className="aurora-text mr-2 truncate text-sm" title={url.url}>
+                                  {url.url}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  className="shrink-0"
+                                  style={{ color: "var(--lcc-red)" }}
+                                  onClick={() => handleDeleteUrl(url.id)}
+                                  title="Delete URL"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </>
                   )}
-                </Card>
+                </div>
               )
             })}
           </div>
