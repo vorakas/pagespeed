@@ -30,11 +30,14 @@ const KPI_ORDER: Array<{ key: string; label: string; goodWhen: "up" | "down" }> 
 
 export function WhatChangedToday({ latest, diff }: Props) {
   const summary = latest.changeSummary
+  // Strip counts must match the column counts below — derive from the same
+  // diff fields the columns render, so the numbers can't drift apart.
+  const newCount = diff.newItems.added.length + diff.criticalBugs.added.length
   const cells = [
-    { label: "New", value: summary?.new ?? diff.newItems.added.length, tone: "violet" },
+    { label: "New", value: newCount, tone: "violet" },
     { label: "Resolved", value: summary?.resolved ?? latest.positives.length, tone: "green" },
-    { label: "Regressed", value: summary?.regressed ?? diff.prodFailures.regressed.length, tone: "red" },
-    { label: "Reassigned", value: summary?.reassigned ?? diff.prodFailures.reassigned.length, tone: "amber" },
+    { label: "Regressed", value: diff.prodFailures.regressed.length, tone: "red" },
+    { label: "Reassigned", value: diff.prodFailures.reassigned.length, tone: "amber" },
     { label: "On Hold", value: summary?.onHold ?? 0, tone: "blue" },
   ]
 
