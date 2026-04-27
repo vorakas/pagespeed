@@ -1,5 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card"
-
 interface PercentileMetric {
   p50: number | null
   p75: number | null
@@ -12,11 +10,11 @@ interface CwvMetricsProps {
   interactionsCount: number | null
 }
 
-function getThresholdClass(value: number | null, good: number, poor: number): string {
-  if (value === null) return "text-muted-foreground"
-  if (value <= good) return "text-score-good"
-  if (value <= poor) return "text-score-average"
-  return "text-score-poor"
+function getThresholdColor(value: number | null, good: number, poor: number): string {
+  if (value === null) return "var(--lcc-text-faint)"
+  if (value <= good) return "var(--lcc-green)"
+  if (value <= poor) return "var(--lcc-amber)"
+  return "var(--lcc-red)"
 }
 
 function getThresholdLabel(value: number | null, good: number, poor: number): string {
@@ -51,45 +49,39 @@ function PercentileCard({
   poorThreshold: number
 }) {
   const p75Value = metric?.p75 ?? null
-  const thresholdClass = getThresholdClass(p75Value, goodThreshold, poorThreshold)
+  const thresholdColor = getThresholdColor(p75Value, goodThreshold, poorThreshold)
   const thresholdLabel = getThresholdLabel(p75Value, goodThreshold, poorThreshold)
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="mb-3">
-          <h3 className="text-base font-semibold text-foreground">{title}</h3>
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
-          <p className="text-xs text-muted-foreground">{idealText}</p>
+    <div className="aurora-panel p-4">
+      <div className="mb-3">
+        <h3 className="aurora-text text-base font-semibold">{title}</h3>
+        <p className="aurora-text-faint text-xs">{subtitle}</p>
+        <p className="aurora-text-faint text-xs">{idealText}</p>
+      </div>
+      <div className="flex items-end gap-6">
+        <div className="text-center">
+          <p className="aurora-eyebrow">P50</p>
+          <p className="aurora-stat-value">{formatValue(metric?.p50 ?? null, decimals)}</p>
+          <p className="aurora-text-faint text-[10px]">{unit}</p>
         </div>
-        <div className="flex items-end gap-6">
-          <div className="text-center">
-            <p className="text-[10px] uppercase text-muted-foreground">P50</p>
-            <p className="text-lg font-semibold tabular-nums text-foreground">
-              {formatValue(metric?.p50 ?? null, decimals)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">{unit}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] uppercase text-muted-foreground">P75</p>
-            <p className="text-lg font-semibold tabular-nums text-foreground">
-              {formatValue(metric?.p75 ?? null, decimals)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">{unit}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] uppercase text-muted-foreground">P90</p>
-            <p className="text-lg font-semibold tabular-nums text-foreground">
-              {formatValue(metric?.p90 ?? null, decimals)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">{unit}</p>
-          </div>
+        <div className="text-center">
+          <p className="aurora-eyebrow">P75</p>
+          <p className="aurora-stat-value">{formatValue(metric?.p75 ?? null, decimals)}</p>
+          <p className="aurora-text-faint text-[10px]">{unit}</p>
         </div>
-        {thresholdLabel && (
-          <p className={`mt-2 text-xs font-medium ${thresholdClass}`}>{thresholdLabel}</p>
-        )}
-      </CardContent>
-    </Card>
+        <div className="text-center">
+          <p className="aurora-eyebrow">P90</p>
+          <p className="aurora-stat-value">{formatValue(metric?.p90 ?? null, decimals)}</p>
+          <p className="aurora-text-faint text-[10px]">{unit}</p>
+        </div>
+      </div>
+      {thresholdLabel && (
+        <p className="mt-2 text-xs font-medium" style={{ color: thresholdColor }}>
+          {thresholdLabel}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -103,26 +95,24 @@ function BreakdownCard({
   metric: PercentileMetric | undefined
 }) {
   return (
-    <Card>
-      <CardContent className="p-3">
-        <h4 className="text-sm font-medium text-foreground">{title}</h4>
-        <p className="text-[10px] text-muted-foreground mb-2">{idealText}</p>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div>
-            <p className="text-sm font-semibold tabular-nums">{formatValue(metric?.p50 ?? null)} ms</p>
-            <p className="text-[10px] text-muted-foreground">P50</p>
-          </div>
-          <div>
-            <p className="text-sm font-semibold tabular-nums">{formatValue(metric?.p75 ?? null)} ms</p>
-            <p className="text-[10px] text-muted-foreground">P75</p>
-          </div>
-          <div>
-            <p className="text-sm font-semibold tabular-nums">{formatValue(metric?.p90 ?? null)} ms</p>
-            <p className="text-[10px] text-muted-foreground">P90</p>
-          </div>
+    <div className="aurora-panel p-3">
+      <h4 className="aurora-text text-sm font-medium">{title}</h4>
+      <p className="aurora-text-faint mb-2 text-[10px]">{idealText}</p>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div>
+          <p className="aurora-text text-sm font-semibold tabular-nums">{formatValue(metric?.p50 ?? null)} ms</p>
+          <p className="aurora-eyebrow">P50</p>
         </div>
-      </CardContent>
-    </Card>
+        <div>
+          <p className="aurora-text text-sm font-semibold tabular-nums">{formatValue(metric?.p75 ?? null)} ms</p>
+          <p className="aurora-eyebrow">P75</p>
+        </div>
+        <div>
+          <p className="aurora-text text-sm font-semibold tabular-nums">{formatValue(metric?.p90 ?? null)} ms</p>
+          <p className="aurora-eyebrow">P90</p>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -182,7 +172,7 @@ export function CwvMetrics({ metrics, metadata, interactionsCount }: CwvMetricsP
 
       {/* Breakdown */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-3">Performance Breakdown</h3>
+        <h3 className="aurora-text mb-3 text-sm font-semibold">Performance Breakdown</h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <BreakdownCard title="Backend Duration" idealText="Ideal P75: ≤ 500ms" metric={backend} />
           <BreakdownCard title="Frontend Duration" idealText="Ideal P75: ≤ 1500ms" metric={frontend} />
@@ -193,34 +183,30 @@ export function CwvMetrics({ metrics, metadata, interactionsCount }: CwvMetricsP
 
       {/* Interactions + Metadata */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="text-sm font-semibold text-foreground">Browser Interactions</h3>
-            <p className="text-3xl font-bold tabular-nums text-foreground mt-2">
-              {interactionsCount !== null ? interactionsCount.toLocaleString() : "--"}
+        <div className="aurora-panel p-4">
+          <h3 className="aurora-text text-sm font-semibold">Browser Interactions</h3>
+          <p className="aurora-stat-value-lg mt-2">
+            {interactionsCount !== null ? interactionsCount.toLocaleString() : "--"}
+          </p>
+          {metadata?.time_range && (
+            <p className="aurora-text-faint mt-1 text-xs">
+              In the last {metadata.time_range.replace(" ago", "")}
             </p>
-            {metadata?.time_range && (
-              <p className="text-xs text-muted-foreground mt-1">
-                In the last {metadata.time_range.replace(" ago", "")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+          )}
+        </div>
         {metadata && (
-          <Card>
-            <CardContent className="p-4 space-y-1">
-              <h3 className="text-sm font-semibold text-foreground mb-2">Query Metadata</h3>
-              <p className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">App:</span> {metadata.app_name || "--"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">Page:</span> {metadata.page_url || "--"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">Updated:</span> {new Date().toLocaleString()}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="aurora-panel space-y-1 p-4">
+            <h3 className="aurora-text mb-2 text-sm font-semibold">Query Metadata</h3>
+            <p className="aurora-text-dim text-xs">
+              <span className="aurora-text font-medium">App:</span> {metadata.app_name || "--"}
+            </p>
+            <p className="aurora-text-dim text-xs">
+              <span className="aurora-text font-medium">Page:</span> {metadata.page_url || "--"}
+            </p>
+            <p className="aurora-text-dim text-xs">
+              <span className="aurora-text font-medium">Updated:</span> {new Date().toLocaleString()}
+            </p>
+          </div>
         )}
       </div>
     </div>

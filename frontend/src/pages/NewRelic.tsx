@@ -1,15 +1,6 @@
 import { useState, useCallback } from "react"
 import { Header } from "@/components/layout/Header"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select"
 import { NewRelicConfigPanel } from "@/components/newrelic/NewRelicConfig"
 import { CwvMetrics } from "@/components/newrelic/CwvMetrics"
 import { PerformanceOverview } from "@/components/newrelic/PerformanceOverview"
@@ -38,7 +29,7 @@ const DEFAULT_CONFIG: NewRelicConfig = {
 
 export function NewRelic() {
   const [config, setConfig] = useLocalConfig<NewRelicConfig>("nrConfig", DEFAULT_CONFIG)
-  const [connected, setConnected] = useState(false)
+  const [, setConnected] = useState(false)
   const [pageUrl, setPageUrl] = useState("https://www.lampsplus.com/")
   const [timeRange, setTimeRange] = useState("30 minutes ago")
 
@@ -101,61 +92,61 @@ export function NewRelic() {
         />
 
         {/* Query Controls */}
-        <div className="flex flex-wrap items-end gap-3 [&_input]:h-[38px] [&_[data-slot=select-trigger]]:h-[38px] [&_[data-slot=button]]:h-[38px]">
-          <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-            <Label htmlFor="pageUrl">Page URL to Monitor</Label>
-            <Input
-              id="pageUrl"
-              value={pageUrl}
-              onChange={(e) => setPageUrl(e.target.value)}
-              placeholder="https://www.lampsplus.com/"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5 w-48">
-            <Label>Time Range</Label>
-            <Select value={timeRange} onValueChange={setTimeRange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
+        <div className="aurora-panel p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+              <label htmlFor="pageUrl" className="aurora-label block">Page URL to Monitor</label>
+              <input
+                id="pageUrl"
+                className="aurora-input w-full"
+                value={pageUrl}
+                onChange={(e) => setPageUrl(e.target.value)}
+                placeholder="https://www.lampsplus.com/"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 w-48">
+              <label className="aurora-label block">Time Range</label>
+              <select
+                className="aurora-select w-full"
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+              >
                 {TIME_RANGES.map((tr) => (
-                  <SelectItem key={tr.value} value={tr.value}>
+                  <option key={tr.value} value={tr.value}>
                     {tr.label}
-                  </SelectItem>
+                  </option>
                 ))}
-              </SelectContent>
-            </Select>
+              </select>
+            </div>
+            <Button onClick={loadAllMetrics} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {loading ? "Loading..." : "Load Metrics"}
+            </Button>
           </div>
-          <Button onClick={loadAllMetrics} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {loading ? "Loading..." : "Load Metrics"}
-          </Button>
         </div>
 
         {error && (
-          <p className="text-sm text-score-poor">{error}</p>
+          <p className="text-sm" style={{ color: "var(--lcc-red)" }}>{error}</p>
         )}
 
         {loading && <LoadingSpinner message="Loading Core Web Vitals data from New Relic..." />}
 
         {/* Core Web Vitals */}
         {!loading && cwvData && (
-          <>
-            <div>
-              <h2 className="text-lg font-semibold text-foreground mb-3">Core Web Vitals</h2>
-              <CwvMetrics
-                metrics={cwvMetrics as Record<string, { p50: number | null; p75: number | null; p90: number | null }> | null ?? null}
-                metadata={cwvMetadata ?? null}
-                interactionsCount={interactionsCount}
-              />
-            </div>
-          </>
+          <div>
+            <h2 className="aurora-section-title mb-3">Core Web Vitals</h2>
+            <CwvMetrics
+              metrics={cwvMetrics as Record<string, { p50: number | null; p75: number | null; p90: number | null }> | null ?? null}
+              metadata={cwvMetadata ?? null}
+              interactionsCount={interactionsCount}
+            />
+          </div>
         )}
 
         {/* Performance Overview */}
         {!loading && perfData && (
           <div>
-            <h2 className="text-lg font-semibold text-foreground mb-3">Performance Overview</h2>
+            <h2 className="aurora-section-title mb-3">Performance Overview</h2>
             <PerformanceOverview data={perfData} />
           </div>
         )}
@@ -163,14 +154,14 @@ export function NewRelic() {
         {/* APM Metrics */}
         {!loading && apmData && (
           <div>
-            <h2 className="text-lg font-semibold text-foreground mb-3">Application Performance Monitoring</h2>
+            <h2 className="aurora-section-title mb-3">Application Performance Monitoring</h2>
             <ApmMetrics data={apmData} />
           </div>
         )}
 
         {/* Custom Query */}
         <div>
-          <h2 className="text-lg font-semibold text-foreground mb-3">Custom NerdGraph Query</h2>
+          <h2 className="aurora-section-title mb-3">Custom NerdGraph Query</h2>
           <CustomQuery config={config} />
         </div>
       </div>

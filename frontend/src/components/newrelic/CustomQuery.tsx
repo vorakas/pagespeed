@@ -1,8 +1,5 @@
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
 import { Play } from "lucide-react"
 import { api } from "@/services/api"
 import type { NewRelicConfig } from "@/types"
@@ -43,47 +40,43 @@ export function CustomQuery({ config }: CustomQueryProps) {
   }
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-foreground">Custom NRQL Query</h3>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => setQuery(SAMPLE_QUERIES.apm)}
-          >
-            APM Sample
-          </Button>
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => setQuery(SAMPLE_QUERIES.browser)}
-          >
-            Browser Sample
-          </Button>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="nrqlQuery">NRQL Query</Label>
-          <Textarea
-            id="nrqlQuery"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="SELECT ... FROM ... SINCE ..."
-            rows={3}
-            className="font-mono text-xs"
-          />
-        </div>
-        <Button onClick={handleRun} disabled={running || !query.trim()}>
-          <Play className="h-4 w-4" />
-          {running ? "Running..." : "Run Query"}
+    <div className="aurora-panel space-y-3 p-4">
+      <h3 className="aurora-text text-sm font-semibold">Custom NRQL Query</h3>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="xs"
+          onClick={() => setQuery(SAMPLE_QUERIES.apm)}
+        >
+          APM Sample
         </Button>
-        {error && <p className="text-sm text-score-poor">{error}</p>}
-        {result && (
-          <pre className="max-h-[300px] overflow-auto rounded-md bg-muted p-3 text-xs font-mono">
-            {result}
-          </pre>
-        )}
-      </CardContent>
-    </Card>
+        <Button
+          variant="outline"
+          size="xs"
+          onClick={() => setQuery(SAMPLE_QUERIES.browser)}
+        >
+          Browser Sample
+        </Button>
+      </div>
+      <div className="space-y-1.5">
+        <label htmlFor="nrqlQuery" className="aurora-label block">NRQL Query</label>
+        <textarea
+          id="nrqlQuery"
+          className="aurora-textarea"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="SELECT ... FROM ... SINCE ..."
+          rows={3}
+        />
+      </div>
+      <Button onClick={handleRun} disabled={running || !query.trim()}>
+        <Play className="h-4 w-4" />
+        {running ? "Running..." : "Run Query"}
+      </Button>
+      {error && <p className="text-sm" style={{ color: "var(--lcc-red)" }}>{error}</p>}
+      {result && (
+        <pre className="aurora-pre max-h-[300px]">{result}</pre>
+      )}
+    </div>
   )
 }
