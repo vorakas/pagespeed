@@ -11,6 +11,7 @@ export interface IncidentItem {
   severity: string | null
   meta: string | null
   time: string | null
+  sortTime: number
   raw: MigrationBlocker | RawTaskRecord
 }
 
@@ -29,6 +30,12 @@ const SEV_ORDER: Record<string, number> = {
   high: 1,
   medium: 2,
   low: 3,
+}
+
+function parseTimestamp(value: string | null | undefined): number {
+  if (!value) return 0
+  const ms = Date.parse(value)
+  return Number.isFinite(ms) ? ms : 0
 }
 
 /**
@@ -55,6 +62,7 @@ export function IncidentStream({
         severity: (p.priority ?? "").toLowerCase() || "medium",
         meta: p.assignee,
         time: "active",
+        sortTime: parseTimestamp(p.updated) || parseTimestamp(p.created),
         raw: p,
       })
     }
@@ -67,6 +75,7 @@ export function IncidentStream({
         severity: (b.severity ?? "").toLowerCase() || "medium",
         meta: b.affects.join(", "),
         time: b.status || null,
+        sortTime: 0,
         raw: b,
       })
     }
@@ -79,12 +88,19 @@ export function IncidentStream({
         severity: (n.priority ?? "").toLowerCase() || "medium",
         meta: n.project,
         time: n.created ? `filed ${n.created}` : null,
+        sortTime: parseTimestamp(n.updated) || parseTimestamp(n.created),
         raw: n,
       })
     }
     return out
       .filter((i) => filter === "all" || i.kind === filter)
-      .sort((a, b) => (SEV_ORDER[a.severity ?? "medium"] ?? 9) - (SEV_ORDER[b.severity ?? "medium"] ?? 9))
+      .sort((a, b) => {
+        const sevDiff =
+          (SEV_ORDER[a.severity ?? "medium"] ?? 9) -
+          (SEV_ORDER[b.severity ?? "medium"] ?? 9)
+        if (sevDiff !== 0) return sevDiff
+        return b.sortTime - a.sortTime
+      })
   }, [blockers, prodFailures, newBugs, filter])
 
   const total = (blockers?.length ?? 0) + (prodFailures?.length ?? 0) + (newBugs?.length ?? 0)
