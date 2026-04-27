@@ -1,14 +1,5 @@
 import { useState, useCallback } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { BarChart3 } from "lucide-react"
 import { api } from "@/services/api"
@@ -34,11 +25,13 @@ interface SummaryData {
   statusDistribution: Array<{ statusCode: number; count: number; percentage: number }>
 }
 
-const statusClasses: Record<string, string> = {
-  "2": "text-score-good",
-  "3": "text-primary",
-  "4": "text-score-average",
-  "5": "text-score-poor",
+function getStatusColor(code: number): string | undefined {
+  const prefix = String(code).charAt(0)
+  if (prefix === "2") return "var(--lcc-green)"
+  if (prefix === "3") return "var(--lcc-blue)"
+  if (prefix === "4") return "var(--lcc-amber)"
+  if (prefix === "5") return "var(--lcc-red)"
+  return undefined
 }
 
 export function DashboardSummary({ config, selectedSite }: DashboardSummaryProps) {
@@ -71,7 +64,7 @@ export function DashboardSummary({ config, selectedSite }: DashboardSummaryProps
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-foreground">Dashboard Summary</h2>
+        <h2 className="aurora-section-title">Dashboard Summary</h2>
         <Button variant="outline" size="sm" onClick={loadDashboard}>
           <BarChart3 className="h-4 w-4" /> Load Dashboard (24h)
         </Button>
@@ -81,82 +74,108 @@ export function DashboardSummary({ config, selectedSite }: DashboardSummaryProps
         <>
           {/* Stat Cards */}
           <div className="grid gap-3 sm:grid-cols-4">
-            <Card><CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Total Requests</p>
-              <p className="text-2xl font-bold tabular-nums text-foreground">{Number(data.summary.totalRequests).toLocaleString()}</p>
-            </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">4xx Errors</p>
-              <p className={`text-2xl font-bold tabular-nums ${data.summary.errorCount4xx > 0 ? "text-score-average" : "text-foreground"}`}>{Number(data.summary.errorCount4xx).toLocaleString()}</p>
-            </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">5xx Errors</p>
-              <p className={`text-2xl font-bold tabular-nums ${data.summary.errorCount5xx > 0 ? "text-score-poor" : "text-foreground"}`}>{Number(data.summary.errorCount5xx).toLocaleString()}</p>
-            </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Avg Response</p>
-              <p className="text-2xl font-bold tabular-nums text-foreground">{data.summary.avgTimeTaken} ms</p>
-            </CardContent></Card>
+            <div className="aurora-panel p-4">
+              <p className="aurora-stat-label">Total Requests</p>
+              <p className="aurora-stat-value">{Number(data.summary.totalRequests).toLocaleString()}</p>
+            </div>
+            <div className="aurora-panel p-4">
+              <p className="aurora-stat-label">4xx Errors</p>
+              <p
+                className="aurora-stat-value"
+                style={{ color: data.summary.errorCount4xx > 0 ? "var(--lcc-amber)" : undefined }}
+              >
+                {Number(data.summary.errorCount4xx).toLocaleString()}
+              </p>
+            </div>
+            <div className="aurora-panel p-4">
+              <p className="aurora-stat-label">5xx Errors</p>
+              <p
+                className="aurora-stat-value"
+                style={{ color: data.summary.errorCount5xx > 0 ? "var(--lcc-red)" : undefined }}
+              >
+                {Number(data.summary.errorCount5xx).toLocaleString()}
+              </p>
+            </div>
+            <div className="aurora-panel p-4">
+              <p className="aurora-stat-label">Avg Response</p>
+              <p className="aurora-stat-value">{data.summary.avgTimeTaken} ms</p>
+            </div>
           </div>
 
           {/* Percentiles */}
-          <Card><CardContent className="p-4">
-            <h3 className="text-sm font-semibold text-foreground mb-2">Response Time Breakdown</h3>
+          <div className="aurora-panel p-4">
+            <h3 className="aurora-text mb-2 text-sm font-semibold">Response Time Breakdown</h3>
             <div className="grid grid-cols-4 gap-4 text-center">
-              <div><p className="text-[10px] uppercase text-muted-foreground">P50</p><p className="text-lg font-semibold tabular-nums">{data.summary.p50TimeTaken} ms</p></div>
-              <div><p className="text-[10px] uppercase text-muted-foreground">P90</p><p className="text-lg font-semibold tabular-nums">{data.summary.p90TimeTaken} ms</p></div>
-              <div><p className="text-[10px] uppercase text-muted-foreground">P99</p><p className="text-lg font-semibold tabular-nums">{data.summary.p99TimeTaken} ms</p></div>
-              <div><p className="text-[10px] uppercase text-muted-foreground">Max</p><p className="text-lg font-semibold tabular-nums">{Number(data.summary.maxTimeTaken).toLocaleString()} ms</p></div>
+              <div>
+                <p className="aurora-eyebrow">P50</p>
+                <p className="aurora-text text-lg font-semibold tabular-nums">{data.summary.p50TimeTaken} ms</p>
+              </div>
+              <div>
+                <p className="aurora-eyebrow">P90</p>
+                <p className="aurora-text text-lg font-semibold tabular-nums">{data.summary.p90TimeTaken} ms</p>
+              </div>
+              <div>
+                <p className="aurora-eyebrow">P99</p>
+                <p className="aurora-text text-lg font-semibold tabular-nums">{data.summary.p99TimeTaken} ms</p>
+              </div>
+              <div>
+                <p className="aurora-eyebrow">Max</p>
+                <p className="aurora-text text-lg font-semibold tabular-nums">{Number(data.summary.maxTimeTaken).toLocaleString()} ms</p>
+              </div>
             </div>
-          </CardContent></Card>
+          </div>
 
           {/* Top Pages + Status Distribution side by side */}
           <div className="grid gap-4 sm:grid-cols-2">
             {data.topPages && data.topPages.length > 0 && (
-              <Card><CardContent className="p-0">
-                <div className="px-4 py-2 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Top Pages</h3></div>
+              <div className="aurora-panel overflow-hidden">
+                <div className="aurora-panel-header">Top Pages</div>
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader><TableRow className="hover:bg-transparent">
-                      <TableHead className="text-xs">URL</TableHead>
-                      <TableHead className="text-xs">Requests</TableHead>
-                      <TableHead className="text-xs">Avg Time</TableHead>
-                    </TableRow></TableHeader>
-                    <TableBody>
+                  <table className="aurora-table">
+                    <thead>
+                      <tr>
+                        <th>URL</th>
+                        <th>Requests</th>
+                        <th>Avg Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {data.topPages.map((p, i) => (
-                        <TableRow key={i}>
-                          <TableCell className="py-1.5 text-xs font-mono truncate max-w-[200px]">{p.url}</TableCell>
-                          <TableCell className="py-1.5 text-xs tabular-nums">{Number(p.requestCount).toLocaleString()}</TableCell>
-                          <TableCell className="py-1.5 text-xs tabular-nums">{p.avgTimeTaken} ms</TableCell>
-                        </TableRow>
+                        <tr key={i}>
+                          <td><span className="aurora-num truncate max-w-[260px] inline-block align-middle">{p.url}</span></td>
+                          <td><span className="aurora-num">{Number(p.requestCount).toLocaleString()}</span></td>
+                          <td><span className="aurora-num">{p.avgTimeTaken} ms</span></td>
+                        </tr>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                 </div>
-              </CardContent></Card>
+              </div>
             )}
             {data.statusDistribution && data.statusDistribution.length > 0 && (
-              <Card><CardContent className="p-0">
-                <div className="px-4 py-2 border-b border-border"><h3 className="text-sm font-semibold text-foreground">Status Distribution</h3></div>
+              <div className="aurora-panel overflow-hidden">
+                <div className="aurora-panel-header">Status Distribution</div>
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader><TableRow className="hover:bg-transparent">
-                      <TableHead className="text-xs">Status</TableHead>
-                      <TableHead className="text-xs">Count</TableHead>
-                      <TableHead className="text-xs">%</TableHead>
-                    </TableRow></TableHeader>
-                    <TableBody>
+                  <table className="aurora-table">
+                    <thead>
+                      <tr>
+                        <th>Status</th>
+                        <th>Count</th>
+                        <th>%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {data.statusDistribution.map((s, i) => (
-                        <TableRow key={i}>
-                          <TableCell className={`py-1.5 text-xs font-medium ${statusClasses[String(s.statusCode).charAt(0)] || ""}`}>{s.statusCode}</TableCell>
-                          <TableCell className="py-1.5 text-xs tabular-nums">{Number(s.count).toLocaleString()}</TableCell>
-                          <TableCell className="py-1.5 text-xs tabular-nums">{s.percentage}%</TableCell>
-                        </TableRow>
+                        <tr key={i}>
+                          <td className="font-medium" style={{ color: getStatusColor(s.statusCode) }}>{s.statusCode}</td>
+                          <td><span className="aurora-num">{Number(s.count).toLocaleString()}</span></td>
+                          <td><span className="aurora-num">{s.percentage}%</span></td>
+                        </tr>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
                 </div>
-              </CardContent></Card>
+              </div>
             )}
           </div>
         </>

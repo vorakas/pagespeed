@@ -1,29 +1,10 @@
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { DateTimePicker } from "@/components/ui/date-time-picker"
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { Search } from "lucide-react"
 import { api } from "@/services/api"
-import { escapeHtml } from "@/lib/utils"
 import type { AzureConfig } from "@/types"
 
 interface LogEntry {
@@ -42,17 +23,14 @@ interface LogSearchPanelProps {
   selectedSite: string
 }
 
-const statusClasses: Record<string, string> = {
-  "2": "text-score-good",
-  "3": "text-primary",
-  "4": "text-score-average",
-  "5": "text-score-poor",
-}
-
-function getStatusClass(code: number | undefined): string {
-  if (!code) return ""
+function getStatusColor(code: number | undefined): string | undefined {
+  if (!code) return undefined
   const prefix = String(code).charAt(0)
-  return statusClasses[prefix] || ""
+  if (prefix === "2") return "var(--lcc-green)"
+  if (prefix === "3") return "var(--lcc-blue)"
+  if (prefix === "4") return "var(--lcc-amber)"
+  if (prefix === "5") return "var(--lcc-red)"
+  return undefined
 }
 
 function formatDateTime(isoStr?: string): string {
@@ -106,86 +84,93 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-foreground">Search & Filter IIS Logs</h2>
-      <div className="grid grid-cols-[repeat(5,auto)_1fr] items-end gap-x-3 gap-y-1.5">
-        <Label>Start Date</Label>
-        <Label>End Date</Label>
-        <Label>URL Path</Label>
-        <Label>Status</Label>
-        <Label>Limit</Label>
-        <div />
-        <DateTimePicker value={startDate} onChange={setStartDate} className="w-56" />
-        <DateTimePicker value={endDate} onChange={setEndDate} className="w-56" />
-        <Input value={urlFilter} onChange={(e) => setUrlFilter(e.target.value)} placeholder="/products" className="w-40" />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="All" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="2">2xx Success</SelectItem>
-            <SelectItem value="3">3xx Redirect</SelectItem>
-            <SelectItem value="4">4xx Client Error</SelectItem>
-            <SelectItem value="5">5xx Server Error</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={limit} onValueChange={setLimit}>
-          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="50">50</SelectItem>
-            <SelectItem value="100">100</SelectItem>
-            <SelectItem value="250">250</SelectItem>
-            <SelectItem value="500">500</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button onClick={handleSearch} disabled={loading} className="justify-self-start">
-          <Search className="h-4 w-4" /> Search
-        </Button>
+      <h2 className="aurora-section-title">Search & Filter IIS Logs</h2>
+      <div className="aurora-panel p-4">
+        <div className="grid grid-cols-[repeat(5,auto)_1fr] items-end gap-x-3 gap-y-1.5">
+          <label className="aurora-label">Start Date</label>
+          <label className="aurora-label">End Date</label>
+          <label className="aurora-label">URL Path</label>
+          <label className="aurora-label">Status</label>
+          <label className="aurora-label">Limit</label>
+          <div />
+          <DateTimePicker value={startDate} onChange={setStartDate} className="w-56" />
+          <DateTimePicker value={endDate} onChange={setEndDate} className="w-56" />
+          <input
+            className="aurora-input w-40"
+            value={urlFilter}
+            onChange={(e) => setUrlFilter(e.target.value)}
+            placeholder="/products"
+          />
+          <select
+            className="aurora-select w-36"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value === "all" ? "" : e.target.value)}
+          >
+            <option value="all">All</option>
+            <option value="2">2xx Success</option>
+            <option value="3">3xx Redirect</option>
+            <option value="4">4xx Client Error</option>
+            <option value="5">5xx Server Error</option>
+          </select>
+          <select
+            className="aurora-select w-24"
+            value={limit}
+            onChange={(e) => setLimit(e.target.value)}
+          >
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+            <option value="500">500</option>
+          </select>
+          <Button onClick={handleSearch} disabled={loading} className="justify-self-start">
+            <Search className="h-4 w-4" /> Search
+          </Button>
+        </div>
       </div>
 
       {loading && <LoadingSpinner message="Searching IIS logs..." />}
-      {error && <p className="text-sm text-score-poor">{error}</p>}
+      {error && <p className="text-sm" style={{ color: "var(--lcc-red)" }}>{error}</p>}
 
       {logs !== null && !loading && (
-        <Card>
-          <div className="border-b border-border px-4 py-2">
-            <p className="text-xs text-muted-foreground">Found {count} log entries</p>
+        <div className="aurora-panel overflow-hidden">
+          <div className="aurora-panel-header">
+            <span className="aurora-text-faint text-xs font-normal">Found {count} log entries</span>
           </div>
-          <CardContent className="p-0">
-            {logs.length === 0 ? (
-              <EmptyState icon={<Search size={36} />} title="No Log Entries Found" description="Try adjusting your search criteria." />
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-xs w-[6%]">Time</TableHead>
-                      <TableHead className="text-xs w-[3%]">Method</TableHead>
-                      <TableHead className="text-xs w-[24%]">URL Path</TableHead>
-                      <TableHead className="text-xs w-[34%]">Query String</TableHead>
-                      <TableHead className="text-xs w-[5%]">Status</TableHead>
-                      <TableHead className="text-xs w-[7%]">Time (ms)</TableHead>
-                      <TableHead className="text-xs w-[8%]">Client IP</TableHead>
-                      <TableHead className="text-xs w-[8%]">Site</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {logs.map((log, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="py-1.5 text-xs truncate max-w-[80px]" title={formatDateTime(log.TimeGenerated)}>{formatDateTime(log.TimeGenerated)}</TableCell>
-                        <TableCell className="py-1.5 text-xs">{log.csMethod || "--"}</TableCell>
-                        <TableCell className="py-1.5 text-xs font-mono truncate max-w-[200px]" title={log.csUriStem}>{log.csUriStem || "--"}</TableCell>
-                        <TableCell className="py-1.5 text-xs break-all max-w-[300px]">{log.csUriQuery || "--"}</TableCell>
-                        <TableCell className={`py-1.5 text-xs font-medium ${getStatusClass(log.scStatus)}`}>{log.scStatus ?? "--"}</TableCell>
-                        <TableCell className="py-1.5 text-xs tabular-nums">{log.TimeTaken != null ? Number(log.TimeTaken).toLocaleString() : "--"}</TableCell>
-                        <TableCell className="py-1.5 text-xs truncate max-w-[80px]" title={log.cIP}>{log.cIP || "--"}</TableCell>
-                        <TableCell className="py-1.5 text-xs truncate max-w-[80px]" title={log.sSiteName}>{log.sSiteName || "--"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {logs.length === 0 ? (
+            <EmptyState icon={<Search size={36} />} title="No Log Entries Found" description="Try adjusting your search criteria." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="aurora-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Method</th>
+                    <th>URL Path</th>
+                    <th>Query String</th>
+                    <th>Status</th>
+                    <th>Time (ms)</th>
+                    <th>Client IP</th>
+                    <th>Site</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((log, i) => (
+                    <tr key={i}>
+                      <td className="aurora-text-dim truncate max-w-[120px]" title={formatDateTime(log.TimeGenerated)}>{formatDateTime(log.TimeGenerated)}</td>
+                      <td className="aurora-text-dim">{log.csMethod || "--"}</td>
+                      <td className="aurora-num truncate max-w-[260px]" title={log.csUriStem}>{log.csUriStem || "--"}</td>
+                      <td className="aurora-text-dim break-all max-w-[300px]">{log.csUriQuery || "--"}</td>
+                      <td className="font-medium" style={{ color: getStatusColor(log.scStatus) }}>{log.scStatus ?? "--"}</td>
+                      <td><span className="aurora-num">{log.TimeTaken != null ? Number(log.TimeTaken).toLocaleString() : "--"}</span></td>
+                      <td className="aurora-text-dim truncate max-w-[120px]" title={log.cIP}>{log.cIP || "--"}</td>
+                      <td className="aurora-text-dim truncate max-w-[120px]" title={log.sSiteName}>{log.sSiteName || "--"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

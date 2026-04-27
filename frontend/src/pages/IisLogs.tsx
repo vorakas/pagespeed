@@ -1,13 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
 import { Header } from "@/components/layout/Header"
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
 import { AzureConfigPanel } from "@/components/iis-logs/AzureConfigPanel"
 import { LogSearchPanel } from "@/components/iis-logs/LogSearchPanel"
 import { DashboardSummary } from "@/components/iis-logs/DashboardSummary"
@@ -77,18 +69,17 @@ export function IisLogs() {
         {/* Site Selector */}
         {connected && sites.length > 0 && (
           <div className="flex items-center gap-2">
-            <Label className="text-sm">IIS Site:</Label>
-            <Select value={selectedSite || "all"} onValueChange={handleSiteChange}>
-              <SelectTrigger className="w-60">
-                <SelectValue placeholder="All Sites" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sites</SelectItem>
-                {sites.map((site) => (
-                  <SelectItem key={site} value={site}>{site}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="aurora-label">IIS Site:</label>
+            <select
+              className="aurora-select w-60"
+              value={selectedSite || "all"}
+              onChange={(e) => handleSiteChange(e.target.value)}
+            >
+              <option value="all">All Sites</option>
+              {sites.map((site) => (
+                <option key={site} value={site}>{site}</option>
+              ))}
+            </select>
           </div>
         )}
 
