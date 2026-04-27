@@ -1858,3 +1858,135 @@
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+/* ── Global shadcn primitive overrides ────────────────────────────
+ * Scoped to .aurora-app-shell so already-converted pages (which use
+ * .aurora-panel / .aurora-input directly) are unaffected. These let
+ * pages that still render shadcn Card/Input/Select/Table inherit the
+ * Aurora Glass aesthetic without rewriting every JSX file. */
+
+/* Card → glass panel */
+.aurora-app-shell [data-slot="card"] {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  border-radius: var(--lcc-radius);
+  color: var(--lcc-text);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .aurora-app-shell [data-slot="card"] { background: var(--glass-bg-strong); }
+}
+
+.aurora-app-shell [data-slot="card-title"] {
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora-app-shell [data-slot="card-description"] {
+  color: var(--lcc-text-dim);
+  font-family: var(--aurora-font-sans);
+}
+
+/* Input → glass field */
+.aurora-app-shell [data-slot="input"] {
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora-app-shell [data-slot="input"]::placeholder {
+  color: var(--lcc-text-faint);
+}
+.aurora-app-shell [data-slot="input"]:hover {
+  border-color: var(--glass-border-strong);
+}
+.aurora-app-shell [data-slot="input"]:focus {
+  border-color: var(--lcc-violet);
+  background: var(--glass-bg-strong);
+}
+
+/* Select trigger → glass field with chevron */
+.aurora-app-shell [data-slot="select-trigger"] {
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora-app-shell [data-slot="select-trigger"]:hover {
+  border-color: var(--glass-border-strong);
+}
+.aurora-app-shell [data-slot="select-trigger"][data-popup-open],
+.aurora-app-shell [data-slot="select-trigger"]:focus-visible {
+  border-color: var(--lcc-violet);
+  background: var(--glass-bg-strong);
+}
+
+/* Select dropdown content (rendered via portal — not under aurora-app-shell,
+ * so target globally via the data-slot attribute). */
+[data-slot="select-content"] {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow: var(--glass-shadow);
+  color: var(--lcc-text);
+}
+[data-slot="select-item"] {
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+[data-slot="select-item"][data-highlighted] {
+  background: var(--glass-hi);
+  color: var(--lcc-text);
+}
+
+/* Table → aurora table styling on shadcn primitives */
+.aurora-app-shell [data-slot="table"] {
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora-app-shell [data-slot="table-head"] {
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+  border-bottom: 1px solid var(--glass-border);
+  background: transparent;
+}
+.aurora-app-shell [data-slot="table-row"] {
+  border-bottom: 1px solid var(--glass-border);
+}
+.aurora-app-shell [data-slot="table-row"]:last-child {
+  border-bottom: none;
+}
+.aurora-app-shell [data-slot="table-row"]:hover {
+  background: var(--glass-hi);
+}
+.aurora-app-shell [data-slot="table-cell"] {
+  color: var(--lcc-text);
+}
+
+/* Badge: keep shadcn variants (they map to semantic colors), but
+ * lift the border tone for the "outline" variant so it reads on
+ * glass. */
+.aurora-app-shell [data-slot="badge"][class*="border-border"],
+.aurora-app-shell .group\/badge[class*="border-border"] {
+  border-color: var(--glass-border-strong);
+  color: var(--lcc-text);
+}
+
+/* Textarea — same shape as input but multi-line. shadcn Textarea
+ * doesn't carry data-slot, so target by tag inside the app shell. */
+.aurora-app-shell textarea:not(.aurora-textarea):not([data-slot="dialog-content"] textarea) {
+  background: var(--glass-hi);
+  border-color: var(--glass-border);
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-mono);
+}
+.aurora-app-shell textarea:not(.aurora-textarea):focus {
+  border-color: var(--lcc-violet);
+  background: var(--glass-bg-strong);
+}
