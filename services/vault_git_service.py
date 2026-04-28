@@ -69,6 +69,7 @@ class VaultGitService:
         self._last_auto_refresh_ts: Optional[float] = None
         self._last_auto_refresh_ok: Optional[bool] = None
         self._last_auto_refresh_head: Optional[str] = None
+        self._last_orchestration_push_ts: Optional[int] = None
 
     @property
     def vault_root(self) -> Path:
@@ -488,6 +489,8 @@ class VaultGitService:
         self._last_auto_refresh_ts = _time.time()
         self._last_auto_refresh_ok = ok
         self._last_auto_refresh_head = head
+        if ok:
+            self._last_orchestration_push_ts = self._read_last_orchestration_ts()
         return {"ok": ok, "head": head, "timestamp": self._last_auto_refresh_ts}
 
     def auto_refresh_status(self) -> dict:
@@ -496,7 +499,44 @@ class VaultGitService:
             "lastRefreshedAt": self._last_auto_refresh_ts,
             "lastRefreshedOk": self._last_auto_refresh_ok,
             "lastRefreshedHead": self._last_auto_refresh_head,
+            "lastOrchestrationPushAt": self._last_orchestration_push_ts,
         }
+
+    def refresh_orchestration_marker(self) -> Optional[int]:
+        """Recompute and cache the last ``[orchestrate]`` commit timestamp.
+
+        Called at boot (after :meth:`pull_latest`) so the dashboard header
+        renders a value immediately, before the first auto-refresh tick.
+        Returns the cached value.
+        """
+        self._last_orchestration_push_ts = self._read_last_orchestration_ts()
+        return self._last_orchestration_push_ts
+
+    def _read_last_orchestration_ts(self) -> Optional[int]:
+        """Return the commit time (epoch seconds) of the most recent
+        ``[orchestrate]`` commit in the clone, or ``None`` if none exist.
+
+        Matches subjects only, mirroring :meth:`pending_for_orchestration`,
+        so a body mention of ``[orchestrate]`` doesn't get picked up.
+        """
+        if not self.is_git_repo:
+            return None
+        try:
+            log = self._run(
+                ["git", "log", "--format=%ct%x09%s", "-200"],
+                capture=True,
+            )
+        except VaultGitError:
+            return None
+        for line in log.splitlines():
+            ts_s, _, subject = line.partition("\t")
+            if not subject.startswith("[orchestrate]"):
+                continue
+            try:
+                return int(ts_s)
+            except ValueError:
+                return None
+        return None
 
     def pull_latest(self) -> None:
         """Hard-reset the clone to the remote tip at boot.

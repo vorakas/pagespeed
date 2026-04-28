@@ -32,6 +32,7 @@ interface TopBarProps {
 export function TopBar({ health, filter, onFilterChange, onRefresh, refreshing }: TopBarProps) {
   const [now, setNow] = useState(() => Date.now())
   const [autoRefreshedAt, setAutoRefreshedAt] = useState<number | null>(null)
+  const [lastOrchestrationAt, setLastOrchestrationAt] = useState<number | null>(null)
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 30_000)
@@ -46,8 +47,12 @@ export function TopBar({ health, filter, onFilterChange, onRefresh, refreshing }
     const tick = async () => {
       try {
         const s = await api.getVaultAutoRefreshStatus()
-        if (!cancelled && s.enabled && typeof s.lastRefreshedAt === "number") {
+        if (cancelled || !s.enabled) return
+        if (typeof s.lastRefreshedAt === "number") {
           setAutoRefreshedAt(s.lastRefreshedAt * 1000)
+        }
+        if (typeof s.lastOrchestrationPushAt === "number") {
+          setLastOrchestrationAt(s.lastOrchestrationPushAt * 1000)
         }
       } catch {
         // Endpoint may be disabled in local dev — silent fallback.
@@ -130,6 +135,15 @@ export function TopBar({ health, filter, onFilterChange, onRefresh, refreshing }
               title="Last automatic vault pull from origin"
             >
               auto-refreshed {formatPacific(autoRefreshedAt)}
+            </div>
+          )}
+          {lastOrchestrationAt && (
+            <div
+              className="lcc-sync-sub"
+              style={{ marginTop: 2, color: "var(--lcc-text-faint)" }}
+              title="When the orchestrator last pushed an [orchestrate] commit to GitHub"
+            >
+              orchestrated {formatPacific(lastOrchestrationAt)}
             </div>
           )}
         </div>

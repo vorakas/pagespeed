@@ -25,6 +25,8 @@ import type {
   DevOpsBuild,
   FailedTest,
   SkippedTest,
+  ApplitoolsConfig,
+  UnresolvedTest,
   BlazemeterConfigStatus,
   BlazemeterProject,
   BlazemeterTest,
@@ -556,6 +558,52 @@ class ApiClient {
     })
   }
 
+  // ---------- Applitools ----------
+
+  private applitoolsBody(config: ApplitoolsConfig, extra: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      api_key: config.apiKey,
+      base_url: config.baseUrl,
+      ...extra,
+    })
+  }
+
+  async testApplitoolsConnection(
+    config: ApplitoolsConfig,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.request("/api/applitools/test-connection", {
+      method: "POST",
+      body: this.applitoolsBody(config),
+    })
+  }
+
+  async getApplitoolsBatch(
+    config: ApplitoolsConfig,
+    batchId: string,
+  ): Promise<{ success: boolean; tests: UnresolvedTest[] }> {
+    return this.request("/api/applitools/batch", {
+      method: "POST",
+      body: this.applitoolsBody(config, { batch_id: batchId }),
+    })
+  }
+
+  async probeApplitoolsListEndpoints(
+    config: ApplitoolsConfig,
+  ): Promise<{
+    success: boolean
+    probes: Array<{
+      url: string
+      status: number | null
+      shape: unknown
+      snippet: string
+    }>
+  }> {
+    return this.request("/api/applitools/probe-list", {
+      method: "POST",
+      body: this.applitoolsBody(config),
+    })
+  }
+
   // ---------- BlazeMeter (Load Testing) ----------
 
   async getBlazemeterConfig(): Promise<BlazemeterConfigStatus> {
@@ -729,6 +777,7 @@ class ApiClient {
     lastRefreshedAt?: number | null
     lastRefreshedOk?: boolean | null
     lastRefreshedHead?: string | null
+    lastOrchestrationPushAt?: number | null
   }> {
     return this.request("/api/obsidian/vault/auto-refresh-status")
   }

@@ -70,7 +70,7 @@ from exceptions import (
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
-from services.obsidian_sync_service import ObsidianSyncService
+from services.obsidian_sync_service import ObsidianSyncService, SyncAlreadyRunning
 from services.obsidian_sync.vault_reader import VaultReader
 from services.snapshot_service import SnapshotService
 from services.pagespeed_client import PageSpeedClient
@@ -208,6 +208,10 @@ def create_app() -> Flask:
     # one sync cycle behind the remote).
     if vault_git is not None:
         vault_git.pull_latest()
+        # Seed the cached orchestration push timestamp from the freshly
+        # pulled clone so the dashboard header renders it immediately,
+        # rather than waiting for the first auto-refresh tick.
+        vault_git.refresh_orchestration_marker()
 
     # Seed the DB on boot so the dashboard has history even before the
     # first sync cycle runs.
@@ -299,6 +303,29 @@ def create_app() -> Flask:
             replace_existing=True,
             next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30),
         )
+
+    # Hourly Jira/Asana sync. Configurable via OBSIDIAN_SYNC_INTERVAL_MIN
+    # so we can dial it back if the upstream APIs start rate-limiting.
+    # If a sync is already running when the tick fires, skip — don't queue
+    # up a second one. The next tick will pick up where this left off.
+    OBSIDIAN_SYNC_INTERVAL_MIN = int(os.environ.get("OBSIDIAN_SYNC_INTERVAL_MIN", "60"))
+
+    def _obsidian_sync_tick() -> None:
+        try:
+            obsidian_sync_service.start_sync(source="both")
+        except SyncAlreadyRunning:
+            logging.info("Skipping scheduled sync — a sync is already running")
+        except Exception:
+            logging.exception("Scheduled obsidian sync failed to start")
+
+    scheduler.add_job(
+        _obsidian_sync_tick,
+        trigger="interval",
+        minutes=OBSIDIAN_SYNC_INTERVAL_MIN,
+        id="obsidian-hourly-sync",
+        replace_existing=True,
+        next_run_time=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
 
     # ---- Blueprints ----
     register_blueprints(
