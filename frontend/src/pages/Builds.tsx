@@ -46,6 +46,7 @@ const MAX_POLL_INTERVAL_MS = 120_000
 
 export function Builds() {
   const [config, setConfig] = useLocalConfig<DevOpsConfig>("devOpsConfig", DEFAULT_DEVOPS_CONFIG)
+  const [serverManaged, setServerManaged] = useState(false)
   const [connected, setConnected] = useState(false)
   const [autoConnecting, setAutoConnecting] = useState(false)
   const [recentBuilds, setRecentBuilds] = useState<Record<string, DevOpsBuild[]>>({})
@@ -109,9 +110,37 @@ export function Builds() {
     return map
   }, [builds, effectiveByBuildId])
 
-  // Auto-connect on page load if PAT is saved
+  // On mount: ask the server whether it has credentials configured. If yes,
+  // merge the server's non-secret defaults into local config (so any per-
+  // request body fields like `organization` are correct), mark the page as
+  // server-managed (hides the config panel), and auto-connect. The body PAT
+  // can stay empty — backend ignores it whenever DEVOPS_PAT env is set.
   useEffect(() => {
-    if (connected || !config.pat) return
+    let cancelled = false
+    api.getDevOpsServerConfig()
+      .then((srv) => {
+        if (cancelled || !srv.managed) return
+        setServerManaged(true)
+        setConfig((prev) => ({
+          ...prev,
+          organization: srv.organization || prev.organization,
+          project: srv.project || prev.project,
+          orchestratorPipelineId: srv.orchestratorPipelineId ?? prev.orchestratorPipelineId,
+          pipelineMap: Object.keys(srv.pipelineMap).length
+            ? { ...prev.pipelineMap, ...srv.pipelineMap }
+            : prev.pipelineMap,
+        }))
+        setConnected(true)
+      })
+      .catch(() => {
+        // Endpoint missing (older backend) — fall through to localStorage path.
+      })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Local-dev fallback: when the server doesn't manage credentials and the
+  // user has a PAT in localStorage, auto-connect just like before.
+  useEffect(() => {
+    if (serverManaged || connected || !config.pat) return
     setAutoConnecting(true)
     api.testDevOpsConnection(config)
       .then((result) => {
@@ -119,7 +148,7 @@ export function Builds() {
       })
       .catch(() => {})
       .finally(() => setAutoConnecting(false))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [serverManaged]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const applyBackoff = useCallback((retryAfter?: number) => {
     const floor = retryAfter ? retryAfter * 1000 : pollIntervalRef.current * 2
@@ -489,12 +518,16 @@ export function Builds() {
       />
 
       <div className="space-y-6 p-6">
-        {/* Config */}
-        <DevOpsConfigPanel
-          config={config}
-          onConfigChange={setConfig}
-          onConnected={() => setConnected(true)}
-        />
+        {/* Config — only shown when the server hasn't supplied a PAT. When
+            DEVOPS_PAT is set on the backend, every user is auto-connected
+            and the panel is hidden so nobody has to paste credentials. */}
+        {!serverManaged && (
+          <DevOpsConfigPanel
+            config={config}
+            onConfigChange={setConfig}
+            onConnected={() => setConnected(true)}
+          />
+        )}
 
         {rateLimited && (
           <div className="mx-6 mt-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-300">

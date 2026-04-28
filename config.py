@@ -129,6 +129,63 @@ AZDO_API_VERSION: str = '7.1'
 AZDO_REQUEST_TIMEOUT_SECONDS: int = 15
 """HTTP timeout for Azure DevOps REST API requests."""
 
+DEVOPS_PAT: str | None = os.getenv('DEVOPS_PAT')
+"""Azure DevOps Personal Access Token (server-side env var; never sent to the client).
+
+When set, the Automation Builds page skips its config panel and uses this
+PAT for all users. When unset, falls back to per-user localStorage so
+local dev still works without setting an env var."""
+
+DEVOPS_ORGANIZATION: str = os.getenv('DEVOPS_ORGANIZATION', 'LampsPlus')
+"""Azure DevOps organization slug. Defaults to ``LampsPlus``."""
+
+DEVOPS_PROJECT: str = os.getenv('DEVOPS_PROJECT', 'TestAutomation')
+"""Azure DevOps project name. Defaults to ``TestAutomation``."""
+
+
+def _parse_int_env(name: str) -> int | None:
+    raw = os.getenv(name)
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        logging.warning('%s must be an integer; ignoring %r', name, raw)
+        return None
+
+
+DEVOPS_ORCHESTRATOR_PIPELINE_ID: int | None = _parse_int_env('DEVOPS_ORCHESTRATOR_PIPELINE_ID')
+"""Optional pipeline definition id for the Run-All orchestrator. Pre-fills
+the Builds page so users don't need to set it in localStorage."""
+
+
+def _parse_pipeline_map(raw: str | None) -> dict[str, int]:
+    """Parse ``DEVOPS_PIPELINE_MAP`` — JSON of ``{role_key: definition_id}``.
+
+    Empty/missing/invalid yields an empty map, in which case the frontend
+    falls back to its hardcoded defaults."""
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        logging.warning('DEVOPS_PIPELINE_MAP is not valid JSON; ignoring')
+        return {}
+    if not isinstance(data, dict):
+        logging.warning('DEVOPS_PIPELINE_MAP must be a JSON object; got %s', type(data))
+        return {}
+    out: dict[str, int] = {}
+    for k, v in data.items():
+        try:
+            out[str(k)] = int(v)
+        except (TypeError, ValueError):
+            logging.warning('DEVOPS_PIPELINE_MAP[%s] must be an integer; skipping', k)
+    return out
+
+
+DEVOPS_PIPELINE_MAP: dict[str, int] = _parse_pipeline_map(os.getenv('DEVOPS_PIPELINE_MAP'))
+"""Map of role key (e.g. ``Windows_Functional``) → pipeline definition id."""
+
 # ---------------------------------------------------------------------------
 # BlazeMeter defaults
 # ---------------------------------------------------------------------------
