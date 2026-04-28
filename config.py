@@ -5,6 +5,8 @@ Other modules import from here instead of calling os.getenv() directly,
 ensuring one source of truth for defaults and environment overrides.
 """
 
+import json
+import logging
 import os
 
 
@@ -151,3 +153,109 @@ BLAZEMETER_TIMEOUT_SECONDS: int = 30
 
 BLAZEMETER_POLL_SECONDS: int = 20
 """Interval at which the queue manager polls the active BlazeMeter run."""
+
+# ---------------------------------------------------------------------------
+# Obsidian Bridge (Jira + Asana → vault) defaults
+# ---------------------------------------------------------------------------
+
+OBSIDIAN_VAULT_ROOT: str = os.getenv(
+    'OBSIDIAN_VAULT_ROOT',
+    '/data/vault',
+)
+"""Absolute path to the Obsidian vault root on disk.
+
+Defaults to ``/data/vault`` which matches the Railway volume mount. Locally
+you can point this at the Desktop LPAdobe copy for dev."""
+
+JIRA_BASE_URL: str = os.getenv('JIRA_BASE_URL', 'https://lampstrack.lampsplus.com')
+"""Jira Data Center base URL used for the Obsidian sync."""
+
+JIRA_PAT: str | None = os.getenv('JIRA_PAT')
+"""Jira personal access token. None disables the Jira side of the sync."""
+
+ASANA_PAT: str | None = os.getenv('ASANA_PAT')
+"""Asana personal access token. None disables the Asana side of the sync."""
+
+VAULT_REPO_URL: str | None = os.getenv('VAULT_REPO_URL')
+"""HTTPS clone URL of the GitHub-hosted vault (``lpadobe-vault``).
+
+When set alongside ``VAULT_BOT_TOKEN``, the Obsidian bridge commits and
+pushes every completed sync to this repo. When unset, the bridge falls
+back to the Docker-image seed and leaves the vault volume-local."""
+
+VAULT_BOT_TOKEN: str | None = os.getenv('VAULT_BOT_TOKEN')
+"""Fine-grained GitHub PAT with contents:write on the vault repo.
+
+Embedded in the remote URL after clone so subsequent push/pull run
+without per-call credential plumbing."""
+
+VAULT_COMMITTER_NAME: str = os.getenv('VAULT_COMMITTER_NAME', 'pharos-sync-bot')
+"""Display name on commits created by the Railway sync hook."""
+
+VAULT_COMMITTER_EMAIL: str = os.getenv('VAULT_COMMITTER_EMAIL', 'sync@pharos.local')
+"""Email on commits created by the Railway sync hook."""
+
+GITHUB_WEBHOOK_SECRET: str | None = os.getenv('GITHUB_WEBHOOK_SECRET')
+"""Shared secret for verifying GitHub webhook HMAC signatures.
+
+When set, ``POST /api/github-webhook/lpadobe-vault`` verifies incoming
+``X-Hub-Signature-256`` headers and, on a push that touches ``wiki/``,
+runs a vault pull + dashboard refresh. When unset the endpoint 503s so
+a misconfigured deploy fails loudly rather than silently skipping auth."""
+
+
+def _parse_project_map(raw: str | None) -> dict[str, str]:
+    """Parse ``ASANA_PROJECT_MAP`` which is JSON of ``{name: gid}``.
+
+    Returns an empty dict if unset or unparseable — the sync service treats
+    an empty map as "Asana not configured" rather than erroring."""
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        logging.warning('ASANA_PROJECT_MAP is not valid JSON; Asana sync disabled')
+        return {}
+    if not isinstance(data, dict):
+        logging.warning('ASANA_PROJECT_MAP must be a JSON object; got %s', type(data))
+        return {}
+    return {str(k): str(v) for k, v in data.items()}
+
+
+ASANA_PROJECT_MAP: dict[str, str] = _parse_project_map(os.getenv('ASANA_PROJECT_MAP'))
+"""Map of Asana project name → GID. Set as JSON in ``ASANA_PROJECT_MAP``."""
+
+JIRA_DEFAULT_PROJECTS: list[str] = [
+    p.strip() for p in os.getenv(
+        'JIRA_DEFAULT_PROJECTS',
+        'ACE2E,ACEDS,ACAB,ACAQA,ACCMS,ACM',
+    ).split(',') if p.strip()
+]
+"""Comma-separated Jira project keys to sync when none are specified."""
+
+
+def _parse_jql_queries(raw: str | None) -> dict[str, str]:
+    """Parse ``JIRA_JQL_QUERIES`` — JSON of ``{output_folder: jql_string}``.
+
+    Each entry runs a custom JQL pull alongside the regular project sync,
+    writing results into ``<vault>/raw/<output_folder>/``. Returns an empty
+    dict if unset or unparseable; the sync service treats that as "no
+    custom JQL feeds configured" rather than erroring."""
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        logging.warning('JIRA_JQL_QUERIES is not valid JSON; custom JQL feeds disabled')
+        return {}
+    if not isinstance(data, dict):
+        logging.warning('JIRA_JQL_QUERIES must be a JSON object; got %s', type(data))
+        return {}
+    return {str(k): str(v) for k, v in data.items() if k and v}
+
+
+JIRA_JQL_QUERIES: dict[str, str] = _parse_jql_queries(os.getenv('JIRA_JQL_QUERIES'))
+"""Map of output-folder name → JQL string. Set as JSON in ``JIRA_JQL_QUERIES``.
+
+Example: ``{"WPM": "key in (WPM-4610, childIssuesOf(WPM-4610)) AND ..."}``
+writes to ``<vault>/raw/WPM/``."""

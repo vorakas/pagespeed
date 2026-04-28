@@ -4,24 +4,33 @@ Each blueprint is created via a factory function that receives its
 dependencies (services, repositories) through explicit arguments.
 """
 
+from typing import Callable, Sequence
+
 from flask import Flask
 
 from data_access import BlazemeterPresetRepository, BlazemeterRunRepository, TestResultRepository
 from routes.ai_api import create_ai_blueprint
 from routes.azure_api import create_azure_blueprint
 from routes.blazemeter_api import create_blazemeter_blueprint
+from routes.dashboard_api import create_dashboard_blueprint
 from routes.devops_api import create_devops_blueprint
+from routes.github_webhook_api import create_github_webhook_blueprint
 from routes.metrics_api import create_metrics_blueprint
 from routes.newrelic_api import create_newrelic_blueprint
+from routes.obsidian_api import create_obsidian_blueprint
 from routes.pages import create_pages_blueprint
 from routes.sites_api import create_sites_blueprint
 from routes.testing_api import create_testing_blueprint
 from routes.triggers_api import create_triggers_blueprint
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
+from services.migration_dashboard_service import MigrationDashboardService
+from services.obsidian_sync_service import ObsidianSyncService
 from services.site_service import SiteService
+from services.snapshot_service import SnapshotService
 from services.testing_service import TestingService
 from services.trigger_service import TriggerService
+from services.vault_git_service import VaultGitService
 
 
 def register_blueprints(
@@ -34,6 +43,12 @@ def register_blueprints(
     blazemeter_run_repo: BlazemeterRunRepository,
     blazemeter_client: "BlazemeterClient | None" = None,
     blazemeter_queue: "BlazemeterQueueService | None" = None,
+    obsidian_sync_service: "ObsidianSyncService | None" = None,
+    vault_git_service: "VaultGitService | None" = None,
+    migration_dashboard_service: "MigrationDashboardService | None" = None,
+    snapshot_service: "SnapshotService | None" = None,
+    on_vault_refreshed: "Sequence[Callable[[], None]] | None" = None,
+    github_webhook_secret: "str | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -61,3 +76,23 @@ def register_blueprints(
             blazemeter_run_repo,
         ),
     )
+    if obsidian_sync_service is not None:
+        app.register_blueprint(
+            create_obsidian_blueprint(
+                obsidian_sync_service,
+                vault_git_service,
+                on_vault_refreshed=on_vault_refreshed,
+            )
+        )
+    if migration_dashboard_service is not None:
+        app.register_blueprint(
+            create_dashboard_blueprint(migration_dashboard_service, snapshot_service),
+        )
+    if vault_git_service is not None:
+        app.register_blueprint(
+            create_github_webhook_blueprint(
+                vault_git_service,
+                webhook_secret=github_webhook_secret,
+                on_vault_refreshed=on_vault_refreshed,
+            )
+        )

@@ -1,29 +1,9 @@
 import { useState, useCallback } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { Play, Save, Trash2, Download, Search } from "lucide-react"
 import { api } from "@/services/api"
-import { escapeHtml } from "@/lib/utils"
 import type { AzureConfig } from "@/types"
 
 const KQL_PRESETS: Record<string, { label: string; query: string }> = {
@@ -85,11 +65,14 @@ interface KqlResult {
   raw: unknown
 }
 
-const statusClasses: Record<string, string> = {
-  "2": "text-score-good",
-  "3": "text-primary",
-  "4": "text-score-average",
-  "5": "text-score-poor",
+function getStatusColor(code: unknown): string | undefined {
+  if (code == null) return undefined
+  const prefix = String(code).charAt(0)
+  if (prefix === "2") return "var(--lcc-green)"
+  if (prefix === "3") return "var(--lcc-blue)"
+  if (prefix === "4") return "var(--lcc-amber)"
+  if (prefix === "5") return "var(--lcc-red)"
+  return undefined
 }
 
 interface KqlQueryPanelProps {
@@ -242,73 +225,88 @@ export function KqlQueryPanel({ config }: KqlQueryPanelProps) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-foreground">KQL Query Mode</h2>
+      <h2 className="aurora-section-title">KQL Query Mode</h2>
 
       {/* Profile bar */}
       <div className="flex flex-wrap items-center gap-2">
-        <Label className="text-xs">Profile:</Label>
-        <Select value={currentProfileName} onValueChange={handleProfileChange}>
-          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {profilesData.profiles.map((p) => (
-              <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <label className="aurora-label">Profile:</label>
+        <select
+          className="aurora-select w-40"
+          value={currentProfileName}
+          onChange={(e) => handleProfileChange(e.target.value)}
+        >
+          {profilesData.profiles.map((p) => (
+            <option key={p.name} value={p.name}>{p.name}</option>
+          ))}
+        </select>
         <Button variant="outline" size="xs" onClick={handleCreateProfile}>+ New</Button>
         <Button variant="outline" size="xs" onClick={handleDeleteProfile} disabled={profilesData.profiles.length <= 1}>Delete</Button>
       </div>
 
       {/* Query editor */}
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex-1 min-w-[200px]">
-              <Select value={selectedPreset} onValueChange={handlePresetChange}>
-                <SelectTrigger><SelectValue placeholder="Load a query..." /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(KQL_PRESETS).map(([key, preset]) => (
-                    <SelectItem key={key} value={`preset:${key}`}>{preset.label}</SelectItem>
+      <div className="aurora-panel space-y-3 p-4">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[200px]">
+            <select
+              className="aurora-select w-full"
+              value={selectedPreset}
+              onChange={(e) => handlePresetChange(e.target.value)}
+            >
+              <option value="">Load a query...</option>
+              {Object.entries(KQL_PRESETS).map(([key, preset]) => (
+                <option key={key} value={`preset:${key}`}>{preset.label}</option>
+              ))}
+              {currentProfile.queries.length > 0 && (
+                <>
+                  <option value="" disabled>-- Saved Queries --</option>
+                  {currentProfile.queries.map((q, i) => (
+                    <option key={`saved:${i}`} value={`saved:${i}`}>{q.name}</option>
                   ))}
-                  {currentProfile.queries.length > 0 && (
-                    <>
-                      <SelectItem value="__sep__" disabled>-- Saved Queries --</SelectItem>
-                      {currentProfile.queries.map((q, i) => (
-                        <SelectItem key={`saved:${i}`} value={`saved:${i}`}>{q.name}</SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <Input value={queryName} onChange={(e) => setQueryName(e.target.value)} placeholder="Query name..." className="w-40" />
-            <Button variant="outline" size="sm" onClick={handleSaveQuery} disabled={!queryName.trim() || !query.trim()}>
-              <Save className="h-3.5 w-3.5" /> Save
-            </Button>
-            {selectedPreset.startsWith("saved:") && (
-              <Button variant="destructive" size="sm" onClick={handleDeleteQuery}>
-                <Trash2 className="h-3.5 w-3.5" /> Delete
-              </Button>
-            )}
-            <Button onClick={handleRun} disabled={running || !query.trim()}>
-              <Play className="h-4 w-4" /> {running ? "Running..." : "Run Query"}
-            </Button>
+                </>
+              )}
+            </select>
           </div>
-          <Textarea value={query} onChange={(e) => setQuery(e.target.value)} rows={6} placeholder={"W3CIISLog\n| where TimeGenerated > ago(1h)\n| take 100"} className="font-mono text-xs" />
-        </CardContent>
-      </Card>
+          <input
+            className="aurora-input w-40"
+            value={queryName}
+            onChange={(e) => setQueryName(e.target.value)}
+            placeholder="Query name..."
+          />
+          <Button variant="outline" size="sm" onClick={handleSaveQuery} disabled={!queryName.trim() || !query.trim()}>
+            <Save className="h-3.5 w-3.5" /> Save
+          </Button>
+          {selectedPreset.startsWith("saved:") && (
+            <Button variant="destructive" size="sm" onClick={handleDeleteQuery}>
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </Button>
+          )}
+          <Button onClick={handleRun} disabled={running || !query.trim()}>
+            <Play className="h-4 w-4" /> {running ? "Running..." : "Run Query"}
+          </Button>
+        </div>
+        <textarea
+          className="aurora-textarea"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          rows={6}
+          placeholder={"W3CIISLog\n| where TimeGenerated > ago(1h)\n| take 100"}
+        />
+      </div>
 
       {/* Loading */}
       {running && <LoadingSpinner message="Executing KQL query..." />}
 
       {/* Error */}
-      {error && <p className="text-sm text-score-poor">{error}</p>}
+      {error && <p className="text-sm" style={{ color: "var(--lcc-red)" }}>{error}</p>}
 
       {/* Results */}
       {result && !running && (
-        <Card>
-          <div className="flex items-center justify-between border-b border-border px-4 py-2">
-            <span className="text-xs text-muted-foreground">{result.count} rows</span>
+        <div className="aurora-panel overflow-hidden">
+          <div
+            className="flex items-center justify-between px-4 py-2"
+            style={{ borderBottom: "1px solid var(--glass-border)" }}
+          >
+            <span className="aurora-text-faint text-xs">{result.count} rows</span>
             <div className="flex items-center gap-2">
               {result.rows.length > 0 && (
                 <Button variant="outline" size="xs" onClick={handleDownloadCsv}>
@@ -321,45 +319,47 @@ export function KqlQueryPanel({ config }: KqlQueryPanelProps) {
               </div>
             </div>
           </div>
-          <CardContent className="p-0">
-            {viewMode === "table" ? (
-              result.rows.length === 0 ? (
-                <EmptyState icon={<Search size={36} />} title="No Results" description="The query returned no data." />
-              ) : (
-                <div className="overflow-x-auto max-h-[500px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        {result.columns.map((col) => (
-                          <TableHead key={col} className="text-xs whitespace-nowrap">{col}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {result.rows.map((row, i) => (
-                        <TableRow key={i}>
-                          {result.columns.map((col) => {
-                            const val = row[col]
-                            const statusClass = col === "scStatus" && val ? (statusClasses[String(val).charAt(0)] || "") : ""
-                            return (
-                              <TableCell key={col} className={`py-1.5 text-xs ${statusClass}`}>
-                                {formatCellValue(col, val)}
-                              </TableCell>
-                            )
-                          })}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )
+          {viewMode === "table" ? (
+            result.rows.length === 0 ? (
+              <EmptyState icon={<Search size={36} />} title="No Results" description="The query returned no data." />
             ) : (
-              <pre className="max-h-[500px] overflow-auto p-4 text-xs font-mono">
-                {JSON.stringify(result.raw, null, 2)}
-              </pre>
-            )}
-          </CardContent>
-        </Card>
+              <div className="overflow-x-auto max-h-[500px]">
+                <table className="aurora-table">
+                  <thead>
+                    <tr>
+                      {result.columns.map((col) => (
+                        <th key={col}>{col}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.rows.map((row, i) => (
+                      <tr key={i}>
+                        {result.columns.map((col) => {
+                          const val = row[col]
+                          const statusColor = col === "scStatus" ? getStatusColor(val) : undefined
+                          return (
+                            <td key={col} style={statusColor ? { color: statusColor, fontWeight: 500 } : undefined}>
+                              {col === "scStatus" || typeof val === "number" ? (
+                                <span className="aurora-num">{formatCellValue(col, val)}</span>
+                              ) : (
+                                formatCellValue(col, val)
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : (
+            <pre className="aurora-pre max-h-[500px] m-0 rounded-none border-0">
+              {JSON.stringify(result.raw, null, 2)}
+            </pre>
+          )}
+        </div>
       )}
     </div>
   )

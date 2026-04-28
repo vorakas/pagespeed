@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card"
 import { Zap, TrendingUp, XCircle, Target } from "lucide-react"
 import type { ReactNode } from "react"
 
@@ -20,7 +19,7 @@ function StatCard({
   direction: "lower-better" | "higher-better"
 }) {
   let changeText = ""
-  let changeClass = "text-muted-foreground"
+  let changeColor: string = "var(--lcc-text-faint)"
 
   if (change?.current !== null && change?.previous !== null && change.previous !== 0) {
     const pctChange = ((change.current! - change.previous!) / Math.abs(change.previous!)) * 100
@@ -29,22 +28,20 @@ function StatCard({
     const isPositive =
       direction === "lower-better" ? pctChange <= 0 : pctChange >= 0
     changeText = `${arrow} ${absChange}% from previous period`
-    changeClass = isPositive ? "text-score-good" : "text-score-poor"
+    changeColor = isPositive ? "var(--lcc-green)" : "var(--lcc-red)"
   }
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="shrink-0 text-muted-foreground">{icon}</div>
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-lg font-semibold tabular-nums text-foreground">{value}</p>
-            {changeText && <p className={`text-xs ${changeClass}`}>{changeText}</p>}
-          </div>
+    <div className="aurora-panel p-4">
+      <div className="flex items-start gap-3">
+        <div className="aurora-text-faint shrink-0">{icon}</div>
+        <div className="min-w-0">
+          <p className="aurora-stat-label">{label}</p>
+          <p className="aurora-stat-value">{value}</p>
+          {changeText && <p className="text-xs" style={{ color: changeColor }}>{changeText}</p>}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 

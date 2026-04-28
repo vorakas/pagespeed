@@ -25,6 +25,8 @@ import type {
   DevOpsBuild,
   FailedTest,
   SkippedTest,
+  ApplitoolsConfig,
+  UnresolvedTest,
   BlazemeterConfigStatus,
   BlazemeterProject,
   BlazemeterTest,
@@ -34,6 +36,27 @@ import type {
   BlazemeterPresetInput,
   BlazemeterMasterReport,
   BlazemeterRunsResponse,
+  ObsidianCapabilities,
+  ObsidianPendingOrchestration,
+  ObsidianSyncJob,
+  ObsidianSyncJobSummary,
+  ObsidianSyncRequest,
+  ObsidianVaultNode,
+  ObsidianVaultPage,
+  MigrationHealthSnapshot,
+  MigrationKpis,
+  MigrationSource,
+  MigrationWorkstream,
+  MigrationBlocker,
+  MigrationTaskStatusRow,
+  MigrationTrendPoint,
+  MigrationTeam,
+  MigrationWorkstreamDetail,
+  MigrationSnapshot,
+  MigrationSnapshotDiff,
+  MigrationSnapshotDiffResponse,
+  MigrationHistoryEntry,
+  RawTaskRecord,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -535,6 +558,52 @@ class ApiClient {
     })
   }
 
+  // ---------- Applitools ----------
+
+  private applitoolsBody(config: ApplitoolsConfig, extra: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      api_key: config.apiKey,
+      base_url: config.baseUrl,
+      ...extra,
+    })
+  }
+
+  async testApplitoolsConnection(
+    config: ApplitoolsConfig,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.request("/api/applitools/test-connection", {
+      method: "POST",
+      body: this.applitoolsBody(config),
+    })
+  }
+
+  async getApplitoolsBatch(
+    config: ApplitoolsConfig,
+    batchId: string,
+  ): Promise<{ success: boolean; tests: UnresolvedTest[] }> {
+    return this.request("/api/applitools/batch", {
+      method: "POST",
+      body: this.applitoolsBody(config, { batch_id: batchId }),
+    })
+  }
+
+  async probeApplitoolsListEndpoints(
+    config: ApplitoolsConfig,
+  ): Promise<{
+    success: boolean
+    probes: Array<{
+      url: string
+      status: number | null
+      shape: unknown
+      snippet: string
+    }>
+  }> {
+    return this.request("/api/applitools/probe-list", {
+      method: "POST",
+      body: this.applitoolsBody(config),
+    })
+  }
+
   // ---------- BlazeMeter (Load Testing) ----------
 
   async getBlazemeterConfig(): Promise<BlazemeterConfigStatus> {
@@ -633,6 +702,132 @@ class ApiClient {
 
   async listBlazemeterRuns(limit = 50, offset = 0): Promise<BlazemeterRunsResponse> {
     return this.request(`/api/blazemeter/runs?limit=${limit}&offset=${offset}`)
+  }
+
+  // ---------- Obsidian Bridge ----------
+
+  async getObsidianCapabilities(): Promise<ObsidianCapabilities> {
+    return this.request("/api/obsidian/capabilities")
+  }
+
+  async getObsidianPendingOrchestration(): Promise<ObsidianPendingOrchestration> {
+    return this.request("/api/obsidian/pending-orchestration")
+  }
+
+  async startObsidianSync(
+    body: ObsidianSyncRequest = {},
+  ): Promise<{ success: boolean; job: ObsidianSyncJob }> {
+    return this.request("/api/obsidian/sync", {
+      method: "POST",
+      body: JSON.stringify(body),
+    })
+  }
+
+  async getObsidianActiveSync(): Promise<{ active: ObsidianSyncJob | null }> {
+    return this.request("/api/obsidian/sync/active")
+  }
+
+  async getObsidianSyncHistory(limit = 20): Promise<{ jobs: ObsidianSyncJobSummary[] }> {
+    return this.request(`/api/obsidian/sync/history?limit=${limit}`)
+  }
+
+  async getObsidianSyncJob(jobId: string): Promise<{ job: ObsidianSyncJob }> {
+    return this.request(`/api/obsidian/sync/${jobId}`)
+  }
+
+  async cancelObsidianSync(
+    jobId: string,
+  ): Promise<{ success: boolean; job: ObsidianSyncJob }> {
+    return this.request(`/api/obsidian/sync/${jobId}/cancel`, {
+      method: "POST",
+    })
+  }
+
+  async getObsidianVaultTree(subdir = "", depth = 6): Promise<{ tree: ObsidianVaultNode }> {
+    const params = new URLSearchParams()
+    if (subdir) params.set("subdir", subdir)
+    params.set("depth", String(depth))
+    return this.request(`/api/obsidian/vault/tree?${params.toString()}`)
+  }
+
+  async getObsidianVaultPage(path: string): Promise<{ page: ObsidianVaultPage }> {
+    return this.request(`/api/obsidian/vault/page?path=${encodeURIComponent(path)}`)
+  }
+
+  // ---------- Migration dashboard ----------
+
+  async getMigrationHealth(): Promise<MigrationHealthSnapshot> {
+    return this.request("/api/dashboard/health")
+  }
+
+  async getMigrationKpis(): Promise<MigrationKpis> {
+    return this.request("/api/dashboard/kpis")
+  }
+
+  async getMigrationSources(): Promise<MigrationSource[]> {
+    return this.request("/api/dashboard/sources")
+  }
+
+  async getMigrationWorkstreams(): Promise<MigrationWorkstream[]> {
+    return this.request("/api/dashboard/workstreams")
+  }
+
+  async getVaultAutoRefreshStatus(): Promise<{
+    enabled: boolean
+    lastRefreshedAt?: number | null
+    lastRefreshedOk?: boolean | null
+    lastRefreshedHead?: string | null
+    lastOrchestrationPushAt?: number | null
+  }> {
+    return this.request("/api/obsidian/vault/auto-refresh-status")
+  }
+
+  async getMigrationBlockers(): Promise<MigrationBlocker[]> {
+    return this.request("/api/dashboard/blockers")
+  }
+
+  async getMigrationProductionFailures(): Promise<RawTaskRecord[]> {
+    return this.request("/api/dashboard/production-failures")
+  }
+
+  async getMigrationNewBugs(windowDays = 7): Promise<RawTaskRecord[]> {
+    return this.request(`/api/dashboard/new-bugs?windowDays=${windowDays}`)
+  }
+
+  async getMigrationTaskStatus(): Promise<MigrationTaskStatusRow[]> {
+    return this.request("/api/dashboard/task-status")
+  }
+
+  async getMigrationTrend(): Promise<MigrationTrendPoint[]> {
+    return this.request("/api/dashboard/trend")
+  }
+
+  async getMigrationTeams(): Promise<MigrationTeam[]> {
+    return this.request("/api/dashboard/teams")
+  }
+
+  async getMigrationWorkstreamDetail(id: string): Promise<MigrationWorkstreamDetail> {
+    return this.request(`/api/dashboard/workstream/${encodeURIComponent(id)}`)
+  }
+
+  async getMigrationSnapshots(): Promise<MigrationSnapshot[]> {
+    return this.request("/api/dashboard/snapshots")
+  }
+
+  async getMigrationSnapshotLatest(): Promise<MigrationSnapshot> {
+    return this.request("/api/dashboard/snapshots/latest")
+  }
+
+  async getMigrationSnapshotDiff(): Promise<MigrationSnapshotDiffResponse> {
+    return this.request("/api/dashboard/snapshots/diff")
+  }
+
+  async getMigrationSnapshotHistory(): Promise<MigrationHistoryEntry[]> {
+    return this.request("/api/dashboard/snapshots/history")
+  }
+
+  async reingestMigrationSnapshots(): Promise<{ ingested: string[] }> {
+    return this.request("/api/dashboard/snapshots/reingest", { method: "POST" })
   }
 }
 

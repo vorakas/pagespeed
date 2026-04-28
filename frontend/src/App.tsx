@@ -13,6 +13,10 @@ import { IisLogs } from "@/pages/IisLogs"
 import { AiAnalysis } from "@/pages/AiAnalysis"
 import { Builds } from "@/pages/Builds"
 import { LoadTesting } from "@/pages/LoadTesting"
+import { Obsidian } from "@/pages/Obsidian"
+import { LaunchDashboard } from "@/pages/LaunchDashboard"
+import { StatusHistory } from "@/pages/StatusHistory"
+import { WorkstreamDetail } from "@/pages/WorkstreamDetail"
 
 export default function App() {
   return (
@@ -31,6 +35,10 @@ export default function App() {
                 <Route path="ai-analysis" element={<AiAnalysis />} />
               <Route path="builds" element={<Builds />} />
               <Route path="load-testing" element={<LoadTesting />} />
+              <Route path="obsidian" element={<Obsidian />} />
+              <Route path="dashboard" element={<LaunchDashboard />} />
+              <Route path="dashboard/history" element={<StatusHistory />} />
+              <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
               </Route>
             </Routes>
           </SitesProvider>

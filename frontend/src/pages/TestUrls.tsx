@@ -9,7 +9,6 @@ import { TestProgressPanel, type TestProgressEntry } from "@/components/test-url
 import { TestDetailDialog } from "@/components/test-urls/TestDetailDialog"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
-import { Card, CardContent } from "@/components/ui/card"
 import { useSites } from "@/hooks/use-sites"
 import { api } from "@/services/api"
 import type { Strategy, LatestResult, TestDetail, SiteWithUrls } from "@/types"
@@ -291,28 +290,30 @@ export function TestUrls() {
 
         {/* Site Tabs + Results */}
         {sites.length === 0 ? (
-          <Card>
-            <CardContent className="p-0">
-              <EmptyState
-                icon={<Monitor size={40} />}
-                title="No Sites Configured"
-                description="Add your first site and URLs to start monitoring performance."
-                actionText="Go to Setup"
-                actionHref="/setup"
-              />
-            </CardContent>
-          </Card>
+          <div className="aurora-panel overflow-hidden">
+            <EmptyState
+              icon={<Monitor size={40} />}
+              title="No Sites Configured"
+              description="Add your first site and URLs to start monitoring performance."
+              actionText="Go to Setup"
+              actionHref="/setup"
+            />
+          </div>
         ) : (
           <Tabs
             value={activeSiteId?.toString()}
             onValueChange={handleSiteChange}
             defaultValue={sites[0]?.id.toString()}
           >
-            <TabsList>
+            <TabsList className="aurora-tabs-list">
               {sites.map((site) => (
-                <TabsTrigger key={site.id} value={site.id.toString()}>
+                <TabsTrigger
+                  key={site.id}
+                  value={site.id.toString()}
+                  className="aurora-tabs-trigger"
+                >
                   {site.name}
-                  <span className="ml-1 text-xs text-muted-foreground">
+                  <span className="aurora-text-faint ml-1 text-xs">
                     ({site.urls.length})
                   </span>
                 </TabsTrigger>

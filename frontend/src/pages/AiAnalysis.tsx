@@ -1,18 +1,7 @@
 import { useState, useRef, useCallback } from "react"
 import { Header } from "@/components/layout/Header"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select"
 import { AiConfigPanel } from "@/components/ai-analysis/AiConfigPanel"
 import { AnalysisPanel, type ChatMessage } from "@/components/ai-analysis/AnalysisPanel"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
@@ -334,14 +323,19 @@ export function AiAnalysis() {
       />
       <div className="space-y-6 p-6">
         {/* Disclaimer */}
-        <Card className="border-score-average/30 bg-score-average/5">
-          <CardContent className="p-4 text-sm text-foreground">
-            <strong>Experimental Feature:</strong> AI-generated analysis is provided for informational
-            purposes only. Results may contain inaccuracies and should always be verified.
-            <br />
-            <strong>Note:</strong> Currently only available for the Lamps Plus site.
-          </CardContent>
-        </Card>
+        <div
+          className="aurora-panel p-4 text-sm"
+          style={{
+            borderColor: "color-mix(in srgb, var(--lcc-amber) 30%, transparent)",
+            background: "color-mix(in srgb, var(--lcc-amber-bg) 60%, var(--glass-bg))",
+            color: "var(--lcc-text)",
+          }}
+        >
+          <strong>Experimental Feature:</strong> AI-generated analysis is provided for informational
+          purposes only. Results may contain inaccuracies and should always be verified.
+          <br />
+          <strong>Note:</strong> Currently only available for the Lamps Plus site.
+        </div>
 
         {/* AI Config */}
         <AiConfigPanel config={aiConfig} onConfigChange={setAiConfig} />
@@ -349,72 +343,85 @@ export function AiAnalysis() {
         {/* Data Source Status */}
         {dataSources && (
           <div className="flex gap-2">
-            <span className={`rounded-full px-3 py-1 text-xs font-medium ${dataSources.newrelic ? "bg-score-good/20 text-score-good" : "bg-score-average/20 text-score-average"}`}>
+            <span
+              className="rounded-full px-3 py-1 text-xs font-medium"
+              style={{
+                background: dataSources.newrelic ? "var(--lcc-green-bg)" : "var(--lcc-amber-bg)",
+                color: dataSources.newrelic ? "var(--lcc-green)" : "var(--lcc-amber)",
+                border: `1px solid color-mix(in srgb, ${dataSources.newrelic ? "var(--lcc-green)" : "var(--lcc-amber)"} 35%, transparent)`,
+              }}
+            >
               New Relic: {dataSources.newrelic ? "Connected" : "No data"}
             </span>
-            <span className={`rounded-full px-3 py-1 text-xs font-medium ${dataSources.iis_logs ? "bg-score-good/20 text-score-good" : "bg-score-average/20 text-score-average"}`}>
+            <span
+              className="rounded-full px-3 py-1 text-xs font-medium"
+              style={{
+                background: dataSources.iis_logs ? "var(--lcc-green-bg)" : "var(--lcc-amber-bg)",
+                color: dataSources.iis_logs ? "var(--lcc-green)" : "var(--lcc-amber)",
+                border: `1px solid color-mix(in srgb, ${dataSources.iis_logs ? "var(--lcc-green)" : "var(--lcc-amber)"} 35%, transparent)`,
+              }}
+            >
               IIS Logs: {dataSources.iis_logs ? "Connected" : "No data"}
             </span>
           </div>
         )}
 
         {/* Analysis Inputs */}
-        <Card>
-          <CardContent className="p-4 space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">Performance Analysis</h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="aiUrlPath">URL Path (for IIS Logs)</Label>
-                <Input
-                  id="aiUrlPath"
-                  value={urlPath}
-                  onChange={(e) => setUrlPath(e.target.value)}
-                  placeholder="/products/ceiling-fans"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="aiPageUrl">Full Page URL (for CWV)</Label>
-                <Input
-                  id="aiPageUrl"
-                  value={pageUrl}
-                  onChange={(e) => setPageUrl(e.target.value)}
-                  placeholder="https://www.lampsplus.com/products/ceiling-fans/"
-                />
-              </div>
+        <div className="aurora-panel space-y-4 p-4">
+          <h3 className="aurora-text text-sm font-semibold">Performance Analysis</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label htmlFor="aiUrlPath" className="aurora-label block">URL Path (for IIS Logs)</label>
+              <input
+                id="aiUrlPath"
+                className="aurora-input w-full"
+                value={urlPath}
+                onChange={(e) => setUrlPath(e.target.value)}
+                placeholder="/products/ceiling-fans"
+              />
             </div>
-            <div className="flex flex-wrap items-end gap-4">
-              <div className="space-y-1.5 w-48">
-                <Label>Time Range</Label>
-                <Select value={timeRange} onValueChange={setTimeRange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIME_RANGES.map((tr) => (
-                      <SelectItem key={tr.value} value={tr.value}>
-                        {tr.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                  <Checkbox checked={useClaude} onCheckedChange={(v) => setUseClaude(!!v)} />
-                  Claude
-                </label>
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                  <Checkbox checked={useOpenai} onCheckedChange={(v) => setUseOpenai(!!v)} />
-                  OpenAI
-                </label>
-              </div>
-              <Button onClick={handleAnalyze} disabled={analyzing || !urlPath.trim() || (!useClaude && !useOpenai)}>
-                {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {analyzing ? "Analyzing..." : "Analyze"}
-              </Button>
+            <div className="space-y-1.5">
+              <label htmlFor="aiPageUrl" className="aurora-label block">Full Page URL (for CWV)</label>
+              <input
+                id="aiPageUrl"
+                className="aurora-input w-full"
+                value={pageUrl}
+                onChange={(e) => setPageUrl(e.target.value)}
+                placeholder="https://www.lampsplus.com/products/ceiling-fans/"
+              />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5 w-48">
+              <label className="aurora-label block">Time Range</label>
+              <select
+                className="aurora-select w-full"
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+              >
+                {TIME_RANGES.map((tr) => (
+                  <option key={tr.value} value={tr.value}>
+                    {tr.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="aurora-text flex cursor-pointer items-center gap-1.5 text-sm">
+                <Checkbox checked={useClaude} onCheckedChange={(v) => setUseClaude(!!v)} />
+                Claude
+              </label>
+              <label className="aurora-text flex cursor-pointer items-center gap-1.5 text-sm">
+                <Checkbox checked={useOpenai} onCheckedChange={(v) => setUseOpenai(!!v)} />
+                OpenAI
+              </label>
+            </div>
+            <Button onClick={handleAnalyze} disabled={analyzing || !urlPath.trim() || (!useClaude && !useOpenai)}>
+              {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {analyzing ? "Analyzing..." : "Analyze"}
+            </Button>
+          </div>
+        </div>
 
         {/* Loading */}
         {analyzing && <LoadingSpinner message="Gathering data and running AI analysis..." />}
@@ -449,30 +456,28 @@ export function AiAnalysis() {
 
         {/* Follow-up */}
         {conversation.active && !analyzing && (
-          <Card>
-            <CardContent className="p-4">
-              <h3 className="text-sm font-semibold text-foreground mb-2">Follow-up Question</h3>
-              <div className="flex gap-2">
-                <Textarea
-                  ref={followupRef}
-                  value={followupText}
-                  onChange={(e) => setFollowupText(e.target.value)}
-                  onKeyDown={handleFollowupKeyDown}
-                  placeholder="Ask a follow-up question... (Enter to send, Shift+Enter for newline)"
-                  rows={2}
-                  disabled={sendingFollowup}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleFollowup}
-                  disabled={sendingFollowup || !followupText.trim()}
-                  className="self-end"
-                >
-                  {sendingFollowup ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="aurora-panel p-4">
+            <h3 className="aurora-text mb-2 text-sm font-semibold">Follow-up Question</h3>
+            <div className="flex gap-2">
+              <textarea
+                ref={followupRef}
+                className="aurora-textarea flex-1"
+                value={followupText}
+                onChange={(e) => setFollowupText(e.target.value)}
+                onKeyDown={handleFollowupKeyDown}
+                placeholder="Ask a follow-up question... (Enter to send, Shift+Enter for newline)"
+                rows={2}
+                disabled={sendingFollowup}
+              />
+              <Button
+                onClick={handleFollowup}
+                disabled={sendingFollowup || !followupText.trim()}
+                className="self-end"
+              >
+                {sendingFollowup ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </>

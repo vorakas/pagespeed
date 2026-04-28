@@ -500,6 +500,603 @@ export interface BlazemeterMasterReport {
   fetchErrors: Record<string, string>
 }
 
+// ---------- Obsidian Bridge ----------
+
+export interface ObsidianCapabilities {
+  vaultRoot: string
+  vaultExists: boolean
+  jiraConfigured: boolean
+  asanaConfigured: boolean
+  jiraProjects: string[]
+  asanaProjects: string[]
+}
+
+export interface ObsidianCommitMeta {
+  hash: string
+  shortHash: string
+  timestamp: number | null
+  subject: string | null
+}
+
+export interface ObsidianPendingSource {
+  key: string
+  added: number
+  modified: number
+  deleted: number
+  total: number
+}
+
+export interface ObsidianPendingFile {
+  path: string
+  change: string
+}
+
+export interface ObsidianPendingOrchestration {
+  enabled: boolean
+  error?: string
+  hasOrchestrateAnchor?: boolean
+  lastOrchestrate?: ObsidianCommitMeta | null
+  lastSync?: ObsidianCommitMeta | null
+  head?: string
+  pendingSyncCommits?: number
+  files?: ObsidianPendingFile[]
+  added?: number
+  modified?: number
+  deleted?: number
+  total?: number
+  bySource?: ObsidianPendingSource[]
+}
+
+export type ObsidianSyncStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "partial"
+  | "cancelled"
+
+export interface ObsidianSyncJob {
+  jobId: string
+  source: "jira" | "asana" | "both"
+  projectsJira: string[]
+  projectsAsana: string[]
+  fullRefresh: boolean
+  status: ObsidianSyncStatus
+  startedAt: number | null
+  endedAt: number | null
+  lineCount: number
+  lines: string[]
+  error: string | null
+  cancelRequested?: boolean
+}
+
+export type ObsidianSyncJobSummary = Omit<ObsidianSyncJob, "lines">
+
+export interface ObsidianSyncRequest {
+  source?: "jira" | "asana" | "both"
+  projectsJira?: string[]
+  projectsAsana?: string[]
+  fullRefresh?: boolean
+}
+
+export interface ObsidianVaultNode {
+  path: string
+  name: string
+  isDir: boolean
+  children?: ObsidianVaultNode[]
+}
+
+export interface ObsidianVaultPage {
+  path: string
+  name: string
+  raw: string
+  body: string
+  frontmatter: Record<string, string>
+  wikilinks: string[]
+  size: number
+  modified: number
+}
+
+// ---------- Launch Command Center (migration dashboard) ----------
+
+export type MigrationHealth =
+  | "at-risk"
+  | "blocked"
+  | "in-progress"
+  | "near-complete"
+  | "improving"
+  | "groomed"
+
+export interface MigrationLaunchWindow {
+  start: string
+  end: string | null
+}
+
+export interface MigrationHealthSnapshot {
+  overall: MigrationHealth | null
+  launchWindow: MigrationLaunchWindow | null
+  lastSynced: string | null
+  headline: string | null
+  reasons: string[]
+}
+
+export interface MigrationKpis {
+  combinedUnique: number
+  combinedResolved: number
+  combinedActive: number
+  resolvedPct: number
+  productionFailures: number
+  openBlockers: number
+  criticalBlockers: number
+  newBugs24h: number
+  unassignedRate: number
+  failedQa: number
+}
+
+export interface MigrationSource {
+  key: string
+  kind: "jira" | "asana" | string
+  name: string
+  total: number
+  resolved: number
+  active: number
+  pct: number
+}
+
+export interface MigrationWorkstream {
+  id: string
+  name: string
+  area: string | null
+  status: MigrationHealth | string | null
+  tasks: number
+  closed: number
+  failedQa: number
+  inProgress: number
+  blockedCount: number
+  epics: string[]
+  blockers: string[]
+  note: string | null
+}
+
+export type BlockerSeverity = "critical" | "high" | "medium" | "low"
+
+export interface MigrationBlocker {
+  id: string
+  name: string
+  status: string
+  severity: BlockerSeverity | string | null
+  affects: string[]
+  note: string | null
+  relPath: string | null
+}
+
+export interface RawTaskRecord {
+  key: string
+  source: "jira" | "asana" | string
+  project: string
+  relPath: string
+  summary: string | null
+  type: string | null
+  status: string | null
+  priority: string | null
+  assignee: string | null
+  created: string | null
+  updated: string | null
+  resolved: string | null
+  taskStatus: string | null
+  uatStatus: string | null
+  completion: string | null
+  url: string | null
+}
+
+export interface MigrationTaskStatusRow {
+  status: string
+  count: number
+  color: "green" | "red" | "amber" | "blue" | "neutral" | string
+  group: "done" | "inProgress" | "blocked" | "backlog" | string
+}
+
+export interface MigrationTrendPoint {
+  date: string
+  overallHealth: MigrationHealth | string | null
+  resolved: number | null
+  active: number | null
+  total: number | null
+}
+
+export interface MigrationTeam {
+  id: string
+  name: string
+  project: string | null
+  lead: string | null
+  qaLead: string | null
+  devCount: number | null
+  qaCount: number | null
+  note: string | null
+  totalTasks?: number
+  assignedTasks?: number
+  unassignedRate?: number
+}
+
+export interface WorkstreamMdMeta {
+  type: string
+  status: string | null
+  taskCount: number | null
+  blockedCount: number
+  title: string
+  lastUpdate: string | null
+}
+
+export interface WorkstreamMdSource {
+  key: string
+  kind: string
+  name: string
+  issues?: number
+  note?: string
+}
+
+export interface WorkstreamMdScopeItem {
+  label: string
+  note: string
+}
+
+export interface WorkstreamMdEpic {
+  id: string
+  title: string
+}
+
+export interface WorkstreamMdProgressBucket {
+  label: string
+  count: number
+  tone: string
+  kind: string
+}
+
+export interface WorkstreamMdProgress {
+  total: number | null
+  completion: string | null
+  buckets: WorkstreamMdProgressBucket[]
+}
+
+export interface WorkstreamMdActiveItem {
+  id: string
+  title: string
+  assignee: string | null
+  note?: string
+  overdue?: boolean
+  isNew?: boolean
+}
+
+export interface WorkstreamMdActive {
+  blocked: WorkstreamMdActiveItem[]
+  inProgress: WorkstreamMdActiveItem[]
+  onHold: WorkstreamMdActiveItem[]
+  approvedReview: WorkstreamMdActiveItem[]
+  codeReview: WorkstreamMdActiveItem[]
+  openUnassigned: WorkstreamMdActiveItem[]
+  evaluating: WorkstreamMdActiveItem[]
+  evaluated: WorkstreamMdActiveItem[]
+}
+
+export interface WorkstreamMdRisk {
+  tone: "red" | "amber" | string
+  text: string
+}
+
+export interface WorkstreamMdBurndown {
+  month: string
+  closed: number
+  cum: number
+  partial: boolean
+}
+
+export interface WorkstreamMdVelocity {
+  q1avg: number | null
+  marRate: number | null
+  remaining: number | null
+  projection: string | null
+  projectionNote: string | null
+}
+
+export interface WorkstreamMdDev {
+  name: string
+  inProgress: number
+  codeReview: number
+  pipeline: number
+  backlog: number
+  total: number
+  unassigned: boolean
+}
+
+export interface WorkstreamMdRecent {
+  id: string
+  title: string
+  status: string
+  tone: string
+  assignee: string
+  updated: string
+  highlight: boolean
+}
+
+export interface WorkstreamMdDecision {
+  date: string
+  id: string
+  decision: string
+  status: string
+  impact: string
+}
+
+export interface WorkstreamMdCrossRef {
+  area: string
+  ws: string
+}
+
+export interface WorkstreamMdPayload {
+  meta: WorkstreamMdMeta
+  sources: WorkstreamMdSource[]
+  overviewParagraph: string
+  scope: WorkstreamMdScopeItem[]
+  epics: WorkstreamMdEpic[]
+  progress: WorkstreamMdProgress
+  active: WorkstreamMdActive
+  keyRisks: WorkstreamMdRisk[]
+  burndown: WorkstreamMdBurndown[]
+  velocity: WorkstreamMdVelocity
+  devs: WorkstreamMdDev[]
+  devObservations: string[]
+  recentActivity: WorkstreamMdRecent[]
+  activitySummary: string | null
+  decisions: WorkstreamMdDecision[]
+  decisionContext: string | null
+  crossRefs: WorkstreamMdCrossRef[]
+  team: { leads: string[] }
+  crossDeps?: WorkstreamMdCrossDep[]
+  internalChains?: WorkstreamMdInternalChain[]
+  criticalBlocker?: WorkstreamMdCriticalBlocker | null
+  asanaJira?: WorkstreamMdAsanaJira[]
+  asanaJiraNotes?: WorkstreamMdRisk[]
+  asanaCoverage?: WorkstreamMdAsanaCoverage | null
+}
+
+export interface WorkstreamMdCrossDep {
+  from: string
+  fromTitle: string
+  fromStatus: string | null
+  relation: string
+  to: string
+  toTitle: string
+  area: string
+}
+
+export interface WorkstreamMdInternalChain {
+  blocked: string
+  blockedTitle: string
+  blockedBy: string
+  blockerTitle: string
+  blockerStatus: string
+  resolved: boolean
+}
+
+export interface WorkstreamMdCriticalBlocker {
+  id: string
+  title: string
+  note: string
+}
+
+export interface WorkstreamMdAsanaJira {
+  asana: string
+  asanaTitle: string
+  jira: string | null
+  asanaStatus: string | null
+  jiraStatus: string | null
+  aligned: "yes" | "no" | "no-link" | "unknown"
+}
+
+export interface WorkstreamMdAsanaCoverageCard {
+  count: number
+  note: string
+  tasks?: string[]
+}
+
+export interface WorkstreamMdAsanaCoverage {
+  implementation: WorkstreamMdAsanaCoverageCard
+  actionItems: WorkstreamMdAsanaCoverageCard
+  lpwe: WorkstreamMdAsanaCoverageCard
+}
+
+export interface MigrationWorkstreamDetail {
+  workstream: MigrationWorkstream
+  blockers: MigrationBlocker[]
+  criticalTasks: RawTaskRecord[]
+  referencedKeyCount: number
+  markdown: WorkstreamMdPayload | null
+}
+
+// ---------- Snapshots (status-YYYY-MM-DD.md rollups) ----------
+
+export interface SnapshotKpis {
+  combinedUnique?: number | null
+  combinedResolved?: number | null
+  combinedActive?: number | null
+  resolvedPct?: number | null
+  productionFailures?: number | null
+  openBlockers?: number | null
+  criticalBlockers?: number | null
+  newBugs24h?: number | null
+  criticalBugCount?: number | null
+  wpm?: number | null
+  [k: string]: number | null | undefined
+}
+
+export interface SnapshotSource {
+  key: string
+  total: number
+  resolved: number
+  active: number
+  approx?: boolean
+}
+
+export interface SnapshotTaskItem {
+  id: string
+  title?: string
+  sev?: string
+  due?: string
+  who?: string
+  status?: string
+  tag?: string
+  regression?: boolean
+  isNew?: boolean
+  type?: string
+  workstream?: string
+  note?: string
+}
+
+export interface SnapshotStatusChange {
+  id: string
+  change: string
+  detail: string
+}
+
+export interface SnapshotPositive {
+  id: string
+  title: string
+  detail: string
+}
+
+export interface SnapshotChangeSummary {
+  new: number
+  resolved: number
+  reassigned: number
+  regressed: number
+  onHold: number
+}
+
+export interface SnapshotAreaHealthRow {
+  area: string
+  ws: string
+  status: string
+  concern: string
+}
+
+export interface SnapshotRetestItem {
+  id: string
+  title: string
+  who?: string
+  status?: string
+}
+
+export interface SnapshotAnalyticsBlocker {
+  id: string
+  title: string
+  who?: string
+  priority?: string
+}
+
+export interface SnapshotOpenHighPriItem {
+  id: string
+  title: string
+  priority?: string
+  status?: string
+}
+
+export interface SnapshotOpenHighPriGroup {
+  label: string
+  items: SnapshotOpenHighPriItem[]
+}
+
+export interface SnapshotMaoItem {
+  id: string
+  title: string
+  status?: string
+  ok?: boolean
+}
+
+export interface SnapshotPrivateLinkGap {
+  id: string
+  field: string
+}
+
+export interface SnapshotLpweUnestimated {
+  id: string
+  title: string
+  estimate?: string
+}
+
+export interface MigrationSnapshot {
+  date: string
+  overall: string | null
+  headline: string | null
+  kpis: SnapshotKpis
+  sourceCoverage: SnapshotSource[]
+  areaStatuses: Record<string, string>
+  criticalBugs: SnapshotTaskItem[]
+  prodFailures: SnapshotTaskItem[]
+  openBlockers: SnapshotTaskItem[]
+  newItems: SnapshotTaskItem[]
+  statusChanges: SnapshotStatusChange[]
+  positives: SnapshotPositive[]
+  areaHealth: SnapshotAreaHealthRow[]
+  retest: SnapshotRetestItem[]
+  analyticsBlockers: SnapshotAnalyticsBlocker[]
+  openHighPri: SnapshotOpenHighPriGroup[]
+  mao: SnapshotMaoItem[]
+  privateLinkGaps: SnapshotPrivateLinkGap[]
+  lpweUnestimated: SnapshotLpweUnestimated[]
+  changeSummary: SnapshotChangeSummary
+  sourcePath?: string | null
+  ingestedAt?: string | null
+}
+
+export interface SnapshotKpiDelta {
+  prev: number | null
+  curr: number | null
+  delta: number | null
+}
+
+export interface SnapshotAreaChange {
+  ws: string
+  from: string
+  to: string
+}
+
+export interface SnapshotSourceDelta {
+  key: string
+  total: SnapshotKpiDelta
+  resolved: SnapshotKpiDelta
+  active: SnapshotKpiDelta
+}
+
+export interface MigrationSnapshotDiff {
+  from: string
+  to: string
+  kpis: Record<string, SnapshotKpiDelta>
+  sources: SnapshotSourceDelta[]
+  areaStatuses: SnapshotAreaChange[]
+  criticalBugs: { added: SnapshotTaskItem[]; removed: SnapshotTaskItem[] }
+  prodFailures: {
+    added: SnapshotTaskItem[]
+    removed: SnapshotTaskItem[]
+    reassigned: (SnapshotTaskItem & { from?: string })[]
+    regressed: SnapshotTaskItem[]
+  }
+  openBlockers: { added: SnapshotTaskItem[]; removed: SnapshotTaskItem[] }
+  newItems: { added: SnapshotTaskItem[]; removed: SnapshotTaskItem[] }
+}
+
+export interface MigrationSnapshotDiffResponse {
+  latest: MigrationSnapshot | null
+  previous: MigrationSnapshot | null
+  diff: MigrationSnapshotDiff | null
+}
+
+export interface MigrationHistoryEntry {
+  from: string
+  to: string
+  currentPayload: MigrationSnapshot
+  previousPayload: MigrationSnapshot
+  diff: MigrationSnapshotDiff
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {

@@ -1,8 +1,5 @@
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Save, Wifi } from "lucide-react"
 import { api } from "@/services/api"
 import type { AzureConfig } from "@/types"
@@ -25,6 +22,15 @@ function getExpirationWarning(dateStr: string): { message: string; type: "expire
     return { message: `Client secret expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""} (${dateStr}).`, type: "warning" }
   }
   return null
+}
+
+const statusColor = (type: "success" | "error" | "testing" | "warning") => {
+  switch (type) {
+    case "success": return "var(--lcc-green)"
+    case "error":   return "var(--lcc-red)"
+    case "warning": return "var(--lcc-amber)"
+    case "testing": return "var(--lcc-text-dim)"
+  }
 }
 
 export function AzureConfigPanel({ config, onConfigChange, onConnected }: AzureConfigPanelProps) {
@@ -73,50 +79,49 @@ export function AzureConfigPanel({ config, onConfigChange, onConnected }: AzureC
   return (
     <div className="space-y-3">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Azure AD Authentication</h3>
-            <div className="space-y-1.5">
-              <Label htmlFor="azTenant">Tenant ID</Label>
-              <Input id="azTenant" value={config.tenantId} onChange={(e) => updateField("tenantId", e.target.value)} placeholder="Directory (Tenant) ID" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="azClient">Client ID</Label>
-              <Input id="azClient" value={config.clientId} onChange={(e) => updateField("clientId", e.target.value)} placeholder="Application (Client) ID" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="azSecret">Client Secret</Label>
-              <Input id="azSecret" type="password" value={config.clientSecret} onChange={(e) => updateField("clientSecret", e.target.value)} placeholder="Client Secret Value" />
-            </div>
-            <Button onClick={handleSave}>
-              <Save className="h-4 w-4" /> Save Configuration
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Workspace Settings</h3>
-            <div className="space-y-1.5">
-              <Label htmlFor="azWorkspace">Workspace ID</Label>
-              <Input id="azWorkspace" value={config.workspaceId} onChange={(e) => updateField("workspaceId", e.target.value)} placeholder="Log Analytics Workspace ID" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="azExpiration">Secret Expiration Date</Label>
-              <Input id="azExpiration" type="date" value={config.secretExpirationDate} onChange={(e) => updateField("secretExpirationDate", e.target.value)} />
-            </div>
-            <Button variant="outline" onClick={handleTestConnection}>
-              <Wifi className="h-4 w-4" /> Test Connection
-            </Button>
-            {connectionStatus && (
-              <p className={`text-sm ${connectionStatus.type === "success" ? "text-score-good" : connectionStatus.type === "error" ? "text-score-poor" : connectionStatus.type === "warning" ? "text-score-average" : "text-muted-foreground"}`}>
-                {connectionStatus.message}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="aurora-panel space-y-3 p-4">
+          <h3 className="aurora-text text-sm font-semibold">Azure AD Authentication</h3>
+          <div className="space-y-1.5">
+            <label htmlFor="azTenant" className="aurora-label block">Tenant ID</label>
+            <input id="azTenant" className="aurora-input w-full" value={config.tenantId} onChange={(e) => updateField("tenantId", e.target.value)} placeholder="Directory (Tenant) ID" />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="azClient" className="aurora-label block">Client ID</label>
+            <input id="azClient" className="aurora-input w-full" value={config.clientId} onChange={(e) => updateField("clientId", e.target.value)} placeholder="Application (Client) ID" />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="azSecret" className="aurora-label block">Client Secret</label>
+            <input id="azSecret" type="password" className="aurora-input w-full" value={config.clientSecret} onChange={(e) => updateField("clientSecret", e.target.value)} placeholder="Client Secret Value" />
+          </div>
+          <Button onClick={handleSave}>
+            <Save className="h-4 w-4" /> Save Configuration
+          </Button>
+        </div>
+        <div className="aurora-panel space-y-3 p-4">
+          <h3 className="aurora-text text-sm font-semibold">Workspace Settings</h3>
+          <div className="space-y-1.5">
+            <label htmlFor="azWorkspace" className="aurora-label block">Workspace ID</label>
+            <input id="azWorkspace" className="aurora-input w-full" value={config.workspaceId} onChange={(e) => updateField("workspaceId", e.target.value)} placeholder="Log Analytics Workspace ID" />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="azExpiration" className="aurora-label block">Secret Expiration Date</label>
+            <input id="azExpiration" type="date" className="aurora-input w-full" value={config.secretExpirationDate} onChange={(e) => updateField("secretExpirationDate", e.target.value)} />
+          </div>
+          <Button variant="outline" onClick={handleTestConnection}>
+            <Wifi className="h-4 w-4" /> Test Connection
+          </Button>
+          {connectionStatus && (
+            <p className="text-sm" style={{ color: statusColor(connectionStatus.type) }}>
+              {connectionStatus.message}
+            </p>
+          )}
+        </div>
       </div>
       {expirationWarning && (
-        <p className={`text-sm font-medium ${expirationWarning.type === "expired" ? "text-score-poor" : "text-score-average"}`}>
+        <p
+          className="text-sm font-medium"
+          style={{ color: expirationWarning.type === "expired" ? "var(--lcc-red)" : "var(--lcc-amber)" }}
+        >
           {expirationWarning.message}
         </p>
       )}

@@ -6,10 +6,8 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-  Legend,
 } from "recharts"
 import { GitCompareArrows } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ScoreBadge } from "@/components/shared/ScoreBadge"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
@@ -39,7 +37,7 @@ function MetricRow({ label, value1, value2, format, isScore }: MetricRowProps) {
   if (isScore) {
     return (
       <div className="flex items-center justify-between py-1">
-        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="aurora-text-dim text-sm">{label}</span>
         <div className="flex items-center gap-6">
           <span className="w-20 flex justify-end"><ScoreBadge score={value1 as number | null} /></span>
           <span className="w-20 flex justify-end"><ScoreBadge score={value2 as number | null} /></span>
@@ -50,17 +48,17 @@ function MetricRow({ label, value1, value2, format, isScore }: MetricRowProps) {
 
   return (
     <div className="flex items-center justify-between py-1">
-      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="aurora-text-dim text-sm">{label}</span>
       <div className="flex items-center gap-6">
-        <span className="w-20 text-right text-sm tabular-nums text-foreground">{formatted1}</span>
-        <span className="w-20 text-right text-sm tabular-nums text-foreground">{formatted2}</span>
+        <span className="aurora-text aurora-num w-20 text-right text-sm">{formatted1}</span>
+        <span className="aurora-text aurora-num w-20 text-right text-sm">{formatted2}</span>
       </div>
     </div>
   )
 }
 
-const SITE1_COLOR = "hsl(234 77% 60%)"
-const SITE2_COLOR = "hsl(160 84% 39%)"
+const SITE1_COLOR = "var(--lcc-violet)"
+const SITE2_COLOR = "var(--lcc-green)"
 
 function ComparisonResults({ data }: { data: ComparisonResult }) {
   const { url1, url2 } = data
@@ -68,10 +66,10 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
   const scoreDiff = (url1.performance_score ?? 0) - (url2.performance_score ?? 0)
   const diffLabel = scoreDiff > 0 ? `+${scoreDiff}` : String(scoreDiff)
   const diffColor = scoreDiff > 0
-    ? "text-score-good"
+    ? "var(--lcc-green)"
     : scoreDiff < 0
-      ? "text-score-poor"
-      : "text-muted-foreground"
+      ? "var(--lcc-red)"
+      : "var(--lcc-text-dim)"
 
   const radarData = [
     { metric: "Performance", site1: url1.performance_score ?? 0, site2: url2.performance_score ?? 0 },
@@ -91,16 +89,16 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
     <div className="space-y-2">
       {/* Lighthouse Scores — radar chart + metrics side by side */}
       <div>
-        <h4 className="mb-1.5 text-sm font-semibold text-foreground">Lighthouse Scores</h4>
+        <h4 className="aurora-text mb-1.5 text-sm font-semibold">Lighthouse Scores</h4>
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="divide-y divide-border">
+          <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
             <div className="flex items-center justify-between px-0 pb-1">
               <div />
               <div className="flex items-center gap-6">
-                <span className="w-20 text-right text-xs font-medium text-muted-foreground truncate" title={url1.site_name}>
+                <span className="aurora-text-faint w-20 text-right text-xs font-medium truncate" title={url1.site_name}>
                   {url1.site_name}
                 </span>
-                <span className="w-20 text-right text-xs font-medium text-muted-foreground truncate" title={url2.site_name}>
+                <span className="aurora-text-faint w-20 text-right text-xs font-medium truncate" title={url2.site_name}>
                   {url2.site_name}
                 </span>
               </div>
@@ -113,21 +111,21 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
           <div>
             <ResponsiveContainer width="100%" height={240}>
               <RadarChart data={radarData} margin={{ top: 20, right: 40, bottom: 30, left: 40 }}>
-                <PolarGrid stroke="var(--border)" />
-                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
+                <PolarGrid stroke="var(--glass-border)" />
+                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--lcc-text-dim)", fontFamily: "var(--aurora-font-mono)" }} />
                 <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar name={url1.site_name} dataKey="site1" stroke={SITE1_COLOR} fill={SITE1_COLOR} fillOpacity={0.2} />
-                <Radar name={url2.site_name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.2} />
+                <Radar name={url1.site_name} dataKey="site1" stroke={SITE1_COLOR} fill={SITE1_COLOR} fillOpacity={0.25} />
+                <Radar name={url2.site_name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.25} />
               </RadarChart>
             </ResponsiveContainer>
             <div className="flex items-center justify-center gap-4 text-xs">
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SITE1_COLOR }} />
-                <span className="text-foreground">{url1.site_name}</span>
+                <span className="aurora-text">{url1.site_name}</span>
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SITE2_COLOR }} />
-                <span className="text-foreground">{url2.site_name}</span>
+                <span className="aurora-text">{url2.site_name}</span>
               </span>
             </div>
           </div>
@@ -136,9 +134,9 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
 
       {/* Core Web Vitals — per-metric bars + metrics side by side */}
       <div>
-        <h4 className="mb-1.5 text-sm font-semibold text-foreground">Core Web Vitals</h4>
+        <h4 className="aurora-text mb-1.5 text-sm font-semibold">Core Web Vitals</h4>
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="divide-y divide-border">
+          <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
             <MetricRow label="FCP" value1={url1.fcp} value2={url2.fcp} format={formatMilliseconds} />
             <MetricRow label="LCP" value1={url1.lcp} value2={url2.lcp} format={formatMilliseconds} />
             <MetricRow label="CLS" value1={url1.cls} value2={url2.cls} format={formatCls} />
@@ -150,20 +148,20 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
               const maxVal = Math.max(item.site1, item.site2, 1)
               return (
                 <div key={item.metric} className="space-y-0.5">
-                  <span className="text-[11px] font-medium text-muted-foreground">{item.metric}</span>
+                  <span className="aurora-text-faint text-[11px] font-medium">{item.metric}</span>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-16 text-right text-[10px] text-muted-foreground truncate" title={url1.site_name}>{url1.site_name}</span>
-                    <div className="flex-1 h-2.5 rounded-sm bg-muted/50 overflow-hidden">
-                      <div className="h-full rounded-sm" style={{ width: `${(item.site1 / maxVal) * 100}%`, backgroundColor: SITE1_COLOR }} />
+                    <span className="aurora-text-faint w-16 text-right text-[10px] truncate" title={url1.site_name}>{url1.site_name}</span>
+                    <div className="aurora-bar-track flex-1">
+                      <div className="aurora-bar-fill" style={{ width: `${(item.site1 / maxVal) * 100}%`, backgroundColor: SITE1_COLOR }} />
                     </div>
-                    <span className="w-12 text-right text-[11px] tabular-nums text-foreground">{formatMilliseconds(item.site1)}</span>
+                    <span className="aurora-text aurora-num w-12 text-right text-[11px]">{formatMilliseconds(item.site1)}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-16 text-right text-[10px] text-muted-foreground truncate" title={url2.site_name}>{url2.site_name}</span>
-                    <div className="flex-1 h-2.5 rounded-sm bg-muted/50 overflow-hidden">
-                      <div className="h-full rounded-sm" style={{ width: `${(item.site2 / maxVal) * 100}%`, backgroundColor: SITE2_COLOR }} />
+                    <span className="aurora-text-faint w-16 text-right text-[10px] truncate" title={url2.site_name}>{url2.site_name}</span>
+                    <div className="aurora-bar-track flex-1">
+                      <div className="aurora-bar-fill" style={{ width: `${(item.site2 / maxVal) * 100}%`, backgroundColor: SITE2_COLOR }} />
                     </div>
-                    <span className="w-12 text-right text-[11px] tabular-nums text-foreground">{formatMilliseconds(item.site2)}</span>
+                    <span className="aurora-text aurora-num w-12 text-right text-[11px]">{formatMilliseconds(item.site2)}</span>
                   </div>
                 </div>
               )
@@ -174,16 +172,16 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
 
       {/* Size */}
       <div>
-        <h4 className="mb-2 text-sm font-semibold text-foreground">Page Size</h4>
-        <div className="divide-y divide-border">
+        <h4 className="aurora-text mb-2 text-sm font-semibold">Page Size</h4>
+        <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
           <MetricRow label="Total Weight" value1={url1.total_byte_weight} value2={url2.total_byte_weight} format={formatBytes} />
         </div>
       </div>
 
       {/* Performance diff summary */}
-      <div className="rounded-md border border-border bg-muted/50 p-3 text-center">
-        <span className="text-sm text-muted-foreground">Performance difference: </span>
-        <span className={`text-sm font-semibold tabular-nums ${diffColor}`}>{diffLabel} points</span>
+      <div className="aurora-callout text-center">
+        <span className="aurora-text-dim text-sm">Performance difference: </span>
+        <span className="aurora-num text-sm font-semibold" style={{ color: diffColor }}>{diffLabel} points</span>
       </div>
     </div>
   )
@@ -225,131 +223,127 @@ export function PageComparison() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Page Comparison</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="aurora-section-title">Page Comparison</h2>
+        <p className="aurora-section-subtitle">
           Compare the same page across different sites
         </p>
       </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-end gap-3">
-            {/* Site 1 */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Site 1</label>
-              <select
-                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
-                value={site1Id}
-                onChange={(e) => {
-                  setSite1Id(e.target.value ? Number(e.target.value) : "")
-                  setUrl1Id("")
-                  setResult(null)
-                  setError(null)
-                }}
-                disabled={sitesLoading}
-              >
-                <option value="">Select first site...</option>
-                {sites.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-              <label className="text-xs font-medium text-muted-foreground">URL</label>
-              <select
-                className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-                value={url1Id}
-                onChange={(e) => {
-                  setUrl1Id(e.target.value ? Number(e.target.value) : "")
-                  setResult(null)
-                  setError(null)
-                }}
-                disabled={!site1Id}
-              >
-                <option value="">Select URL...</option>
-                {site1?.urls.map((url) => (
-                  <option key={url.id} value={url.id}>
-                    {url.url}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <span className="pb-2 text-sm font-medium text-muted-foreground">vs</span>
-
-            {/* Site 2 */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Site 2</label>
-              <select
-                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
-                value={site2Id}
-                onChange={(e) => {
-                  setSite2Id(e.target.value ? Number(e.target.value) : "")
-                  setUrl2Id("")
-                  setResult(null)
-                  setError(null)
-                }}
-                disabled={sitesLoading}
-              >
-                <option value="">Select second site...</option>
-                {sites.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-              <label className="text-xs font-medium text-muted-foreground">URL</label>
-              <select
-                className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-                value={url2Id}
-                onChange={(e) => {
-                  setUrl2Id(e.target.value ? Number(e.target.value) : "")
-                  setResult(null)
-                  setError(null)
-                }}
-                disabled={!site2Id}
-              >
-                <option value="">Select URL...</option>
-                {site2?.urls.map((url) => (
-                  <option key={url.id} value={url.id}>
-                    {url.url}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <Button onClick={handleCompare} disabled={!url1Id || !url2Id || loading}>
-              Compare
-            </Button>
+      <div className="aurora-panel p-4">
+        <div className="flex items-end gap-3">
+          {/* Site 1 */}
+          <div className="flex flex-col gap-1.5">
+            <label className="aurora-label">Site 1</label>
+            <select
+              className="aurora-select"
+              value={site1Id}
+              onChange={(e) => {
+                setSite1Id(e.target.value ? Number(e.target.value) : "")
+                setUrl1Id("")
+                setResult(null)
+                setError(null)
+              }}
+              disabled={sitesLoading}
+            >
+              <option value="">Select first site...</option>
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardContent className="p-4">
-          {loading && <LoadingSpinner message="Loading comparison..." />}
+          <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+            <label className="aurora-label">URL</label>
+            <select
+              className="aurora-select w-full"
+              value={url1Id}
+              onChange={(e) => {
+                setUrl1Id(e.target.value ? Number(e.target.value) : "")
+                setResult(null)
+                setError(null)
+              }}
+              disabled={!site1Id}
+            >
+              <option value="">Select URL...</option>
+              {site1?.urls.map((url) => (
+                <option key={url.id} value={url.id}>
+                  {url.url}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          {error && (
-            <p className="py-8 text-center text-sm text-destructive">{error}</p>
-          )}
+          <span className="aurora-text-faint pb-2 text-sm font-medium">vs</span>
 
-          {!loading && !error && !result && (
-            <EmptyState
-              icon={<GitCompareArrows size={40} />}
-              title="Select URLs to Compare"
-              description="Choose a site and URL on each side, then click Compare to see a side-by-side breakdown."
-            />
-          )}
+          {/* Site 2 */}
+          <div className="flex flex-col gap-1.5">
+            <label className="aurora-label">Site 2</label>
+            <select
+              className="aurora-select"
+              value={site2Id}
+              onChange={(e) => {
+                setSite2Id(e.target.value ? Number(e.target.value) : "")
+                setUrl2Id("")
+                setResult(null)
+                setError(null)
+              }}
+              disabled={sitesLoading}
+            >
+              <option value="">Select second site...</option>
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          {!loading && !error && result && <ComparisonResults data={result} />}
-        </CardContent>
-      </Card>
+          <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+            <label className="aurora-label">URL</label>
+            <select
+              className="aurora-select w-full"
+              value={url2Id}
+              onChange={(e) => {
+                setUrl2Id(e.target.value ? Number(e.target.value) : "")
+                setResult(null)
+                setError(null)
+              }}
+              disabled={!site2Id}
+            >
+              <option value="">Select URL...</option>
+              {site2?.urls.map((url) => (
+                <option key={url.id} value={url.id}>
+                  {url.url}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Button onClick={handleCompare} disabled={!url1Id || !url2Id || loading}>
+            Compare
+          </Button>
+        </div>
+      </div>
+
+      <div className="aurora-panel p-4">
+        {loading && <LoadingSpinner message="Loading comparison..." />}
+
+        {error && (
+          <p className="py-8 text-center text-sm" style={{ color: "var(--lcc-red)" }}>{error}</p>
+        )}
+
+        {!loading && !error && !result && (
+          <EmptyState
+            icon={<GitCompareArrows size={40} />}
+            title="Select URLs to Compare"
+            description="Choose a site and URL on each side, then click Compare to see a side-by-side breakdown."
+          />
+        )}
+
+        {!loading && !error && result && <ComparisonResults data={result} />}
+      </div>
     </div>
   )
 }

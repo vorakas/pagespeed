@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Play, Pencil, Trash2, Clock, Monitor, Link } from "lucide-react"
@@ -32,11 +31,11 @@ function formatRelativeTime(isoString: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-const statusStyles: Record<string, { label: string; className: string }> = {
-  success: { label: "Success", className: "text-score-good" },
-  partial: { label: "Partial", className: "text-score-average" },
-  failed: { label: "Failed", className: "text-score-poor" },
-  running: { label: "Running...", className: "text-primary" },
+const statusStyles: Record<string, { label: string; color: string }> = {
+  success: { label: "Success", color: "var(--lcc-green)" },
+  partial: { label: "Partial", color: "var(--lcc-amber)" },
+  failed: { label: "Failed", color: "var(--lcc-red)" },
+  running: { label: "Running...", color: "var(--lcc-blue)" },
 }
 
 export function TriggerCard({ trigger, onEdit, onDeleted, onToggled }: TriggerCardProps) {
@@ -88,11 +87,11 @@ export function TriggerCard({ trigger, onEdit, onDeleted, onToggled }: TriggerCa
   const statusConfig = lastRunStatus ? statusStyles[lastRunStatus] : null
 
   return (
-    <Card className={`${trigger.enabled ? "" : "opacity-60"}`}>
+    <div className={`aurora-panel ${trigger.enabled ? "" : "opacity-60"}`}>
       <div className="flex items-start justify-between gap-4 p-4">
         <div className="min-w-0 flex-1 space-y-1.5">
-          <h4 className="text-sm font-semibold text-foreground">{trigger.name}</h4>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <h4 className="aurora-text text-sm font-semibold">{trigger.name}</h4>
+          <div className="aurora-text-dim flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
               {trigger.schedule_label || cronDesc}
@@ -106,17 +105,17 @@ export function TriggerCard({ trigger, onEdit, onDeleted, onToggled }: TriggerCa
               {urlCount} URL{urlCount !== 1 ? "s" : ""}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="aurora-text-faint text-xs">
             Runs: {cronDesc} (UTC)
           </p>
           {/* Last run status */}
-          <p className="text-xs text-muted-foreground">
+          <p className="aurora-text-faint text-xs">
             Last run:{" "}
             {trigger.last_run_at ? (
               <>
                 {formatRelativeTime(trigger.last_run_at)}
                 {statusConfig && (
-                  <span className={`ml-1 ${statusConfig.className}`}>
+                  <span className="ml-1" style={{ color: statusConfig.color }}>
                     — {statusConfig.label}
                   </span>
                 )}
@@ -154,13 +153,13 @@ export function TriggerCard({ trigger, onEdit, onDeleted, onToggled }: TriggerCa
             variant="ghost"
             size="icon-xs"
             title="Delete"
-            className="text-destructive hover:text-destructive"
+            style={{ color: "var(--lcc-red)" }}
             onClick={handleDelete}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }

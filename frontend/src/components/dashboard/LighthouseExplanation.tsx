@@ -1,11 +1,11 @@
-import { Card, CardContent } from "@/components/ui/card"
 import { Zap, Accessibility, ShieldCheck, Search } from "lucide-react"
-import { cn } from "@/lib/utils"
+
+type Tone = "violet" | "blue" | "green" | "amber" | "pink"
 
 interface CategoryInfo {
   icon: React.ReactNode
   title: string
-  accentClass: string
+  tone: Tone
   measures: string
   details: string[]
   impact: string
@@ -13,9 +13,9 @@ interface CategoryInfo {
 
 const categories: CategoryInfo[] = [
   {
-    icon: <Zap size={20} />,
+    icon: <Zap size={18} />,
     title: "Performance",
-    accentClass: "text-chart-1 bg-chart-1/10",
+    tone: "violet",
     measures: "How quickly content loads and becomes interactive",
     details: [
       "Speed Metrics: First Contentful Paint, Largest Contentful Paint, Speed Index",
@@ -25,9 +25,9 @@ const categories: CategoryInfo[] = [
     impact: "Faster sites improve user experience and engagement. Performance is a ranking factor for Google Search.",
   },
   {
-    icon: <Accessibility size={20} />,
+    icon: <Accessibility size={18} />,
     title: "Accessibility",
-    accentClass: "text-pink-400 bg-pink-400/10",
+    tone: "pink",
     measures: "How usable your site is for all users, including those with disabilities",
     details: [
       "Screen Readers: Proper ARIA labels, semantic HTML, image alt text",
@@ -38,9 +38,9 @@ const categories: CategoryInfo[] = [
     impact: "Makes your site usable by everyone and is often a legal requirement (ADA, WCAG compliance).",
   },
   {
-    icon: <ShieldCheck size={20} />,
+    icon: <ShieldCheck size={18} />,
     title: "Best Practices",
-    accentClass: "text-cyan-400 bg-cyan-400/10",
+    tone: "blue",
     measures: "Overall code quality and modern web development standards",
     details: [
       "Security: HTTPS usage, secure connections, no browser errors",
@@ -51,9 +51,9 @@ const categories: CategoryInfo[] = [
     impact: "Ensures your site follows web standards, is secure, and provides a reliable experience.",
   },
   {
-    icon: <Search size={20} />,
+    icon: <Search size={18} />,
     title: "SEO",
-    accentClass: "text-emerald-400 bg-emerald-400/10",
+    tone: "green",
     measures: "How well search engines can crawl and index your site",
     details: [
       "Content: Page titles, meta descriptions, heading structure",
@@ -69,42 +69,40 @@ export function LighthouseExplanation() {
   return (
     <div className="space-y-3">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Understanding Lighthouse Scores</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="aurora-section-title">Understanding Lighthouse Scores</h2>
+        <p className="aurora-section-subtitle">
           What each category measures (scores range from 0-100) — Powered by Google PageSpeed Insights API
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {categories.map((category) => (
-          <Card key={category.title}>
-            <CardContent className="p-5">
-              <div className="mb-3 flex items-center gap-2.5">
-                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", category.accentClass)}>
-                  {category.icon}
-                </div>
-                <h3 className="text-sm font-semibold text-foreground">{category.title}</h3>
+          <div key={category.title} className="aurora-panel p-5">
+            <div className="mb-3 flex items-center gap-2.5">
+              <div className="aurora-icon-tile" data-tone={category.tone}>
+                {category.icon}
               </div>
-              <p className="mb-2 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Measures: </span>
-                {category.measures}
-              </p>
-              <ul className="mb-3 space-y-1">
-                {category.details.map((detail) => {
-                  const [label, ...rest] = detail.split(": ")
-                  return (
-                    <li key={detail} className="text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">{label}: </span>
-                      {rest.join(": ")}
-                    </li>
-                  )
-                })}
-              </ul>
-              <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Impact: </span>
-                {category.impact}
-              </p>
-            </CardContent>
-          </Card>
+              <h3 className="aurora-text text-sm font-semibold">{category.title}</h3>
+            </div>
+            <p className="aurora-text-dim mb-2 text-sm">
+              <span className="aurora-text font-medium">Measures: </span>
+              {category.measures}
+            </p>
+            <ul className="mb-3 space-y-1">
+              {category.details.map((detail) => {
+                const [label, ...rest] = detail.split(": ")
+                return (
+                  <li key={detail} className="aurora-text-dim text-sm">
+                    <span className="aurora-text font-medium">{label}: </span>
+                    {rest.join(": ")}
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="aurora-text-dim text-sm">
+              <span className="aurora-text font-medium">Impact: </span>
+              {category.impact}
+            </p>
+          </div>
         ))}
       </div>
     </div>

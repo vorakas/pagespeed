@@ -1,5 +1,4 @@
 import { Calendar } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { TriggerCard } from "./TriggerCard"
@@ -20,23 +19,21 @@ export function TriggerList({ triggers, loading, error, onEdit, onChanged }: Tri
 
   if (error) {
     return (
-      <Card className="p-6">
-        <p className="text-center text-sm text-destructive">{error}</p>
-      </Card>
+      <div className="aurora-panel p-6">
+        <p className="text-center text-sm" style={{ color: "var(--lcc-red)" }}>{error}</p>
+      </div>
     )
   }
 
   if (triggers.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-0">
-          <EmptyState
-            icon={<Calendar size={40} />}
-            title="No Triggers Created"
-            description="Create a trigger above to automate your PageSpeed testing."
-          />
-        </CardContent>
-      </Card>
+      <div className="aurora-panel overflow-hidden">
+        <EmptyState
+          icon={<Calendar size={40} />}
+          title="No Triggers Created"
+          description="Create a trigger above to automate your PageSpeed testing."
+        />
+      </div>
     )
   }
 
