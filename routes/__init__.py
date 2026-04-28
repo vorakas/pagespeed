@@ -49,6 +49,11 @@ def register_blueprints(
     snapshot_service: "SnapshotService | None" = None,
     on_vault_refreshed: "Sequence[Callable[[], None]] | None" = None,
     github_webhook_secret: "str | None" = None,
+    devops_pat: "str | None" = None,
+    devops_organization: str = "LampsPlus",
+    devops_project: str = "TestAutomation",
+    devops_orchestrator_pipeline_id: "int | None" = None,
+    devops_pipeline_map: "dict | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -67,7 +72,13 @@ def register_blueprints(
     app.register_blueprint(create_newrelic_blueprint())
     app.register_blueprint(create_azure_blueprint())
     app.register_blueprint(create_ai_blueprint())
-    app.register_blueprint(create_devops_blueprint())
+    app.register_blueprint(create_devops_blueprint(
+        server_pat=devops_pat,
+        server_organization=devops_organization,
+        server_project=devops_project,
+        server_orchestrator_pipeline_id=devops_orchestrator_pipeline_id,
+        server_pipeline_map=devops_pipeline_map,
+    ))
     app.register_blueprint(
         create_blazemeter_blueprint(
             blazemeter_queue,

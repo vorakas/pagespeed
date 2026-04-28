@@ -393,6 +393,16 @@ class ApiClient {
   }
   // ---------- Azure DevOps ----------
 
+  async getDevOpsServerConfig(): Promise<{
+    managed: boolean
+    organization: string
+    project: string
+    orchestratorPipelineId: number | null
+    pipelineMap: Record<string, number>
+  }> {
+    return this.request("/api/devops/server-config")
+  }
+
   private devOpsBody(config: DevOpsConfig, extra: Record<string, unknown> = {}): string {
     return JSON.stringify({
       pat: config.pat,
