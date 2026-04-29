@@ -7,8 +7,12 @@ so the dashboard can poll freely.
 
 from __future__ import annotations
 
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
 from flask import Blueprint, jsonify, request
 
+from config import VAULT_ACTIVE_HOURS_TZ
 from services.migration_dashboard_service import MigrationDashboardService
 from services.snapshot_service import SnapshotService, diff_snapshots
 
@@ -62,6 +66,31 @@ def create_dashboard_blueprint(
             return jsonify({"error": "vault not found"}), 404
         window = int(request.args.get("windowDays", "7"))
         return jsonify(service.get_new_bugs(window_days=window))
+
+    @bp.route("/api/dashboard/daily-activity", methods=["GET"])
+    def daily_activity():
+        """Tickets created and resolved on a given day, from raw timestamps.
+
+        Date defaults to today in the configured reporting timezone
+        (Pacific by default), so "today" rolls over at PT midnight to
+        match the user's wall clock. Pass ``?date=YYYY-MM-DD`` to look
+        at any prior day.
+        """
+        if not service.is_available():
+            return jsonify({"error": "vault not found"}), 404
+        date_param = request.args.get("date")
+        if date_param:
+            try:
+                on_date = date.fromisoformat(date_param)
+            except ValueError:
+                return jsonify({"error": f"invalid date: {date_param!r}"}), 400
+        else:
+            try:
+                tz = ZoneInfo(VAULT_ACTIVE_HOURS_TZ)
+            except Exception:
+                tz = ZoneInfo("America/Los_Angeles")
+            on_date = datetime.now(tz).date()
+        return jsonify(service.get_daily_activity(on_date))
 
     @bp.route("/api/dashboard/task-status", methods=["GET"])
     def task_status():

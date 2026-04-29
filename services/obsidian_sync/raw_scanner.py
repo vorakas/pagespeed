@@ -114,6 +114,10 @@ class RawTask:
     def created_date(self) -> Optional[date]:
         return _parse_iso_date(self.created)
 
+    @property
+    def resolved_date(self) -> Optional[date]:
+        return _parse_iso_date(self.resolved)
+
 
 # ── Scanner ────────────────────────────────────────────────────────────
 
@@ -217,6 +221,34 @@ def new_bugs(tasks: Iterable[RawTask], *, window_days: int = 14, today: Optional
     # Newest first
     out.sort(key=lambda t: t.created_date or date.min, reverse=True)
     return out
+
+
+def daily_activity(
+    tasks: Iterable[RawTask],
+    *,
+    on_date: date,
+) -> Dict[str, List[RawTask]]:
+    """Return tickets created and resolved on ``on_date`` (raw, untruncated).
+
+    Sourced from per-ticket ``created`` / ``resolved`` ISO date strings, so
+    the result reflects actual activity rather than what the orchestrator
+    happened to summarize in its daily status file. The two lists may
+    overlap: a ticket created and resolved on the same day appears in both.
+
+    Tasks are returned newest-first by key. We don't have intra-day
+    timestamps in the frontmatter, so within a date we sort by key as a
+    proxy for filing order.
+    """
+    created: List[RawTask] = []
+    resolved: List[RawTask] = []
+    for task in tasks:
+        if task.created_date == on_date:
+            created.append(task)
+        if task.resolved_date == on_date:
+            resolved.append(task)
+    created.sort(key=lambda t: t.key, reverse=True)
+    resolved.sort(key=lambda t: t.key, reverse=True)
+    return {"created": created, "resolved": resolved}
 
 
 def status_histogram(tasks: Iterable[RawTask], *, project: Optional[str] = None) -> Dict[str, int]:

@@ -1,97 +1,89 @@
-import type {
-  MigrationSnapshot,
-  MigrationSnapshotDiff,
-  SnapshotKpiDelta,
-  SnapshotTaskItem,
-} from "@/types"
+import { useEffect, useState } from "react"
+import { api } from "@/services/api"
+import { formatPacificDate } from "@/lib/datetime"
+import type { MigrationDailyActivity, RawTaskRecord } from "@/types"
 
-// Maps diff output onto the handoff's "What Changed Today" panel:
-//   [ 5-cell summary strip ]
-//   [ 3 columns: added / removed/reassigned / regressed ]
-//   [ KPI delta bar ]
-//
-// Reads the latest snapshot and diff. Hidden entirely if there is no
-// previous snapshot (i.e. first ingest). The single-responsibility
-// contract here is layout — all diff logic lives server-side.
+/**
+ * "What Changed Today" — tickets created and resolved during the
+ * current Pacific calendar day. Sourced from raw Jira/Asana frontmatter
+ * timestamps via ``GET /api/dashboard/daily-activity``, so the counts
+ * stay accurate regardless of whether the orchestrator's daily status
+ * file populated its summary sections.
+ *
+ * The previous implementation diff'd the latest two daily snapshots,
+ * which gave 0s across the board when the orchestrator's "what changed"
+ * fields weren't populated. This version goes to the source of truth
+ * (per-ticket created/resolved dates) and reports actual day-of activity.
+ */
+export function WhatChangedToday() {
+  const [data, setData] = useState<MigrationDailyActivity | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-interface Props {
-  latest: MigrationSnapshot
-  diff: MigrationSnapshotDiff
-}
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getMigrationDailyActivity()
+      .then((d) => {
+        if (!cancelled) setData(d)
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setError(e instanceof Error ? e.message : "failed to load")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-const KPI_ORDER: Array<{ key: string; label: string; goodWhen: "up" | "down" }> = [
-  { key: "combinedResolved", label: "Resolved", goodWhen: "up" },
-  { key: "combinedActive", label: "Active", goodWhen: "down" },
-  { key: "resolvedPct", label: "% Resolved", goodWhen: "up" },
-  { key: "productionFailures", label: "Prod Failures", goodWhen: "down" },
-  { key: "openBlockers", label: "Open Blockers", goodWhen: "down" },
-  { key: "newBugs24h", label: "New Bugs", goodWhen: "down" },
-]
+  if (error) {
+    return (
+      <section className="panel" aria-label="What changed today">
+        <h3 style={headingStyle}>
+          <span>What Changed</span>
+        </h3>
+        <p style={{ color: "var(--lcc-red)", fontSize: 12, margin: 0 }}>{error}</p>
+      </section>
+    )
+  }
 
-export function WhatChangedToday({ latest, diff }: Props) {
-  const summary = latest.changeSummary
-  // Strip counts must match the column counts below — derive from the same
-  // diff fields the columns render, so the numbers can't drift apart.
-  const newCount = diff.newItems.added.length + diff.criticalBugs.added.length
-  const resolvedCount = summary?.resolved ?? latest.positives.length
-  const cells = [
-    { label: "New", value: newCount, tone: "violet" },
-    { label: "Resolved", value: resolvedCount, tone: "green" },
-    { label: "Regressed", value: diff.prodFailures.regressed.length, tone: "red" },
-    { label: "Reassigned", value: diff.prodFailures.reassigned.length, tone: "amber" },
-    { label: "On Hold", value: summary?.onHold ?? 0, tone: "blue" },
-  ]
+  if (!data) {
+    return (
+      <section className="panel" aria-label="What changed today">
+        <h3 style={headingStyle}>
+          <span>What Changed</span>
+        </h3>
+        <p style={{ color: "var(--lcc-text-faint)", fontSize: 12, margin: 0 }}>
+          loading…
+        </p>
+      </section>
+    )
+  }
+
+  const dateLabel = formatPacificDate(data.date)
 
   return (
     <section className="panel" aria-label="What changed today">
       <h3 style={headingStyle}>
-        <span>What Changed · {latest.date} vs {diff.from}</span>
-        <span style={cycleSummaryStyle}>
-          <span style={cycleNumberNewStyle}>{newCount}</span> new
-          <span style={cycleSepStyle}>·</span>
-          <span style={cycleNumberResolvedStyle}>{resolvedCount}</span> resolved
+        <span>What Changed · {dateLabel}</span>
+        <span style={summaryStyle}>
+          <span style={numNewStyle}>{data.createdCount}</span> new
+          <span style={sepStyle}>·</span>
+          <span style={numResolvedStyle}>{data.resolvedCount}</span> resolved
           <span style={cycleLabelStyle}>today</span>
         </span>
       </h3>
 
-      <div style={stripStyle}>
-        {cells.map((c) => (
-          <div key={c.label} style={{ ...cellStyle, borderLeft: `3px solid var(--lcc-${c.tone})` }}>
-            <div style={cellValueStyle}>{c.value}</div>
-            <div style={cellLabelStyle}>{c.label}</div>
-          </div>
-        ))}
-      </div>
-
       <div style={columnsStyle}>
         <Column
           tone="violet"
-          label="Added / New"
-          count={diff.newItems.added.length + diff.criticalBugs.added.length}
-          items={[...diff.criticalBugs.added, ...diff.newItems.added]}
+          label="Created today"
+          tickets={data.created}
         />
         <Column
-          tone="amber"
-          label="Reassigned"
-          count={diff.prodFailures.reassigned.length}
-          items={diff.prodFailures.reassigned.map((p) => ({
-            ...p,
-            title: `${p.title ?? ""} ${p.from ? `· was ${p.from}` : ""}`.trim(),
-          }))}
+          tone="green"
+          label="Resolved today"
+          tickets={data.resolved}
         />
-        <Column
-          tone="red"
-          label="Regressed"
-          count={diff.prodFailures.regressed.length}
-          items={diff.prodFailures.regressed}
-        />
-      </div>
-
-      <div style={kpiRowStyle}>
-        {KPI_ORDER.map((k) => {
-          const delta = (diff.kpis ?? {})[k.key] as SnapshotKpiDelta | undefined
-          return <KpiDelta key={k.key} label={k.label} delta={delta} goodWhen={k.goodWhen} />
-        })}
       </div>
     </section>
   )
@@ -99,77 +91,56 @@ export function WhatChangedToday({ latest, diff }: Props) {
 
 // ── Sub components ────────────────────────────────────────────────────
 
-function Column({
-  tone,
-  label,
-  count,
-  items,
-}: {
-  tone: "violet" | "amber" | "red" | "green"
+interface ColumnProps {
+  tone: "violet" | "green"
   label: string
-  count: number
-  items: Array<SnapshotTaskItem & { from?: string }>
-}) {
+  tickets: RawTaskRecord[]
+}
+
+function Column({ tone, label, tickets }: ColumnProps) {
   return (
     <div>
       <div style={sectionHeadStyle}>
         <span style={{ color: `var(--lcc-${tone})`, fontWeight: 700 }}>{label}</span>
         <span style={sectionSepStyle} />
-        <span style={sectionCountStyle}>{count}</span>
+        <span style={sectionCountStyle}>{tickets.length}</span>
       </div>
-      {items.length === 0 ? (
-        <div style={emptyStyle}>No changes</div>
+      {tickets.length === 0 ? (
+        <div style={emptyStyle}>None</div>
       ) : (
         <ul style={listStyle}>
-          {items.slice(0, 6).map((item, i) => (
-            <li key={`${item.id}-${i}`} style={{ ...itemStyle, borderLeft: `2px solid var(--lcc-${tone})` }}>
-              <div style={itemIdStyle}>{item.id}</div>
-              <div style={itemTitleStyle}>{item.title || "(no title)"}</div>
-              {(item.who || item.sev || item.tag) && (
-                <div style={itemMetaStyle}>
-                  {item.sev && <span className="lcc-chip" data-sev={item.sev}>{item.sev}</span>}
-                  {item.who && <span style={{ marginLeft: 6 }}>{item.who}</span>}
-                  {item.tag && <span style={{ marginLeft: 6, color: "var(--lcc-text-faint)" }}>{item.tag}</span>}
-                </div>
-              )}
+          {tickets.slice(0, 8).map((t) => (
+            <li
+              key={t.key}
+              style={{
+                ...itemStyle,
+                borderLeft: `2px solid var(--lcc-${tone})`,
+              }}
+            >
+              <div style={itemIdStyle}>{t.key}</div>
+              <div style={itemTitleStyle}>{t.summary || "(no summary)"}</div>
+              <div style={itemMetaStyle}>
+                <span>{t.project}</span>
+                {t.priority && (
+                  <>
+                    <span style={{ marginLeft: 6 }}>·</span>
+                    <span style={{ marginLeft: 6 }}>{t.priority}</span>
+                  </>
+                )}
+                {t.assignee && (
+                  <>
+                    <span style={{ marginLeft: 6 }}>·</span>
+                    <span style={{ marginLeft: 6 }}>{t.assignee}</span>
+                  </>
+                )}
+              </div>
             </li>
           ))}
+          {tickets.length > 8 && (
+            <li style={moreStyle}>+{tickets.length - 8} more</li>
+          )}
         </ul>
       )}
-    </div>
-  )
-}
-
-function KpiDelta({
-  label,
-  delta,
-  goodWhen,
-}: {
-  label: string
-  delta: SnapshotKpiDelta | undefined
-  goodWhen: "up" | "down"
-}) {
-  if (!delta) return null
-  const curr = delta.curr ?? 0
-  const value = delta.delta ?? 0
-  const tone =
-    value === 0
-      ? "neutral"
-      : (goodWhen === "up" && value > 0) || (goodWhen === "down" && value < 0)
-      ? "green"
-      : "red"
-  const arrow = value > 0 ? "▲" : value < 0 ? "▼" : "·"
-  return (
-    <div style={kpiCellStyle}>
-      <div style={kpiLabelStyle}>{label}</div>
-      <div style={kpiValueStyle}>
-        <span>{curr}</span>
-        {value !== 0 && (
-          <span style={{ color: `var(--lcc-${tone})`, marginLeft: 6, fontSize: 12, fontWeight: 600 }}>
-            {arrow} {Math.abs(value)}
-          </span>
-        )}
-      </div>
     </div>
   )
 }
@@ -188,7 +159,7 @@ const headingStyle: React.CSSProperties = {
   gap: 8,
 }
 
-const cycleSummaryStyle: React.CSSProperties = {
+const summaryStyle: React.CSSProperties = {
   marginLeft: "auto",
   display: "inline-flex",
   alignItems: "baseline",
@@ -201,21 +172,21 @@ const cycleSummaryStyle: React.CSSProperties = {
   letterSpacing: 0,
 }
 
-const cycleNumberNewStyle: React.CSSProperties = {
+const numNewStyle: React.CSSProperties = {
   color: "var(--lcc-violet)",
   fontWeight: 700,
   fontSize: 14,
   fontVariantNumeric: "tabular-nums",
 }
 
-const cycleNumberResolvedStyle: React.CSSProperties = {
+const numResolvedStyle: React.CSSProperties = {
   color: "var(--lcc-green)",
   fontWeight: 700,
   fontSize: 14,
   fontVariantNumeric: "tabular-nums",
 }
 
-const cycleSepStyle: React.CSSProperties = {
+const sepStyle: React.CSSProperties = {
   color: "var(--lcc-text-faint)",
   margin: "0 4px",
 }
@@ -228,45 +199,10 @@ const cycleLabelStyle: React.CSSProperties = {
   letterSpacing: "0.1em",
 }
 
-const stripStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(5, 1fr)",
-  gap: 10,
-  marginBottom: 16,
-}
-
-const cellStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 8,
-  background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
-  border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.1))",
-  display: "flex",
-  flexDirection: "column",
-  gap: 2,
-}
-
-const cellValueStyle: React.CSSProperties = {
-  fontSize: 22,
-  fontWeight: 700,
-  lineHeight: 1,
-  color: "var(--lcc-text)",
-  fontVariantNumeric: "tabular-nums",
-}
-
-const cellLabelStyle: React.CSSProperties = {
-  fontSize: 10,
-  letterSpacing: "0.1em",
-  textTransform: "uppercase",
-  color: "var(--lcc-text-faint)",
-  fontFamily: "var(--font-mono, monospace)",
-  marginTop: 3,
-}
-
 const columnsStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
   gap: 18,
-  marginBottom: 14,
 }
 
 const sectionHeadStyle: React.CSSProperties = {
@@ -328,9 +264,6 @@ const itemMetaStyle: React.CSSProperties = {
   fontSize: 10.5,
   color: "var(--lcc-text-dim)",
   marginTop: 4,
-  display: "flex",
-  alignItems: "center",
-  flexWrap: "wrap",
 }
 
 const emptyStyle: React.CSSProperties = {
@@ -343,35 +276,9 @@ const emptyStyle: React.CSSProperties = {
   borderRadius: 6,
 }
 
-const kpiRowStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
-  gap: 8,
-  marginTop: 12,
-  paddingTop: 14,
-  borderTop: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.1))",
-}
-
-const kpiCellStyle: React.CSSProperties = {
-  padding: "6px 8px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 2,
-}
-
-const kpiLabelStyle: React.CSSProperties = {
-  fontSize: 9.5,
-  letterSpacing: "0.1em",
-  textTransform: "uppercase",
+const moreStyle: React.CSSProperties = {
+  fontSize: 11,
   color: "var(--lcc-text-faint)",
-  fontFamily: "var(--font-mono, monospace)",
-}
-
-const kpiValueStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "baseline",
-  fontSize: 16,
-  fontWeight: 700,
-  color: "var(--lcc-text)",
-  fontVariantNumeric: "tabular-nums",
+  fontStyle: "italic",
+  padding: "4px 10px",
 }

@@ -295,6 +295,21 @@ export interface SkippedTest {
   zephyrUrl: string
 }
 
+// ---------- Applitools ----------
+
+export interface ApplitoolsConfig {
+  apiKey: string
+  baseUrl: string
+}
+
+export interface UnresolvedTest {
+  testId: string
+  testName: string
+  /** "Unresolved" or "Failed" — capitalized from the Eyes API status field. */
+  status: string
+  zephyrUrl: string
+}
+
 // ---------- BlazeMeter (Load Testing) ----------
 
 export interface BlazemeterConfigStatus {
@@ -1087,6 +1102,19 @@ export interface MigrationSnapshotDiffResponse {
   latest: MigrationSnapshot | null
   previous: MigrationSnapshot | null
   diff: MigrationSnapshotDiff | null
+}
+
+/**
+ * Tickets created and resolved on a given calendar day, sourced from
+ * raw Jira/Asana frontmatter timestamps. Independent of the orchestrator
+ * snapshot pipeline — see ``GET /api/dashboard/daily-activity``.
+ */
+export interface MigrationDailyActivity {
+  date: string
+  createdCount: number
+  resolvedCount: number
+  created: RawTaskRecord[]
+  resolved: RawTaskRecord[]
 }
 
 export interface MigrationHistoryEntry {

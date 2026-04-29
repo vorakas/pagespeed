@@ -182,9 +182,7 @@ export function LaunchDashboard() {
         <main className="lcc-main">
           <HeroStrip health={health} />
 
-          {snapshotDiff?.latest && snapshotDiff.diff && (
-            <WhatChangedToday latest={snapshotDiff.latest} diff={snapshotDiff.diff} />
-          )}
+          <WhatChangedToday />
 
           {snapshotDiff?.latest && (
             <DailyStatusSummary snapshot={snapshotDiff.latest} />

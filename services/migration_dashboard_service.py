@@ -24,6 +24,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 from services.obsidian_sync.raw_scanner import (
     RawTask,
     RawTaskScanner,
+    daily_activity,
     new_bugs,
     production_failures,
     source_counts,
@@ -161,6 +162,20 @@ class MigrationDashboardService:
 
     def get_new_bugs(self, window_days: int = 7) -> List[dict]:
         return self._cached(f"newBugs:{window_days}", lambda: self._compute_new_bugs(window_days))
+
+    def get_daily_activity(self, on_date: date) -> dict:
+        """Return tickets created and resolved on ``on_date``.
+
+        Sourced from per-ticket ``created`` / ``resolved`` ISO date strings
+        in the raw frontmatter — so the result is always in sync with what
+        Jira/Asana actually have, regardless of whether the orchestrator's
+        daily status file populated its summary sections. Callers are
+        expected to pass a ``date`` already resolved in the user's
+        reporting timezone (typically Pacific) so the day boundary lines
+        up with the wall clock.
+        """
+        cache_key = f"dailyActivity:{on_date.isoformat()}"
+        return self._cached(cache_key, lambda: self._compute_daily_activity(on_date))
 
     def get_task_status(self) -> List[dict]:
         return self._cached("taskStatus", self._compute_task_status)
@@ -328,6 +343,16 @@ class MigrationDashboardService:
 
     def _compute_new_bugs(self, window_days: int) -> List[dict]:
         return [t.to_dict() for t in new_bugs(self._raw_tasks(), window_days=window_days)]
+
+    def _compute_daily_activity(self, on_date: date) -> dict:
+        activity = daily_activity(self._raw_tasks(), on_date=on_date)
+        return {
+            "date": on_date.isoformat(),
+            "createdCount": len(activity["created"]),
+            "resolvedCount": len(activity["resolved"]),
+            "created": [t.to_dict() for t in activity["created"]],
+            "resolved": [t.to_dict() for t in activity["resolved"]],
+        }
 
     def _compute_task_status(self) -> List[dict]:
         hist = status_histogram(self._raw_tasks(), project=_ACE2E_PROJECT_KEY)
