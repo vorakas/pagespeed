@@ -252,6 +252,23 @@ VAULT_COMMITTER_NAME: str = os.getenv('VAULT_COMMITTER_NAME', 'pharos-sync-bot')
 VAULT_COMMITTER_EMAIL: str = os.getenv('VAULT_COMMITTER_EMAIL', 'sync@pharos.local')
 """Email on commits created by the Railway sync hook."""
 
+VAULT_ACTIVE_HOURS_TZ: str = os.getenv('VAULT_ACTIVE_HOURS_TZ', 'America/Los_Angeles')
+"""IANA timezone whose hours the active-hours window is interpreted in.
+
+The vault auto-refresh and Jira/Asana sync schedulers only fire their
+real work when the local-clock hour in this timezone is within the
+``[VAULT_ACTIVE_HOURS_START, VAULT_ACTIVE_HOURS_END]`` window."""
+
+VAULT_ACTIVE_HOURS_START: int = int(os.getenv('VAULT_ACTIVE_HOURS_START', '8'))
+"""Earliest local hour (0-23) at which periodic vault jobs may run. Default 8 AM."""
+
+VAULT_ACTIVE_HOURS_END: int = int(os.getenv('VAULT_ACTIVE_HOURS_END', '22'))
+"""Latest local hour (0-23, inclusive) at which periodic vault jobs may run.
+
+Default 22 (10 PM) — meaning the last fire window of the day spans
+22:00–22:59 local time, and nothing runs between 23:00 and the start
+hour the next morning."""
+
 GITHUB_WEBHOOK_SECRET: str | None = os.getenv('GITHUB_WEBHOOK_SECRET')
 """Shared secret for verifying GitHub webhook HMAC signatures.
 

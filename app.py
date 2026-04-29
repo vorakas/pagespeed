@@ -48,6 +48,9 @@ from config import (
     OBSIDIAN_VAULT_ROOT,
     PAGESPEED_API_KEY,
     PORT,
+    VAULT_ACTIVE_HOURS_END,
+    VAULT_ACTIVE_HOURS_START,
+    VAULT_ACTIVE_HOURS_TZ,
     VAULT_BOT_TOKEN,
     VAULT_COMMITTER_EMAIL,
     VAULT_COMMITTER_NAME,
@@ -77,6 +80,7 @@ from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService, SyncAlreadyRunning
 from services.obsidian_sync.vault_reader import VaultReader
+from services.scheduling_window import ActiveHoursWindow
 from services.snapshot_service import SnapshotService
 from services.pagespeed_client import PageSpeedClient
 from services.vault_git_service import VaultGitService
@@ -285,6 +289,27 @@ def create_app() -> Flask:
         except Exception:
             logging.exception("Snapshot ingest after vault refresh failed")
 
+    # Active-hours gate for periodic vault jobs. Both the auto-refresh
+    # tick and the Jira/Asana sync tick consult this before doing any
+    # real work; outside the window the tick still fires (APScheduler
+    # keeps its own cadence) but no-ops at the top so we don't hammer
+    # upstream APIs overnight when no human is around to read the
+    # output.
+    try:
+        active_hours = ActiveHoursWindow(
+            start_hour=VAULT_ACTIVE_HOURS_START,
+            end_hour=VAULT_ACTIVE_HOURS_END,
+            timezone=VAULT_ACTIVE_HOURS_TZ,
+        )
+        logging.info(
+            "Vault scheduler active-hours window: %s", active_hours.describe()
+        )
+    except Exception:
+        logging.exception(
+            "Invalid VAULT_ACTIVE_HOURS_* config — falling back to 24/7 schedule"
+        )
+        active_hours = None
+
     # Schedule a periodic pull from origin so orchestrator commits land
     # on the Railway clone without waiting for the user to click refresh.
     # 10 minutes is responsive enough for hourly orchestration without
@@ -295,6 +320,12 @@ def create_app() -> Flask:
         AUTO_REFRESH_INTERVAL_MIN = int(os.environ.get("VAULT_AUTO_REFRESH_MINUTES", "10"))
 
         def _vault_auto_refresh_tick() -> None:
+            if active_hours is not None and not active_hours.is_open():
+                logging.debug(
+                    "Vault auto-refresh skipped — outside active-hours window (%s)",
+                    active_hours.describe(),
+                )
+                return
             prev_head = vault_git.auto_refresh_status().get("lastRefreshedHead")
             result = vault_git.auto_refresh()
             if result.get("ok") and result.get("head") and result["head"] != prev_head:
@@ -316,6 +347,12 @@ def create_app() -> Flask:
     OBSIDIAN_SYNC_INTERVAL_MIN = int(os.environ.get("OBSIDIAN_SYNC_INTERVAL_MIN", "60"))
 
     def _obsidian_sync_tick() -> None:
+        if active_hours is not None and not active_hours.is_open():
+            logging.debug(
+                "Obsidian sync skipped — outside active-hours window (%s)",
+                active_hours.describe(),
+            )
+            return
         try:
             obsidian_sync_service.start_sync(source="both")
         except SyncAlreadyRunning:
