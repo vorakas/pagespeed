@@ -1,4 +1,5 @@
 import type { MigrationHealthSnapshot } from "@/types"
+import { formatPacificDateLong } from "@/lib/datetime"
 import { renderHeadlineSegments } from "./headlineWikilinks"
 
 interface HeroStripProps {
@@ -57,11 +58,7 @@ function clamp01(value: number): number {
 }
 
 function formatToday(): string {
-  return new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
+  return formatPacificDateLong(new Date())
 }
 
 function stripEmphasis<T extends string | null | undefined>(text: T): T {

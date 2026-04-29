@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { renderHeadlineSegments } from "./headlineWikilinks"
 import type {
   MigrationSnapshot,
-  MigrationWorkstream,
   SnapshotAnalyticsBlocker,
-  SnapshotAreaHealthRow,
   SnapshotLpweUnestimated,
   SnapshotMaoItem,
   SnapshotOpenHighPriGroup,
@@ -16,38 +14,37 @@ import type {
   SnapshotTaskItem,
 } from "@/types"
 
-// Six-tab panel matching the handoff DailyStatus component. Each tab
+// Five-tab panel matching the handoff DailyStatus component. Each tab
 // consumes a subset of the snapshot payload (see handoff/design/app.jsx
 // and status_parser.py). Tabs hide themselves when they have no data
 // so low-signal days don't show empty pills.
+//
+// The legacy "Project Health" tab was removed when we demoted workstreams
+// — its data was a per-area workstream rollup, which is now an editorial
+// view rather than a primary surface. Project-level health lives on the
+// per-project dashboard pages instead.
 
 type Tone = "red" | "amber" | "green" | "blue" | "violet" | "neutral"
 
-type TabId = "critical" | "open" | "changes" | "services" | "coverage" | "health"
+type TabId = "critical" | "open" | "changes" | "services" | "coverage"
 
 interface Props {
   snapshot: MigrationSnapshot
-  workstreams?: MigrationWorkstream[] | null
+  /**
+   * Accepted for backwards compatibility with existing callers but no
+   * longer used — the workstream-driven Health tab was removed when we
+   * demoted workstreams behind the per-project view. Safe to drop on
+   * the call site.
+   */
+  workstreams?: unknown
 }
 
-export function DailyStatusSummary({ snapshot: input, workstreams }: Props) {
+export function DailyStatusSummary({ snapshot: input }: Props) {
   const snapshot = useMemo(() => withDefaults(input), [input])
   const tabs = useMemo(() => buildTabs(snapshot), [snapshot])
-  const [tab, setTab] = useState<TabId>(() => {
-    if (typeof window !== "undefined" && window.location.hash === "#workstreams") {
-      return "health"
-    }
-    return tabs.find((t) => t.count > 0)?.id ?? "critical"
-  })
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const onHashChange = () => {
-      if (window.location.hash === "#workstreams") setTab("health")
-    }
-    window.addEventListener("hashchange", onHashChange)
-    return () => window.removeEventListener("hashchange", onHashChange)
-  }, [])
+  const [tab, setTab] = useState<TabId>(
+    () => tabs.find((t) => t.count > 0)?.id ?? "critical",
+  )
 
   return (
     <section
@@ -99,9 +96,6 @@ export function DailyStatusSummary({ snapshot: input, workstreams }: Props) {
         {tab === "changes" && <ChangesTab snapshot={snapshot} />}
         {tab === "services" && <ServicesTab snapshot={snapshot} />}
         {tab === "coverage" && <CoverageTab sources={snapshot.sourceCoverage} />}
-        {tab === "health" && (
-          <HealthTab rows={snapshot.areaHealth} workstreams={workstreams ?? null} />
-        )}
       </div>
     </section>
   )
@@ -162,11 +156,6 @@ function buildTabs(s: MigrationSnapshot): Array<{ id: TabId; label: string; coun
       count: s.mao.length + s.privateLinkGaps.length + s.lpweUnestimated.length,
     },
     { id: "coverage", label: "Source Coverage", count: s.sourceCoverage.length },
-    {
-      id: "health",
-      label: "Project Health",
-      count: s.areaHealth.length || Object.keys(s.areaStatuses).length,
-    },
   ]
 }
 
@@ -520,168 +509,6 @@ function sourceLabel(key: string): string {
   // horizontal space in a cramped panel.
   if (key === "WPM") return "WPM (28 projects)"
   return key
-}
-
-function HealthTab({
-  rows,
-  workstreams,
-}: {
-  rows: SnapshotAreaHealthRow[]
-  workstreams: MigrationWorkstream[] | null
-}) {
-  if (!rows.length) return <EmptyHint>No area statuses on this snapshot.</EmptyHint>
-
-  // Derive short labels from the ws- id (e.g. "ws-pdp" → "PDP"). The
-  // workstream feed's full name field ("Product Detail Page (PDP)") is
-  // too verbose for this compact area view.
-  const labelByWs = new Map<string, string>()
-  for (const w of workstreams ?? []) {
-    if (w.id) labelByWs.set(w.id, deriveWsLabel(w.id))
-  }
-
-  // Preserve source order of areas (matches the MD table) rather than
-  // alphabetizing, so Storefront → Checkout → … stays meaningful.
-  const areas: Array<{ name: string; rows: SnapshotAreaHealthRow[] }> = []
-  const index = new Map<string, number>()
-  for (const row of rows) {
-    const areaKey = row.area || "Unsorted"
-    let idx = index.get(areaKey)
-    if (idx == null) {
-      idx = areas.push({ name: areaKey, rows: [] }) - 1
-      index.set(areaKey, idx)
-    }
-    areas[idx].rows.push(row)
-  }
-
-  return (
-    <div style={healthColumnsStyle}>
-      {areas.map((a) => (
-        <section key={a.name} style={healthAreaBlockStyle}>
-          <div style={healthAreaHeadStyle}>
-            <span style={healthAreaLabelStyle}>{a.name}</span>
-            <span style={healthAreaSepStyle} />
-            <span style={healthAreaCountStyle}>{a.rows.length}</span>
-          </div>
-          <div style={healthAreaRowsStyle}>
-            {a.rows.map((row) => (
-              <HealthRow
-                key={row.ws}
-                ws={row.ws}
-                label={labelByWs.get(row.ws) ?? deriveWsLabel(row.ws)}
-                status={row.status}
-                concern={row.concern}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  )
-}
-
-function HealthRow({
-  ws,
-  label,
-  status,
-  concern,
-}: {
-  ws: string
-  label: string
-  status: string
-  concern: string
-}) {
-  const tone = healthStatusTone(status)
-  const statusLabel = healthStatusLabel(status)
-  return (
-    <div
-      style={{
-        ...healthRowStyle,
-        borderLeft: `2px solid ${tone === "neutral" ? "var(--lcc-text-faint)" : `var(--lcc-${tone})`}`,
-      }}
-    >
-      <div style={healthWsChipStyle} title={ws}>
-        {ws.length > 18 ? `${ws.slice(0, 16)}…` : ws}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={healthLabelTextStyle}>{label}</div>
-        {concern && concern.toLowerCase() !== "no change" && (
-          <div style={healthConcernStyle}>{concern}</div>
-        )}
-        {(!concern || concern.toLowerCase() === "no change") && (
-          <div style={healthConcernFaintStyle}>No change</div>
-        )}
-      </div>
-      <span
-        style={{
-          ...healthStatusPillStyle,
-          color:
-            tone === "neutral" ? "var(--lcc-text-dim)" : `var(--lcc-${tone})`,
-          borderColor:
-            tone === "neutral"
-              ? "var(--lcc-glass-border, rgba(255,255,255,0.12))"
-              : `var(--lcc-${tone})`,
-          background:
-            tone === "neutral"
-              ? "rgba(255,255,255,0.04)"
-              : `var(--lcc-${tone}-bg, rgba(255,255,255,0.04))`,
-        }}
-      >
-        {statusLabel}
-      </span>
-    </div>
-  )
-}
-
-function healthStatusTone(status: string): Tone {
-  switch (status) {
-    case "blocked":
-      return "red"
-    case "at-risk":
-      return "amber"
-    case "in-progress":
-      return "blue"
-    case "improving":
-      return "blue"
-    case "near-complete":
-      return "green"
-    case "groomed":
-      return "neutral"
-    default:
-      return "neutral"
-  }
-}
-
-function healthStatusLabel(status: string): string {
-  switch (status) {
-    case "blocked":
-      return "CRITICAL"
-    case "at-risk":
-      return "AT RISK"
-    case "in-progress":
-      return "IN PROGRESS"
-    case "improving":
-      return "IMPROVING"
-    case "near-complete":
-      return "NEAR COMPLETE"
-    case "groomed":
-      return "GROOMED"
-    default:
-      return status.toUpperCase() || "UNKNOWN"
-  }
-}
-
-const WS_ACRONYMS = new Set(["pdp", "plp", "eds", "qa", "lp", "dy", "be", "ac"])
-
-function deriveWsLabel(ws: string): string {
-  const stem = ws.startsWith("ws-") ? ws.slice(3) : ws
-  return stem
-    .split("-")
-    .map((w) => {
-      if (!w) return w
-      if (WS_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase()
-      return w[0].toUpperCase() + w.slice(1)
-    })
-    .join(" ")
 }
 
 // ── Primitives ─────────────────────────────────────────────────────────
@@ -1146,111 +973,3 @@ const coverageBarLabelOutsideStyle: React.CSSProperties = {
   letterSpacing: "0.04em",
 }
 
-const healthColumnsStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
-  gap: 18,
-  alignItems: "start",
-}
-
-const healthAreaBlockStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-}
-
-const healthAreaHeadStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  marginBottom: 4,
-  fontSize: 12,
-  textTransform: "uppercase",
-  letterSpacing: "0.16em",
-  fontFamily: "var(--font-mono, monospace)",
-  fontWeight: 700,
-}
-
-const healthAreaLabelStyle: React.CSSProperties = {
-  color: "var(--lcc-blue)",
-}
-
-const healthAreaSepStyle: React.CSSProperties = {
-  flex: 1,
-  height: 1,
-  background:
-    "linear-gradient(90deg, var(--lcc-glass-border, rgba(255,255,255,0.1)), transparent)",
-}
-
-const healthAreaCountStyle: React.CSSProperties = {
-  fontFamily: "var(--font-mono, monospace)",
-  fontSize: 10,
-  padding: "1px 7px",
-  borderRadius: 999,
-  background: "rgba(255,255,255,0.06)",
-  color: "var(--lcc-text-dim)",
-}
-
-const healthAreaRowsStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-}
-
-const healthRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 12,
-  padding: "10px 12px",
-  background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
-  borderRadius: 6,
-}
-
-const healthWsChipStyle: React.CSSProperties = {
-  fontSize: 10,
-  color: "var(--lcc-text-faint)",
-  fontFamily: "var(--font-mono, monospace)",
-  padding: "3px 8px",
-  background: "rgba(255,255,255,0.04)",
-  borderRadius: 999,
-  whiteSpace: "nowrap",
-  flexShrink: 0,
-  marginTop: 1,
-  minWidth: 80,
-  textAlign: "center",
-}
-
-const healthLabelTextStyle: React.CSSProperties = {
-  fontSize: 13,
-  color: "var(--lcc-text)",
-  fontWeight: 600,
-  lineHeight: 1.3,
-}
-
-const healthConcernStyle: React.CSSProperties = {
-  fontSize: 11.5,
-  color: "var(--lcc-text-dim)",
-  marginTop: 3,
-  lineHeight: 1.45,
-}
-
-const healthConcernFaintStyle: React.CSSProperties = {
-  ...healthConcernStyle,
-  color: "var(--lcc-text-faint)",
-  fontStyle: "italic",
-}
-
-const healthStatusPillStyle: React.CSSProperties = {
-  fontSize: 9.5,
-  fontWeight: 700,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  padding: "3px 9px",
-  borderRadius: 999,
-  borderWidth: 1,
-  borderStyle: "solid",
-  whiteSpace: "nowrap",
-  flexShrink: 0,
-  fontFamily: "var(--font-mono, monospace)",
-  marginTop: 1,
-}

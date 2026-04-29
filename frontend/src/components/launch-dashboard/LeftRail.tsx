@@ -1,29 +1,45 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import type { MigrationKpis, MigrationWorkstream } from "@/types"
+import { ChevronDown, ChevronRight } from "lucide-react"
+import { formatPacificDate } from "@/lib/datetime"
+import type {
+  MigrationKpis,
+  MigrationSource,
+  MigrationWorkstream,
+} from "@/types"
 
 interface LeftRailProps {
   kpis: MigrationKpis | null
+  sources: MigrationSource[] | null
   workstreams: MigrationWorkstream[] | null
   vaultLastSynced: string | null
 }
 
 /**
- * Sticky left rail: at-a-glance KPIs + a ranked "Needs attention" shortlist.
+ * Sticky left rail: at-a-glance KPIs + a Projects list (primary nav) +
+ * a collapsed Rollups section (workstreams, demoted).
  *
- * The shortlist replaces the old Areas filter — most workstreams fell under
- * "Unsorted" because the status page's Project Health by Area table only
- * categorized ~8 of 34, and the Workstreams picker rail already covers
- * per-area navigation. This surfaces the top handful of workstreams with
- * open blockers / failed QA / risky status so the dashboard gives an
- * actionable triage queue instead of a cold filter list.
+ * Projects come from the per-source counts (`MigrationSource`), which roll
+ * up directly from `raw/<project>/` folders — every number on a project row
+ * traces back to a Jira/Asana feed without an editorial layer in between.
+ *
+ * Workstreams remain reachable via the "Rollups" section, but they're no
+ * longer the front door: the user clicks a project to see project-scoped
+ * data, and only opens a rollup when they want a cross-project view.
  */
 export function LeftRail({
   kpis,
+  sources,
   workstreams,
   vaultLastSynced,
 }: LeftRailProps) {
   const navigate = useNavigate()
+  const [rollupsOpen, setRollupsOpen] = useState(false)
+
+  const sortedProjects = useMemo(() => {
+    if (!sources) return []
+    return [...sources].sort((a, b) => b.total - a.total)
+  }, [sources])
 
   const needsAttention = useMemo(() => {
     if (!workstreams) return []
@@ -31,7 +47,7 @@ export function LeftRail({
       .map((ws) => ({ ws, score: attentionScore(ws) }))
       .filter(({ score }) => score > 0)
     scored.sort((a, b) => b.score - a.score)
-    return scored.slice(0, 7)
+    return scored.slice(0, 5)
   }, [workstreams])
 
   return (
@@ -66,63 +82,71 @@ export function LeftRail({
 
       <div className="lcc-lr-section">
         <div className="lcc-lr-label">
-          Needs attention
+          Projects
+          {sortedProjects.length > 0 && (
+            <span className="lcc-lr-label-count">{sortedProjects.length}</span>
+          )}
+        </div>
+        {sortedProjects.length === 0 ? (
+          <div className="lcc-lr-empty">No source feeds.</div>
+        ) : (
+          sortedProjects.map((src) => (
+            <ProjectRow
+              key={src.key}
+              source={src}
+              onOpen={() => navigate(`/dashboard/projects/${encodeURIComponent(src.key)}`)}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="lcc-lr-section">
+        <button
+          type="button"
+          className="lcc-lr-label"
+          onClick={() => setRollupsOpen((v) => !v)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            background: "transparent",
+            border: 0,
+            padding: 0,
+            cursor: "pointer",
+            color: "inherit",
+            font: "inherit",
+            width: "100%",
+          }}
+          aria-expanded={rollupsOpen}
+        >
+          {rollupsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          Rollups
           {needsAttention.length > 0 && (
             <span className="lcc-lr-label-count">{needsAttention.length}</span>
           )}
-        </div>
-        {needsAttention.length === 0 ? (
-          <div className="lcc-lr-empty">No open blockers or at-risk streams.</div>
-        ) : (
-          needsAttention.map(({ ws }) => (
-            <button
-              key={ws.id}
-              type="button"
-              className="lcc-lr-area"
-              onClick={() => navigate(`/dashboard/workstreams/${ws.id}`)}
-              title={ws.name}
+        </button>
+        {rollupsOpen && (
+          <>
+            {needsAttention.length === 0 ? (
+              <div className="lcc-lr-empty">No at-risk rollups.</div>
+            ) : (
+              needsAttention.map(({ ws }) => (
+                <RollupRow
+                  key={ws.id}
+                  workstream={ws}
+                  onOpen={() => navigate(`/dashboard/workstreams/${ws.id}`)}
+                />
+              ))
+            )}
+            <div
+              className="lcc-lr-empty"
+              style={{ marginTop: 6, fontStyle: "italic" }}
             >
-              <span
-                className="lcc-lr-dot"
-                data-tone={toneForStatus(ws.status)}
-                aria-hidden
-              />
-              <span className="lcc-lr-area-name">{ws.name}</span>
-              <span className="lcc-lr-area-meta">
-                {ws.blockedCount > 0 && (
-                  <span className="lcc-lr-area-risk" title={`${ws.blockedCount} blocker(s)`}>
-                    {ws.blockedCount}
-                  </span>
-                )}
-                {ws.failedQa > 0 && (
-                  <span
-                    className="lcc-lr-area-count"
-                    data-tone="amber"
-                    title={`${ws.failedQa} failed QA`}
-                  >
-                    {ws.failedQa}
-                  </span>
-                )}
-              </span>
-            </button>
-          ))
+              Workstreams are an editorial cross-project view. Numbers here
+              aggregate the project feeds above.
+            </div>
+          </>
         )}
-        <div className="lcc-lr-legend">
-          <div className="lcc-lr-legend-row">
-            <span className="lcc-lr-dot" data-tone="red" aria-hidden />
-            <span>blocked</span>
-            <span className="lcc-lr-dot" data-tone="amber" aria-hidden />
-            <span>at-risk</span>
-            <span className="lcc-lr-dot" data-tone="green" aria-hidden />
-            <span>on-track</span>
-          </div>
-          <div className="lcc-lr-legend-row">
-            <span className="lcc-lr-area-risk">N</span>
-            <span>blockers</span>
-            <span className="lcc-lr-area-count" data-tone="amber">N</span>
-            <span>failed QA</span>
-          </div>
-        </div>
       </div>
 
       <div className="lcc-lr-section">
@@ -130,10 +154,94 @@ export function LeftRail({
         <div className="lcc-lr-crumb">obsidian-vault</div>
         <div className="lcc-lr-crumb">└ /api/dashboard</div>
         <div className="lcc-lr-crumb">
-          └ {vaultLastSynced ? `synced ${new Date(vaultLastSynced).toLocaleDateString()}` : "not synced"}
+          └ {vaultLastSynced ? `synced ${formatPacificDate(vaultLastSynced)}` : "not synced"}
         </div>
       </div>
     </aside>
+  )
+}
+
+interface ProjectRowProps {
+  source: MigrationSource
+  onOpen: () => void
+}
+
+function ProjectRow({ source, onOpen }: ProjectRowProps) {
+  const pct = Math.max(0, Math.min(100, Math.round(source.pct ?? 0)))
+  return (
+    <button
+      type="button"
+      className="lcc-lr-area"
+      onClick={onOpen}
+      title={`${source.name} — ${source.total.toLocaleString()} tasks`}
+      style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span
+          className="lcc-src-kind"
+          style={{ fontSize: 9, textTransform: "uppercase", opacity: 0.7 }}
+        >
+          {source.kind}
+        </span>
+        <span className="lcc-lr-area-name" style={{ fontWeight: 600 }}>
+          {source.key}
+        </span>
+        <span className="lcc-lr-area-meta" style={{ marginLeft: "auto" }}>
+          <span className="lcc-lr-area-count">
+            {source.total.toLocaleString()}
+          </span>
+        </span>
+      </div>
+      <div className="lcc-src-bar" style={{ height: 3 }}>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+      <div
+        style={{
+          fontSize: 10,
+          color: "var(--lcc-text-faint)",
+          display: "flex",
+          justifyContent: "space-between",
+        }}
+      >
+        <span>{pct}% closed</span>
+        <span>{source.active.toLocaleString()} active</span>
+      </div>
+    </button>
+  )
+}
+
+interface RollupRowProps {
+  workstream: MigrationWorkstream
+  onOpen: () => void
+}
+
+function RollupRow({ workstream: ws, onOpen }: RollupRowProps) {
+  return (
+    <button
+      type="button"
+      className="lcc-lr-area"
+      onClick={onOpen}
+      title={ws.name}
+    >
+      <span className="lcc-lr-dot" data-tone={toneForStatus(ws.status)} aria-hidden />
+      <span className="lcc-lr-area-name">{ws.name}</span>
+      <span className="lcc-lr-area-meta">
+        {ws.blockedCount > 0 && (
+          <span className="lcc-lr-area-risk" title={`${ws.blockedCount} blocker(s)`}>
+            {ws.blockedCount}
+          </span>
+        )}
+        {ws.failedQa > 0 && (
+          <span
+            className="lcc-lr-area-count"
+            data-tone="amber"
+            title={`${ws.failedQa} failed QA`}
+          >
+            {ws.failedQa}
+          </span>
+        )}
+      </span>
+    </button>
   )
 }
 

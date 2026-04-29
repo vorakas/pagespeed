@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
-import { TopBar, type HealthFilter } from "@/components/launch-dashboard/TopBar"
+import { TopBar } from "@/components/launch-dashboard/TopBar"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import { HeroStrip } from "@/components/launch-dashboard/HeroStrip"
 import { TrendChart } from "@/components/launch-dashboard/TrendChart"
@@ -46,7 +46,6 @@ export function LaunchDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  const [filter, setFilter] = useState<HealthFilter>("all")
   const location = useLocation()
 
   useEffect(() => {
@@ -169,14 +168,13 @@ export function LaunchDashboard() {
     <LaunchShell>
       <TopBar
         health={health}
-        filter={filter}
-        onFilterChange={setFilter}
         onRefresh={() => void loadAll(true)}
         refreshing={refreshing}
       />
       <div className="lcc-shell">
         <LeftRail
           kpis={kpis}
+          sources={sources}
           workstreams={workstreams}
           vaultLastSynced={health.lastSynced}
         />
@@ -189,7 +187,7 @@ export function LaunchDashboard() {
           )}
 
           {snapshotDiff?.latest && (
-            <DailyStatusSummary snapshot={snapshotDiff.latest} workstreams={workstreams} />
+            <DailyStatusSummary snapshot={snapshotDiff.latest} />
           )}
 
           <div

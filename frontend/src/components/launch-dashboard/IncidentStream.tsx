@@ -1,4 +1,5 @@
 import { useMemo } from "react"
+import { formatPacificDate } from "@/lib/datetime"
 import type { MigrationBlocker, RawTaskRecord } from "@/types"
 
 export type IncidentFilter = "all" | "prod" | "blocker" | "bug"
@@ -87,7 +88,7 @@ export function IncidentStream({
         note: n.assignee ? `@${n.assignee}` : "UNASSIGNED",
         severity: (n.priority ?? "").toLowerCase() || "medium",
         meta: n.project,
-        time: n.created ? `filed ${n.created}` : null,
+        time: n.created ? `filed ${formatPacificDate(n.created)}` : null,
         sortTime: parseTimestamp(n.updated) || parseTimestamp(n.created),
         raw: n,
       })

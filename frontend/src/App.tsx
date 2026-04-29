@@ -17,6 +17,8 @@ import { Obsidian } from "@/pages/Obsidian"
 import { LaunchDashboard } from "@/pages/LaunchDashboard"
 import { StatusHistory } from "@/pages/StatusHistory"
 import { WorkstreamDetail } from "@/pages/WorkstreamDetail"
+import { ProjectDashboard } from "@/pages/ProjectDashboard"
+import { PrototypeBeaconBuilds } from "@/prototypes/beacon-builds/PrototypeBeaconBuilds"
 
 export default function App() {
   return (
@@ -25,6 +27,10 @@ export default function App() {
         <TooltipProvider>
           <SitesProvider>
             <Routes>
+              {/* Prototype routes — bypass AppLayout entirely. */}
+              <Route path="prototype/builds" element={<PrototypeBeaconBuilds register="beacon" />} />
+              <Route path="prototype/builds/aurora" element={<PrototypeBeaconBuilds register="aurora" />} />
+
               <Route element={<AppLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="test" element={<TestUrls />} />
@@ -39,6 +45,7 @@ export default function App() {
               <Route path="dashboard" element={<LaunchDashboard />} />
               <Route path="dashboard/history" element={<StatusHistory />} />
               <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
+              <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
               </Route>
             </Routes>
           </SitesProvider>
