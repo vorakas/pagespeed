@@ -33,9 +33,10 @@ export function WhatChangedToday({ latest, diff }: Props) {
   // Strip counts must match the column counts below — derive from the same
   // diff fields the columns render, so the numbers can't drift apart.
   const newCount = diff.newItems.added.length + diff.criticalBugs.added.length
+  const resolvedCount = summary?.resolved ?? latest.positives.length
   const cells = [
     { label: "New", value: newCount, tone: "violet" },
-    { label: "Resolved", value: summary?.resolved ?? latest.positives.length, tone: "green" },
+    { label: "Resolved", value: resolvedCount, tone: "green" },
     { label: "Regressed", value: diff.prodFailures.regressed.length, tone: "red" },
     { label: "Reassigned", value: diff.prodFailures.reassigned.length, tone: "amber" },
     { label: "On Hold", value: summary?.onHold ?? 0, tone: "blue" },
@@ -45,8 +46,11 @@ export function WhatChangedToday({ latest, diff }: Props) {
     <section className="panel" aria-label="What changed today">
       <h3 style={headingStyle}>
         <span>What Changed · {latest.date} vs {diff.from}</span>
-        <span style={{ marginLeft: "auto", color: "var(--lcc-text-dim)", fontFamily: "var(--font-mono, monospace)", fontWeight: 500, fontSize: 11 }}>
-          {diff.areaStatuses.length} workstream status change{diff.areaStatuses.length === 1 ? "" : "s"}
+        <span style={cycleSummaryStyle}>
+          <span style={cycleNumberNewStyle}>{newCount}</span> new
+          <span style={cycleSepStyle}>·</span>
+          <span style={cycleNumberResolvedStyle}>{resolvedCount}</span> resolved
+          <span style={cycleLabelStyle}>this sync cycle</span>
         </span>
       </h3>
 
@@ -182,6 +186,46 @@ const headingStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
+}
+
+const cycleSummaryStyle: React.CSSProperties = {
+  marginLeft: "auto",
+  display: "inline-flex",
+  alignItems: "baseline",
+  gap: 6,
+  color: "var(--lcc-text-dim)",
+  fontFamily: "var(--font-mono, monospace)",
+  fontWeight: 500,
+  fontSize: 11,
+  textTransform: "none",
+  letterSpacing: 0,
+}
+
+const cycleNumberNewStyle: React.CSSProperties = {
+  color: "var(--lcc-violet)",
+  fontWeight: 700,
+  fontSize: 14,
+  fontVariantNumeric: "tabular-nums",
+}
+
+const cycleNumberResolvedStyle: React.CSSProperties = {
+  color: "var(--lcc-green)",
+  fontWeight: 700,
+  fontSize: 14,
+  fontVariantNumeric: "tabular-nums",
+}
+
+const cycleSepStyle: React.CSSProperties = {
+  color: "var(--lcc-text-faint)",
+  margin: "0 4px",
+}
+
+const cycleLabelStyle: React.CSSProperties = {
+  marginLeft: 8,
+  color: "var(--lcc-text-faint)",
+  fontSize: 10,
+  textTransform: "uppercase",
+  letterSpacing: "0.1em",
 }
 
 const stripStyle: React.CSSProperties = {

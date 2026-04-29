@@ -1,17 +1,18 @@
 import type { MigrationHealthSnapshot } from "@/types"
-import {
-  convertUtcTimesToPacific,
-  formatPacificDateLong,
-} from "@/lib/datetime"
-import { renderHeadlineSegments } from "./headlineWikilinks"
+import { formatPacificDateLong } from "@/lib/datetime"
 
 interface HeroStripProps {
   health: MigrationHealthSnapshot
 }
 
 /**
- * Full-width hero banner: health badge + headline + reasons on the left,
+ * Full-width hero banner: health badge + status header on the left,
  * oversized countdown with progress bar on the right.
+ *
+ * The previous version rendered up to three "reasons" bullets here,
+ * but those duplicated content already shown in the Daily Status panel
+ * and made the hero noisy. The cycle-level "what happened" summary
+ * lives in WhatChangedToday's header instead.
  */
 export function HeroStrip({ health }: HeroStripProps) {
   const days = computeDaysUntil(health.launchWindow?.start)
@@ -26,18 +27,6 @@ export function HeroStrip({ health }: HeroStripProps) {
           </span>
           <div className="lcc-hs-headline">Project Status as of {formatToday()}</div>
         </div>
-        <ul className="lcc-hs-reasons">
-          {health.reasons.slice(0, 3).map((r, i) => (
-            <li key={i}>
-              {renderHeadlineSegments(
-                convertUtcTimesToPacific(
-                  stripEmphasis(r) ?? "",
-                  health.lastSynced,
-                ),
-              )}
-            </li>
-          ))}
-        </ul>
       </div>
       <div className="lcc-hs-countdown">
         <div className="lcc-hs-cd-label">Launch in</div>
@@ -69,13 +58,4 @@ function clamp01(value: number): number {
 
 function formatToday(): string {
   return formatPacificDateLong(new Date())
-}
-
-function stripEmphasis<T extends string | null | undefined>(text: T): T {
-  if (text == null) return text
-  const cleaned = (text as string)
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .replace(/<[^>]+>/g, "")
-  return cleaned as T
 }
