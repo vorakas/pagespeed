@@ -50,7 +50,7 @@ export function WhatChangedToday({ latest, diff }: Props) {
           <span style={cycleNumberNewStyle}>{newCount}</span> new
           <span style={cycleSepStyle}>·</span>
           <span style={cycleNumberResolvedStyle}>{resolvedCount}</span> resolved
-          <span style={cycleLabelStyle}>this sync cycle</span>
+          <span style={cycleLabelStyle}>today</span>
         </span>
       </h3>
 
