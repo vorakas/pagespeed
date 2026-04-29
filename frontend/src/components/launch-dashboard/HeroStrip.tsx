@@ -1,5 +1,8 @@
 import type { MigrationHealthSnapshot } from "@/types"
-import { formatPacificDateLong } from "@/lib/datetime"
+import {
+  convertUtcTimesToPacific,
+  formatPacificDateLong,
+} from "@/lib/datetime"
 import { renderHeadlineSegments } from "./headlineWikilinks"
 
 interface HeroStripProps {
@@ -25,7 +28,14 @@ export function HeroStrip({ health }: HeroStripProps) {
         </div>
         <ul className="lcc-hs-reasons">
           {health.reasons.slice(0, 3).map((r, i) => (
-            <li key={i}>{renderHeadlineSegments(stripEmphasis(r) ?? "")}</li>
+            <li key={i}>
+              {renderHeadlineSegments(
+                convertUtcTimesToPacific(
+                  stripEmphasis(r) ?? "",
+                  health.lastSynced,
+                ),
+              )}
+            </li>
           ))}
         </ul>
       </div>

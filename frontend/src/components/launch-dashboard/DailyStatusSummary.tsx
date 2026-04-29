@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { convertUtcTimesToPacific } from "@/lib/datetime"
 import { renderHeadlineSegments } from "./headlineWikilinks"
 import type {
   MigrationSnapshot,
@@ -69,7 +70,11 @@ export function DailyStatusSummary({ snapshot: input }: Props) {
         )}
       </div>
 
-      {snapshot.headline && <HeadlineBullets text={snapshot.headline} />}
+      {snapshot.headline && (
+        <HeadlineBullets
+          text={convertUtcTimesToPacific(snapshot.headline, snapshot.date)}
+        />
+      )}
 
       <div style={tabBarStyle} role="tablist">
         {tabs.map((t) => {
