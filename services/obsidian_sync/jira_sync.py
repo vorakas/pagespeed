@@ -626,16 +626,32 @@ _ATTACHMENT_KEY_RE = re.compile(r"^([A-Z][A-Z0-9]+-\d+)_(.+)$")
 
 
 def fetch_issue_attachments(session, issue_key):
-    """Return the ``attachment`` array for a single Jira issue, or [] on failure."""
+    """Return the ``attachment`` array for a single Jira issue, or [] on failure.
+
+    Uses ``/rest/api/2/search`` with a key-equality JQL rather than the
+    single-issue endpoint. On Lampstrack's permission scheme, the
+    single-issue endpoint with ``fields=attachment`` returns 200 but
+    drops the attachment array entirely; the search endpoint returns
+    the same payload shape that ``fetch_all_issues`` already uses
+    successfully during the per-project sync, so we know it's
+    auth-clean.
+    """
     try:
         resp = session.get(
-            f"{JIRA_BASE_URL}/rest/api/2/issue/{issue_key}",
-            params={"fields": "attachment"},
+            f"{JIRA_BASE_URL}/rest/api/2/search",
+            params={
+                "jql": f"key = {issue_key}",
+                "fields": "attachment",
+                "maxResults": 1,
+            },
             headers={"X-Atlassian-Token": "no-check"},
             timeout=30,
         )
         resp.raise_for_status()
-        return resp.json().get("fields", {}).get("attachment") or []
+        issues = resp.json().get("issues") or []
+        if not issues:
+            return []
+        return issues[0].get("fields", {}).get("attachment") or []
     except Exception as e:
         print(f"   ⚠ Backfill: failed to fetch {issue_key} attachments: {e}")
         return []
@@ -705,8 +721,15 @@ def backfill_missing_attachments(session, vault_root, projects=None):
 
     recovered = 0
     still_missing = 0
+    issues_no_attachments = 0
     for (project_dir, issue_key), wanted_names in missing_by_issue.items():
         attachments = fetch_issue_attachments(session, issue_key)
+        if not attachments:
+            # Jira returned no attachment metadata. Either the issue lost
+            # its attachments, or the PAT can't see them via the search
+            # endpoint. Track the count so the summary line shows how
+            # often this happens.
+            issues_no_attachments += 1
         # Build a name → attachment lookup; some Jira instances serve
         # space-encoded filenames, so look up by the normalized form too.
         by_name: dict = {}
@@ -732,9 +755,14 @@ def backfill_missing_attachments(session, vault_root, projects=None):
         recovered += len(downloaded)
         still_missing += len(failed)
 
+    no_att_msg = (
+        f" ({issues_no_attachments} issue(s) returned empty attachment lists)"
+        if issues_no_attachments
+        else ""
+    )
     print(
         f"   ✓ Attachment backfill: recovered {recovered}, "
-        f"still missing {still_missing}."
+        f"still missing {still_missing}.{no_att_msg}"
     )
     return {
         "scanned": scanned,
