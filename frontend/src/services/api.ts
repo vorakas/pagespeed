@@ -582,6 +582,7 @@ class ApiClient {
     batchId: string
     fetchedAt: string
     uploadedAt: number
+    platform: string | null
     testCount: number
   }>> {
     const response = await fetch("/api/applitools/recent-uploads", {

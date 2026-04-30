@@ -40,6 +40,10 @@ class _StoredBatch:
     tests: tuple[dict[str, Any], ...]
     fetched_at: str
     uploaded_at: float
+    # Platform the batch belongs to (Windows/Mac/iPhone/Android). The
+    # helper supplies this at upload time; the dropdown in Pharos uses
+    # it to scope suggestions to the matching Visual card.
+    platform: str | None
 
 
 class ApplitoolsBatchStore:
@@ -64,6 +68,7 @@ class ApplitoolsBatchStore:
         batch_id: str,
         tests: list[dict[str, Any]],
         fetched_at: str,
+        platform: str | None = None,
     ) -> None:
         """Store the helper-fetched test rows for *batch_id*.
 
@@ -80,6 +85,7 @@ class ApplitoolsBatchStore:
                 tests=snapshot,
                 fetched_at=fetched_at,
                 uploaded_at=time.time(),
+                platform=platform,
             )
 
     def get(self, batch_id: str) -> dict[str, Any] | None:
@@ -94,6 +100,7 @@ class ApplitoolsBatchStore:
                 "batchId": batch_id,
                 "fetchedAt": entry.fetched_at,
                 "uploadedAt": entry.uploaded_at,
+                "platform": entry.platform,
                 "tests": [dict(row) for row in entry.tests],
             }
 
@@ -114,6 +121,7 @@ class ApplitoolsBatchStore:
                         "batchId": batch_id,
                         "fetchedAt": entry.fetched_at,
                         "uploadedAt": entry.uploaded_at,
+                        "platform": entry.platform,
                         "testCount": len(entry.tests),
                     }
                     for batch_id, entry in self._entries.items()

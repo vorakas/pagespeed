@@ -29,6 +29,11 @@ from services.validation import validate_required_fields
 
 logger = logging.getLogger(__name__)
 
+# Each Visual build card belongs to one of these platforms; the helper
+# tags every upload with one so the dashboard dropdown can scope
+# suggestions to the matching card. Anything else is rejected.
+_VALID_PLATFORMS: frozenset[str] = frozenset({"Windows", "Mac", "iPhone", "Android"})
+
 
 def create_applitools_blueprint(
     store: ApplitoolsBatchStore,
@@ -90,10 +95,35 @@ def create_applitools_blueprint(
             })
 
         fetched_at = str(data.get("fetchedAt") or datetime.now(timezone.utc).isoformat())
-        store.put(str(data["batchId"]).strip(), normalized, fetched_at)
+
+        # Platform is optional for backwards compatibility (the cache
+        # gets wiped on every redeploy anyway), but when supplied it
+        # has to be one of the four card platforms — typos would
+        # silently break the dropdown filter on the frontend.
+        platform_raw = data.get("platform")
+        platform = str(platform_raw).strip() if platform_raw else None
+        if platform and platform not in _VALID_PLATFORMS:
+            return (
+                jsonify({
+                    "success": False,
+                    "error": (
+                        f"Unknown platform '{platform}'. "
+                        f"Expected one of: {', '.join(sorted(_VALID_PLATFORMS))}."
+                    ),
+                }),
+                400,
+            )
+
+        store.put(
+            str(data["batchId"]).strip(),
+            normalized,
+            fetched_at,
+            platform=platform,
+        )
         logger.info(
-            "Applitools batch uploaded: id=%s rows=%d",
+            "Applitools batch uploaded: id=%s platform=%s rows=%d",
             data["batchId"],
+            platform or "<none>",
             len(normalized),
         )
         return jsonify({"success": True, "stored": len(normalized)})

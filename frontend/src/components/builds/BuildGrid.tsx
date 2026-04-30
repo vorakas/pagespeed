@@ -73,6 +73,7 @@ interface BuildGridProps {
     batchId: string
     fetchedAt: string
     uploadedAt: number
+    platform: string | null
     testCount: number
   }>
 }
@@ -199,7 +200,14 @@ export function BuildGrid({
                   selected={builds[visual.key]?.id === selectedBuildId}
                   applitoolsBatchId={applitoolsBatchIds[visual.key]}
                   onApplitoolsBatchIdChange={onApplitoolsBatchIdChange}
-                  recentApplitoolsBatches={recentApplitoolsBatches}
+                  recentApplitoolsBatches={recentApplitoolsBatches.filter(
+                    // Only show uploads tagged with this card's platform.
+                    // Untagged (legacy) entries fall through to all cards
+                    // so cache wipes don't strand them; new helper builds
+                    // always tag, so this only matters during a deploy
+                    // straddling the schema change.
+                    (b) => !b.platform || b.platform === visual.key.split("_")[0],
+                  )}
                 />
               </div>
             </div>

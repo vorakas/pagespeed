@@ -46,9 +46,13 @@ export function ApplitoolsConfigPanel() {
             </li>
             <li>
               <strong className="text-foreground">Each release</strong>: run
-              <code className="ml-1 text-foreground">applitools-fetch.exe BATCH_ID</code>
-              {" "}— or double-click and paste the batch id. It uploads in
-              under a second.
+              <code className="ml-1 text-foreground">
+                applitools-fetch.exe BATCH_ID PLATFORM
+              </code>
+              {" "}(platform = Windows / Mac / iPhone / Android), or
+              double-click and the helper will prompt for both. The
+              platform tag is what scopes the dropdown to the matching
+              Visual card — so a Mac batch only appears on the Mac card.
             </li>
             <li>
               <strong className="text-foreground">Back in Pharos</strong>: click

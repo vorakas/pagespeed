@@ -66,6 +66,11 @@ ZEPHYR_BASE_URL: str = "https://lampstrack.lampsplus.com/secure/Tests.jspa#/test
 # laser-focused on test rows that need QA attention.
 KEPT_STATUSES: frozenset[str] = frozenset({"unresolved", "failed"})
 
+# Each Applitools batch belongs to exactly one Visual card (one of
+# Windows/Mac/iPhone/Android). The helper tags every upload with the
+# platform so Pharos can scope the dropdown on the matching card.
+VALID_PLATFORMS: tuple[str, ...] = ("Windows", "Mac", "iPhone", "Android")
+
 # Applitools has shipped several spellings for the test list over the
 # years — enumerate them so we don't break on a server upgrade.
 TEST_CONTAINER_KEYS: tuple[str, ...] = ("sessions", "items", "tests", "results")
@@ -173,7 +178,7 @@ class ApplitoolsFetcher:
     def __init__(self, config: HelperConfig) -> None:
         self._config: HelperConfig = config
 
-    def run(self, batch_id: str) -> int:
+    def run(self, batch_id: str, platform: str) -> int:
         """Fetch + upload one batch. Returns process exit code."""
         try:
             raw_tests, tests = self._fetch_batch_rows(batch_id)
@@ -189,13 +194,13 @@ class ApplitoolsFetcher:
             self._print_diagnosis(batch_id, raw_tests)
 
         try:
-            stored = self._upload(batch_id, tests)
+            stored = self._upload(batch_id, tests, platform)
         except _Exit as exc:
             print(f"ERROR (Pharos upload): {exc}")
             return 2
 
         print(
-            f"OK — uploaded {stored} row(s) for batch {batch_id} to "
+            f"OK — uploaded {stored} row(s) for batch {batch_id} ({platform}) to "
             f"{self._config.pharos_url}."
         )
         return 0
@@ -293,11 +298,12 @@ class ApplitoolsFetcher:
 
     # -- Pharos side --------------------------------------------------------
 
-    def _upload(self, batch_id: str, tests: list[dict[str, Any]]) -> int:
+    def _upload(self, batch_id: str, tests: list[dict[str, Any]], platform: str) -> int:
         url = f"{self._config.pharos_url}/api/applitools/upload-batch"
         body = {
             "batchId": batch_id,
             "fetchedAt": datetime.now(timezone.utc).isoformat(),
+            "platform": platform,
             "tests": tests,
         }
         headers = {
@@ -371,20 +377,58 @@ def _extract_test_id(test_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _read_batch_id_from_argv() -> str | None:
+def _read_positional_args() -> tuple[str | None, str | None]:
+    """Pull positional ``BATCH_ID [PLATFORM]`` from argv, ignoring flags."""
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
-    return args[0].strip() if args else None
+    batch_id = args[0].strip() if len(args) >= 1 else None
+    platform_raw = args[1].strip() if len(args) >= 2 else None
+    return batch_id, platform_raw
+
+
+def _resolve_platform(supplied: str | None) -> str | None:
+    """Validate / canonicalise a platform name (case-insensitive match)."""
+    if not supplied:
+        return None
+    lookup = {p.lower(): p for p in VALID_PLATFORMS}
+    return lookup.get(supplied.lower())
+
+
+def _prompt_for_platform() -> str:
+    """Ask QA which Visual card this batch belongs to."""
+    options = " / ".join(f"{i + 1}={p}" for i, p in enumerate(VALID_PLATFORMS))
+    while True:
+        raw = input(f"Platform ({options}): ").strip()
+        if not raw:
+            continue
+        # Accept either the digit, the name, or a case-insensitive prefix.
+        if raw.isdigit() and 1 <= int(raw) <= len(VALID_PLATFORMS):
+            return VALID_PLATFORMS[int(raw) - 1]
+        resolved = _resolve_platform(raw)
+        if resolved:
+            return resolved
+        print(f"  '{raw}' isn't one of {', '.join(VALID_PLATFORMS)}. Try again.")
 
 
 def main() -> int:
     config = load_or_prompt_config()
-    batch_id = _read_batch_id_from_argv()
+    batch_id, platform_arg = _read_positional_args()
     if not batch_id:
         batch_id = input("Applitools batch id: ").strip()
     if not batch_id:
         print("ERROR: no batch id supplied.")
         return 1
-    return ApplitoolsFetcher(config).run(batch_id)
+    platform = _resolve_platform(platform_arg)
+    if platform_arg and not platform:
+        # The user typed a value but it didn't match any known platform.
+        # Bail rather than silently prompt — they explicitly asked for X.
+        print(
+            f"ERROR: '{platform_arg}' is not a known platform. "
+            f"Expected one of: {', '.join(VALID_PLATFORMS)}."
+        )
+        return 1
+    if not platform:
+        platform = _prompt_for_platform()
+    return ApplitoolsFetcher(config).run(batch_id, platform)
 
 
 if __name__ == "__main__":

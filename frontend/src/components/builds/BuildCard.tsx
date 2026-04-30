@@ -49,6 +49,7 @@ interface BuildCardProps {
     batchId: string
     fetchedAt: string
     uploadedAt: number
+    platform: string | null
     testCount: number
   }>
 }

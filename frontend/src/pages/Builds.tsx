@@ -61,6 +61,7 @@ export function Builds() {
     batchId: string
     fetchedAt: string
     uploadedAt: number
+    platform: string | null
     testCount: number
   }>>([])
   const [connected, setConnected] = useState(false)
