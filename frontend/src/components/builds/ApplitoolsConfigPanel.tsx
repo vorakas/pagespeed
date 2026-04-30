@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { buttonVariants } from "@/components/ui/button"
-import { Download, ExternalLink } from "lucide-react"
+import { Download } from "lucide-react"
 
 /**
  * Setup instructions for the Applitools desktop helper.
@@ -67,14 +67,6 @@ export function ApplitoolsConfigPanel() {
               className={buttonVariants({ size: "sm" })}
             >
               <Download className="h-4 w-4" /> Download helper (.exe)
-            </a>
-            <a
-              href="/downloads/applitools-helper-readme.txt"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonVariants({ size: "sm", variant: "outline" })}
-            >
-              <ExternalLink className="h-4 w-4" /> Setup notes
             </a>
           </div>
 

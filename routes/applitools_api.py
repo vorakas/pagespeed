@@ -63,7 +63,14 @@ def create_applitools_blueprint(
             return jsonify({"success": False, "error": "Unauthorized."}), 401
 
         data = request.get_json(silent=True) or {}
-        validate_required_fields(data, ["batchId", "tests"])
+        # ``tests`` is required to be *present* but may legitimately be an
+        # empty list — a batch with no Unresolved/Failed sessions is a
+        # valid upload, and the regression spreadsheet still wants the
+        # section header rendered. Validate the key separately so the
+        # generic non-empty-truthy check doesn't bounce empty lists.
+        validate_required_fields(data, ["batchId"])
+        if "tests" not in data:
+            return jsonify({"success": False, "error": "Missing required field: tests"}), 400
         tests = data.get("tests")
         if not isinstance(tests, list):
             return jsonify({"success": False, "error": "tests must be a list."}), 400

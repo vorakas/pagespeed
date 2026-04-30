@@ -176,16 +176,17 @@ class ApplitoolsFetcher:
     def run(self, batch_id: str) -> int:
         """Fetch + upload one batch. Returns process exit code."""
         try:
-            tests = self._fetch_batch_rows(batch_id)
+            raw_tests, tests = self._fetch_batch_rows(batch_id)
         except _Exit as exc:
             print(f"ERROR (Applitools): {exc}")
             return 1
 
         if not tests:
-            print(
-                f"Batch {batch_id} returned no Unresolved/Failed rows — "
-                f"uploading an empty list anyway so Pharos shows the section."
-            )
+            # Print *why* we ended up with zero rows, so QA can spot
+            # whether the batch genuinely has no failures, the status
+            # filter rejected everything, or test names are missing
+            # the T-number that links rows to Zephyr.
+            self._print_diagnosis(batch_id, raw_tests)
 
         try:
             stored = self._upload(batch_id, tests)
@@ -199,9 +200,50 @@ class ApplitoolsFetcher:
         )
         return 0
 
+    @staticmethod
+    def _print_diagnosis(batch_id: str, raw_tests: list[dict[str, Any]]) -> None:
+        total = len(raw_tests)
+        if total == 0:
+            print(
+                f"Batch {batch_id}: Applitools returned 0 tests. "
+                f"Either the batch id is wrong or the JSON layout uses a "
+                f"key the helper doesn't recognise yet "
+                f"(known keys: {', '.join(TEST_CONTAINER_KEYS)})."
+            )
+            return
+
+        # Tally what the filters found so we can point at the right step.
+        status_counts: dict[str, int] = {}
+        for t in raw_tests:
+            key = str(t.get("status", "")).strip().lower() or "<no-status>"
+            status_counts[key] = status_counts.get(key, 0) + 1
+        kept_statuses = sum(c for s, c in status_counts.items() if s in KEPT_STATUSES)
+        sample_names = [
+            (t.get("testName") or t.get("name") or "<unnamed>")[:80]
+            for t in raw_tests[:3]
+        ]
+        print(
+            f"Batch {batch_id}: {total} total tests, "
+            f"{kept_statuses} matched status filter ({', '.join(sorted(KEPT_STATUSES))}), "
+            f"0 had a recognisable T-number in the name."
+        )
+        print(f"  status distribution: {status_counts}")
+        print(f"  sample names: {sample_names}")
+        print(
+            "  (uploading an empty list anyway so Pharos still renders the section.)"
+        )
+
     # -- Applitools side ----------------------------------------------------
 
-    def _fetch_batch_rows(self, batch_id: str) -> list[dict[str, Any]]:
+    def _fetch_batch_rows(
+        self, batch_id: str,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Fetch a batch and return ``(raw_tests, normalized_rows)``.
+
+        ``raw_tests`` is whatever Applitools handed back, used for the
+        diagnostic print when the normaliser produces no rows.
+        ``normalized_rows`` is what we actually upload.
+        """
         url = f"{self._config.applitools_base_url}/batches/{batch_id}"
         headers = {
             "X-Eyes-Api-Key": self._config.applitools_api_key,
@@ -226,7 +268,8 @@ class ApplitoolsFetcher:
             payload = response.json()
         except ValueError:
             raise _Exit("Applitools response was not valid JSON.")
-        return self._normalize(payload)
+        raw = list(_coerce_tests(payload))
+        return raw, self._normalize(payload)
 
     @staticmethod
     def _normalize(payload: Any) -> list[dict[str, Any]]:

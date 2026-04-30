@@ -16,7 +16,7 @@ const DEFAULT_DEVOPS_CONFIG: DevOpsConfig = {
   pat: "",
   organization: "LampsPlus",
   project: "TestAutomation",
-  orchestratorPipelineId: null,
+  orchestratorPipelineId: 261,
   pipelineMap: {
     WarmUp: 219,
     Windows_Functional: 167,
