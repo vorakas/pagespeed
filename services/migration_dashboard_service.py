@@ -177,6 +177,30 @@ class MigrationDashboardService:
         cache_key = f"dailyActivity:{on_date.isoformat()}"
         return self._cached(cache_key, lambda: self._compute_daily_activity(on_date))
 
+    def get_project_tasks(self, project_key: str) -> dict:
+        """Return all raw tickets for a single project plus a status histogram.
+
+        Used by the per-project dashboard page. The ``project`` field on
+        each ``RawTask`` matches its top-level folder under ``raw/``
+        (e.g. ``ACE2E``, ``WPM``, ``LAMPSPLUS``); the ``asana`` source
+        flattens its sub-projects up so e.g. ``raw/asana/LAMPSPLUS/...``
+        becomes project=``LAMPSPLUS``.
+
+        Output shape:
+            {
+              "project": "ACE2E",
+              "total": 412,
+              "active": 187,
+              "resolved": 225,
+              "statusCounts": [{"status": "Open", "count": 132}, ...],
+              "tasks": [<all task dicts, newest-updated first>],
+            }
+        """
+        cache_key = f"projectTasks:{project_key}"
+        return self._cached(
+            cache_key, lambda: self._compute_project_tasks(project_key)
+        )
+
     def get_task_status(self) -> List[dict]:
         return self._cached("taskStatus", self._compute_task_status)
 
@@ -352,6 +376,38 @@ class MigrationDashboardService:
             "resolvedCount": len(activity["resolved"]),
             "created": [t.to_dict() for t in activity["created"]],
             "resolved": [t.to_dict() for t in activity["resolved"]],
+        }
+
+    def _compute_project_tasks(self, project_key: str) -> dict:
+        # Filter raw tasks to this project. Pre-collect into a list since
+        # we walk it twice (histogram + serialization) and the iterator
+        # would be exhausted after the first pass.
+        tasks = [t for t in self._raw_tasks() if t.project == project_key]
+        # Newest-updated first; tickets without an `updated` date sink to
+        # the bottom rather than crashing on None comparisons.
+        tasks.sort(key=lambda t: (t.updated or "", t.key), reverse=True)
+
+        hist = status_histogram(tasks)
+        status_counts = [
+            {
+                "status": status,
+                "count": count,
+                "color": _STATUS_COLOR_MAP.get(status.lower(), "neutral"),
+                "group": _STATUS_GROUP_MAP.get(status.lower(), "backlog"),
+            }
+            for status, count in hist.items()
+        ]
+
+        active = sum(1 for t in tasks if not t.is_resolved)
+        resolved = len(tasks) - active
+
+        return {
+            "project": project_key,
+            "total": len(tasks),
+            "active": active,
+            "resolved": resolved,
+            "statusCounts": status_counts,
+            "tasks": [t.to_dict() for t in tasks],
         }
 
     def _compute_task_status(self) -> List[dict]:

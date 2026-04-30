@@ -67,6 +67,20 @@ def create_dashboard_blueprint(
         window = int(request.args.get("windowDays", "7"))
         return jsonify(service.get_new_bugs(window_days=window))
 
+    @bp.route("/api/dashboard/projects/<path:project_key>/tasks", methods=["GET"])
+    def project_tasks(project_key: str):
+        """All raw tickets for a single project, newest-updated first.
+
+        Backs the per-project dashboard page. ``project_key`` is the
+        top-level folder name under ``raw/`` (e.g. ``ACE2E``, ``WPM``,
+        ``LAMPSPLUS``). Unknown keys return an empty task list rather
+        than 404, since that's how the page surfaces "this project has
+        no synced tickets yet" without an error state.
+        """
+        if not service.is_available():
+            return jsonify({"error": "vault not found"}), 404
+        return jsonify(service.get_project_tasks(project_key))
+
     @bp.route("/api/dashboard/daily-activity", methods=["GET"])
     def daily_activity():
         """Tickets created and resolved on a given day, from raw timestamps.

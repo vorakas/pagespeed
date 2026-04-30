@@ -5,7 +5,9 @@ import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import type {
   MigrationBlocker,
+  MigrationProjectTasks,
   MigrationSource,
+  MigrationTaskStatusRow,
   MigrationWorkstream,
   RawTaskRecord,
 } from "@/types"
@@ -30,31 +32,35 @@ export function ProjectDashboard() {
   const [blockers, setBlockers] = useState<MigrationBlocker[] | null>(null)
   const [prodFailures, setProdFailures] = useState<RawTaskRecord[] | null>(null)
   const [newBugs, setNewBugs] = useState<RawTaskRecord[] | null>(null)
+  const [projectTasks, setProjectTasks] = useState<MigrationProjectTasks | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const loadAll = useCallback(async () => {
+    if (!projectKey) return
     setError(null)
     setLoading(true)
     try {
-      const [src, ws, bl, pf, nb] = await Promise.all([
+      const [src, ws, bl, pf, nb, pt] = await Promise.all([
         api.getMigrationSources(),
         api.getMigrationWorkstreams(),
         api.getMigrationBlockers(),
         api.getMigrationProductionFailures(),
         api.getMigrationNewBugs(),
+        api.getMigrationProjectTasks(projectKey),
       ])
       setSources(src)
       setWorkstreams(ws)
       setBlockers(bl)
       setProdFailures(pf)
       setNewBugs(nb)
+      setProjectTasks(pt)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load project")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [projectKey])
 
   useEffect(() => {
     void loadAll()
@@ -156,7 +162,12 @@ export function ProjectDashboard() {
           prodFailures={projectProdFailures}
           newBugs={projectNewBugs}
         />
-        <TicketsPlaceholder />
+        {projectTasks && (
+          <>
+            <StatusBreakdownPanel rows={projectTasks.statusCounts} total={projectTasks.total} />
+            <TicketsPanel tasks={projectTasks.tasks} total={projectTasks.total} />
+          </>
+        )}
       </PageFrame>
     </LaunchShell>
   )
@@ -474,26 +485,269 @@ function TaskListPanel({
   )
 }
 
-// ── Tickets placeholder ────────────────────────────────────────────────
+// ── Status breakdown ───────────────────────────────────────────────────
 
-function TicketsPlaceholder() {
+const STATUS_TONE: Record<string, string> = {
+  green: "var(--lcc-green)",
+  red: "var(--lcc-red)",
+  amber: "var(--lcc-amber)",
+  blue: "var(--lcc-blue)",
+  neutral: "var(--lcc-text-faint)",
+}
+
+interface StatusBreakdownPanelProps {
+  rows: MigrationTaskStatusRow[]
+  total: number
+}
+
+function StatusBreakdownPanel({ rows, total }: StatusBreakdownPanelProps) {
+  if (rows.length === 0) return null
   return (
-    <div
-      className="panel"
-      style={{
-        padding: "14px 18px",
-        borderStyle: "dashed",
-        color: "var(--lcc-text-faint)",
-      }}
-    >
-      <h3 style={{ marginTop: 0 }}>Tickets</h3>
-      <p style={{ fontSize: 12, margin: 0 }}>
-        Per-project ticket browsing isn't wired yet — needs a backend
-        endpoint that streams `raw/&lt;project&gt;/` tasks. Today only the
-        aggregated incident lists above are available.
-      </p>
+    <div className="panel" style={{ padding: "14px 18px" }}>
+      <h3>
+        Status breakdown<span className="count">{rows.length}</span>
+      </h3>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gap: 10,
+        }}
+      >
+        {rows.map((row) => {
+          const pct = total > 0 ? Math.round((row.count / total) * 100) : 0
+          const tone = STATUS_TONE[row.color] ?? STATUS_TONE.neutral
+          return (
+            <div
+              key={row.status}
+              style={{
+                padding: "10px 12px",
+                background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
+                borderRadius: 6,
+                borderLeft: `3px solid ${tone}`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: tone,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {row.count}
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--lcc-text)",
+                  marginTop: 1,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                title={row.status}
+              >
+                {row.status}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--lcc-text-faint)", marginTop: 1 }}>
+                {pct}%
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
+}
+
+// ── Tickets table ──────────────────────────────────────────────────────
+
+const TICKET_PAGE_SIZE = 50
+
+interface TicketsPanelProps {
+  tasks: RawTaskRecord[]
+  total: number
+}
+
+function TicketsPanel({ tasks, total }: TicketsPanelProps) {
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? tasks : tasks.slice(0, TICKET_PAGE_SIZE)
+
+  if (tasks.length === 0) {
+    return (
+      <div className="panel" style={{ padding: "14px 18px" }}>
+        <h3>Tickets</h3>
+        <p style={{ color: "var(--lcc-text-faint)", fontSize: 12, margin: 0 }}>
+          No tickets synced for this project.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="panel" style={{ padding: "14px 18px" }}>
+      <h3>
+        Tickets
+        <span className="count">{total.toLocaleString()}</span>
+      </h3>
+      <div style={{ overflowX: "auto" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: 12,
+          }}
+        >
+          <thead>
+            <tr style={{ textAlign: "left", color: "var(--lcc-text-faint)" }}>
+              <Th>Key</Th>
+              <Th>Summary</Th>
+              <Th>Status</Th>
+              <Th>Priority</Th>
+              <Th>Assignee</Th>
+              <Th>Updated</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((t) => (
+              <tr
+                key={t.key}
+                style={{ borderTop: "1px solid var(--lcc-border-faint)" }}
+              >
+                <Td>
+                  {t.url ? (
+                    <a
+                      href={t.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontFamily: "monospace",
+                        color: "var(--lcc-blue)",
+                        textDecoration: "none",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {t.key}
+                    </a>
+                  ) : (
+                    <span
+                      style={{
+                        fontFamily: "monospace",
+                        color: "var(--lcc-text-dim)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {t.key}
+                    </span>
+                  )}
+                </Td>
+                <Td>
+                  <span style={{ color: "var(--lcc-text)" }}>{t.summary ?? "—"}</span>
+                </Td>
+                <Td>
+                  <span style={{ color: "var(--lcc-text-dim)", whiteSpace: "nowrap" }}>
+                    {t.status ?? t.taskStatus ?? "—"}
+                  </span>
+                </Td>
+                <Td>
+                  <span style={{ color: "var(--lcc-text-dim)", whiteSpace: "nowrap" }}>
+                    {t.priority ?? "—"}
+                  </span>
+                </Td>
+                <Td>
+                  <span style={{ color: "var(--lcc-text-dim)", whiteSpace: "nowrap" }}>
+                    {t.assignee ?? "—"}
+                  </span>
+                </Td>
+                <Td>
+                  <span
+                    style={{
+                      color: "var(--lcc-text-faint)",
+                      fontFamily: "monospace",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {t.updated ?? "—"}
+                  </span>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {tasks.length > TICKET_PAGE_SIZE && (
+        <div
+          style={{
+            marginTop: 10,
+            display: "flex",
+            justifyContent: "center",
+            gap: 8,
+            fontSize: 11,
+            color: "var(--lcc-text-faint)",
+          }}
+        >
+          {showAll ? (
+            <>
+              <span>Showing all {tasks.length.toLocaleString()} tickets</span>
+              <button
+                type="button"
+                onClick={() => setShowAll(false)}
+                style={linkButtonStyle}
+              >
+                show first {TICKET_PAGE_SIZE}
+              </button>
+            </>
+          ) : (
+            <>
+              <span>
+                Showing first {TICKET_PAGE_SIZE} of {tasks.length.toLocaleString()}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                style={linkButtonStyle}
+              >
+                show all
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th
+      style={{
+        fontWeight: 600,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        fontSize: 10,
+        padding: "6px 8px",
+      }}
+    >
+      {children}
+    </th>
+  )
+}
+
+function Td({ children }: { children: React.ReactNode }) {
+  return (
+    <td style={{ padding: "6px 8px", verticalAlign: "top" }}>{children}</td>
+  )
+}
+
+const linkButtonStyle: React.CSSProperties = {
+  background: "transparent",
+  border: 0,
+  color: "var(--lcc-blue)",
+  cursor: "pointer",
+  fontSize: 11,
+  padding: 0,
+  textDecoration: "underline",
 }
 
 // ── Filtering helpers ──────────────────────────────────────────────────

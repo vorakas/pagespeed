@@ -1117,6 +1117,20 @@ export interface MigrationDailyActivity {
   resolved: RawTaskRecord[]
 }
 
+/**
+ * All raw tickets for a single project plus a status histogram.
+ * Backs the per-project dashboard page — see
+ * ``GET /api/dashboard/projects/<key>/tasks``.
+ */
+export interface MigrationProjectTasks {
+  project: string
+  total: number
+  active: number
+  resolved: number
+  statusCounts: MigrationTaskStatusRow[]
+  tasks: RawTaskRecord[]
+}
+
 export interface MigrationHistoryEntry {
   from: string
   to: string
