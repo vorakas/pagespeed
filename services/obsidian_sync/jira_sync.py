@@ -625,17 +625,7 @@ _EMBED_REF_RE = re.compile(
 _ATTACHMENT_KEY_RE = re.compile(r"^([A-Z][A-Z0-9]+-\d+)_(.+)$")
 
 
-def fetch_issue_attachments(session, issue_key):
-    """Return the ``attachment`` array for a single Jira issue, or [] on failure.
-
-    Uses ``/rest/api/2/search`` with a key-equality JQL rather than the
-    single-issue endpoint. On Lampstrack's permission scheme, the
-    single-issue endpoint with ``fields=attachment`` returns 200 but
-    drops the attachment array entirely; the search endpoint returns
-    the same payload shape that ``fetch_all_issues`` already uses
-    successfully during the per-project sync, so we know it's
-    auth-clean.
-    """
+def _fetch_issue_attachments_via_search(session, issue_key):
     try:
         resp = session.get(
             f"{JIRA_BASE_URL}/rest/api/2/search",
@@ -653,8 +643,45 @@ def fetch_issue_attachments(session, issue_key):
             return []
         return issues[0].get("fields", {}).get("attachment") or []
     except Exception as e:
-        print(f"   ⚠ Backfill: failed to fetch {issue_key} attachments: {e}")
+        print(f"   ⚠ Backfill: search lookup failed for {issue_key}: {e}")
         return []
+
+
+def _fetch_issue_attachments_via_issue(session, issue_key):
+    try:
+        resp = session.get(
+            f"{JIRA_BASE_URL}/rest/api/2/issue/{issue_key}",
+            params={"fields": "attachment"},
+            headers={"X-Atlassian-Token": "no-check"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json().get("fields", {}).get("attachment") or []
+    except Exception as e:
+        print(f"   ⚠ Backfill: issue lookup failed for {issue_key}: {e}")
+        return []
+
+
+def fetch_issue_attachments(session, issue_key):
+    """Return the ``attachment`` array for a single Jira issue, or [] on
+    failure.
+
+    Lampstrack's permission scheme is asymmetric: the single-issue
+    endpoint (`/rest/api/2/issue/{key}`) returns attachments for some
+    issues that the search endpoint can't see, and vice-versa. Trying
+    them both and using the larger result set squeezes the most out of
+    whatever the PAT is allowed to read. Empirically the search endpoint
+    works for cross-project JQL feeds (WPM) while the single-issue
+    endpoint works for direct project syncs (ACE2E etc.).
+    """
+    # Issue endpoint first — cheaper (no JQL parser) and worked for the
+    # WPM JQL backfill in production. Fall back to search if it returns
+    # nothing, since search picks up some issues the issue endpoint
+    # silently strips.
+    atts = _fetch_issue_attachments_via_issue(session, issue_key)
+    if atts:
+        return atts
+    return _fetch_issue_attachments_via_search(session, issue_key)
 
 
 def backfill_missing_attachments(session, vault_root, projects=None):
