@@ -187,6 +187,19 @@ DEVOPS_PIPELINE_MAP: dict[str, int] = _parse_pipeline_map(os.getenv('DEVOPS_PIPE
 """Map of role key (e.g. ``Windows_Functional``) → pipeline definition id."""
 
 # ---------------------------------------------------------------------------
+# Applitools helper-upload token
+# ---------------------------------------------------------------------------
+
+APPLITOOLS_HELPER_TOKEN: str | None = os.getenv('APPLITOOLS_HELPER_TOKEN')
+"""Shared secret the desktop helper sends in ``X-Pharos-Helper-Token``.
+
+The helper runs on a QA machine (where the corporate firewall actually
+permits Applitools API calls) and POSTs fetched batch rows to
+``/api/applitools/upload-batch``. Without this env var, uploads are
+disabled and the endpoint returns 503 — failing closed so a misconfigured
+production deploy never silently accepts unauthenticated writes."""
+
+# ---------------------------------------------------------------------------
 # BlazeMeter defaults
 # ---------------------------------------------------------------------------
 

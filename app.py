@@ -30,6 +30,7 @@ logging.basicConfig(
 logging.getLogger('apscheduler').setLevel(logging.DEBUG)
 
 from config import (
+    APPLITOOLS_HELPER_TOKEN,
     ASANA_PAT,
     ASANA_PROJECT_MAP,
     BLAZEMETER_API_KEY_ID,
@@ -75,6 +76,7 @@ from exceptions import (
     SchedulerError,
     ValidationError,
 )
+from services.applitools_storage import ApplitoolsBatchStore
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
@@ -144,6 +146,12 @@ def create_app() -> Flask:
 
     site_service = SiteService(site_repo, url_repo, test_result_repo)
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
+
+    # Process-wide cache for Applitools batches uploaded by the desktop
+    # helper. One instance per app so all workers share state — important
+    # because Gunicorn forks but the cache is per-process; if QA hits a
+    # different worker, they'll get a 404 and just rerun the helper.
+    applitools_store = ApplitoolsBatchStore()
 
     # ---- Scheduler ----
     # Explicit UTC timezone ensures cron expressions fire at the same time
@@ -400,6 +408,8 @@ def create_app() -> Flask:
         devops_project=DEVOPS_PROJECT,
         devops_orchestrator_pipeline_id=DEVOPS_ORCHESTRATOR_PIPELINE_ID,
         devops_pipeline_map=DEVOPS_PIPELINE_MAP,
+        applitools_store=applitools_store,
+        applitools_helper_token=APPLITOOLS_HELPER_TOKEN,
     )
 
     # ---- Centralized error handlers ----

@@ -25,7 +25,6 @@ import type {
   DevOpsBuild,
   FailedTest,
   SkippedTest,
-  ApplitoolsConfig,
   UnresolvedTest,
   BlazemeterConfigStatus,
   BlazemeterProject,
@@ -571,50 +570,36 @@ class ApiClient {
     })
   }
 
-  // ---------- Applitools ----------
+  // ---------- Applitools (helper-uploaded results) ----------
 
-  private applitoolsBody(config: ApplitoolsConfig, extra: Record<string, unknown> = {}): string {
-    return JSON.stringify({
-      api_key: config.apiKey,
-      base_url: config.baseUrl,
-      ...extra,
-    })
-  }
-
-  async testApplitoolsConnection(
-    config: ApplitoolsConfig,
-  ): Promise<{ success: boolean; message: string }> {
-    return this.request("/api/applitools/test-connection", {
-      method: "POST",
-      body: this.applitoolsBody(config),
-    })
-  }
-
+  /**
+   * Look up Applitools batch results that the desktop helper uploaded
+   * for this batch id. Returns ``null`` when nothing has been uploaded
+   * yet (the helper hasn't been run, or the cache TTL expired) so
+   * callers can fall back to an empty Unresolved section in the
+   * spreadsheet rather than aborting the whole export.
+   */
   async getApplitoolsBatch(
-    config: ApplitoolsConfig,
     batchId: string,
-  ): Promise<{ success: boolean; tests: UnresolvedTest[] }> {
-    return this.request("/api/applitools/batch", {
-      method: "POST",
-      body: this.applitoolsBody(config, { batch_id: batchId }),
-    })
-  }
-
-  async probeApplitoolsListEndpoints(
-    config: ApplitoolsConfig,
   ): Promise<{
-    success: boolean
-    probes: Array<{
-      url: string
-      status: number | null
-      shape: unknown
-      snippet: string
-    }>
-  }> {
-    return this.request("/api/applitools/probe-list", {
-      method: "POST",
-      body: this.applitoolsBody(config),
-    })
+    batchId: string
+    fetchedAt: string
+    tests: UnresolvedTest[]
+  } | null> {
+    const response = await fetch(
+      `/api/applitools/batch/${encodeURIComponent(batchId)}`,
+      { headers: { Accept: "application/json" } },
+    )
+    if (response.status === 404) return null
+    if (!response.ok) {
+      throw new Error(`Applitools lookup failed: HTTP ${response.status}`)
+    }
+    const data = await response.json()
+    return {
+      batchId: data.batchId,
+      fetchedAt: data.fetchedAt,
+      tests: data.tests ?? [],
+    }
   }
 
   // ---------- BlazeMeter (Load Testing) ----------

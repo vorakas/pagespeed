@@ -11,6 +11,8 @@ build/
 develop-eggs/
 dist/
 downloads/
+# ...but the Vite-served downloads folder (Applitools helper exe) is shipped:
+!frontend/public/downloads/
 eggs/
 .eggs/
 /lib/

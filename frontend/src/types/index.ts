@@ -296,11 +296,13 @@ export interface SkippedTest {
 }
 
 // ---------- Applitools ----------
-
-export interface ApplitoolsConfig {
-  apiKey: string
-  baseUrl: string
-}
+//
+// The browser no longer talks to the Applitools API directly — Railway's
+// egress is blocked at the corporate firewall. Instead, a desktop helper
+// fetches batches and POSTs the rows to the Pharos backend; the dashboard
+// reads them back via ``GET /api/applitools/batch/<batch_id>``. So no
+// per-user ``ApplitoolsConfig`` lives in localStorage; only the test row
+// shape used by the spreadsheet export remains.
 
 export interface UnresolvedTest {
   testId: string
