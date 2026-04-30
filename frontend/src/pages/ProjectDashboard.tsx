@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom"
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react"
 import { marked } from "marked"
 import { api } from "@/services/api"
+import { repairJiraMarkdownSource } from "@/lib/markdown-source"
 import { normalizeJiraMergedHeaderTables } from "@/lib/markdown-tables"
 import { shortenLinksInHtml } from "@/lib/url-shortening"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
@@ -906,10 +907,15 @@ function TicketDrawer({ task, detail }: TicketDrawerProps) {
     if (detail?.kind !== "loaded") return ""
     const body = detail.data.body ?? ""
     if (!body.trim()) return ""
-    const raw = marked.parse(body, { async: false }) as string
-    // Order matters: normalize tables first (so we don't waste work
-    // shortening links inside cells that are about to be dropped),
-    // then shorten URLs in whatever survives.
+    // Pipeline:
+    //   raw → repair source-level Jira quirks (doubled link syntax,
+    //         non-breaking spaces) → marked.parse → normalize Jira
+    //         "Col N" tables → shorten Lampstrack/Asana URLs.
+    // Source-level repairs run first so marked sees correctly-formed
+    // markdown; HTML-level cleanup runs after so it can use DOM
+    // structure (table cells, anchor tags) as anchors.
+    const repaired = repairJiraMarkdownSource(body)
+    const raw = marked.parse(repaired, { async: false }) as string
     return shortenLinksInHtml(normalizeJiraMergedHeaderTables(raw))
   }, [detail])
 
