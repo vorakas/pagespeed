@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom"
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react"
 import { marked } from "marked"
 import { api } from "@/services/api"
+import { shortenLinksInHtml } from "@/lib/url-shortening"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import type {
   MigrationBlocker,
@@ -904,7 +905,8 @@ function TicketDrawer({ task, detail }: TicketDrawerProps) {
     if (detail?.kind !== "loaded") return ""
     const body = detail.data.body ?? ""
     if (!body.trim()) return ""
-    return marked.parse(body, { async: false }) as string
+    const raw = marked.parse(body, { async: false }) as string
+    return shortenLinksInHtml(raw)
   }, [detail])
 
   return (
