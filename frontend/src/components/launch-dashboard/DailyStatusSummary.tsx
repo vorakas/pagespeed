@@ -3,6 +3,7 @@ import { convertUtcTimesToPacific } from "@/lib/datetime"
 import { renderHeadlineSegments } from "./headlineWikilinks"
 import type {
   MigrationSnapshot,
+  MigrationSource,
   SnapshotAnalyticsBlocker,
   SnapshotLpweUnestimated,
   SnapshotMaoItem,
@@ -32,6 +33,14 @@ type TabId = "critical" | "open" | "changes" | "services" | "coverage"
 interface Props {
   snapshot: MigrationSnapshot
   /**
+   * Live source totals from /api/dashboard/sources. When provided,
+   * the Source Coverage tab swaps each row's resolved/active/total
+   * with the live value (matched by `key`) so the tab agrees with
+   * the Projects sidebar instead of pinning to whatever totals were
+   * authored into today's status note.
+   */
+  sources?: MigrationSource[] | null
+  /**
    * Accepted for backwards compatibility with existing callers but no
    * longer used — the workstream-driven Health tab was removed when we
    * demoted workstreams behind the per-project view. Safe to drop on
@@ -40,8 +49,11 @@ interface Props {
   workstreams?: unknown
 }
 
-export function DailyStatusSummary({ snapshot: input }: Props) {
-  const snapshot = useMemo(() => withDefaults(input), [input])
+export function DailyStatusSummary({ snapshot: input, sources }: Props) {
+  const snapshot = useMemo(
+    () => withLiveSources(withDefaults(input), sources),
+    [input, sources],
+  )
   const tabs = useMemo(() => buildTabs(snapshot), [snapshot])
   const [tab, setTab] = useState<TabId>(
     () => tabs.find((t) => t.count > 0)?.id ?? "critical",
@@ -130,6 +142,32 @@ function withDefaults(s: MigrationSnapshot): MigrationSnapshot {
     areaStatuses: s.areaStatuses ?? {},
     areaHealth: s.areaHealth ?? [],
   }
+}
+
+// Status notes hand-author the Source Coverage table, so its totals
+// freeze at publish time and drift from the live Jira/Asana counts the
+// Projects sidebar shows. When the caller passes live `sources`, swap
+// each authored row's resolved/active/total with the live values
+// (matched by key) and clear the `~` approx flag — the live counts are
+// exact. Rows without a live match (none today, but cheap insurance)
+// keep the authored values.
+function withLiveSources(
+  snap: MigrationSnapshot,
+  sources: MigrationSource[] | null | undefined,
+): MigrationSnapshot {
+  if (!sources || sources.length === 0) return snap
+  const liveByKey = new Map(sources.map((s) => [s.key.toUpperCase(), s]))
+  const merged = snap.sourceCoverage.map<SnapshotSource>((row) => {
+    const live = liveByKey.get(row.key.toUpperCase())
+    if (!live) return row
+    return {
+      key: row.key,
+      total: live.total,
+      resolved: live.resolved,
+      active: live.active,
+    }
+  })
+  return { ...snap, sourceCoverage: merged }
 }
 
 // ── Tab definitions ────────────────────────────────────────────────────
