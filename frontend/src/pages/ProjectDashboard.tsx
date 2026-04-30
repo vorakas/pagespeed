@@ -33,6 +33,7 @@ export function ProjectDashboard() {
   const [prodFailures, setProdFailures] = useState<RawTaskRecord[] | null>(null)
   const [newBugs, setNewBugs] = useState<RawTaskRecord[] | null>(null)
   const [projectTasks, setProjectTasks] = useState<MigrationProjectTasks | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -65,6 +66,18 @@ export function ProjectDashboard() {
   useEffect(() => {
     void loadAll()
   }, [loadAll])
+
+  // Drop the status filter when the project key changes so a stale
+  // filter from one project's status set doesn't carry over.
+  useEffect(() => {
+    setStatusFilter(null)
+  }, [projectKey])
+
+  const filteredTasks = useMemo(() => {
+    const all = projectTasks?.tasks ?? []
+    if (!statusFilter) return all
+    return all.filter((t) => (t.status ?? t.taskStatus ?? "") === statusFilter)
+  }, [projectTasks, statusFilter])
 
   const project = useMemo(
     () => sources?.find((s) => s.key === projectKey) ?? null,
@@ -164,8 +177,20 @@ export function ProjectDashboard() {
         />
         {projectTasks && (
           <>
-            <StatusBreakdownPanel rows={projectTasks.statusCounts} total={projectTasks.total} />
-            <TicketsPanel tasks={projectTasks.tasks} total={projectTasks.total} />
+            <StatusBreakdownPanel
+              rows={projectTasks.statusCounts}
+              total={projectTasks.total}
+              selected={statusFilter}
+              onSelect={(status) =>
+                setStatusFilter((prev) => (prev === status ? null : status))
+              }
+            />
+            <TicketsPanel
+              tasks={filteredTasks}
+              total={projectTasks.total}
+              activeStatus={statusFilter}
+              onClearStatus={() => setStatusFilter(null)}
+            />
           </>
         )}
       </PageFrame>
@@ -498,14 +523,33 @@ const STATUS_TONE: Record<string, string> = {
 interface StatusBreakdownPanelProps {
   rows: MigrationTaskStatusRow[]
   total: number
+  selected: string | null
+  onSelect: (status: string) => void
 }
 
-function StatusBreakdownPanel({ rows, total }: StatusBreakdownPanelProps) {
+function StatusBreakdownPanel({
+  rows,
+  total,
+  selected,
+  onSelect,
+}: StatusBreakdownPanelProps) {
   if (rows.length === 0) return null
   return (
     <div className="panel" style={{ padding: "14px 18px" }}>
       <h3>
         Status breakdown<span className="count">{rows.length}</span>
+        <span
+          style={{
+            marginLeft: "auto",
+            fontSize: 10,
+            textTransform: "none",
+            letterSpacing: 0,
+            fontWeight: 400,
+            color: "var(--lcc-text-faint)",
+          }}
+        >
+          click a status to filter the table below
+        </span>
       </h3>
       <div
         style={{
@@ -517,14 +561,36 @@ function StatusBreakdownPanel({ rows, total }: StatusBreakdownPanelProps) {
         {rows.map((row) => {
           const pct = total > 0 ? Math.round((row.count / total) * 100) : 0
           const tone = STATUS_TONE[row.color] ?? STATUS_TONE.neutral
+          const isActive = selected === row.status
           return (
-            <div
+            <button
               key={row.status}
+              type="button"
+              onClick={() => onSelect(row.status)}
+              aria-pressed={isActive}
+              title={
+                isActive
+                  ? `Click again to clear filter`
+                  : `Filter tickets to "${row.status}"`
+              }
               style={{
+                appearance: "none",
+                textAlign: "left",
+                cursor: "pointer",
                 padding: "10px 12px",
-                background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
+                background: isActive
+                  ? "rgba(255,255,255,0.08)"
+                  : "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
                 borderRadius: 6,
+                borderTop: 0,
+                borderRight: 0,
+                borderBottom: 0,
                 borderLeft: `3px solid ${tone}`,
+                outline: isActive ? `1px solid ${tone}` : "none",
+                outlineOffset: 0,
+                color: "inherit",
+                font: "inherit",
+                transition: "background 120ms ease",
               }}
             >
               <div
@@ -546,14 +612,13 @@ function StatusBreakdownPanel({ rows, total }: StatusBreakdownPanelProps) {
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                 }}
-                title={row.status}
               >
                 {row.status}
               </div>
               <div style={{ fontSize: 10, color: "var(--lcc-text-faint)", marginTop: 1 }}>
                 {pct}%
               </div>
-            </div>
+            </button>
           )
         })}
       </div>
@@ -568,13 +633,26 @@ const TICKET_PAGE_SIZE = 50
 interface TicketsPanelProps {
   tasks: RawTaskRecord[]
   total: number
+  activeStatus: string | null
+  onClearStatus: () => void
 }
 
-function TicketsPanel({ tasks, total }: TicketsPanelProps) {
+function TicketsPanel({
+  tasks,
+  total,
+  activeStatus,
+  onClearStatus,
+}: TicketsPanelProps) {
   const [showAll, setShowAll] = useState(false)
+  // Reset pagination when the filter changes so the user always sees
+  // the head of the filtered set.
+  useEffect(() => {
+    setShowAll(false)
+  }, [activeStatus])
   const visible = showAll ? tasks : tasks.slice(0, TICKET_PAGE_SIZE)
+  const isFiltered = activeStatus !== null
 
-  if (tasks.length === 0) {
+  if (total === 0) {
     return (
       <div className="panel" style={{ padding: "14px 18px" }}>
         <h3>Tickets</h3>
@@ -589,8 +667,34 @@ function TicketsPanel({ tasks, total }: TicketsPanelProps) {
     <div className="panel" style={{ padding: "14px 18px" }}>
       <h3>
         Tickets
-        <span className="count">{total.toLocaleString()}</span>
+        <span className="count">
+          {isFiltered
+            ? `${tasks.length.toLocaleString()} / ${total.toLocaleString()}`
+            : total.toLocaleString()}
+        </span>
+        {isFiltered && (
+          <span style={filterChipStyle}>
+            <span style={{ color: "var(--lcc-text-faint)", marginRight: 4 }}>
+              status:
+            </span>
+            <span style={{ color: "var(--lcc-text)" }}>{activeStatus}</span>
+            <button
+              type="button"
+              onClick={onClearStatus}
+              aria-label="Clear status filter"
+              title="Clear status filter"
+              style={filterChipClearStyle}
+            >
+              ×
+            </button>
+          </span>
+        )}
       </h3>
+      {isFiltered && tasks.length === 0 && (
+        <p style={{ color: "var(--lcc-text-faint)", fontSize: 12, margin: "0 0 8px" }}>
+          No tickets match this filter.
+        </p>
+      )}
       <div style={{ overflowX: "auto" }}>
         <table
           style={{
@@ -748,6 +852,32 @@ const linkButtonStyle: React.CSSProperties = {
   fontSize: 11,
   padding: 0,
   textDecoration: "underline",
+}
+
+const filterChipStyle: React.CSSProperties = {
+  marginLeft: 10,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  padding: "2px 4px 2px 8px",
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid var(--lcc-border-faint, rgba(255,255,255,0.12))",
+  fontSize: 10.5,
+  textTransform: "none",
+  letterSpacing: 0,
+  fontWeight: 500,
+}
+
+const filterChipClearStyle: React.CSSProperties = {
+  appearance: "none",
+  background: "transparent",
+  border: 0,
+  color: "var(--lcc-text-faint)",
+  cursor: "pointer",
+  padding: "0 4px",
+  fontSize: 12,
+  lineHeight: 1,
 }
 
 // ── Filtering helpers ──────────────────────────────────────────────────
