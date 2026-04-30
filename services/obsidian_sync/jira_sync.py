@@ -492,30 +492,94 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp"}
 ATTACHMENTS_FOLDER = "_attachments"
 
 
+def _fetch_attachment_binary(session, att_id, content_hint, dest):
+    """Download a Jira attachment to ``dest``. Returns True on success.
+
+    Jira Data Center's ``/secure/attachment/{id}/{filename}`` servlet rejects
+    PAT-authenticated requests with 403 even when the same session works
+    against ``/rest/api/2/*`` — the servlet wants a session cookie + CSRF
+    token rather than a Bearer header. The REST attachment endpoint accepts
+    PAT auth and (a) confirms we have access to the attachment, (b) returns
+    a fresh ``content`` URL whose redirect chain establishes session state
+    the servlet then honors. The ``X-Atlassian-Token: no-check`` header
+    bypasses the CSRF/Referer guard for both calls.
+
+    ``content_hint`` is the URL Jira embedded in the parent issue payload —
+    used as a fallback when the metadata fetch fails (e.g. an old token
+    that lost ``BROWSE_PROJECTS`` but kept attachment visibility).
+    """
+    headers = {"X-Atlassian-Token": "no-check"}
+    content_url = None
+    if att_id:
+        try:
+            meta = session.get(
+                f"{JIRA_BASE_URL}/rest/api/2/attachment/{att_id}",
+                headers=headers,
+                timeout=30,
+            )
+            meta.raise_for_status()
+            content_url = meta.json().get("content")
+        except Exception:
+            content_url = None
+    if not content_url:
+        content_url = content_hint
+    if not content_url:
+        return False
+    try:
+        resp = session.get(
+            content_url,
+            stream=True,
+            allow_redirects=True,
+            headers=headers,
+            timeout=60,
+        )
+        resp.raise_for_status()
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with open(dest, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+        return True
+    except Exception as e:
+        print(f"   ⚠ Failed to download {dest.name} (id={att_id}): {e}")
+        # Partial files leave a half-written .png that Obsidian can't render —
+        # remove it so a later backfill pass treats the slot as empty and
+        # retries cleanly.
+        try:
+            if dest.exists():
+                dest.unlink()
+        except OSError:
+            pass
+        return False
+
+
 def download_attachments(session, issue_key, attachments, output_dir):
     """Download all attachments for an issue into the _attachments folder.
 
-    Returns a dict mapping original filename → local filename (with key prefix).
-    Skips files that already exist on disk (unless size differs).
+    Returns a tuple ``(downloaded, failed)`` where ``downloaded`` maps the
+    original Jira filename → local filename (with issue-key prefix) and
+    ``failed`` lists ``{key, id, filename}`` records that couldn't be
+    fetched. Files already on disk with matching size are treated as
+    downloaded without a re-fetch.
     """
     if not attachments:
-        return {}
+        return {}, []
 
     att_dir = output_dir / ATTACHMENTS_FOLDER
     att_dir.mkdir(exist_ok=True)
 
     downloaded = {}
+    failed = []
     for att in attachments:
         original_name = att.get("filename", "file")
-        content_url = att.get("content", "")
+        att_id = att.get("id")
+        content_hint = att.get("content", "")
         remote_size = att.get("size", 0)
 
-        if not content_url:
+        if not att_id and not content_hint:
             continue
 
         # Prefix with issue key to avoid collisions across issues
-        local_name = f"{issue_key}_{original_name}"
-        local_name = sanitize_filename(local_name)
+        local_name = sanitize_filename(f"{issue_key}_{original_name}")
         local_path = att_dir / local_name
 
         # Skip if already downloaded and same size
@@ -523,17 +587,131 @@ def download_attachments(session, issue_key, attachments, output_dir):
             downloaded[original_name] = local_name
             continue
 
-        try:
-            resp = session.get(content_url, stream=True, timeout=60)
-            resp.raise_for_status()
-            with open(local_path, "wb") as f:
-                for chunk in resp.iter_content(chunk_size=8192):
-                    f.write(chunk)
+        if _fetch_attachment_binary(session, att_id, content_hint, local_path):
             downloaded[original_name] = local_name
-        except Exception as e:
-            print(f"   ⚠ Failed to download {original_name} from {issue_key}: {e}")
+        else:
+            failed.append({"key": issue_key, "id": att_id, "filename": original_name})
 
-    return downloaded
+    return downloaded, failed
+
+
+# Pattern for the embedded-attachment wikilink the description converter
+# emits — ``![[_attachments/{KEY}_{name}]]`` — used by the backfill scan
+# to discover orphaned references.
+_EMBED_REF_RE = re.compile(
+    r"!\[\[_attachments/([A-Z][A-Z0-9]+-\d+)_([^\]\|]+?)(?:\|[^\]]*)?\]\]"
+)
+# Issue-key prefix on attachment filenames already saved to disk.
+_ATTACHMENT_KEY_RE = re.compile(r"^([A-Z][A-Z0-9]+-\d+)_(.+)$")
+
+
+def fetch_issue_attachments(session, issue_key):
+    """Return the ``attachment`` array for a single Jira issue, or [] on failure."""
+    try:
+        resp = session.get(
+            f"{JIRA_BASE_URL}/rest/api/2/issue/{issue_key}",
+            params={"fields": "attachment"},
+            headers={"X-Atlassian-Token": "no-check"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json().get("fields", {}).get("attachment") or []
+    except Exception as e:
+        print(f"   ⚠ Backfill: failed to fetch {issue_key} attachments: {e}")
+        return []
+
+
+def backfill_missing_attachments(session, vault_root, projects=None):
+    """Scan the vault for ``![[_attachments/KEY_name]]`` refs whose target
+    file is missing on disk, then re-fetch them from Jira via the REST
+    flow.
+
+    Cheap to run after every sync: an exhaustive scan with no missing
+    files makes only a few stat calls. ``projects`` optionally restricts
+    the sweep to a list of project subfolders (e.g. ``["ACE2E"]``).
+    Returns a dict with ``scanned``, ``missing``, ``recovered``,
+    ``still_missing`` counts.
+    """
+    root = Path(vault_root)
+    if not root.exists():
+        return {"scanned": 0, "missing": 0, "recovered": 0, "still_missing": 0}
+
+    project_dirs = (
+        [root / p for p in projects] if projects else [d for d in root.iterdir() if d.is_dir()]
+    )
+
+    # Group missing filenames per (project_dir, issue_key) so we hit the
+    # Jira issue API once per affected issue rather than once per ref.
+    missing_by_issue: dict = {}
+    scanned = 0
+    for project_dir in project_dirs:
+        if not project_dir.exists() or not project_dir.is_dir():
+            continue
+        att_dir = project_dir / ATTACHMENTS_FOLDER
+        for md_path in project_dir.rglob("*.md"):
+            scanned += 1
+            try:
+                content = md_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            for match in _EMBED_REF_RE.finditer(content):
+                issue_key = match.group(1)
+                original_name = match.group(2)
+                local_name = sanitize_filename(f"{issue_key}_{original_name}")
+                local_path = att_dir / local_name
+                if local_path.exists() and local_path.stat().st_size > 0:
+                    continue
+                missing_by_issue.setdefault((project_dir, issue_key), set()).add(original_name)
+
+    if not missing_by_issue:
+        print(f"   ✓ Attachment backfill: scanned {scanned} file(s), nothing missing.")
+        return {"scanned": scanned, "missing": 0, "recovered": 0, "still_missing": 0}
+
+    total_missing = sum(len(v) for v in missing_by_issue.values())
+    print(
+        f"   🔧 Attachment backfill: {total_missing} missing across "
+        f"{len(missing_by_issue)} issue(s)..."
+    )
+
+    recovered = 0
+    still_missing = 0
+    for (project_dir, issue_key), wanted_names in missing_by_issue.items():
+        attachments = fetch_issue_attachments(session, issue_key)
+        # Build a name → attachment lookup; some Jira instances serve
+        # space-encoded filenames, so look up by the normalized form too.
+        by_name: dict = {}
+        for att in attachments:
+            fname = att.get("filename")
+            if fname:
+                by_name[fname] = att
+                by_name[fname.replace(" ", "+")] = att
+        targets = [(name, by_name.get(name)) for name in wanted_names]
+        wanted_atts = [att for _name, att in targets if att]
+        unknown = [name for name, att in targets if not att]
+        if unknown:
+            print(
+                f"      ⚠ {issue_key}: {len(unknown)} ref(s) missing from Jira's "
+                f"attachment list ({', '.join(sorted(unknown)[:3])}…)"
+            )
+            still_missing += len(unknown)
+        if not wanted_atts:
+            continue
+        downloaded, failed = download_attachments(
+            session, issue_key, wanted_atts, project_dir
+        )
+        recovered += len(downloaded)
+        still_missing += len(failed)
+
+    print(
+        f"   ✓ Attachment backfill: recovered {recovered}, "
+        f"still missing {still_missing}."
+    )
+    return {
+        "scanned": scanned,
+        "missing": total_missing,
+        "recovered": recovered,
+        "still_missing": still_missing,
+    }
 
 
 # ──────────────────────────────────────────────
@@ -973,8 +1151,10 @@ def sync_project(session, project_key, force_full=False):
             downloaded = {}
             if attachments:
                 print(f"   📎 {key}: downloading {len(attachments)} attachment(s)...")
-                downloaded = download_attachments(session, key, attachments, output)
+                downloaded, failed = download_attachments(session, key, attachments, output)
                 att_count += len(downloaded)
+                if failed:
+                    print(f"      ⚠ {len(failed)} attachment(s) failed; backfill will retry")
 
             md = build_issue_markdown(issue, issue_lookup, downloaded)
             (type_dir / filename).write_text(md, encoding="utf-8")
@@ -1165,8 +1345,10 @@ def sync_jql(session, jql, output_name, force_full=False):
             downloaded = {}
             if attachments:
                 print(f"   📎 {key}: downloading {len(attachments)} attachment(s)...")
-                downloaded = download_attachments(session, key, attachments, output)
+                downloaded, failed = download_attachments(session, key, attachments, output)
                 att_count += len(downloaded)
+                if failed:
+                    print(f"      ⚠ {len(failed)} attachment(s) failed; backfill will retry")
 
             md = build_issue_markdown(issue, issue_lookup, downloaded)
             (type_dir / filename).write_text(md, encoding="utf-8")
@@ -1240,6 +1422,7 @@ def sync_jql(session, jql, output_name, force_full=False):
 def main():
     # Parse arguments: project keys + flags
     force_full = "--full" in sys.argv
+    backfill_only = "--backfill-attachments" in sys.argv
     args = sys.argv[1:]
 
     # Extract --jql "...", --jql-file path, and --output NAME
@@ -1307,12 +1490,20 @@ def main():
         project_keys = DEFAULT_PROJECTS
 
     print(f"   Projects:   {', '.join(project_keys)}")
+    if backfill_only:
+        print("   Mode:       --backfill-attachments (skip sync, only re-fetch missing files)")
+        print()
+        backfill_missing_attachments(session, VAULT_ROOT, project_keys)
+        print("🏁 Backfill complete!")
+        return
     if force_full:
         print(f"   Mode:       --full (forced complete refresh)")
     print()
 
     for project_key in project_keys:
         sync_project(session, project_key, force_full=force_full)
+
+    backfill_missing_attachments(session, VAULT_ROOT, project_keys)
 
     print("🏁 All projects synced!")
 
