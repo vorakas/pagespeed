@@ -55,7 +55,7 @@ export function DevOpsConfigPanel({ config, onConfigChange, onConnected }: DevOp
     <div className="grid gap-4 sm:grid-cols-2">
       <Card>
         <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground">Authentication</h3>
+          <h3 className="text-base beacon-headline">Authentication</h3>
           <div className="space-y-1.5">
             <Label htmlFor="devopsPat">Personal Access Token</Label>
             <Input
@@ -73,7 +73,7 @@ export function DevOpsConfigPanel({ config, onConfigChange, onConnected }: DevOp
       </Card>
       <Card>
         <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground">Project Settings</h3>
+          <h3 className="text-base beacon-headline">Project Settings</h3>
           <div className="space-y-1.5">
             <Label htmlFor="devopsOrg">Organization</Label>
             <Input

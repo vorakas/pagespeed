@@ -1,0 +1,399 @@
+/* ==========================================================================
+   Beacon register — Round 1 prototype
+   Scoped to a `.beacon` ancestor. The rest of the app uses shadcn defaults.
+   See DESIGN.md for the full spec.
+   ========================================================================== */
+
+.beacon {
+  /* Neutrals */
+  --beacon-ground:    oklch(13% 0.012 240);
+  --beacon-surface:   oklch(19% 0.018 240);
+  --beacon-elevated:  oklch(23% 0.020 240);
+  --beacon-border:    oklch(28% 0.025 240);
+  --beacon-hairline:  oklch(28% 0.025 240 / 0.6);
+
+  /* Text */
+  --beacon-text:        oklch(96% 0.005 240);
+  --beacon-text-muted:  oklch(72% 0.010 240);
+  --beacon-text-faint:  oklch(52% 0.015 240);
+
+  /* Signature — signal amber */
+  --beacon-amber:       oklch(78% 0.16 70);
+  --beacon-amber-soft:  oklch(78% 0.16 70 / 0.12);
+  --beacon-amber-line:  oklch(78% 0.16 70 / 0.30);
+
+  /* State */
+  --beacon-pass: oklch(72% 0.14 145);
+  --beacon-fail: oklch(64% 0.18 25);
+  --beacon-warn: oklch(78% 0.16 70);
+  --beacon-info: oklch(70% 0.13 230);
+  --beacon-idle: oklch(48% 0.005 240);
+
+  /* Override shadcn primary inside scope so existing Button[variant=default]
+     and ring colors pick up the signal amber for free. */
+  --primary: var(--beacon-amber);
+  --primary-foreground: oklch(15% 0.012 240);
+  --ring: var(--beacon-amber);
+
+  /* Full shadcn token overrides — every child component (Card, Button,
+     Input, Select, Dialog, etc.) automatically renders in Beacon colors
+     when wrapped inside `.beacon`. Outside the wrapper, the rest of the
+     app is unaffected. */
+  --background: var(--beacon-ground);
+  --foreground: var(--beacon-text);
+  --card: var(--beacon-surface);
+  --card-foreground: var(--beacon-text);
+  --popover: var(--beacon-elevated);
+  --popover-foreground: var(--beacon-text);
+  --muted: var(--beacon-elevated);
+  --muted-foreground: var(--beacon-text-muted);
+  --secondary: var(--beacon-elevated);
+  --secondary-foreground: var(--beacon-text);
+  --accent: var(--beacon-amber-soft);
+  --accent-foreground: var(--beacon-amber);
+  --destructive: var(--beacon-fail);
+  --border: var(--beacon-border);
+  --input: var(--beacon-border);
+}
+
+/* Full Beacon shell — applies to the root layout when the entire app
+   chrome (sidebar + header + content) should be Beacon-styled. The
+   ground color paints the body. Used by the prototype layout; not
+   applied to the existing `/builds` deploy. */
+.beacon-shell {
+  background: var(--beacon-ground);
+  color: var(--beacon-text);
+  min-height: 100vh;
+}
+
+/* --------------------------------------------------------------------------
+   Lighthouse polling sweep — diegetic motion on the brand mark when
+   active polling is in progress. The sweep stops when polling stops.
+   -------------------------------------------------------------------------- */
+.beacon-lighthouse {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.beacon-lighthouse-tower {
+  position: absolute;
+  inset: 0;
+  color: var(--beacon-text);
+}
+
+.beacon-lighthouse-beam {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 64px;
+  height: 1px;
+  transform-origin: 0 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    var(--brand-beam, var(--beacon-amber)) 0%,
+    transparent 100%
+  );
+  opacity: 0;
+}
+
+.beacon-lighthouse--polling .beacon-lighthouse-beam {
+  opacity: 0.85;
+  animation: beacon-sweep 4s linear infinite;
+}
+
+/* Sidebar — Beacon styling (used by the prototype shell) */
+.beacon-sidebar {
+  background: var(--beacon-surface);
+  border-right: 1px solid var(--beacon-hairline);
+}
+
+.beacon-sidebar-section {
+  padding: 0.5rem 0.75rem 0.25rem;
+}
+
+.beacon-sidebar-section-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--beacon-text-faint);
+  padding: 0 0.5rem;
+  margin-bottom: 0.375rem;
+}
+
+.beacon-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: 2px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  color: var(--beacon-text-muted);
+  text-decoration: none;
+  position: relative;
+  transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+              color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.beacon-sidebar-item:hover {
+  background: var(--beacon-elevated);
+  color: var(--beacon-text);
+}
+
+.beacon-sidebar-item[data-active="true"] {
+  color: var(--beacon-amber);
+  background: var(--beacon-amber-soft);
+}
+
+.beacon-sidebar-item[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: -0.5rem;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--beacon-amber);
+  border-radius: 0 1px 1px 0;
+}
+
+.beacon-sidebar-divider {
+  border-top: 1px solid var(--beacon-hairline);
+  margin: 0.5rem 0.5rem;
+}
+
+/* Header — Beacon styling (used by the prototype shell) */
+.beacon-header {
+  border-bottom: 1px solid var(--beacon-hairline);
+  background: var(--beacon-surface);
+}
+
+.beacon-header-title {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--beacon-text);
+}
+
+.beacon-header-description {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--beacon-text-muted);
+}
+
+.beacon-header-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.beacon-header-stat-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--beacon-text-faint);
+}
+
+.beacon-header-stat-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--beacon-text);
+}
+
+.beacon-header-stat-value--accent {
+  color: var(--beacon-amber);
+}
+
+/* --------------------------------------------------------------------------
+   Card surface — solid, hairline border, no shadow
+   -------------------------------------------------------------------------- */
+.beacon [data-slot="card"] {
+  background: var(--beacon-surface);
+  border: 1px solid var(--beacon-border);
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------------------
+   Section labels — uppercase letterspaced mono, optional hairline rule
+   -------------------------------------------------------------------------- */
+.beacon-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--beacon-text-muted);
+}
+
+.beacon-section {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.beacon-section .beacon-rule {
+  flex: 1;
+  border: 0;
+  border-top: 1px solid var(--beacon-hairline);
+}
+
+/* --------------------------------------------------------------------------
+   Beacon dot — filled circle inside a thin concentric ring
+   Color is driven by `currentColor`, so apply via text-* utilities.
+   Pulse only on running/cancelling.
+   -------------------------------------------------------------------------- */
+.beacon-dot {
+  position: relative;
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  flex-shrink: 0;
+}
+.beacon-dot::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 9999px;
+  background: currentColor;
+  transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.beacon-dot--pulse::after {
+  animation: beacon-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes beacon-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* --------------------------------------------------------------------------
+   Type badge — lowercase mono with hairline border, no fill
+   Carries kind only, never status.
+   -------------------------------------------------------------------------- */
+.beacon-typebadge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  padding: 1px 6px;
+  border: 1px solid var(--beacon-hairline);
+  border-radius: 2px;
+  color: var(--beacon-text-muted);
+  background: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Status pill — mono, letterspaced, color via text-* utility
+   -------------------------------------------------------------------------- */
+.beacon-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Mono tabular utility — for build numbers, durations, counts, IDs
+   -------------------------------------------------------------------------- */
+.beacon-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: 0.01em;
+}
+
+/* --------------------------------------------------------------------------
+   Headline — Inter at tight tracking
+   -------------------------------------------------------------------------- */
+.beacon-headline {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--beacon-text);
+}
+
+/* --------------------------------------------------------------------------
+   Selects within the scope use mono — branch names, instance letters, ids
+   all read as data, not prose
+   -------------------------------------------------------------------------- */
+.beacon select {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* --------------------------------------------------------------------------
+   Details summaries — compact uppercase mono labels
+   -------------------------------------------------------------------------- */
+.beacon details > summary.beacon-summary {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------------------
+   Banner — used for the rate-limit notice
+   -------------------------------------------------------------------------- */
+.beacon-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--beacon-amber-line);
+  background: var(--beacon-amber-soft);
+  color: var(--beacon-amber);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.beacon-banner .beacon-mono {
+  color: var(--beacon-text);
+}
+
+/* --------------------------------------------------------------------------
+   Selected-build ring on cards uses signal amber instead of the generic
+   sidebar-primary ring.
+   -------------------------------------------------------------------------- */
+.beacon [data-slot="card"].is-selected {
+  border-color: var(--beacon-amber);
+  box-shadow: inset 0 0 0 1px var(--beacon-amber-line);
+}
+
+/* --------------------------------------------------------------------------
+   Polling sweep — single piece of motion on the polling indicator.
+   Reserved for a future shared Header refit; included here so the keyframe
+   exists for round 2 wiring.
+   -------------------------------------------------------------------------- */
+@keyframes beacon-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.beacon-sweep {
+  animation: beacon-sweep 4s linear infinite;
+  transform-origin: 50% 50%;
+}

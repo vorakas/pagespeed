@@ -1,0 +1,419 @@
+/* ==========================================================================
+   Aurora register — faithful to Claude Design's Aurora Glass spec.
+
+   Tokens (colors, typography, radii, layout dimensions) come EXACTLY from
+   `Pharos/handoff/design/styles.css`. The visual character is Aurora as
+   intended: deep purple-blue ground, multi-hue pastel state palette
+   (red / amber / green / blue / violet), Inter + JetBrains Mono, 14px
+   panel radius, mono uppercase letterspaced section labels.
+
+   Where the original spec used techniques that read as AI-slop, this file
+   substitutes non-slop equivalents while preserving the intent:
+     - Animated drift backdrop blobs        → static radial gradient
+     - `backdrop-filter: blur(22px)` glass  → solid surfaces with real depth
+     - Gradient text on numbers/headlines   → solid color (use weight + size)
+     - Isotropic glow on dots / numbers     → solid color, real drop shadow
+     - Conic brand orb                      → static Pharos lighthouse mark
+     - Decorative side-stripe borders       → kept ONLY when functional
+                                              (e.g. status indicator)
+
+   Applied as `<div class="beacon aurora ...">`. The .beacon scope keeps
+   the structural rules (cards, dots, type badges, status pills); the
+   .aurora class re-skins them via CSS custom properties.
+   ========================================================================== */
+
+.aurora {
+  /* Typography — exact match */
+  --font-sans: 'Inter', ui-sans-serif, -apple-system, system-ui,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo',
+    'Cascadia Code', Consolas, monospace;
+
+  /* Aurora ground — same structure as the design but hue-shifted from
+     purple-blue (~268°-285°) to true blue (~225°). Each layer keeps
+     its luminance so the tonal hierarchy (ground < surface < elevated)
+     still gives cards visible lift; chroma stays restrained so the
+     blue reads as branded depth, not a flat color. */
+  --aurora-1: #061230;
+  --aurora-2: #0d1c44;
+  --aurora-3: #122655;
+  --aurora-4: #0f2847;
+
+  /* Beacon-shell variables map to the design's surface levels.
+       ground   → aurora-1 (page bg)
+       surface  → custom (cards) — sits slightly darker than aurora-2
+                   so cards visibly recess below the translucent sidebar
+                   and header (which sit at ~aurora-2 effective lightness
+                   after their 0.72 alpha mixes with the body gradient).
+                   Without this, cards and chrome read at the same depth.
+       elevated → aurora-3 (popovers, secondary panels)
+     The ~5% lightness gap between ground / card / chrome is what makes
+     drop shadows visible on dark. */
+  --beacon-ground:    var(--aurora-1);
+  --beacon-surface:   #091a3c;
+  --beacon-elevated:  var(--aurora-3);
+  --beacon-border:    rgba(255, 255, 255, 0.10);  /* glass-border */
+  --beacon-hairline:  rgba(255, 255, 255, 0.18);  /* glass-border-strong */
+
+  /* Text — exact match */
+  --beacon-text:        #eef1ff;
+  --beacon-text-muted:  #a9b3d6;
+  --beacon-text-faint:  #7a83a8;
+
+  /* Multi-hue state palette — exact hex values from the design (kept
+     unchanged so semantic colors stay consistent: red = blocked,
+     amber = at-risk, green = pass, blue = in-progress).
+     `--aurora-violet` is repurposed as the BRAND accent and shifted
+     from violet (#b08cff) to periwinkle blue (#7cb0ff) — same chroma
+     and luminance, hue rotated 290° → 245°. The variable name is
+     retained for compatibility with existing rules. */
+  --aurora-red:    #ff6b8b;  --aurora-red-bg:    rgba(255, 107, 139, 0.14);
+  --aurora-amber:  #ffc46b;  --aurora-amber-bg:  rgba(255, 196, 107, 0.14);
+  --aurora-green:  #6ee7a8;  --aurora-green-bg:  rgba(110, 231, 168, 0.14);
+  --aurora-blue:   #6ec7ff;  --aurora-blue-bg:   rgba(110, 199, 255, 0.14);
+  --aurora-violet: #7cb0ff;  --aurora-violet-bg: rgba(124, 176, 255, 0.14);
+
+  /* Map beacon semantic tokens to the design palette */
+  --beacon-pass: var(--aurora-green);
+  --beacon-fail: var(--aurora-red);
+  --beacon-warn: var(--aurora-amber);
+  --beacon-info: var(--aurora-blue);
+  --beacon-idle: var(--aurora-text-faint, #7a83a8);
+
+  /* Brand accent: violet — what the design uses for active filters,
+     tab indicators, and the primary tab gradient's left stop. The
+     accent is held in --beacon-amber so existing `var(--beacon-amber)`
+     consumers automatically pick it up. */
+  --beacon-amber:       var(--aurora-violet);
+  --beacon-amber-soft:  var(--aurora-violet-bg);
+  --beacon-amber-line:  rgba(124, 176, 255, 0.40);
+
+  /* Lighthouse beam picks up violet automatically */
+  --brand-beam: var(--beacon-amber);
+
+  /* Primary action: the design uses a violet→blue gradient for the
+     active filter pill, the active tab, and the active tweaks button.
+     We surface that as the --primary background, so any default-variant
+     button (Run Orchestrator) renders with this gradient. Gradient on
+     a button background is NOT slop — only gradient text is. */
+  --primary: var(--aurora-violet);
+  --primary-foreground: #ffffff;
+  --ring: var(--aurora-violet);
+
+  /* shadcn token overrides */
+  --background: var(--beacon-ground);
+  --foreground: var(--beacon-text);
+  --card: var(--beacon-surface);
+  --card-foreground: var(--beacon-text);
+  --popover: var(--beacon-elevated);
+  --popover-foreground: var(--beacon-text);
+  --muted: var(--beacon-elevated);
+  --muted-foreground: var(--beacon-text-muted);
+  --secondary: var(--beacon-elevated);
+  --secondary-foreground: var(--beacon-text);
+  --accent: var(--beacon-amber-soft);
+  --accent-foreground: var(--aurora-violet);
+  --destructive: var(--aurora-red);
+  --border: var(--beacon-border);
+  --input: var(--beacon-border);
+
+  /* Score tokens — Pharos's existing components (e.g. SpreadsheetWidget
+     totals, BuildCard status colors) consume these via Tailwind utility
+     classes like text-score-good. Keep them aligned with Aurora pastels. */
+  --color-score-good: var(--aurora-green);
+  --color-score-average: var(--aurora-amber);
+  --color-score-poor: var(--aurora-red);
+
+  /* Radii — exact match */
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Backdrop atmosphere — replicates the design's body lighting in a
+   purely static stack. Four layers, in paint order:
+     1. Upper-left violet ambient  (was `body::before` violet blob)
+     2. Upper-right teal ambient   (was `body::before` teal blob)
+     3. Bottom-center aurora-4     (was the linear bg's radial-gradient)
+     4. Vertical aurora-1 → aurora-2 base
+   The ambient blobs were originally `body::before` with
+   `filter: blur(90px)` + `animation: drift1` — both slop tactics. Static
+   radial gradients give the same "light source from off-screen" feel
+   without the blur or drift, just at lower intensity (0.18 / 0.10
+   alpha vs the original 0.55) since soft radials don't need blur to
+   feel diffuse. Sits behind the translucent sidebar/header so the
+   chromatic bleed reads through them.
+   -------------------------------------------------------------------------- */
+.aurora.beacon-shell {
+  background:
+    /* Upper-left blue ambient (was violet — same intensity, hue shifted) */
+    radial-gradient(
+      45% 40% at 22% 28%,
+      rgba(108, 156, 255, 0.22),
+      transparent 70%
+    ),
+    /* Upper-mid teal ambient (kept — pairs with blue as cool warmth) */
+    radial-gradient(
+      40% 35% at 60% 22%,
+      rgba(56, 224, 208, 0.12),
+      transparent 70%
+    ),
+    /* Lower-right cyan ambient (was pink — keep the bottom-right
+       light source but stay in the cool spectrum for cohesion) */
+    radial-gradient(
+      55% 45% at 88% 90%,
+      rgba(100, 200, 255, 0.10),
+      transparent 70%
+    ),
+    /* Bottom-center aurora-4 anchor */
+    radial-gradient(
+      60% 45% at 50% 105%,
+      var(--aurora-4) 0%,
+      transparent 60%
+    ),
+    /* Base vertical gradient */
+    linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
+  background-attachment: fixed;
+}
+
+/* --------------------------------------------------------------------------
+   Cards: the design's panel radius is 14px. Drop shadow + inset
+   highlight gives the lifted feel the original tried to get from glass
+   blur, but with real layered depth. The hairline inset highlight
+   matches the design's `--glass-inner` token (inset 0 1px 0 white at
+   8% alpha).
+   -------------------------------------------------------------------------- */
+.aurora [data-slot="card"] {
+  border-radius: var(--radius);
+  border-color: var(--beacon-border);
+  background: var(--beacon-surface);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    0 8px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Banner: matches panel radius
+   -------------------------------------------------------------------------- */
+.aurora .beacon-banner {
+  border-radius: var(--radius-sm);
+  background: var(--aurora-violet-bg);
+  border-color: rgba(176, 140, 255, 0.40);
+  color: var(--aurora-violet);
+}
+
+/* --------------------------------------------------------------------------
+   Section labels — match the design's `.lr-label` / `.panel h3` /
+   `.wall-group-head` style: 10.5px, mono, letterspaced 0.12em,
+   uppercase, --text-faint
+   -------------------------------------------------------------------------- */
+.aurora .beacon-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--beacon-text-faint);
+}
+
+/* --------------------------------------------------------------------------
+   Type badge — matches the design's `.chip` pattern: mono, uppercase,
+   pill-shaped, low-alpha colored background
+   -------------------------------------------------------------------------- */
+.aurora .beacon-typebadge {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--beacon-text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--beacon-border);
+}
+
+/* --------------------------------------------------------------------------
+   Headlines — Inter, weight 700, letterspaced -0.01em (matches the
+   design's `.topbar .brand-name`, `.wc-name`, `.sp-title`). NOT
+   gradient text — the design uses gradient text on the countdown and
+   hero, but those are decorative and we substitute solid text.
+   -------------------------------------------------------------------------- */
+.aurora .beacon-headline {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--beacon-text);
+}
+
+/* --------------------------------------------------------------------------
+   Header stat values — mono, tabular numerals, larger so they read as
+   data display
+   -------------------------------------------------------------------------- */
+/* No `color` here — the base .beacon-header-stat-value rule sets it via
+   var(--beacon-text), and the --accent modifier (used when ACTIVE > 0)
+   sets it via var(--beacon-amber) = violet. Setting color here would
+   shadow the modifier and ACTIVE would lose its violet emphasis. */
+.aurora .beacon-header-stat-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.aurora .beacon-header-stat-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--beacon-text-faint);
+}
+
+.aurora .beacon-header-title {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: 18px;
+  color: var(--beacon-text);
+}
+
+.aurora .beacon-header-description {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--beacon-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Sidebar — floats as a rounded panel, matches the design's `.left-rail`
+   shape (radius 14, padding 16/14, gap 18 between sections). Bg uses
+   the elevated layer so it reads as a panel sitting above the page bg.
+   -------------------------------------------------------------------------- */
+/* Sidebar uses a translucent surface (matches the design's
+   --glass-bg-strong: rgba(28, 34, 68, 0.66)) so the body's static
+   aurora gradient shows through behind it, giving the chrome a sense
+   of depth and "place." This is the original design's intent — what
+   we're skipping is the slop tactic that achieved it (`backdrop-filter:
+   blur(22px)`). Plain translucency over a static gradient bg looks
+   nearly identical without the blur, since there's no content behind
+   the panel to need diffusing. */
+.aurora .beacon-sidebar {
+  top: 12px;
+  left: 12px;
+  bottom: 12px;
+  background: rgba(18, 38, 85, 0.72);
+  border: 1px solid var(--beacon-border);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    0 8px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.aurora .beacon-main {
+  margin-left: 232px;
+  margin-right: 12px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.aurora .beacon-sidebar-item {
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 8px 10px;
+  color: var(--beacon-text-muted);
+}
+
+.aurora .beacon-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--beacon-text);
+}
+
+/* Active state: the design's `.lr-area.active` uses a strong glass bg
+   plus a 2px violet inset rule on the left. Match that — the inset
+   is a functional indicator (which row is active), not decoration. */
+.aurora .beacon-sidebar-item[data-active="true"] {
+  color: var(--beacon-text);
+  background: rgba(18, 38, 85, 0.72);
+  border: 1px solid var(--beacon-hairline);
+  box-shadow: inset 2px 0 0 var(--aurora-violet);
+}
+
+.aurora .beacon-sidebar-item[data-active="true"]::before {
+  display: none;
+}
+
+.aurora .beacon-sidebar-section-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--beacon-text-faint);
+}
+
+.aurora .beacon-sidebar-divider {
+  border-top-color: var(--beacon-border);
+}
+
+/* --------------------------------------------------------------------------
+   Header — floats as a rounded panel matching cards/sidebar
+   -------------------------------------------------------------------------- */
+/* Header — same translucent surface as the sidebar so the chrome reads
+   as a coherent glass-like panel system over the gradient body. Cards
+   stay solid (see `[data-slot="card"]` rule above) because they hold
+   readable content. */
+.aurora .beacon-header {
+  position: sticky;
+  top: 12px;
+  z-index: 30;
+  margin-bottom: 14px;
+  background: rgba(18, 38, 85, 0.72);
+  border: 1px solid var(--beacon-border);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    0 8px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Status pills: keep mono, slightly looser tracking
+   -------------------------------------------------------------------------- */
+.aurora .beacon-status {
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+/* --------------------------------------------------------------------------
+   Lighthouse mark inherits Aurora text color
+   -------------------------------------------------------------------------- */
+.aurora .beacon-lighthouse-tower {
+  color: var(--beacon-text);
+}
+
+/* --------------------------------------------------------------------------
+   Primary button: violet→blue gradient (matches the design's
+   `.tb-filter.active`, `.is-tab.active`, `.ds-tab.active`). The Button
+   component's `default` variant compiles to `bg-primary text-primary-
+   foreground`, so the `.bg-primary` selector inside .aurora catches it.
+   Gradient on a button BACKGROUND is fine — only gradient TEXT is slop.
+   -------------------------------------------------------------------------- */
+.aurora .bg-primary {
+  background: linear-gradient(135deg, var(--aurora-violet), #38e0d0);
+  color: var(--primary-foreground);
+  border-color: transparent;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(124, 176, 255, 0.25);
+}
+
+.aurora .bg-primary:hover {
+  background: linear-gradient(135deg, var(--aurora-violet), #38e0d0);
+  filter: brightness(1.08);
+}
