@@ -58,6 +58,7 @@ import type {
   MigrationHistoryEntry,
   MigrationDailyActivity,
   MigrationProjectTasks,
+  MigrationTaskDetail,
   RawTaskRecord,
 } from "@/types"
 
@@ -813,6 +814,10 @@ class ApiClient {
 
   async getMigrationProjectTasks(projectKey: string): Promise<MigrationProjectTasks> {
     return this.request(`/api/dashboard/projects/${encodeURIComponent(projectKey)}/tasks`)
+  }
+
+  async getMigrationTaskDetail(relPath: string): Promise<MigrationTaskDetail> {
+    return this.request(`/api/dashboard/task-detail?relPath=${encodeURIComponent(relPath)}`)
   }
 
   async getMigrationTaskStatus(): Promise<MigrationTaskStatusRow[]> {

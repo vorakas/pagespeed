@@ -177,6 +177,32 @@ class MigrationDashboardService:
         cache_key = f"dailyActivity:{on_date.isoformat()}"
         return self._cached(cache_key, lambda: self._compute_daily_activity(on_date))
 
+    def get_task_detail(self, rel_path: str) -> dict:
+        """Return one raw ticket's full record — frontmatter + body markdown.
+
+        Used by the per-project ticket drawer: clicking the key on a row
+        expands inline detail instead of jumping to Jira. Reads through
+        :class:`VaultReader.read_page` so path validation (no ``..``,
+        within vault root, supported extension) is enforced consistently
+        with every other vault read endpoint.
+
+        Output shape mirrors what the frontend already expects from the
+        task dicts in :meth:`get_project_tasks`, plus a ``body`` field
+        carrying the markdown after the frontmatter so the drawer can
+        render the description / acceptance criteria / etc.
+        """
+        page = self._vault.read_page(rel_path)
+        fm = page.get("frontmatter") or {}
+        body = page.get("body") or ""
+        return {
+            "relPath": page.get("path"),
+            "name": page.get("name"),
+            "frontmatter": fm,
+            "body": body,
+            "size": page.get("size"),
+            "modified": page.get("modified"),
+        }
+
     def get_project_tasks(self, project_key: str) -> dict:
         """Return all raw tickets for a single project plus a status histogram.
 

@@ -1131,6 +1131,21 @@ export interface MigrationProjectTasks {
   tasks: RawTaskRecord[]
 }
 
+/**
+ * One raw ticket's full content — frontmatter + markdown body. Backs
+ * the inline ticket drawer on the project page (clicking the key
+ * expands detail instead of jumping to Jira). See
+ * ``GET /api/dashboard/task-detail?relPath=…``.
+ */
+export interface MigrationTaskDetail {
+  relPath: string
+  name: string
+  frontmatter: Record<string, unknown>
+  body: string
+  size: number | null
+  modified: number | null
+}
+
 export interface MigrationHistoryEntry {
   from: string
   to: string

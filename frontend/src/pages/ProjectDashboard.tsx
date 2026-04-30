@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react"
+import { marked } from "marked"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import type {
   MigrationBlocker,
   MigrationProjectTasks,
   MigrationSource,
+  MigrationTaskDetail,
   MigrationTaskStatusRow,
   MigrationWorkstream,
   RawTaskRecord,
@@ -637,6 +639,11 @@ interface TicketsPanelProps {
   onClearStatus: () => void
 }
 
+type DetailState =
+  | { kind: "loading" }
+  | { kind: "loaded"; data: MigrationTaskDetail }
+  | { kind: "error"; message: string }
+
 function TicketsPanel({
   tasks,
   total,
@@ -644,11 +651,45 @@ function TicketsPanel({
   onClearStatus,
 }: TicketsPanelProps) {
   const [showAll, setShowAll] = useState(false)
-  // Reset pagination when the filter changes so the user always sees
-  // the head of the filtered set.
+  const [expandedRel, setExpandedRel] = useState<string | null>(null)
+  // Cache one DetailState per relPath. Keep the data after the row
+  // collapses so reopening the same ticket is instant; we never refetch
+  // unless the user explicitly retries on an error.
+  const [details, setDetails] = useState<Record<string, DetailState>>({})
+
+  // Reset pagination + collapse any open drawer when the filter changes.
   useEffect(() => {
     setShowAll(false)
+    setExpandedRel(null)
   }, [activeStatus])
+
+  const handleToggle = useCallback(
+    (relPath: string) => {
+      setExpandedRel((prev) => {
+        if (prev === relPath) return null
+        // Lazy-fetch the detail if we haven't loaded it yet.
+        setDetails((d) => {
+          if (d[relPath]?.kind === "loaded") return d
+          return { ...d, [relPath]: { kind: "loading" } }
+        })
+        api
+          .getMigrationTaskDetail(relPath)
+          .then((data) =>
+            setDetails((d) => ({ ...d, [relPath]: { kind: "loaded", data } })),
+          )
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : "failed to load"
+            setDetails((d) => ({
+              ...d,
+              [relPath]: { kind: "error", message },
+            }))
+          })
+        return relPath
+      })
+    },
+    [],
+  )
+
   const visible = showAll ? tasks : tasks.slice(0, TICKET_PAGE_SIZE)
   const isFiltered = activeStatus !== null
 
@@ -714,72 +755,23 @@ function TicketsPanel({
             </tr>
           </thead>
           <tbody>
-            {visible.map((t) => (
-              <tr
-                // Use relPath, not key — multiple raw files can share the
-                // same Jira key (rename ghosts) and React leaves stale rows
-                // mounted when a previous render had duplicate <tr key=…>.
-                key={t.relPath || t.key}
-                style={{ borderTop: "1px solid var(--lcc-border-faint)" }}
-              >
-                <Td>
-                  {t.url ? (
-                    <a
-                      href={t.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontFamily: "monospace",
-                        color: "var(--lcc-blue)",
-                        textDecoration: "none",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {t.key}
-                    </a>
-                  ) : (
-                    <span
-                      style={{
-                        fontFamily: "monospace",
-                        color: "var(--lcc-text-dim)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {t.key}
-                    </span>
-                  )}
-                </Td>
-                <Td>
-                  <span style={{ color: "var(--lcc-text)" }}>{t.summary ?? "—"}</span>
-                </Td>
-                <Td>
-                  <span style={{ color: "var(--lcc-text-dim)", whiteSpace: "nowrap" }}>
-                    {t.status ?? t.taskStatus ?? "—"}
-                  </span>
-                </Td>
-                <Td>
-                  <span style={{ color: "var(--lcc-text-dim)", whiteSpace: "nowrap" }}>
-                    {t.priority ?? "—"}
-                  </span>
-                </Td>
-                <Td>
-                  <span style={{ color: "var(--lcc-text-dim)", whiteSpace: "nowrap" }}>
-                    {t.assignee ?? "—"}
-                  </span>
-                </Td>
-                <Td>
-                  <span
-                    style={{
-                      color: "var(--lcc-text-faint)",
-                      fontFamily: "monospace",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {t.updated ?? "—"}
-                  </span>
-                </Td>
-              </tr>
-            ))}
+            {visible.map((t) => {
+              const rel = t.relPath || t.key
+              const isExpanded = expandedRel === rel
+              return (
+                <TicketRow
+                  // Use relPath, not key — multiple raw files can share
+                  // the same Jira key (rename ghosts) and React leaves
+                  // stale rows mounted when a previous render had
+                  // duplicate <tr key=…>.
+                  key={rel}
+                  task={t}
+                  expanded={isExpanded}
+                  detail={isExpanded ? details[rel] ?? null : null}
+                  onToggle={() => handleToggle(rel)}
+                />
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -821,6 +813,174 @@ function TicketsPanel({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Ticket row + drawer ───────────────────────────────────────────────
+
+interface TicketRowProps {
+  task: RawTaskRecord
+  expanded: boolean
+  detail: DetailState | null
+  onToggle: () => void
+}
+
+const TICKET_TABLE_COLSPAN = 6
+
+function TicketRow({ task, expanded, detail, onToggle }: TicketRowProps) {
+  return (
+    <>
+      <tr
+        style={{
+          borderTop: "1px solid var(--lcc-border-faint)",
+          background: expanded ? "rgba(255,255,255,0.04)" : undefined,
+        }}
+      >
+        <Td>
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            title={expanded ? "Hide details" : "Show details"}
+            style={ticketKeyButtonStyle}
+          >
+            {expanded ? (
+              <ChevronDown size={11} aria-hidden />
+            ) : (
+              <ChevronRight size={11} aria-hidden />
+            )}
+            <span>{task.key}</span>
+          </button>
+        </Td>
+        <Td>
+          <span style={{ color: "var(--lcc-text)" }}>{task.summary ?? "—"}</span>
+        </Td>
+        <Td>
+          <span style={{ color: "var(--lcc-text-dim)", whiteSpace: "nowrap" }}>
+            {task.status ?? task.taskStatus ?? "—"}
+          </span>
+        </Td>
+        <Td>
+          <span style={{ color: "var(--lcc-text-dim)", whiteSpace: "nowrap" }}>
+            {task.priority ?? "—"}
+          </span>
+        </Td>
+        <Td>
+          <span style={{ color: "var(--lcc-text-dim)", whiteSpace: "nowrap" }}>
+            {task.assignee ?? "—"}
+          </span>
+        </Td>
+        <Td>
+          <span
+            style={{
+              color: "var(--lcc-text-faint)",
+              fontFamily: "monospace",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {task.updated ?? "—"}
+          </span>
+        </Td>
+      </tr>
+      {expanded && (
+        <tr style={{ background: "rgba(255,255,255,0.02)" }}>
+          <td colSpan={TICKET_TABLE_COLSPAN} style={{ padding: 0 }}>
+            <TicketDrawer task={task} detail={detail} />
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+interface TicketDrawerProps {
+  task: RawTaskRecord
+  detail: DetailState | null
+}
+
+function TicketDrawer({ task, detail }: TicketDrawerProps) {
+  const bodyHtml = useMemo(() => {
+    if (detail?.kind !== "loaded") return ""
+    const body = detail.data.body ?? ""
+    if (!body.trim()) return ""
+    return marked.parse(body, { async: false }) as string
+  }, [detail])
+
+  return (
+    <div style={drawerStyle}>
+      <div style={drawerMetaGridStyle}>
+        <DrawerField label="Key" value={task.key} mono />
+        <DrawerField label="Type" value={task.type ?? "—"} />
+        <DrawerField label="Source" value={task.source ?? "—"} />
+        <DrawerField label="Project" value={task.project ?? "—"} />
+        <DrawerField label="Status" value={task.status ?? task.taskStatus ?? "—"} />
+        <DrawerField label="Priority" value={task.priority ?? "—"} />
+        <DrawerField label="Assignee" value={task.assignee ?? "—"} />
+        <DrawerField label="Created" value={task.created ?? "—"} mono />
+        <DrawerField label="Updated" value={task.updated ?? "—"} mono />
+        <DrawerField label="Resolved" value={task.resolved ?? "—"} mono />
+        {task.uatStatus && <DrawerField label="UAT" value={task.uatStatus} />}
+        {task.completion && <DrawerField label="Completion" value={task.completion} />}
+      </div>
+
+      <div style={drawerBodyHeaderStyle}>
+        <span>Description</span>
+        {task.url && (
+          <a
+            href={task.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={drawerExternalLinkStyle}
+          >
+            <ExternalLink size={11} /> Open in {task.source === "asana" ? "Asana" : "Jira"}
+          </a>
+        )}
+      </div>
+      <div style={drawerBodyStyle}>
+        {detail === null || detail.kind === "loading" ? (
+          <span style={{ color: "var(--lcc-text-faint)", fontStyle: "italic" }}>
+            <Loader2 size={11} className="animate-spin" /> Loading description…
+          </span>
+        ) : detail.kind === "error" ? (
+          <span style={{ color: "var(--lcc-red)" }}>Failed to load: {detail.message}</span>
+        ) : !bodyHtml ? (
+          <span style={{ color: "var(--lcc-text-faint)", fontStyle: "italic" }}>
+            (No description in the synced markdown.)
+          </span>
+        ) : (
+          <div
+            className="lcc-markdown"
+            dangerouslySetInnerHTML={{ __html: bodyHtml }}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DrawerField({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+}) {
+  return (
+    <div>
+      <div style={drawerFieldLabelStyle}>{label}</div>
+      <div
+        style={{
+          fontSize: 12,
+          color: "var(--lcc-text)",
+          fontFamily: mono ? "var(--font-mono, monospace)" : undefined,
+          wordBreak: "break-word",
+        }}
+      >
+        {value}
+      </div>
     </div>
   )
 }
@@ -881,6 +1041,82 @@ const filterChipClearStyle: React.CSSProperties = {
   padding: "0 4px",
   fontSize: 12,
   lineHeight: 1,
+}
+
+const ticketKeyButtonStyle: React.CSSProperties = {
+  appearance: "none",
+  background: "transparent",
+  border: 0,
+  padding: 0,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  fontFamily: "monospace",
+  fontSize: 12,
+  color: "var(--lcc-blue)",
+  whiteSpace: "nowrap",
+}
+
+const drawerStyle: React.CSSProperties = {
+  padding: "14px 18px",
+  borderTop: "1px solid var(--lcc-border-faint)",
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+}
+
+const drawerMetaGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+  gap: 10,
+  padding: "8px 10px",
+  background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
+  borderRadius: 6,
+}
+
+const drawerFieldLabelStyle: React.CSSProperties = {
+  fontSize: 9.5,
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  color: "var(--lcc-text-faint)",
+  marginBottom: 2,
+  fontFamily: "var(--font-mono, monospace)",
+}
+
+const drawerBodyHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  fontSize: 10,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  color: "var(--lcc-text-faint)",
+  fontWeight: 600,
+}
+
+const drawerExternalLinkStyle: React.CSSProperties = {
+  marginLeft: "auto",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  fontSize: 10,
+  letterSpacing: "0.06em",
+  color: "var(--lcc-blue)",
+  textDecoration: "none",
+  textTransform: "none",
+  fontWeight: 500,
+}
+
+const drawerBodyStyle: React.CSSProperties = {
+  fontSize: 13,
+  color: "var(--lcc-text)",
+  lineHeight: 1.55,
+  padding: "10px 12px",
+  background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
+  borderRadius: 6,
+  maxHeight: 480,
+  overflow: "auto",
 }
 
 // ── Filtering helpers ──────────────────────────────────────────────────

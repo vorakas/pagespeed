@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify, request
 
 from config import VAULT_ACTIVE_HOURS_TZ
 from services.migration_dashboard_service import MigrationDashboardService
+from services.obsidian_sync.vault_reader import VaultNotFoundError, VaultPathError
 from services.snapshot_service import SnapshotService, diff_snapshots
 
 
@@ -66,6 +67,27 @@ def create_dashboard_blueprint(
             return jsonify({"error": "vault not found"}), 404
         window = int(request.args.get("windowDays", "7"))
         return jsonify(service.get_new_bugs(window_days=window))
+
+    @bp.route("/api/dashboard/task-detail", methods=["GET"])
+    def task_detail():
+        """Return one raw ticket's full record (frontmatter + body markdown).
+
+        Backs the per-row drawer on the project page: clicking the ticket
+        key expands inline detail instead of jumping to Jira. Pass the
+        ``relPath`` of the raw .md file (matching the value the project-
+        tasks endpoint returns on each task).
+        """
+        if not service.is_available():
+            return jsonify({"error": "vault not found"}), 404
+        rel_path = request.args.get("relPath")
+        if not rel_path:
+            return jsonify({"error": "relPath query parameter is required"}), 400
+        try:
+            return jsonify(service.get_task_detail(rel_path))
+        except VaultNotFoundError:
+            return jsonify({"error": "vault not found"}), 404
+        except VaultPathError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     @bp.route("/api/dashboard/projects/<path:project_key>/tasks", methods=["GET"])
     def project_tasks(project_key: str):
