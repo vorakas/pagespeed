@@ -625,6 +625,58 @@ _EMBED_REF_RE = re.compile(
 _ATTACHMENT_KEY_RE = re.compile(r"^([A-Z][A-Z0-9]+-\d+)_(.+)$")
 
 
+def _fetch_attachments_batch(session, issue_keys):
+    """Batched attachment lookup for many issues in one or more JQL searches.
+
+    Lampstrack returns the ``attachment`` field reliably when the JQL
+    matches multiple issues at once (the same shape ``fetch_all_issues``
+    uses during the per-project sync), but strips it on key-equality
+    queries against a single issue. Hitting ``key in (...)`` with the
+    full set in one batch is the path empirically known to work.
+
+    Returns a ``{issue_key: [attachment, ...]}`` dict. Unknown keys are
+    omitted (treat ``dict.get(k, [])`` as the lookup).
+    """
+    out = {}
+    if not issue_keys:
+        return out
+    keys = list(issue_keys)
+    # JQL has a practical clause length limit; chunk to be safe.
+    CHUNK = 80
+    for start_chunk in range(0, len(keys), CHUNK):
+        chunk = keys[start_chunk : start_chunk + CHUNK]
+        jql = f"key in ({','.join(chunk)})"
+        start_at = 0
+        while True:
+            try:
+                resp = session.get(
+                    f"{JIRA_BASE_URL}/rest/api/2/search",
+                    params={
+                        "jql": jql,
+                        "fields": "attachment",
+                        "startAt": start_at,
+                        "maxResults": MAX_RESULTS_PER_PAGE,
+                    },
+                    headers={"X-Atlassian-Token": "no-check"},
+                    timeout=60,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as e:
+                print(f"   ⚠ Backfill: batch lookup failed ({len(chunk)} keys): {e}")
+                break
+            for issue in data.get("issues", []) or []:
+                k = issue.get("key")
+                atts = issue.get("fields", {}).get("attachment") or []
+                if k:
+                    out[k] = atts
+            total = data.get("total", 0)
+            start_at += MAX_RESULTS_PER_PAGE
+            if start_at >= total:
+                break
+    return out
+
+
 def _fetch_issue_attachments_via_search(session, issue_key):
     try:
         resp = session.get(
@@ -746,16 +798,27 @@ def backfill_missing_attachments(session, vault_root, projects=None):
         f"{len(missing_by_issue)} issue(s)..."
     )
 
+    # Batch-load attachment metadata for every missing issue up front via
+    # one or more JQL searches — much faster than per-issue calls and the
+    # only path that reliably surfaces the attachment field on
+    # Lampstrack.
+    issue_keys = sorted({k for (_d, k) in missing_by_issue.keys()})
+    print(f"   ?? Fetching attachment metadata for {len(issue_keys)} issue(s) via batched search...")
+    batch_attachments = _fetch_attachments_batch(session, issue_keys)
+
     recovered = 0
     still_missing = 0
     issues_no_attachments = 0
     for (project_dir, issue_key), wanted_names in missing_by_issue.items():
-        attachments = fetch_issue_attachments(session, issue_key)
+        attachments = batch_attachments.get(issue_key)
+        if not attachments:
+            # Fallback: try the legacy per-issue endpoints just in case
+            # the batch dropped this one.
+            attachments = fetch_issue_attachments(session, issue_key)
         if not attachments:
             # Jira returned no attachment metadata. Either the issue lost
-            # its attachments, or the PAT can't see them via the search
-            # endpoint. Track the count so the summary line shows how
-            # often this happens.
+            # its attachments, or the PAT can't see them. Track the count
+            # so the summary line shows how often this happens.
             issues_no_attachments += 1
         # Build a name → attachment lookup; some Jira instances serve
         # space-encoded filenames, so look up by the normalized form too.
