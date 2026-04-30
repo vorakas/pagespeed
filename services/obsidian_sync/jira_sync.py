@@ -490,6 +490,11 @@ def issue_wikilink(key, summary=None):
 # Image extensions that Obsidian can render inline
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp"}
 ATTACHMENTS_FOLDER = "_attachments"
+# Linux ext4 caps filenames at 255 bytes; some Jira descriptions paste full
+# S3 presigned URLs into image refs which the converter then turns into
+# multi-kilobyte filenames. Skip anything past this limit so one rogue ref
+# doesn't crash the whole sync with ENAMETOOLONG.
+_MAX_ATTACHMENT_NAME_LEN = 200
 
 
 def _fetch_attachment_binary(session, att_id, content_hint, dest):
@@ -580,11 +585,26 @@ def download_attachments(session, issue_key, attachments, output_dir):
 
         # Prefix with issue key to avoid collisions across issues
         local_name = sanitize_filename(f"{issue_key}_{original_name}")
+        if len(local_name) > _MAX_ATTACHMENT_NAME_LEN:
+            print(
+                f"   ⚠ {issue_key}: skipping attachment with overlong name "
+                f"({len(local_name)} chars) — likely a URL pasted into the description"
+            )
+            failed.append({"key": issue_key, "id": att_id, "filename": original_name})
+            continue
         local_path = att_dir / local_name
 
-        # Skip if already downloaded and same size
-        if local_path.exists() and abs(local_path.stat().st_size - remote_size) < 100:
-            downloaded[original_name] = local_name
+        # Skip if already downloaded and same size. Wrap in try/except so a
+        # filesystem error (e.g. ENAMETOOLONG sneaking through on a name we
+        # underestimated) downgrades to "treat as not downloaded" rather
+        # than killing the whole sync.
+        try:
+            if local_path.exists() and abs(local_path.stat().st_size - remote_size) < 100:
+                downloaded[original_name] = local_name
+                continue
+        except OSError as exc:
+            print(f"   ⚠ {issue_key}: cannot stat {local_name[:60]}…: {exc}")
+            failed.append({"key": issue_key, "id": att_id, "filename": original_name})
             continue
 
         if _fetch_attachment_binary(session, att_id, content_hint, local_path):
@@ -658,8 +678,18 @@ def backfill_missing_attachments(session, vault_root, projects=None):
                 issue_key = match.group(1)
                 original_name = match.group(2)
                 local_name = sanitize_filename(f"{issue_key}_{original_name}")
+                if len(local_name) > _MAX_ATTACHMENT_NAME_LEN:
+                    # The ref is too long to ever land on disk (URL pasted
+                    # into a description, etc.). Don't try to backfill —
+                    # download_attachments would skip it anyway.
+                    continue
                 local_path = att_dir / local_name
-                if local_path.exists() and local_path.stat().st_size > 0:
+                try:
+                    if local_path.exists() and local_path.stat().st_size > 0:
+                        continue
+                except OSError:
+                    # Filename slipped past the length check on this fs;
+                    # treat as unrecoverable and skip rather than crash.
                     continue
                 missing_by_issue.setdefault((project_dir, issue_key), set()).add(original_name)
 
