@@ -340,11 +340,21 @@ def create_app() -> Flask:
             next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30),
         )
 
-    # Hourly Jira/Asana sync. Configurable via OBSIDIAN_SYNC_INTERVAL_MIN
-    # so we can dial it back if the upstream APIs start rate-limiting.
-    # If a sync is already running when the tick fires, skip — don't queue
-    # up a second one. The next tick will pick up where this left off.
-    OBSIDIAN_SYNC_INTERVAL_MIN = int(os.environ.get("OBSIDIAN_SYNC_INTERVAL_MIN", "60"))
+    # Hourly Jira/Asana sync, locked to a wall-clock minute via cron.
+    #
+    # The previous interval schedule (60 min, first fire 2 min after
+    # boot) re-armed every container restart, so a busy deploy hour
+    # would produce one sync per deploy — and each sync pushes raw
+    # files which retriggers the orchestrator. Switching to a cron
+    # trigger pins firing to the same wall-clock minute every hour
+    # regardless of when we redeploy, so N deploys in an hour produce
+    # at most one sync.
+    #
+    # OBSIDIAN_SYNC_CRON_MINUTE accepts any APScheduler minute
+    # expression: "5" (default, fires at :05), "*/30" (every 30 min),
+    # "0,30" (top + half), etc. The active-hours gate still applies
+    # so overnight ticks no-op even if the cron fires.
+    OBSIDIAN_SYNC_CRON_MINUTE = os.environ.get("OBSIDIAN_SYNC_CRON_MINUTE", "5")
 
     def _obsidian_sync_tick() -> None:
         if active_hours is not None and not active_hours.is_open():
@@ -362,11 +372,14 @@ def create_app() -> Flask:
 
     scheduler.add_job(
         _obsidian_sync_tick,
-        trigger="interval",
-        minutes=OBSIDIAN_SYNC_INTERVAL_MIN,
+        trigger="cron",
+        minute=OBSIDIAN_SYNC_CRON_MINUTE,
         id="obsidian-hourly-sync",
         replace_existing=True,
-        next_run_time=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
+    logging.info(
+        "Obsidian sync cron registered: minute=%s (cron expression)",
+        OBSIDIAN_SYNC_CRON_MINUTE,
     )
 
     # ---- Blueprints ----
