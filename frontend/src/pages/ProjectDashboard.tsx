@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom"
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react"
 import { marked } from "marked"
 import { api } from "@/services/api"
+import { normalizeJiraMergedHeaderTables } from "@/lib/markdown-tables"
 import { shortenLinksInHtml } from "@/lib/url-shortening"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import type {
@@ -906,7 +907,10 @@ function TicketDrawer({ task, detail }: TicketDrawerProps) {
     const body = detail.data.body ?? ""
     if (!body.trim()) return ""
     const raw = marked.parse(body, { async: false }) as string
-    return shortenLinksInHtml(raw)
+    // Order matters: normalize tables first (so we don't waste work
+    // shortening links inside cells that are about to be dropped),
+    // then shorten URLs in whatever survives.
+    return shortenLinksInHtml(normalizeJiraMergedHeaderTables(raw))
   }, [detail])
 
   return (
