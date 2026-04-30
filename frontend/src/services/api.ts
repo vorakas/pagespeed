@@ -573,6 +573,26 @@ class ApiClient {
   // ---------- Applitools (helper-uploaded results) ----------
 
   /**
+   * List recent helper uploads — one entry per cached batch, sorted
+   * newest first. Used by the Visual-card dropdown so QA can pick an
+   * uploaded batch by id without retyping it. Test rows are not
+   * included; fetch them per-batch via ``getApplitoolsBatch``.
+   */
+  async getRecentApplitoolsBatches(): Promise<Array<{
+    batchId: string
+    fetchedAt: string
+    uploadedAt: number
+    testCount: number
+  }>> {
+    const response = await fetch("/api/applitools/recent-uploads", {
+      headers: { Accept: "application/json" },
+    })
+    if (!response.ok) return []
+    const data = await response.json()
+    return data.uploads ?? []
+  }
+
+  /**
    * Look up Applitools batch results that the desktop helper uploaded
    * for this batch id. Returns ``null`` when nothing has been uploaded
    * yet (the helper hasn't been run, or the cache TTL expired) so

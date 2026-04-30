@@ -54,6 +54,15 @@ export function Builds() {
   // network access) and uploaded to /api/applitools/upload-batch; the
   // browser then reads them back from /api/applitools/batch/<id>.
   const [applitoolsBatchIds, setApplitoolsBatchIds] = useState<Record<string, string>>({})
+  // Helper-uploaded batches surfaced as autocomplete options in the
+  // batch-id input. Polled lightly so a fresh helper run shows up
+  // without a page refresh.
+  const [recentApplitoolsBatches, setRecentApplitoolsBatches] = useState<Array<{
+    batchId: string
+    fetchedAt: string
+    uploadedAt: number
+    testCount: number
+  }>>([])
   const [connected, setConnected] = useState(false)
   const [autoConnecting, setAutoConnecting] = useState(false)
   const [recentBuilds, setRecentBuilds] = useState<Record<string, DevOpsBuild[]>>({})
@@ -544,6 +553,27 @@ export function Builds() {
     setApplitoolsBatchIds((prev) => ({ ...prev, [roleKey]: value }))
   }, [])
 
+  // Pull the helper-upload list on mount, when the window regains
+  // focus (likely just-after a helper run), and every 30s while the
+  // tab is open. The endpoint is cheap (metadata only, no test rows)
+  // and unauthenticated, so polling without backoff is fine.
+  useEffect(() => {
+    let cancelled = false
+    const refresh = () => {
+      api.getRecentApplitoolsBatches()
+        .then((list) => { if (!cancelled) setRecentApplitoolsBatches(list) })
+        .catch(() => {})
+    }
+    refresh()
+    const interval = setInterval(refresh, 30_000)
+    window.addEventListener("focus", refresh)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      window.removeEventListener("focus", refresh)
+    }
+  }, [])
+
   return (
     <>
       <Header
@@ -641,6 +671,7 @@ export function Builds() {
                   selectedBuildId={selectedBuild?.id}
                   applitoolsBatchIds={applitoolsBatchIds}
                   onApplitoolsBatchIdChange={handleApplitoolsBatchIdChange}
+                  recentApplitoolsBatches={recentApplitoolsBatches}
                 />
               </div>
 

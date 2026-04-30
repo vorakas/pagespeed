@@ -51,10 +51,11 @@ export function ApplitoolsConfigPanel() {
               under a second.
             </li>
             <li>
-              <strong className="text-foreground">Back in Pharos</strong>: type
-              the same batch id into the Visual card and click{" "}
-              <strong className="text-foreground">+ Sheet</strong>. The Unresolved
-              rows are folded in automatically.
+              <strong className="text-foreground">Back in Pharos</strong>: click
+              into the Visual card's <em>Applitools Batch ID</em> field — the
+              batch you just uploaded appears in a dropdown, pick it, then
+              click <strong className="text-foreground">+ Sheet</strong>. (You
+              can also type a batch id by hand if it's older than 24h.)
             </li>
           </ol>
 

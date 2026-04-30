@@ -39,39 +39,47 @@ interface BuildCardProps {
   onStop?: () => void
   cancelling?: boolean
   selected?: boolean
+  /** Applitools batch id for this Visual card — passed through to the
+   * sheet export. Ignored for non-Visual cards. Cleared per run. */
+  applitoolsBatchId?: string
+  onApplitoolsBatchIdChange?: (roleKey: string, value: string) => void
+  /** Recent helper-uploaded batches surfaced as autocomplete options
+   * in the batch-id input so QA can pick instead of retyping. */
+  recentApplitoolsBatches?: Array<{
+    batchId: string
+    fetchedAt: string
+    uploadedAt: number
+    testCount: number
+  }>
 }
 
-function statusColor(status: BuildStatus, result: BuildResult): string {
-  if (status === "inProgress") return "bg-blue-500"
-  if (status !== "completed") return "bg-muted"
+function statusTextColor(status: BuildStatus, result: BuildResult): string {
+  if (status === "inProgress") return "text-blue-400"
+  if (status !== "completed") return "text-muted-foreground"
   switch (result) {
-    case "succeeded": return "bg-score-good"
-    case "partiallySucceeded": return "bg-score-average"
-    case "failed": return "bg-score-poor"
-    case "canceled": return "bg-muted"
-    default: return "bg-muted"
+    case "succeeded": return "text-score-good"
+    case "partiallySucceeded": return "text-score-average"
+    case "failed": return "text-score-poor"
+    case "canceled": return "text-muted-foreground"
+    default: return "text-muted-foreground"
   }
 }
 
 function statusLabel(status: BuildStatus, result: BuildResult): string {
-  if (status === "inProgress") return "Running"
-  if (status === "notStarted") return "Queued"
-  if (status !== "completed") return status
+  if (status === "inProgress") return "RUNNING"
+  if (status === "notStarted") return "QUEUED"
+  if (status !== "completed") return status.toUpperCase()
   switch (result) {
-    case "succeeded": return "Passed"
-    case "partiallySucceeded": return "Partial"
-    case "failed": return "Failed"
-    case "canceled": return "Canceled"
-    default: return "Unknown"
+    case "succeeded": return "PASSED"
+    case "partiallySucceeded": return "PARTIAL"
+    case "failed": return "FAILED"
+    case "canceled": return "CANCELED"
+    default: return "UNKNOWN"
   }
 }
 
-function typeBadgeColor(type: "WarmUp" | "Functional" | "Visual"): string {
-  switch (type) {
-    case "WarmUp": return "bg-purple-500/15 text-purple-600 dark:text-purple-400"
-    case "Functional": return "bg-blue-500/15 text-blue-600 dark:text-blue-400"
-    case "Visual": return "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-  }
+function typeBadgeLabel(type: "WarmUp" | "Functional" | "Visual"): string {
+  return type === "WarmUp" ? "warmup" : type.toLowerCase()
 }
 
 function formatDuration(startTime: string | null, finishTime: string | null): string {
@@ -106,6 +114,7 @@ export function BuildCard({
   branches, globalBranch, globalTargetInstance, globalStagingInstance, override, onOverrideChange,
   onTrigger, onShowResults, onShowSkipped, onAddToSheet, addedToSheet,
   triggering, triggerError, onStop, cancelling, selected,
+  applitoolsBatchId, onApplitoolsBatchIdChange, recentApplitoolsBatches,
 }: BuildCardProps) {
   const isServerCancelling = build?.status === "cancelling"
   const showCancelling = cancelling || isServerCancelling
@@ -130,22 +139,29 @@ export function BuildCard({
     : null
   const hasBuildOverride = !!selectedBuild
 
+  const dotPulse = isRunning || showCancelling
+  const dotColorClass = showCancelling ? "text-amber-500" : statusTextColor(displayStatus, displayResult)
+
   return (
-    <Card className={`relative overflow-hidden transition-colors ${selected ? "ring-1 ring-sidebar-primary" : ""}`}>
+    <Card className={`relative overflow-hidden transition-colors ${selected ? "is-selected" : ""}`}>
       <CardContent className="p-3 space-y-2 overflow-hidden">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{roleLabel}</p>
-            <span className={`inline-block mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${typeBadgeColor(typeBadge)}`}>
-              {typeBadge}
+            <p className="text-sm beacon-headline truncate">{roleLabel}</p>
+            <span className="beacon-typebadge mt-1">
+              {typeBadgeLabel(typeBadge)}
             </span>
           </div>
           {build && (
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className={`h-2 w-2 rounded-full ${showCancelling ? "bg-amber-500" : statusColor(displayStatus, displayResult)} ${(isRunning || showCancelling) ? "animate-pulse" : ""}`} />
-              <span className="text-xs text-muted-foreground">
-                {showCancelling ? "Cancelling..." : statusLabel(displayStatus, displayResult)}
-                {hasRerun && displayResult === "succeeded" && " (Re-runs)"}
+              <span
+                className={`beacon-dot ${dotColorClass} ${dotPulse ? "beacon-dot--pulse" : ""}`}
+                aria-label={showCancelling ? "Cancelling" : statusLabel(displayStatus, displayResult)}
+                role="img"
+              />
+              <span className={`beacon-status ${dotColorClass}`}>
+                {showCancelling ? "CANCELLING" : statusLabel(displayStatus, displayResult)}
+                {hasRerun && displayResult === "succeeded" && " (RR)"}
               </span>
             </div>
           )}
@@ -154,17 +170,18 @@ export function BuildCard({
         {build ? (
           <div className="space-y-1 text-xs text-muted-foreground">
             <div className="flex justify-between">
-              <span>#{build.buildNumber}</span>
-              <span>{formatDuration(build.startTime, build.finishTime)}</span>
+              <span className="beacon-mono">#{build.buildNumber}</span>
+              <span className="beacon-mono">{formatDuration(build.startTime, build.finishTime)}</span>
             </div>
             <div className="flex justify-between">
-              <span>{formatTimeAgo(build.startTime)}</span>
+              <span className="beacon-mono">{formatTimeAgo(build.startTime)}</span>
               {build.webUrl && (
                 <a
                   href={build.webUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-0.5 text-sidebar-primary hover:underline"
+                  className="flex items-center gap-0.5 hover:underline"
+                  style={{ color: "var(--beacon-amber)" }}
                 >
                   View <ExternalLink className="h-3 w-3" />
                 </a>
@@ -172,17 +189,20 @@ export function BuildCard({
             </div>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">No recent builds</p>
+          <p className="text-xs text-muted-foreground beacon-mono">No recent builds</p>
         )}
 
         {/* Per-card overrides */}
         <details className="group">
-          <summary className={`text-[10px] cursor-pointer hover:text-foreground ${hasOverride ? "text-sidebar-primary" : "text-muted-foreground"}`}>
+          <summary
+            className={`beacon-summary cursor-pointer hover:text-foreground ${hasOverride ? "" : "text-muted-foreground"}`}
+            style={hasOverride ? { color: "var(--beacon-amber)" } : undefined}
+          >
             {hasOverride
-              ? "Override active"
+              ? "OVERRIDE ACTIVE"
               : isVisual
-                ? "Override branch / PROD / PPE"
-                : "Override branch / PROD"}
+                ? "OVERRIDE BRANCH / PROD / PPE"
+                : "OVERRIDE BRANCH / PROD"}
           </summary>
           <div
             className={`mt-1.5 grid gap-2 ${isVisual ? "grid-cols-[1fr_2.5rem_2.5rem]" : "grid-cols-[1fr_2.5rem]"}`}
@@ -227,10 +247,13 @@ export function BuildCard({
 
         {recentBuilds.length > 0 && (
           <details className="group">
-            <summary className={`text-[10px] cursor-pointer hover:text-foreground ${hasBuildOverride ? "text-sidebar-primary" : "text-muted-foreground"}`}>
+            <summary
+              className={`beacon-summary cursor-pointer hover:text-foreground ${hasBuildOverride ? "" : "text-muted-foreground"}`}
+              style={hasBuildOverride ? { color: "var(--beacon-amber)" } : undefined}
+            >
               {hasBuildOverride
-                ? `Viewing #${selectedBuild!.buildNumber}`
-                : "Select build"}
+                ? `VIEWING #${selectedBuild!.buildNumber}`
+                : "SELECT BUILD"}
             </summary>
             <div className="mt-1.5">
               <select
@@ -247,6 +270,52 @@ export function BuildCard({
               </select>
             </div>
           </details>
+        )}
+
+        {/* Applitools batch id — Visual cards only. Cleared per run.
+            The <datalist> below turns the input into an autocomplete:
+            QA either types the id by hand or picks one of the recent
+            helper uploads from the dropdown the browser draws. Native
+            datalist gives us the popover, filtering, and click-to-fill
+            for free, no JS state. */}
+        {isVisual && isCompleted && onApplitoolsBatchIdChange && (
+          <div className="space-y-0.5">
+            <label
+              htmlFor={`applitools-batch-${roleKey}`}
+              className="beacon-label"
+            >
+              Applitools Batch ID
+              {recentApplitoolsBatches && recentApplitoolsBatches.length > 0 && (
+                <span className="ml-1 text-muted-foreground">
+                  ({recentApplitoolsBatches.length} uploaded)
+                </span>
+              )}
+            </label>
+            <input
+              id={`applitools-batch-${roleKey}`}
+              type="text"
+              list={`applitools-batches-${roleKey}`}
+              value={applitoolsBatchId ?? ""}
+              onChange={(e) => onApplitoolsBatchIdChange(roleKey, e.target.value)}
+              placeholder={
+                recentApplitoolsBatches && recentApplitoolsBatches.length > 0
+                  ? "Pick from list or paste id"
+                  : "Run helper, then paste id"
+              }
+              className="h-6 w-full rounded border border-border bg-background px-1.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
+            />
+            {recentApplitoolsBatches && recentApplitoolsBatches.length > 0 && (
+              <datalist id={`applitools-batches-${roleKey}`}>
+                {recentApplitoolsBatches.map((b) => (
+                  <option
+                    key={b.batchId}
+                    value={b.batchId}
+                    label={`${b.testCount} row${b.testCount === 1 ? "" : "s"} · ${formatTimeAgo(new Date(b.uploadedAt * 1000).toISOString())}`}
+                  />
+                ))}
+              </datalist>
+            )}
+          </div>
         )}
 
         <div className="flex items-center gap-1.5">

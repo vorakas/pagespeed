@@ -97,6 +97,31 @@ class ApplitoolsBatchStore:
                 "tests": [dict(row) for row in entry.tests],
             }
 
+    def list_recent(self) -> list[dict[str, Any]]:
+        """Return a metadata-only summary of every cached batch, newest first.
+
+        Used by the Visual-card dropdown so QA can pick a recently
+        uploaded batch instead of retyping its id. Test rows are
+        intentionally not included — the dropdown only needs identity
+        and a row-count hint.
+        """
+        now = time.time()
+        with self._lock:
+            self._evict_expired(now)
+            return sorted(
+                (
+                    {
+                        "batchId": batch_id,
+                        "fetchedAt": entry.fetched_at,
+                        "uploadedAt": entry.uploaded_at,
+                        "testCount": len(entry.tests),
+                    }
+                    for batch_id, entry in self._entries.items()
+                ),
+                key=lambda r: r["uploadedAt"],
+                reverse=True,
+            )
+
     def _evict_expired(self, now: float) -> None:
         cutoff = now - self._ttl_seconds
         stale = [k for k, v in self._entries.items() if v.uploaded_at < cutoff]

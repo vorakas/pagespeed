@@ -91,6 +91,13 @@ def create_applitools_blueprint(
         )
         return jsonify({"success": True, "stored": len(normalized)})
 
+    @bp.route("/api/applitools/recent-uploads", methods=["GET"])
+    def recent_uploads():
+        # No auth — same-origin browsers only. Returns metadata only
+        # (no test rows) so QA can pick a batch from a dropdown without
+        # the dashboard having to load every batch's payload eagerly.
+        return jsonify({"success": True, "uploads": store.list_recent()})
+
     @bp.route("/api/applitools/batch/<batch_id>", methods=["GET"])
     def get_batch(batch_id: str):
         payload = store.get(batch_id)
