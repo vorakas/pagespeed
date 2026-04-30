@@ -2015,3 +2015,167 @@
   border-color: var(--lcc-violet);
   background: var(--glass-bg-strong);
 }
+
+/* ── Rendered markdown (.lcc-markdown) ──────────────────────────────
+ * Used by the per-ticket drawer in ProjectDashboard (and any other
+ * surface that renders marked.parse output via dangerouslySetInnerHTML).
+ * Without these rules tables collapse to inline content, lists lose
+ * their bullets, and headings inherit body weight.                   */
+.lcc-markdown {
+  color: var(--lcc-text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.lcc-markdown > *:first-child {
+  margin-top: 0;
+}
+.lcc-markdown > *:last-child {
+  margin-bottom: 0;
+}
+.lcc-markdown p {
+  margin: 0 0 10px;
+}
+.lcc-markdown a {
+  color: var(--lcc-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.lcc-markdown a:hover {
+  text-decoration: none;
+}
+
+/* Headings — keep the rhythm tight inside a drawer. */
+.lcc-markdown h1,
+.lcc-markdown h2,
+.lcc-markdown h3,
+.lcc-markdown h4,
+.lcc-markdown h5,
+.lcc-markdown h6 {
+  margin: 14px 0 6px;
+  color: var(--lcc-text);
+  font-weight: 700;
+  line-height: 1.25;
+}
+.lcc-markdown h1 { font-size: 16px; }
+.lcc-markdown h2 { font-size: 15px; }
+.lcc-markdown h3 { font-size: 14px; }
+.lcc-markdown h4,
+.lcc-markdown h5,
+.lcc-markdown h6 { font-size: 13px; color: var(--lcc-text-dim); }
+
+/* Lists — restore default-ish indentation and tighten spacing. */
+.lcc-markdown ul,
+.lcc-markdown ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+.lcc-markdown ul { list-style: disc outside; }
+.lcc-markdown ol { list-style: decimal outside; }
+.lcc-markdown li {
+  margin: 2px 0;
+}
+.lcc-markdown li > ul,
+.lcc-markdown li > ol {
+  margin: 2px 0;
+}
+
+/* Tables — the main offender. Standard markdown tables come out as
+ * <table><thead><tr><th>…<tbody><tr><td>… with no styling, and inside
+ * a flex parent they collapse to inline content. Style them like the
+ * rest of the dashboard's data tables. */
+.lcc-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 12px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  overflow: hidden;
+  display: table;
+}
+.lcc-markdown thead {
+  background: rgba(255, 255, 255, 0.04);
+}
+.lcc-markdown th,
+.lcc-markdown td {
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-right: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
+  word-break: break-word;
+}
+.lcc-markdown th:last-child,
+.lcc-markdown td:last-child {
+  border-right: 0;
+}
+.lcc-markdown tbody tr:last-child td {
+  border-bottom: 0;
+}
+.lcc-markdown th {
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+  white-space: nowrap;
+}
+.lcc-markdown tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.015);
+}
+.lcc-markdown tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Code — inline + fenced. */
+.lcc-markdown code {
+  font-family: var(--aurora-font-mono, ui-monospace, monospace);
+  font-size: 0.92em;
+  padding: 1px 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: 3px;
+  color: var(--lcc-text);
+}
+.lcc-markdown pre {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.lcc-markdown pre code {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Blockquotes. */
+.lcc-markdown blockquote {
+  margin: 8px 0 12px;
+  padding: 6px 12px;
+  border-left: 3px solid var(--lcc-violet, rgba(167, 139, 250, 0.7));
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lcc-text-dim);
+  font-style: italic;
+}
+
+/* Horizontal rule. */
+.lcc-markdown hr {
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+}
+
+/* Inline images — keep them inside the drawer's max width. */
+.lcc-markdown img {
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+}
