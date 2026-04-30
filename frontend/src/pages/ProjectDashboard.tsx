@@ -716,7 +716,10 @@ function TicketsPanel({
           <tbody>
             {visible.map((t) => (
               <tr
-                key={t.key}
+                // Use relPath, not key — multiple raw files can share the
+                // same Jira key (rename ghosts) and React leaves stale rows
+                // mounted when a previous render had duplicate <tr key=…>.
+                key={t.relPath || t.key}
                 style={{ borderTop: "1px solid var(--lcc-border-faint)" }}
               >
                 <Td>

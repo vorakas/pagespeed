@@ -230,7 +230,39 @@ class MigrationDashboardService:
         return value
 
     def _raw_tasks(self) -> List[RawTask]:
-        return self._cached("raw_tasks", lambda: list(self._scanner.iter_tasks()))
+        return self._cached("raw_tasks", self._compute_raw_tasks)
+
+    def _compute_raw_tasks(self) -> List[RawTask]:
+        """Walk ``raw/`` and deduplicate by ticket key.
+
+        The Jira sync currently writes a brand-new file when a ticket is
+        renamed instead of replacing the old one (see
+        ``session_state.md`` — "Sync script creates a new file on rename
+        instead of updating the existing one"). So one ticket key can
+        end up with multiple frontmatter files on disk, and every
+        downstream caller — KPIs, daily activity, project pages, status
+        histograms — would double-count.
+
+        We keep one canonical record per key, picking the
+        lexicographically-smallest ``rel_path``. That's stable across
+        runs (no dependency on file mtime), tolerable when the duplicate
+        files have the same ticket data (the common case for whitespace-
+        only filename drift), and the user-visible effect is that
+        ``ACE2E-329`` etc. now each appear exactly once.
+
+        Records with no key (e.g. "Map of Content" docs) pass through
+        untouched; deduping on an empty key would collapse them all.
+        """
+        by_key: Dict[str, RawTask] = {}
+        no_key: List[RawTask] = []
+        for task in self._scanner.iter_tasks():
+            if not task.key:
+                no_key.append(task)
+                continue
+            existing = by_key.get(task.key)
+            if existing is None or task.rel_path < existing.rel_path:
+                by_key[task.key] = task
+        return list(by_key.values()) + no_key
 
     def _latest_status(self) -> Optional[StatusSnapshot]:
         return self._cached("latest_status", lambda: latest_status_snapshot(self._vault))
