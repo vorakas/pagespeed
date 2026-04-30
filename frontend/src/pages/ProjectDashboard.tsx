@@ -237,6 +237,19 @@ function PageFrame({
 
 // ── Header ─────────────────────────────────────────────────────────────
 
+// `MigrationSource.name` is the H1 of the editorial source-summary doc
+// (e.g. "Source Summary: Jira ACE2E (2026-04-23)"). The trailing
+// "(YYYY-MM-DD)" is the ingested date the orchestrator stamped when it
+// last regenerated that doc — and that document gets refreshed far less
+// often than the raw ticket data this page actually shows. Surfacing it
+// in the hero reads as a stale-data warning when the tickets themselves
+// are current, so we strip the suffix.
+const INGESTED_DATE_SUFFIX = /\s*\(\d{4}-\d{2}-\d{2}\)\s*$/
+
+function stripIngestedDateSuffix(name: string): string {
+  return name.replace(INGESTED_DATE_SUFFIX, "")
+}
+
 function ProjectHeader({ project }: { project: MigrationSource }) {
   return (
     <div className="panel" style={{ padding: "14px 18px" }}>
@@ -253,7 +266,7 @@ function ProjectHeader({ project }: { project: MigrationSource }) {
         </span>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>{project.key}</h1>
         <span style={{ color: "var(--lcc-text-dim)", fontSize: 14 }}>
-          {project.name}
+          {stripIngestedDateSuffix(project.name)}
         </span>
       </div>
     </div>
