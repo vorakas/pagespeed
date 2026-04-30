@@ -173,14 +173,15 @@ export function LaunchDashboard() {
       />
       <div className="lcc-shell">
         <LeftRail
-          kpis={kpis}
           sources={sources}
           workstreams={workstreams}
+          blockers={blockers}
+          prodFailures={prodFailures}
           vaultLastSynced={health.lastSynced}
         />
 
         <main className="lcc-main">
-          <HeroStrip health={health} />
+          <HeroStrip health={health} kpis={kpis} />
 
           <WhatChangedToday />
 

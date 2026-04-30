@@ -3,34 +3,35 @@ import { useNavigate } from "react-router-dom"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { formatPacificDate } from "@/lib/datetime"
 import type {
-  MigrationKpis,
+  MigrationBlocker,
   MigrationSource,
   MigrationWorkstream,
+  RawTaskRecord,
 } from "@/types"
 
 interface LeftRailProps {
-  kpis: MigrationKpis | null
   sources: MigrationSource[] | null
   workstreams: MigrationWorkstream[] | null
+  blockers: MigrationBlocker[] | null
+  prodFailures: RawTaskRecord[] | null
   vaultLastSynced: string | null
 }
 
 /**
- * Sticky left rail: at-a-glance KPIs + a Projects list (primary nav) +
- * a collapsed Rollups section (workstreams, demoted).
+ * Sticky left rail: a Projects list (primary nav) + a collapsed
+ * Rollups section (workstreams, demoted).
  *
- * Projects come from the per-source counts (`MigrationSource`), which roll
- * up directly from `raw/<project>/` folders — every number on a project row
- * traces back to a Jira/Asana feed without an editorial layer in between.
- *
- * Workstreams remain reachable via the "Rollups" section, but they're no
- * longer the front door: the user clicks a project to see project-scoped
- * data, and only opens a rollup when they want a cross-project view.
+ * The KPI summary that used to sit at the top now lives in the hero
+ * strip, freeing this rail to act as a pure project navigator. Each
+ * project row carries a red/amber/green status dot derived from its
+ * incident footprint (prod fail → red, open blocker → amber, else
+ * green) so health is readable without opening the project.
  */
 export function LeftRail({
-  kpis,
   sources,
   workstreams,
+  blockers,
+  prodFailures,
   vaultLastSynced,
 }: LeftRailProps) {
   const navigate = useNavigate()
@@ -40,6 +41,11 @@ export function LeftRail({
     if (!sources) return []
     return [...sources].sort((a, b) => b.total - a.total)
   }, [sources])
+
+  const projectStatus = useMemo(
+    () => buildProjectStatusMap(sortedProjects, blockers, prodFailures),
+    [sortedProjects, blockers, prodFailures],
+  )
 
   const needsAttention = useMemo(() => {
     if (!workstreams) return []
@@ -52,34 +58,6 @@ export function LeftRail({
 
   return (
     <aside className="lcc-left-rail">
-      <div className="lcc-lr-section">
-        <div className="lcc-lr-label">At a glance</div>
-        <div className="lcc-lr-stat">
-          <div className="lcc-lr-stat-num">{fmt(kpis?.combinedUnique)}</div>
-          <div className="lcc-lr-stat-sub">Combined unique tasks</div>
-        </div>
-        <div className="lcc-lr-stat-row">
-          <div className="lcc-lr-stat-mini" data-tone="green">
-            <div className="v">{kpis?.resolvedPct ?? "—"}%</div>
-            <div className="l">Resolved</div>
-          </div>
-          <div className="lcc-lr-stat-mini" data-tone="red">
-            <div className="v">{fmt(kpis?.productionFailures)}</div>
-            <div className="l">Prod fail</div>
-          </div>
-        </div>
-        <div className="lcc-lr-stat-row">
-          <div className="lcc-lr-stat-mini" data-tone="amber">
-            <div className="v">{fmt(kpis?.openBlockers)}</div>
-            <div className="l">Blockers</div>
-          </div>
-          <div className="lcc-lr-stat-mini" data-tone="red">
-            <div className="v">{fmt(kpis?.newBugs24h)}</div>
-            <div className="l">New / 24h</div>
-          </div>
-        </div>
-      </div>
-
       <div className="lcc-lr-section">
         <div className="lcc-lr-label">
           Projects
@@ -94,6 +72,7 @@ export function LeftRail({
             <ProjectRow
               key={src.key}
               source={src}
+              tone={projectStatus[src.key] ?? "green"}
               onOpen={() => navigate(`/dashboard/projects/${encodeURIComponent(src.key)}`)}
             />
           ))
@@ -163,49 +142,25 @@ export function LeftRail({
 
 interface ProjectRowProps {
   source: MigrationSource
+  tone: ProjectTone
   onOpen: () => void
 }
 
-function ProjectRow({ source, onOpen }: ProjectRowProps) {
-  const pct = Math.max(0, Math.min(100, Math.round(source.pct ?? 0)))
+function ProjectRow({ source, tone, onOpen }: ProjectRowProps) {
   return (
     <button
       type="button"
       className="lcc-lr-area"
       onClick={onOpen}
       title={`${source.name} — ${source.total.toLocaleString()} tasks`}
-      style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span
-          className="lcc-src-kind"
-          style={{ fontSize: 9, textTransform: "uppercase", opacity: 0.7 }}
-        >
-          {source.kind}
+      <span className="lcc-lr-dot" data-tone={tone} aria-hidden />
+      <span className="lcc-lr-area-name">{source.key}</span>
+      <span className="lcc-lr-area-meta">
+        <span className="lcc-lr-area-count">
+          {source.total.toLocaleString()}
         </span>
-        <span className="lcc-lr-area-name" style={{ fontWeight: 600 }}>
-          {source.key}
-        </span>
-        <span className="lcc-lr-area-meta" style={{ marginLeft: "auto" }}>
-          <span className="lcc-lr-area-count">
-            {source.total.toLocaleString()}
-          </span>
-        </span>
-      </div>
-      <div className="lcc-src-bar" style={{ height: 3 }}>
-        <span style={{ width: `${pct}%` }} />
-      </div>
-      <div
-        style={{
-          fontSize: 10,
-          color: "var(--lcc-text-faint)",
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        <span>{pct}% closed</span>
-        <span>{source.active.toLocaleString()} active</span>
-      </div>
+      </span>
     </button>
   )
 }
@@ -245,9 +200,33 @@ function RollupRow({ workstream: ws, onOpen }: RollupRowProps) {
   )
 }
 
-function fmt(n: number | null | undefined): string {
-  if (n == null) return "—"
-  return Number(n).toLocaleString()
+type ProjectTone = "red" | "amber" | "green"
+
+function buildProjectStatusMap(
+  projects: MigrationSource[],
+  blockers: MigrationBlocker[] | null,
+  prodFailures: RawTaskRecord[] | null,
+): Record<string, ProjectTone> {
+  const out: Record<string, ProjectTone> = {}
+  for (const p of projects) {
+    const upper = p.key.toUpperCase()
+    const hasProdFail = (prodFailures ?? []).some(
+      (t) =>
+        t.project?.toUpperCase() === upper ||
+        t.key?.toUpperCase().startsWith(`${upper}-`),
+    )
+    if (hasProdFail) {
+      out[p.key] = "red"
+      continue
+    }
+    const hasBlocker = (blockers ?? []).some(
+      (b) =>
+        b.id?.toUpperCase().startsWith(`${upper}-`) ||
+        b.affects?.some((a) => a?.toUpperCase().includes(upper)),
+    )
+    out[p.key] = hasBlocker ? "amber" : "green"
+  }
+  return out
 }
 
 function attentionScore(ws: MigrationWorkstream): number {

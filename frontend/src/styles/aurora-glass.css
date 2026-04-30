@@ -546,6 +546,32 @@
   background: linear-gradient(135deg, #fff, #cfd5ff);
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
+.launch-dashboard .lcc-hs-kpis {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-top: 14px;
+}
+.launch-dashboard .lcc-hs-kpi {
+  padding: 8px 14px; border-radius: var(--lcc-radius-sm);
+  background: var(--glass-bg-faint); border: 1px solid var(--glass-border);
+  min-width: 96px;
+}
+.launch-dashboard .lcc-hs-kpi-v {
+  font-size: 22px; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+}
+.launch-dashboard .lcc-hs-kpi-l {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--lcc-text-faint); margin-top: 4px;
+  font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-hs-kpi[data-tone="primary"] .lcc-hs-kpi-v {
+  background: linear-gradient(135deg, #fff, #cfd5ff);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.launch-dashboard .lcc-hs-kpi[data-tone="green"] .lcc-hs-kpi-v { color: var(--lcc-green); text-shadow: 0 0 12px rgba(110, 231, 168, 0.4); }
+.launch-dashboard .lcc-hs-kpi[data-tone="amber"] .lcc-hs-kpi-v { color: var(--lcc-amber); text-shadow: 0 0 12px rgba(255, 196, 107, 0.4); }
+.launch-dashboard .lcc-hs-kpi[data-tone="red"]   .lcc-hs-kpi-v { color: var(--lcc-red);   text-shadow: 0 0 12px rgba(255, 107, 139, 0.4); }
+
 .launch-dashboard .lcc-hs-reasons {
   display: flex; flex-wrap: wrap; gap: 14px 28px;
   margin: 0; padding: 0; list-style: none;
