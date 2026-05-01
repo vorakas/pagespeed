@@ -9,6 +9,7 @@ import type {
   ObsidianVaultPage,
 } from "@/types"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { cn } from "@/lib/utils"
 
 /**
@@ -162,14 +163,12 @@ export function Obsidian() {
   const canSyncBoth = canSyncJira && canSyncAsana
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Obsidian Bridge</h1>
-        <p className="text-sm text-muted-foreground">
-          Sync Jira and Asana into the LLM-maintained Adobe Commerce migration vault.
-        </p>
-      </div>
-
+    <>
+      <PageHeader
+        title="Obsidian Bridge"
+        description="Sync Jira and Asana into the LLM-maintained Adobe Commerce migration vault."
+      />
+      <div className="p-6 space-y-6">
       {capabilitiesError && (
         <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {capabilitiesError}
@@ -321,7 +320,8 @@ export function Obsidian() {
           ) : null}
         </div>
       </section>
-    </div>
+      </div>
+    </>
   )
 }
 

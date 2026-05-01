@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import { Monitor, Smartphone, Rocket, RefreshCw } from "lucide-react"
-import { Header } from "@/components/layout/Header"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -224,7 +224,7 @@ export function TestUrls() {
   if (sitesLoading) {
     return (
       <>
-        <Header title="Test URLs" description="Run PageSpeed tests on monitored URLs" />
+        <PageHeader title="Test URLs" description="Run PageSpeed tests on monitored URLs" />
         <div className="p-6">
           <LoadingSpinner message="Loading sites..." />
         </div>
@@ -234,7 +234,7 @@ export function TestUrls() {
 
   return (
     <>
-      <Header
+      <PageHeader
         title="Test URLs"
         description="Run PageSpeed tests on monitored URLs"
         actions={

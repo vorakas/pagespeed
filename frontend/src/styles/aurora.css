@@ -1,0 +1,2606 @@
+/* ==========================================================================
+   Aurora register — single CSS source for the Pharos chrome + page styles.
+
+   Phase 3B of the Aurora rollout merged what used to live in two files:
+
+     - styles/aurora.css (this file's prior contents) — token register,
+       global app shell, sidebar / header / card chrome
+     - styles/aurora-glass.css — :root tokens, reusable page primitives
+       (.aurora-panel, .aurora-input, .aurora-num, .aurora-score, …),
+       shadcn primitive overrides, and the entire Launch Command Center
+       cluster (.launch-dashboard .lcc-*)
+
+   Source order (which determines cascade for equal-specificity rules)
+   matches the original two-file load order: aurora.css's contents come
+   first, then the former aurora-glass.css contents. Section banners
+   help navigation in this ~2,500-line file.
+
+   The Aurora register is ALWAYS active in production — AppLayout wraps
+   in `<div class="beacon beacon-shell dark aurora">` so every
+   `.aurora`, `.beacon`, and `.beacon.aurora` selector matches.
+   The original "non-slop substitution" intent of aurora.css remains:
+   no animated drift blobs, no backdrop-filter blur, no gradient text,
+   no isotropic glow halos, no conic brand orbs.
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+.aurora {
+  /* Typography — exact match */
+  --font-sans: 'Inter', ui-sans-serif, -apple-system, system-ui,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Menlo',
+    'Cascadia Code', Consolas, monospace;
+
+  /* Aurora ground — same structure as the design but hue-shifted from
+     purple-blue (~268°-285°) to true blue (~225°). Each layer keeps
+     its luminance so the tonal hierarchy (ground < surface < elevated)
+     still gives cards visible lift; chroma stays restrained so the
+     blue reads as branded depth, not a flat color. */
+  --aurora-1: #061230;
+  --aurora-2: #0d1c44;
+  --aurora-3: #122655;
+  --aurora-4: #0f2847;
+
+  /* Beacon-shell variables map to the design's surface levels.
+       ground   → aurora-1 (page bg)
+       surface  → custom (cards) — sits slightly darker than aurora-2
+                   so cards visibly recess below the translucent sidebar
+                   and header (which sit at ~aurora-2 effective lightness
+                   after their 0.72 alpha mixes with the body gradient).
+                   Without this, cards and chrome read at the same depth.
+       elevated → aurora-3 (popovers, secondary panels)
+     The ~5% lightness gap between ground / card / chrome is what makes
+     drop shadows visible on dark. */
+  --beacon-ground:    var(--aurora-1);
+  --beacon-surface:   #091a3c;
+  --beacon-elevated:  var(--aurora-3);
+  --beacon-border:    rgba(255, 255, 255, 0.10);  /* glass-border */
+  --beacon-hairline:  rgba(255, 255, 255, 0.18);  /* glass-border-strong */
+
+  /* Text — exact match */
+  --beacon-text:        #eef1ff;
+  --beacon-text-muted:  #a9b3d6;
+  --beacon-text-faint:  #7a83a8;
+
+  /* Multi-hue state palette — exact hex values from the design (kept
+     unchanged so semantic colors stay consistent: red = blocked,
+     amber = at-risk, green = pass, blue = in-progress).
+     `--aurora-violet` is repurposed as the BRAND accent and shifted
+     from violet (#b08cff) to periwinkle blue (#7cb0ff) — same chroma
+     and luminance, hue rotated 290° → 245°. The variable name is
+     retained for compatibility with existing rules. */
+  --aurora-red:    #ff6b8b;  --aurora-red-bg:    rgba(255, 107, 139, 0.14);
+  --aurora-amber:  #ffc46b;  --aurora-amber-bg:  rgba(255, 196, 107, 0.14);
+  --aurora-green:  #6ee7a8;  --aurora-green-bg:  rgba(110, 231, 168, 0.14);
+  --aurora-blue:   #6ec7ff;  --aurora-blue-bg:   rgba(110, 199, 255, 0.14);
+  --aurora-violet: #7cb0ff;  --aurora-violet-bg: rgba(124, 176, 255, 0.14);
+
+  /* Map beacon semantic tokens to the design palette */
+  --beacon-pass: var(--aurora-green);
+  --beacon-fail: var(--aurora-red);
+  --beacon-warn: var(--aurora-amber);
+  --beacon-info: var(--aurora-blue);
+  --beacon-idle: var(--aurora-text-faint, #7a83a8);
+
+  /* Brand accent: violet — what the design uses for active filters,
+     tab indicators, and the primary tab gradient's left stop. The
+     accent is held in --beacon-amber so existing `var(--beacon-amber)`
+     consumers automatically pick it up. */
+  --beacon-amber:       var(--aurora-violet);
+  --beacon-amber-soft:  var(--aurora-violet-bg);
+  --beacon-amber-line:  rgba(124, 176, 255, 0.40);
+
+  /* Lighthouse beam picks up violet automatically */
+  --brand-beam: var(--beacon-amber);
+
+  /* Primary action: the design uses a violet→blue gradient for the
+     active filter pill, the active tab, and the active tweaks button.
+     We surface that as the --primary background, so any default-variant
+     button (Run Orchestrator) renders with this gradient. Gradient on
+     a button background is NOT slop — only gradient text is. */
+  --primary: var(--aurora-violet);
+  --primary-foreground: #ffffff;
+  --ring: var(--aurora-violet);
+
+  /* shadcn token overrides */
+  --background: var(--beacon-ground);
+  --foreground: var(--beacon-text);
+  --card: var(--beacon-surface);
+  --card-foreground: var(--beacon-text);
+  --popover: var(--beacon-elevated);
+  --popover-foreground: var(--beacon-text);
+  --muted: var(--beacon-elevated);
+  --muted-foreground: var(--beacon-text-muted);
+  --secondary: var(--beacon-elevated);
+  --secondary-foreground: var(--beacon-text);
+  --accent: var(--beacon-amber-soft);
+  --accent-foreground: var(--aurora-violet);
+  --destructive: var(--aurora-red);
+  --border: var(--beacon-border);
+  --input: var(--beacon-border);
+
+  /* Score tokens — Pharos's existing components (e.g. SpreadsheetWidget
+     totals, BuildCard status colors) consume these via Tailwind utility
+     classes like text-score-good. Keep them aligned with Aurora pastels. */
+  --color-score-good: var(--aurora-green);
+  --color-score-average: var(--aurora-amber);
+  --color-score-poor: var(--aurora-red);
+
+  /* Radii — exact match */
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Backdrop atmosphere — replicates the design's body lighting in a
+   purely static stack. Four layers, in paint order:
+     1. Upper-left violet ambient  (was `body::before` violet blob)
+     2. Upper-right teal ambient   (was `body::before` teal blob)
+     3. Bottom-center aurora-4     (was the linear bg's radial-gradient)
+     4. Vertical aurora-1 → aurora-2 base
+   The ambient blobs were originally `body::before` with
+   `filter: blur(90px)` + `animation: drift1` — both slop tactics. Static
+   radial gradients give the same "light source from off-screen" feel
+   without the blur or drift, just at lower intensity (0.18 / 0.10
+   alpha vs the original 0.55) since soft radials don't need blur to
+   feel diffuse. Sits behind the translucent sidebar/header so the
+   chromatic bleed reads through them.
+   -------------------------------------------------------------------------- */
+.aurora.beacon-shell {
+  background:
+    /* Upper-left blue ambient (was violet — same intensity, hue shifted) */
+    radial-gradient(
+      45% 40% at 22% 28%,
+      rgba(108, 156, 255, 0.22),
+      transparent 70%
+    ),
+    /* Upper-mid teal ambient (kept — pairs with blue as cool warmth) */
+    radial-gradient(
+      40% 35% at 60% 22%,
+      rgba(56, 224, 208, 0.12),
+      transparent 70%
+    ),
+    /* Lower-right cyan ambient (was pink — keep the bottom-right
+       light source but stay in the cool spectrum for cohesion) */
+    radial-gradient(
+      55% 45% at 88% 90%,
+      rgba(100, 200, 255, 0.10),
+      transparent 70%
+    ),
+    /* Bottom-center aurora-4 anchor */
+    radial-gradient(
+      60% 45% at 50% 105%,
+      var(--aurora-4) 0%,
+      transparent 60%
+    ),
+    /* Base vertical gradient */
+    linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
+  background-attachment: fixed;
+}
+
+/* --------------------------------------------------------------------------
+   Cards: the design's panel radius is 14px. Drop shadow + inset
+   highlight gives the lifted feel the original tried to get from glass
+   blur, but with real layered depth. The hairline inset highlight
+   matches the design's `--glass-inner` token (inset 0 1px 0 white at
+   8% alpha).
+   -------------------------------------------------------------------------- */
+.aurora [data-slot="card"] {
+  border-radius: var(--radius);
+  border-color: var(--beacon-border);
+  background: var(--beacon-surface);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    0 8px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Banner: matches panel radius
+   -------------------------------------------------------------------------- */
+.aurora .beacon-banner {
+  border-radius: var(--radius-sm);
+  background: var(--aurora-violet-bg);
+  border-color: rgba(176, 140, 255, 0.40);
+  color: var(--aurora-violet);
+}
+
+/* --------------------------------------------------------------------------
+   Section labels — match the design's `.lr-label` / `.panel h3` /
+   `.wall-group-head` style: 10.5px, mono, letterspaced 0.12em,
+   uppercase, --text-faint
+   -------------------------------------------------------------------------- */
+.aurora .beacon-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--beacon-text-faint);
+}
+
+/* --------------------------------------------------------------------------
+   Type badge — matches the design's `.chip` pattern: mono, uppercase,
+   pill-shaped, low-alpha colored background
+   -------------------------------------------------------------------------- */
+.aurora .beacon-typebadge {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--beacon-text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--beacon-border);
+}
+
+/* --------------------------------------------------------------------------
+   Headlines — Inter, weight 700, letterspaced -0.01em (matches the
+   design's `.topbar .brand-name`, `.wc-name`, `.sp-title`). NOT
+   gradient text — the design uses gradient text on the countdown and
+   hero, but those are decorative and we substitute solid text.
+   -------------------------------------------------------------------------- */
+.aurora .beacon-headline {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--beacon-text);
+}
+
+/* --------------------------------------------------------------------------
+   Header stat values — mono, tabular numerals, larger so they read as
+   data display
+   -------------------------------------------------------------------------- */
+/* No `color` here — the base .beacon-header-stat-value rule sets it via
+   var(--beacon-text), and the --accent modifier (used when ACTIVE > 0)
+   sets it via var(--beacon-amber) = violet. Setting color here would
+   shadow the modifier and ACTIVE would lose its violet emphasis. */
+.aurora .beacon-header-stat-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.aurora .beacon-header-stat-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--beacon-text-faint);
+}
+
+.aurora .beacon-header-title {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: 18px;
+  color: var(--beacon-text);
+}
+
+.aurora .beacon-header-description {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--beacon-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Sidebar — floats as a rounded panel, matches the design's `.left-rail`
+   shape (radius 14, padding 16/14, gap 18 between sections). Bg uses
+   the elevated layer so it reads as a panel sitting above the page bg.
+   -------------------------------------------------------------------------- */
+/* Sidebar uses a translucent surface (matches the design's
+   --glass-bg-strong: rgba(28, 34, 68, 0.66)) so the body's static
+   aurora gradient shows through behind it, giving the chrome a sense
+   of depth and "place." This is the original design's intent — what
+   we're skipping is the slop tactic that achieved it (`backdrop-filter:
+   blur(22px)`). Plain translucency over a static gradient bg looks
+   nearly identical without the blur, since there's no content behind
+   the panel to need diffusing. */
+.aurora .beacon-sidebar {
+  top: 12px;
+  left: 12px;
+  bottom: 12px;
+  background: rgba(18, 38, 85, 0.72);
+  border: 1px solid var(--beacon-border);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    0 8px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.aurora .beacon-main {
+  margin-left: 232px;
+  margin-right: 12px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.aurora .beacon-sidebar-item {
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 8px 10px;
+  color: var(--beacon-text-muted);
+}
+
+.aurora .beacon-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--beacon-text);
+}
+
+/* Active state: the design's `.lr-area.active` uses a strong glass bg
+   plus a 2px violet inset rule on the left. Match that — the inset
+   is a functional indicator (which row is active), not decoration. */
+.aurora .beacon-sidebar-item[data-active="true"] {
+  color: var(--beacon-text);
+  background: rgba(18, 38, 85, 0.72);
+  border: 1px solid var(--beacon-hairline);
+  box-shadow: inset 2px 0 0 var(--aurora-violet);
+}
+
+.aurora .beacon-sidebar-item[data-active="true"]::before {
+  display: none;
+}
+
+.aurora .beacon-sidebar-section-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--beacon-text-faint);
+}
+
+.aurora .beacon-sidebar-divider {
+  border-top-color: var(--beacon-border);
+}
+
+/* --------------------------------------------------------------------------
+   Header — floats as a rounded panel matching cards/sidebar
+   -------------------------------------------------------------------------- */
+/* Header — same translucent surface as the sidebar so the chrome reads
+   as a coherent glass-like panel system over the gradient body. Cards
+   stay solid (see `[data-slot="card"]` rule above) because they hold
+   readable content. */
+.aurora .beacon-header {
+  position: sticky;
+  top: 12px;
+  z-index: 30;
+  margin-bottom: 14px;
+  background: rgba(18, 38, 85, 0.72);
+  border: 1px solid var(--beacon-border);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    0 8px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Status pills: keep mono, slightly looser tracking
+   -------------------------------------------------------------------------- */
+.aurora .beacon-status {
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+/* --------------------------------------------------------------------------
+   Lighthouse mark inherits Aurora text color
+   -------------------------------------------------------------------------- */
+.aurora .beacon-lighthouse-tower {
+  color: var(--beacon-text);
+}
+
+/* --------------------------------------------------------------------------
+   Primary button: violet→blue gradient (matches the design's
+   `.tb-filter.active`, `.is-tab.active`, `.ds-tab.active`). The Button
+   component's `default` variant compiles to `bg-primary text-primary-
+   foreground`, so the `.bg-primary` selector inside .aurora catches it.
+   Gradient on a button BACKGROUND is fine — only gradient TEXT is slop.
+   -------------------------------------------------------------------------- */
+.aurora .bg-primary {
+  background: linear-gradient(135deg, var(--aurora-violet), #38e0d0);
+  color: var(--primary-foreground);
+  border-color: transparent;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(124, 176, 255, 0.25);
+}
+
+.aurora .bg-primary:hover {
+  background: linear-gradient(135deg, var(--aurora-violet), #38e0d0);
+  filter: brightness(1.08);
+}
+
+/* ==========================================================================
+   Legacy aurora-* class re-map.
+
+   The wider Pharos app already has a body of `.aurora-panel`, `.aurora-input`,
+   `.aurora-text*`, `.aurora-radio-pill`, etc. styled via `--lcc-*` and
+   `--glass-*` tokens. Those classes are a faithful implementation of the
+   original handoff at `~/Downloads/Pharos/handoff/design/styles.css` —
+   value-for-value matching the dark-theme `--text`, `--red`, `--violet`,
+   `--glass-bg`, `--glass-border`, `--radius`, etc.
+
+   Two differences from the new Aurora register at .beacon.aurora:
+     1. Brand accent shifted from violet (#b08cff) → periwinkle blue
+        (#7cb0ff) — the user's blue-palette decision.
+     2. Card surfaces use solid colors instead of `backdrop-filter: blur`,
+        per the non-slop substitution rule.
+
+   So we re-map the legacy tokens under .beacon.aurora rather than forking
+   every component. This cascades to every `aurora-*` class AND every
+   inline `style={{ color: 'var(--lcc-red)' }}` reference because they
+   all read these CSS variables. ~40 lines, vs ~750 of forked component
+   code.
+   ========================================================================== */
+.aurora {
+  /* Text — values already match handoff, but keep the cascade explicit so
+     a future palette change in .beacon.aurora flows through automatically. */
+  --lcc-text:       var(--beacon-text);
+  --lcc-text-dim:   var(--beacon-text-muted);
+  --lcc-text-faint: var(--beacon-text-faint);
+
+  /* State palette — preserve handoff hex except violet, which becomes the
+     periwinkle-blue brand accent the new register uses. */
+  --lcc-red:    var(--aurora-red);     --lcc-red-bg:    var(--aurora-red-bg);
+  --lcc-amber:  var(--aurora-amber);   --lcc-amber-bg:  var(--aurora-amber-bg);
+  --lcc-green:  var(--aurora-green);   --lcc-green-bg:  var(--aurora-green-bg);
+  --lcc-blue:   var(--aurora-blue);    --lcc-blue-bg:   var(--aurora-blue-bg);
+  --lcc-violet: var(--aurora-violet);  --lcc-violet-bg: var(--aurora-violet-bg);
+
+  /* Surfaces — kill the heavy translucent glass in favor of the new
+     register's solid layered depth. The legacy `--glass-*` tokens still
+     drive `.aurora-panel`, `.aurora-input`, `.aurora-callout`, etc. */
+  --glass-bg:            var(--beacon-surface);
+  --glass-bg-strong:     var(--beacon-elevated);
+  --glass-bg-faint:      var(--beacon-surface);
+  --glass-border:        var(--beacon-border);
+  --glass-border-strong: var(--beacon-hairline);
+  --glass-hi:            rgba(255, 255, 255, 0.04);
+
+  /* Radii — already 14 / 8 in both systems, but route them through the
+     register so a token change in one place propagates. */
+  --lcc-radius:    var(--radius);
+  --lcc-radius-sm: var(--radius-sm);
+}
+
+/* `.aurora-panel` had `backdrop-filter: blur(22px) saturate(140%)` baked
+   in — a glass-blur slop tactic. Inside the new register we substitute
+   the same lifted-card depth used by `[data-slot="card"]` (solid surface
+   + real drop shadow + 1px white inset highlight). */
+.aurora .aurora-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--beacon-surface);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    0 8px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Number rendering — Test URLs page numbers (Lighthouse scores in
+   ScoreBadge, CWV / FCP / LCP / CLS / TTFB metric cells via .aurora-num)
+   read soft in the legacy implementation. Three things were softening
+   them:
+
+     1. `.aurora-num` color was `--lcc-text-dim` (#a9b3d6) — low-contrast
+        body text on a dark surface, so digits already faded at 12px.
+     2. `.aurora-score` borders used `color-mix(in srgb, hue 40%,
+        transparent)` — a soft halo that made the badge edge fuzzy and
+        bled into the contained number visually.
+     3. `.aurora-tabs-list` had `backdrop-filter: blur(22px)
+        saturate(140%)` — backdrop-filter is known to disable subpixel
+        text antialiasing in WebKit/Blink, so any text rendered inside
+        (or, due to compositing, near) such a layer reads softer.
+
+   Substitutions, scoped to .beacon.aurora so production is untouched:
+
+     - Number text uses --beacon-text (full contrast) at weight 500
+       with `font-feature-settings: "lnum","tnum"` so digits are lining
+       (not old-style) and tabular (column-aligned).
+     - ScoreBadge keeps its tinted background but gains a solid 1px
+       border at higher alpha — the rim is sharp, the digits crisp.
+       Badge color stays the rating hue at full saturation.
+     - Tabs lose backdrop-filter; pick up a solid surface and 1px
+       border instead.
+   -------------------------------------------------------------------------- */
+/* Specificity note: the legacy `.aurora-table .aurora-num` rule is two
+   classes deep (0,0,2,0) — same as `.aurora .aurora-num`. Source order
+   then decides, and `aurora-glass.css` loads after `aurora.css`, so the
+   dim color wins. We re-anchor on `.aurora-table .aurora-num` to match
+   specificity, then bump to `.aurora .aurora-table .aurora-num` for a
+   clean win without resorting to !important. */
+.aurora .aurora-table .aurora-num,
+.aurora .aurora-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--beacon-text);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
+}
+
+.aurora .aurora-score {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
+  /* No backdrop-filter, no soft 40%-alpha rim; per-rating selectors
+     below set a solid border at 60% alpha for a sharp edge. */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.aurora .aurora-score[data-rating="good"] {
+  color: var(--aurora-green);
+  background: var(--aurora-green-bg);
+  border-color: rgba(110, 231, 168, 0.6);
+}
+.aurora .aurora-score[data-rating="average"] {
+  color: var(--aurora-amber);
+  background: var(--aurora-amber-bg);
+  border-color: rgba(255, 196, 107, 0.6);
+}
+.aurora .aurora-score[data-rating="poor"] {
+  color: var(--aurora-red);
+  background: var(--aurora-red-bg);
+  border-color: rgba(255, 107, 139, 0.6);
+}
+.aurora .aurora-score[data-rating="unknown"] {
+  color: var(--beacon-text-faint);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--beacon-border);
+}
+
+/* Tab rail — solid surface, no backdrop blur. The original was a
+   translucent capsule riding the page gradient; here we mount it on
+   the same elevated layer popovers use, with a hairline border. */
+.aurora .aurora-tabs-list {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--beacon-elevated);
+  border: 1px solid var(--beacon-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Table cell text gets the same lining + tabular treatment so the
+   "Last Tested" column and any future numeric content stay aligned. */
+.aurora .aurora-table {
+  font-feature-settings: "lnum" 1, "tnum" 1;
+}
+.aurora .aurora-table tbody td {
+  color: var(--beacon-text);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ *  PAGE PRIMITIVES + LAUNCH DASHBOARD CLUSTER
+ *
+ *  The remainder of this file was previously `aurora-glass.css` —
+ *  reusable content primitives (.aurora-panel, .aurora-input,
+ *  .aurora-section-title, .aurora-num, .aurora-score, .aurora-tabs-*,
+ *  .aurora-radio-pill, .aurora-progress, .aurora-dialog, .aurora-card,
+ *  .aurora-callout, …), shadcn data-slot overrides scoped under
+ *  `.aurora`, and the entire Launch Command Center cluster
+ *  (`.launch-dashboard .lcc-*`).
+ * ══════════════════════════════════════════════════════════════════ */
+
+/* ── Shared tokens (dark-default) ───────────────────────────────── */
+:root {
+  /* Aurora palette */
+  --aurora-1: #0b1028;
+  --aurora-2: #151b3d;
+  --aurora-3: #1b1747;
+  --aurora-4: #0f2847;
+  /* `--aurora-glow-*` tokens (teal / violet / pink / cyan / lime) used
+   * to drive the animated body-blob backdrop. Phase 1 of the de-slop
+   * pass replaced that with hardcoded RGBA radial-gradient stops in
+   * `.aurora-app-shell`'s background, so these tokens are unreferenced
+   * — deleted. */
+
+  /* Glass surfaces */
+  --glass-bg:         rgba(22, 28, 58, 0.48);
+  --glass-bg-strong:  rgba(28, 34, 68, 0.66);
+  --glass-bg-faint:   rgba(22, 28, 58, 0.30);
+  --glass-border:        rgba(255, 255, 255, 0.10);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
+  --glass-hi:            rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+  --glass-inner:  inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* `--lcc-*` aliases for the glass surface tokens. Consumed via
+   * inline styles in DailyStatusSummary and ProjectDashboard
+   * (e.g. `var(--lcc-glass-border, rgba(255,255,255,0.08))`). The
+   * fallbacks meant the inline styles still rendered, but the named
+   * tokens never resolved — defining them here lets the inline styles
+   * pick up the actual register values, so a future palette tweak
+   * propagates to those sites as well. */
+  --lcc-glass-bg-faint: var(--glass-bg-faint);
+  --lcc-glass-border:   var(--glass-border);
+  /* `--lcc-border-faint` is used by ProjectDashboard's row dividers
+   * — slightly more transparent than the default glass-border. */
+  --lcc-border-faint:   rgba(255, 255, 255, 0.06);
+
+  /* Text */
+  --lcc-text:       #eef1ff;
+  --lcc-text-dim:   #a9b3d6;
+  --lcc-text-faint: #7a83a8;
+
+  /* Semantic colors (traffic palette is default) */
+  --lcc-red:     #ff6b8b;   --lcc-red-bg:     rgba(255, 107, 139, 0.14);
+  --lcc-amber:   #ffc46b;   --lcc-amber-bg:   rgba(255, 196, 107, 0.14);
+  --lcc-green:   #6ee7a8;   --lcc-green-bg:   rgba(110, 231, 168, 0.14);
+  --lcc-blue:    #6ec7ff;   --lcc-blue-bg:    rgba(110, 199, 255, 0.14);
+  --lcc-violet:  #b08cff;   --lcc-violet-bg:  rgba(176, 140, 255, 0.14);
+  --lcc-neutral: #7a83a8;   --lcc-neutral-bg: rgba(122, 131, 168, 0.14);
+
+  /* Type */
+  --aurora-font-sans: "Inter", ui-sans-serif, -apple-system, system-ui, sans-serif;
+  --aurora-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Menlo", monospace;
+
+  /* Layout */
+  --lcc-radius:    14px;
+  --lcc-radius-sm: 8px;
+  --lcc-topbar-h:  60px;
+  --lcc-rail-w:    240px;
+  --lcc-stream-w:  400px;
+}
+
+/* Light variant — applied app-wide via <html class="light"> OR
+ * per-scope via .launch-dashboard[data-theme="light"]. */
+:root.light,
+.launch-dashboard[data-theme="light"] {
+  --aurora-1: #e8ecff; --aurora-2: #dfe5ff; --aurora-3: #e4daff; --aurora-4: #d8eaff;
+  --glass-bg:        rgba(255,255,255,0.60);
+  --glass-bg-strong: rgba(255,255,255,0.78);
+  --glass-bg-faint:  rgba(255,255,255,0.40);
+  --glass-border:        rgba(20, 30, 70, 0.12);
+  --glass-border-strong: rgba(20, 30, 70, 0.22);
+  --glass-hi: rgba(255,255,255,0.55);
+  --lcc-text: #111632; --lcc-text-dim: #47507a; --lcc-text-faint: #7a83a8;
+  --lcc-red: #e23d66; --lcc-amber: #c88a26; --lcc-green: #229a5f;
+  --lcc-blue: #3a82d4; --lcc-violet: #7a5bd8;
+}
+
+/* Launch dashboard wrapper — provides its own opaque gradient
+ * background because the page bleeds edge-to-edge inside AppLayout's
+ * main. (The app shell gradient below is behind the whole app.) */
+.launch-dashboard {
+  position: relative;
+  min-height: 100vh;
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+  /* Transparent so the app shell's gradient + aurora blobs show through,
+   * giving one continuous backdrop between the sidebar and the main. */
+  background: transparent;
+}
+
+/* The original implementation had a `.launch-dashboard::before` sticky
+ * 14px strip at viewport top with `backdrop-filter: blur(28px)` whose
+ * sole job was to blur whatever scrolling content showed in the gap
+ * between the viewport edge and the floating topbar (which sits at
+ * `top: 14px`). With the slop blur tactic stripped, the gap simply
+ * shows the underlying page gradient — and since `.launch-dashboard`'s
+ * background is transparent and the main element's gradient is
+ * continuous, scrolling content never reaches this strip in the first
+ * place. The mask was load-bearing only in the slop implementation;
+ * removing it leaves the floating-card silhouette intact.
+ */
+
+/* ── Palette + density overrides ────────────────────────────────── */
+.launch-dashboard[data-palette="muted"] {
+  --lcc-red: #c78ea0; --lcc-amber: #d6b584; --lcc-green: #8ec7a9;
+  --lcc-blue: #9ebbd9; --lcc-violet: #b2a3d6;
+}
+.launch-dashboard[data-palette="mono"] {
+  --lcc-red: #d0d6e8; --lcc-amber: #bfc6dc; --lcc-green: #aeb6ce;
+  --lcc-blue: #9da6c2; --lcc-violet: #c8cfe0;
+  --lcc-red-bg: rgba(208,214,232,0.10); --lcc-amber-bg: rgba(208,214,232,0.10);
+  --lcc-green-bg: rgba(208,214,232,0.10); --lcc-blue-bg: rgba(208,214,232,0.10);
+  --lcc-violet-bg: rgba(208,214,232,0.10);
+}
+.launch-dashboard[data-density="compact"] { font-size: 12px; }
+.launch-dashboard[data-density="roomy"]   { font-size: 14px; }
+
+/* Dashboard children sit above the (now non-existent) blob backdrop.
+ * Retained as defense-in-depth — if any future rule reintroduces a
+ * fixed-position pseudo behind the dashboard, this still wins. */
+.launch-dashboard > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Glass surface primitive ────────────────────────────────────── *
+ *
+ * Originally `background: var(--glass-bg)` (rgba ~48% alpha) plus
+ * `backdrop-filter: blur(22px) saturate(140%)` to fake real depth via
+ * blurring whatever sat behind the panel. The `@supports not` fallback
+ * promoted `--glass-bg-strong` (66% alpha) to opaque-enough for
+ * non-supporting browsers.
+ *
+ * Substitution: skip the slop blur entirely and use the fallback
+ * surface as the default. With `.aurora` providing a static
+ * radial gradient body and panels rendering on a solid mid-tone
+ * surface, the depth comes from the existing `--glass-shadow` drop
+ * shadow + `--glass-inner` 1px white inset highlight — the same
+ * lifted-card depth model used by the Aurora prototype's `[data-slot=
+ * "card"]` rule.
+ */
+.launch-dashboard .panel,
+.launch-dashboard .lcc-topbar,
+.launch-dashboard .lcc-left-rail,
+.launch-dashboard .lcc-hero-strip,
+.launch-dashboard .lcc-incident-stream,
+.launch-dashboard .lcc-side-panel {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  border-radius: var(--lcc-radius);
+}
+
+/* ── Layout shell ────────────────────────────────────────────────── */
+.launch-dashboard .lcc-shell {
+  display: grid;
+  grid-template-columns: var(--lcc-rail-w) 1fr var(--lcc-stream-w);
+  gap: 14px;
+  padding: 14px;
+}
+
+@media (max-width: 1400px) {
+  .launch-dashboard .lcc-shell {
+    grid-template-columns: 200px 1fr 340px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .launch-dashboard .lcc-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.launch-dashboard .lcc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.launch-dashboard .lcc-left-rail {
+  position: sticky;
+  top: calc(var(--lcc-topbar-h) + 28px);
+  align-self: start;
+  max-height: calc(100vh - var(--lcc-topbar-h) - 42px);
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.launch-dashboard .lcc-incident-stream {
+  position: sticky;
+  top: calc(var(--lcc-topbar-h) + 28px);
+  align-self: start;
+  max-height: calc(100vh - var(--lcc-topbar-h) - 42px);
+  overflow-y: auto;
+}
+
+/* ── Micro primitives re-used across regions ────────────────────── */
+.launch-dashboard .lcc-label {
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+}
+
+.launch-dashboard .lcc-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lcc-green);
+  /* Originally a 2.2s infinite expanding-ring animation. The ring was
+   * decorative — the dot's solid green is sufficient sync-OK signal,
+   * and infinite animations are eye-catching slop in a status indicator
+   * that should fade into the chrome once read. */
+}
+
+.launch-dashboard .lcc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--lcc-neutral-bg);
+  color: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-chip[data-health="at-risk"]       { background: var(--lcc-amber-bg); color: var(--lcc-amber); }
+.launch-dashboard .lcc-chip[data-health="blocked"]       { background: var(--lcc-red-bg);   color: var(--lcc-red); }
+.launch-dashboard .lcc-chip[data-health="in-progress"]   { background: var(--lcc-blue-bg);  color: var(--lcc-blue); }
+.launch-dashboard .lcc-chip[data-health="near-complete"] { background: var(--lcc-green-bg); color: var(--lcc-green); }
+.launch-dashboard .lcc-chip[data-health="improving"]     { background: var(--lcc-green-bg); color: var(--lcc-green); }
+.launch-dashboard .lcc-chip[data-health="groomed"]       { background: var(--lcc-neutral-bg); color: var(--lcc-neutral); }
+
+.launch-dashboard .lcc-chip[data-severity="critical"] { background: var(--lcc-red-bg);    color: var(--lcc-red); }
+.launch-dashboard .lcc-chip[data-severity="high"]     { background: var(--lcc-amber-bg);  color: var(--lcc-amber); }
+.launch-dashboard .lcc-chip[data-severity="medium"]   { background: var(--lcc-violet-bg); color: var(--lcc-violet); }
+.launch-dashboard .lcc-chip[data-severity="low"]      { background: var(--lcc-neutral-bg); color: var(--lcc-neutral); }
+
+.launch-dashboard .lcc-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-dot[data-health="at-risk"]       { background: var(--lcc-amber); }
+.launch-dashboard .lcc-dot[data-health="blocked"]       { background: var(--lcc-red); }
+.launch-dashboard .lcc-dot[data-health="in-progress"]   { background: var(--lcc-blue); }
+.launch-dashboard .lcc-dot[data-health="near-complete"] { background: var(--lcc-green); }
+
+/* Gradient-text utility — originally a warm amber→pink→violet gradient
+ * fill clipped to glyph outlines. Gradient text on numbers/headlines is
+ * a slop tactic that sacrifices subpixel antialiasing and contrast for
+ * decorative chroma. Substitution: solid `--lcc-text` at the consumer's
+ * existing weight/size. The class is retained so JSX consumers don't
+ * have to change. */
+.launch-dashboard .lcc-gradient-text {
+  color: var(--lcc-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── TopBar ──────────────────────────────────────────────────────── */
+.launch-dashboard .lcc-topbar {
+  height: var(--lcc-topbar-h);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 18px;
+  /* Top margin comes from the .launch-dashboard::before mask strip
+   * which occupies 14px of flow height. Side margins stay so the bar
+   * keeps its inset floating-card look. */
+  margin: 0 14px 0;
+  position: sticky;
+  top: 14px;
+  z-index: 50;
+}
+.launch-dashboard .lcc-brand { display: flex; align-items: center; gap: 12px; }
+/* Brand mark — originally a conic gradient orb (rainbow pinwheel) with
+ * a violet halo. The conic gradient + glow was the most slop-heavy
+ * micro-element in the file. Substitution: solid violet dot, the same
+ * accent the prototype uses for active states. The brand identifier
+ * has moved to the LampsPlus + Pharos logo wordmarks adjacent to the
+ * dot anyway, so the dot is just an ambient accent. */
+.launch-dashboard .lcc-brand-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--lcc-violet);
+}
+.launch-dashboard .lcc-brand-name {
+  font-weight: 600; font-size: 13.5px; letter-spacing: -0.01em;
+}
+.launch-dashboard .lcc-brand-sub {
+  font-size: 10px; color: var(--lcc-text-faint);
+  font-family: var(--aurora-font-mono);
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+
+.launch-dashboard .lcc-tb-divider {
+  width: 1px; height: 32px; background: var(--glass-border);
+}
+
+.launch-dashboard .lcc-tb-countdown { display: flex; flex-direction: column; align-items: flex-start; }
+.launch-dashboard .lcc-tb-countdown-num {
+  font-size: 18px; font-weight: 700; letter-spacing: -0.02em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--lcc-text);
+}
+.launch-dashboard .lcc-tb-countdown-sub {
+  font-size: 10px; color: var(--lcc-text-faint);
+  font-family: var(--aurora-font-mono); margin-top: 2px;
+}
+
+.launch-dashboard .lcc-tb-health {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; letter-spacing: 0.08em;
+  font-weight: 600; color: var(--lcc-text);
+}
+.launch-dashboard .lcc-tb-health-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-tb-health-dot[data-health="at-risk"]     { background: var(--lcc-amber); }
+.launch-dashboard .lcc-tb-health-dot[data-health="blocked"]     { background: var(--lcc-red); }
+.launch-dashboard .lcc-tb-health-dot[data-health="in-progress"] { background: var(--lcc-blue); }
+.launch-dashboard .lcc-tb-health-dot[data-health="near-complete"],
+.launch-dashboard .lcc-tb-health-dot[data-health="improving"]   { background: var(--lcc-green); }
+
+.launch-dashboard .lcc-spacer { flex: 1; }
+
+.launch-dashboard .lcc-tb-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+.launch-dashboard .lcc-tb-filter {
+  background: transparent; border: 1px solid var(--glass-border);
+  color: var(--lcc-text-dim); font: inherit; font-size: 10.5px;
+  padding: 5px 10px; border-radius: 999px; cursor: pointer;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  transition: all 0.12s;
+}
+.launch-dashboard .lcc-tb-filter:hover {
+  color: var(--lcc-text); border-color: var(--glass-border-strong);
+}
+.launch-dashboard .lcc-tb-filter.active {
+  background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
+  color: #fff; border-color: transparent;
+}
+
+.launch-dashboard .lcc-sync {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px; color: var(--lcc-text-dim);
+  font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-sync-sub {
+  font-size: 9.5px; color: var(--lcc-text-faint); margin-top: 1px;
+}
+
+.launch-dashboard .lcc-tb-btn {
+  width: 34px; height: 34px;
+  background: var(--glass-hi); border: 1px solid var(--glass-border);
+  color: var(--lcc-text); border-radius: 50%; cursor: pointer;
+  font-size: 15px; display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s, border-color 0.12s;
+}
+.launch-dashboard .lcc-tb-btn:hover {
+  background: var(--glass-bg-strong); border-color: var(--glass-border-strong);
+}
+
+/* ── Left rail ─────────────────────────────────────────────────── */
+.launch-dashboard .lcc-left-rail {
+  padding: 16px 14px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.launch-dashboard .lcc-lr-section { display: flex; flex-direction: column; gap: 4px; }
+.launch-dashboard .lcc-lr-label {
+  font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--lcc-text-faint); font-weight: 600; margin-bottom: 6px;
+  font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-lr-stat { margin-bottom: 10px; }
+.launch-dashboard .lcc-lr-stat-num {
+  font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--lcc-text);
+}
+.launch-dashboard .lcc-lr-stat-sub {
+  font-size: 10px; color: var(--lcc-text-faint);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px;
+}
+
+.launch-dashboard .lcc-lr-stat-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px;
+}
+.launch-dashboard .lcc-lr-stat-mini {
+  padding: 8px 10px; border-radius: var(--lcc-radius-sm);
+  background: var(--glass-bg-faint); border: 1px solid var(--glass-border);
+}
+.launch-dashboard .lcc-lr-stat-mini .v {
+  font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.launch-dashboard .lcc-lr-stat-mini .l {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--lcc-text-faint); margin-top: 1px;
+  font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-lr-stat-mini[data-tone="red"]   .v { color: var(--lcc-red); }
+.launch-dashboard .lcc-lr-stat-mini[data-tone="amber"] .v { color: var(--lcc-amber); }
+.launch-dashboard .lcc-lr-stat-mini[data-tone="green"] .v { color: var(--lcc-green); }
+
+.launch-dashboard .lcc-lr-area {
+  background: transparent; border: 1px solid transparent;
+  color: var(--lcc-text-dim); font: inherit; font-size: 12px;
+  padding: 8px 10px; border-radius: var(--lcc-radius-sm); cursor: pointer;
+  text-align: left; display: flex; align-items: center; gap: 8px;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.launch-dashboard .lcc-lr-area:hover {
+  background: var(--glass-hi); color: var(--lcc-text);
+}
+.launch-dashboard .lcc-lr-area.active {
+  background: var(--glass-bg-strong); color: var(--lcc-text);
+  border-color: var(--glass-border-strong);
+  box-shadow: inset 2px 0 0 var(--lcc-violet);
+}
+.launch-dashboard .lcc-lr-area-name {
+  flex: 1; min-width: 0; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.launch-dashboard .lcc-lr-area-meta { display: flex; gap: 6px; align-items: center; }
+.launch-dashboard .lcc-lr-area-count {
+  font-size: 10px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-faint);
+  background: var(--glass-hi); padding: 1px 6px; border-radius: 999px;
+}
+.launch-dashboard .lcc-lr-area-risk {
+  font-size: 10px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-red); background: var(--lcc-red-bg);
+  padding: 1px 6px; border-radius: 999px;
+  border: 1px solid rgba(255, 107, 139, 0.3);
+}
+.launch-dashboard .lcc-lr-area-count[data-tone="amber"] {
+  color: var(--lcc-amber);
+  background: rgba(255, 196, 107, 0.08);
+  border: 1px solid rgba(255, 196, 107, 0.25);
+}
+
+.launch-dashboard .lcc-lr-label-count {
+  margin-left: 8px;
+  font-size: 9.5px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-faint);
+  background: var(--glass-hi); padding: 1px 6px; border-radius: 999px;
+  letter-spacing: 0;
+}
+.launch-dashboard .lcc-lr-empty {
+  font-size: 11px;
+  color: var(--lcc-text-faint);
+  padding: 6px 2px;
+  font-style: italic;
+}
+.launch-dashboard .lcc-lr-legend {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.launch-dashboard .lcc-lr-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--lcc-text-faint);
+  flex-wrap: wrap;
+}
+.launch-dashboard .lcc-lr-legend-row > span:not(.lcc-lr-dot):not(.lcc-lr-area-risk):not(.lcc-lr-area-count) {
+  margin-right: 4px;
+}
+.launch-dashboard .lcc-lr-dot {
+  width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0;
+  background: var(--lcc-text-faint);
+}
+.launch-dashboard .lcc-lr-dot[data-tone="red"]   { background: var(--lcc-red); }
+.launch-dashboard .lcc-lr-dot[data-tone="amber"] { background: var(--lcc-amber); }
+.launch-dashboard .lcc-lr-dot[data-tone="green"] { background: var(--lcc-green); }
+
+.launch-dashboard .lcc-lr-crumb {
+  font-size: 10.5px; color: var(--lcc-text-faint);
+  font-family: var(--aurora-font-mono); padding: 2px 0;
+}
+
+/* ── Hero strip ─────────────────────────────────────────────────── */
+.launch-dashboard .lcc-hero-strip {
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 28px;
+  align-items: center;
+  position: relative; overflow: hidden;
+}
+.launch-dashboard .lcc-hero-strip::before {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(40% 120% at 0% 50%,   rgba(176, 140, 255, 0.18), transparent 60%),
+    radial-gradient(40% 120% at 100% 50%, rgba(110, 199, 255, 0.18), transparent 60%);
+  pointer-events: none;
+}
+.launch-dashboard .lcc-hs-main,
+.launch-dashboard .lcc-hs-countdown { position: relative; z-index: 1; }
+.launch-dashboard .lcc-hs-status { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.launch-dashboard .lcc-hs-headline {
+  font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1;
+  color: var(--lcc-text);
+}
+.launch-dashboard .lcc-hs-kpis {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-top: 14px;
+}
+.launch-dashboard .lcc-hs-kpi {
+  padding: 8px 14px; border-radius: var(--lcc-radius-sm);
+  background: var(--glass-bg-faint); border: 1px solid var(--glass-border);
+  min-width: 96px;
+}
+.launch-dashboard .lcc-hs-kpi-v {
+  font-size: 22px; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+}
+.launch-dashboard .lcc-hs-kpi-l {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--lcc-text-faint); margin-top: 4px;
+  font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-hs-kpi[data-tone="primary"] .lcc-hs-kpi-v {
+  color: var(--lcc-text);
+}
+.launch-dashboard .lcc-hs-kpi[data-tone="green"] .lcc-hs-kpi-v { color: var(--lcc-green); }
+.launch-dashboard .lcc-hs-kpi[data-tone="amber"] .lcc-hs-kpi-v { color: var(--lcc-amber); }
+.launch-dashboard .lcc-hs-kpi[data-tone="red"]   .lcc-hs-kpi-v { color: var(--lcc-red); }
+
+.launch-dashboard .lcc-hs-reasons {
+  display: flex; flex-wrap: wrap; gap: 14px 28px;
+  margin: 0; padding: 0; list-style: none;
+}
+.launch-dashboard .lcc-hs-reasons li {
+  padding-left: 14px; position: relative;
+  color: var(--lcc-text-dim); font-size: 12px;
+}
+.launch-dashboard .lcc-hs-reasons li::before {
+  content: ""; position: absolute; left: 0; top: 7px;
+  width: 5px; height: 5px; background: var(--lcc-red); border-radius: 50%;
+}
+
+.launch-dashboard .lcc-hs-countdown {
+  border-left: 1px solid var(--glass-border);
+  padding-left: 28px; text-align: right; min-width: 220px;
+}
+.launch-dashboard .lcc-hs-cd-label {
+  font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--lcc-text-faint); font-weight: 600;
+}
+.launch-dashboard .lcc-hs-cd-num {
+  font-size: 52px; font-weight: 700; letter-spacing: -0.04em; line-height: 1;
+  font-variant-numeric: tabular-nums; margin: 4px 0;
+  color: var(--lcc-text);
+}
+.launch-dashboard .lcc-hs-cd-num span {
+  font-size: 18px; margin-left: 4px;
+  color: var(--lcc-text-dim); font-weight: 500;
+  -webkit-text-fill-color: var(--lcc-text-dim);
+}
+.launch-dashboard .lcc-hs-cd-bar {
+  height: 6px; border-radius: 999px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  margin-bottom: 6px;
+}
+.launch-dashboard .lcc-hs-cd-bar > span {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--lcc-amber), var(--lcc-red) 60%, var(--lcc-violet));
+}
+.launch-dashboard .lcc-hs-cd-sub {
+  font-size: 11px; color: var(--lcc-text-faint);
+  font-family: var(--aurora-font-mono);
+}
+
+/* ── Health badge ─────────────────────────────────────────────── */
+.launch-dashboard .lcc-health-badge {
+  font-size: 10.5px; letter-spacing: 0.08em;
+  padding: 5px 11px; border-radius: 999px;
+  text-transform: uppercase; font-weight: 600;
+  border: 1px solid transparent;
+  display: inline-block;
+}
+.launch-dashboard .lcc-health-badge.lg { font-size: 11.5px; padding: 6px 14px; }
+.launch-dashboard .lcc-health-badge[data-health="at-risk"]       { background: var(--lcc-amber-bg); color: var(--lcc-amber); border-color: rgba(255,196,107,0.4); }
+.launch-dashboard .lcc-health-badge[data-health="blocked"]       { background: var(--lcc-red-bg);   color: var(--lcc-red);   border-color: rgba(255,107,139,0.4); }
+.launch-dashboard .lcc-health-badge[data-health="in-progress"]   { background: var(--lcc-blue-bg);  color: var(--lcc-blue);  border-color: rgba(110,199,255,0.4); }
+.launch-dashboard .lcc-health-badge[data-health="near-complete"],
+.launch-dashboard .lcc-health-badge[data-health="improving"]     { background: var(--lcc-green-bg); color: var(--lcc-green); border-color: rgba(110,231,168,0.4); }
+.launch-dashboard .lcc-health-badge[data-health="groomed"]       { background: var(--lcc-neutral-bg); color: var(--lcc-text-dim); border-color: var(--glass-border); }
+
+/* ── Panel heading pattern (shared by wall, charts, etc.) ─────── */
+.launch-dashboard .panel h3 {
+  margin: 0 0 14px; font-size: 10.5px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--lcc-text-faint); font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.launch-dashboard .panel h3 .count {
+  margin-left: auto; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-dim); font-weight: 500;
+  letter-spacing: 0; text-transform: none; font-size: 11px;
+}
+.launch-dashboard .panel {
+  padding: 18px 20px;
+  position: relative; overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Readiness wall ───────────────────────────────────────────── */
+.launch-dashboard .lcc-wall-panel { padding: 18px 22px 22px; }
+.launch-dashboard .lcc-wall-head {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: 14px; gap: 14px; flex-wrap: wrap;
+}
+.launch-dashboard .lcc-wall-head h3 { margin: 0; flex: 1; }
+.launch-dashboard .lcc-wall-legend {
+  display: flex; gap: 14px; font-size: 10.5px;
+  color: var(--lcc-text-dim); font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-wall-legend .lg-item {
+  display: inline-flex; align-items: center; gap: 5px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.launch-dashboard .lcc-wall-legend .d {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-wall-legend .d[data-health="blocked"]       { background: var(--lcc-red); }
+.launch-dashboard .lcc-wall-legend .d[data-health="at-risk"]       { background: var(--lcc-amber); }
+.launch-dashboard .lcc-wall-legend .d[data-health="in-progress"]   { background: var(--lcc-blue); }
+.launch-dashboard .lcc-wall-legend .d[data-health="near-complete"] { background: var(--lcc-green); }
+
+.launch-dashboard .lcc-wall-body { display: flex; flex-direction: column; gap: 18px; }
+.launch-dashboard .lcc-wall-empty {
+  color: var(--lcc-text-faint); font-size: 12px;
+  padding: 30px 0; text-align: center;
+}
+
+.launch-dashboard .lcc-wall-group-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--lcc-text-faint); font-weight: 600; font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-wall-group-sep {
+  flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--glass-border), transparent);
+}
+.launch-dashboard .lcc-wall-group-count { color: var(--lcc-text-dim); }
+
+.launch-dashboard .lcc-wall-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.launch-dashboard .lcc-wall-cell {
+  background: var(--glass-bg-faint);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: background 0.12s, transform 0.12s, box-shadow 0.15s, border-color 0.12s;
+  position: relative; overflow: hidden;
+  text-align: left; font: inherit; color: inherit;
+}
+.launch-dashboard .lcc-wall-cell::after {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-wall-cell:hover {
+  background: var(--glass-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border-color: var(--glass-border-strong);
+}
+.launch-dashboard .lcc-wall-cell[data-status="at-risk"]::after       { background: var(--lcc-amber); }
+.launch-dashboard .lcc-wall-cell[data-status="blocked"]::after       { background: var(--lcc-red); }
+.launch-dashboard .lcc-wall-cell[data-status="in-progress"]::after   { background: var(--lcc-blue); }
+.launch-dashboard .lcc-wall-cell[data-status="near-complete"]::after,
+.launch-dashboard .lcc-wall-cell[data-status="improving"]::after     { background: var(--lcc-green); }
+
+.launch-dashboard .lcc-wc-top {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.launch-dashboard .lcc-wc-id {
+  font-size: 10px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-faint);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.launch-dashboard .lcc-wc-block {
+  font-size: 10px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-red); background: var(--lcc-red-bg);
+  padding: 1px 6px; border-radius: 999px;
+  border: 1px solid rgba(255, 107, 139, 0.3);
+}
+.launch-dashboard .lcc-wc-name {
+  font-size: 13px; font-weight: 600;
+  color: var(--lcc-text); line-height: 1.3;
+}
+.launch-dashboard .lcc-wc-progress {
+  display: flex; align-items: center; gap: 8px; margin-top: 2px;
+}
+.launch-dashboard .lcc-wc-progress-bar {
+  flex: 1; height: 5px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+.launch-dashboard .lcc-wc-progress-bar > span {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--lcc-violet), var(--lcc-blue));
+}
+.launch-dashboard .lcc-wall-cell[data-status="blocked"] .lcc-wc-progress-bar > span,
+.launch-dashboard .lcc-wall-cell[data-status="at-risk"] .lcc-wc-progress-bar > span {
+  background: linear-gradient(90deg, var(--lcc-red), var(--lcc-amber));
+}
+.launch-dashboard .lcc-wall-cell[data-status="near-complete"] .lcc-wc-progress-bar > span,
+.launch-dashboard .lcc-wall-cell[data-status="improving"] .lcc-wc-progress-bar > span {
+  background: linear-gradient(90deg, var(--lcc-green), var(--lcc-blue));
+}
+.launch-dashboard .lcc-wc-progress-pct {
+  font-size: 11px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-dim);
+  min-width: 34px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.launch-dashboard .lcc-wc-meta {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  font-size: 10.5px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-faint);
+}
+.launch-dashboard .lcc-wc-meta .red   { color: var(--lcc-red); }
+.launch-dashboard .lcc-wc-meta .amber { color: var(--lcc-amber); }
+.launch-dashboard .lcc-wc-meta .green { color: var(--lcc-green); }
+
+/* ── Trend chart ─────────────────────────────────────────────── */
+.launch-dashboard .lcc-trend-panel { display: flex; flex-direction: column; }
+.launch-dashboard .lcc-trend-chart { width: 100%; height: 220px; display: block; }
+.launch-dashboard .lcc-trend-wrap { flex: 1; display: flex; flex-direction: column; }
+.launch-dashboard .lcc-trend-legend {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px;
+  font-size: 10.5px; color: var(--lcc-text-dim);
+  font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-trend-legend .dot {
+  display: inline-block; width: 10px; height: 2px;
+  margin-right: 6px; vertical-align: middle;
+}
+.launch-dashboard .lcc-trend-legend .dot.sq {
+  height: 6px; width: 6px; border-radius: 1px;
+}
+
+/* ── Task-status strip ─────────────────────────────────────── */
+.launch-dashboard .lcc-ts-panel { display: flex; flex-direction: column; }
+.launch-dashboard .lcc-ts-stack { display: flex; flex-direction: column; gap: 8px; }
+.launch-dashboard .lcc-ts-row {
+  display: grid; grid-template-columns: 8px minmax(0, 1fr) 80px 42px;
+  align-items: center; gap: 8px;
+}
+.launch-dashboard .lcc-ts-label {
+  font-size: 11.5px; color: var(--lcc-text-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.launch-dashboard .lcc-ts-track {
+  position: relative; height: 12px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+.launch-dashboard .lcc-ts-fill {
+  position: absolute; inset: 0 auto 0 0; border-radius: 999px;
+}
+.launch-dashboard .lcc-ts-fill[data-color="red"]    { background: var(--lcc-red); }
+.launch-dashboard .lcc-ts-fill[data-color="amber"]  { background: var(--lcc-amber); }
+.launch-dashboard .lcc-ts-fill[data-color="green"]  { background: var(--lcc-green); }
+.launch-dashboard .lcc-ts-fill[data-color="blue"]   { background: var(--lcc-blue); }
+.launch-dashboard .lcc-ts-fill[data-color="neutral"]{ background: linear-gradient(90deg, var(--lcc-neutral), rgba(122,131,168,0.4)); }
+.launch-dashboard .lcc-ts-num {
+  text-align: right; font-family: var(--aurora-font-mono);
+  font-size: 11.5px; color: var(--lcc-text);
+}
+
+.launch-dashboard .lcc-sdot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-sdot[data-color="red"]    { background: var(--lcc-red); }
+.launch-dashboard .lcc-sdot[data-color="amber"]  { background: var(--lcc-amber); }
+.launch-dashboard .lcc-sdot[data-color="green"]  { background: var(--lcc-green); }
+.launch-dashboard .lcc-sdot[data-color="blue"]   { background: var(--lcc-blue); }
+
+/* ── Teams strip ───────────────────────────────────────────── */
+.launch-dashboard .lcc-teams-list {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.launch-dashboard .lcc-team-item {
+  padding: 10px 12px; border-radius: var(--lcc-radius-sm);
+  background: var(--glass-bg-faint); border: 1px solid var(--glass-border);
+}
+.launch-dashboard .lcc-team-item .ti-top {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 3px;
+}
+.launch-dashboard .lcc-team-item .ti-name {
+  font-weight: 600; font-size: 12.5px;
+}
+.launch-dashboard .lcc-team-item .ti-unassigned {
+  font-size: 10px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-faint);
+}
+.launch-dashboard .lcc-team-item[data-risk="high"] .ti-unassigned { color: var(--lcc-red); }
+.launch-dashboard .lcc-team-item[data-risk="med"]  .ti-unassigned { color: var(--lcc-amber); }
+.launch-dashboard .lcc-team-item .ti-lead {
+  font-size: 10.5px; color: var(--lcc-text-faint);
+  font-family: var(--aurora-font-mono); margin-bottom: 8px;
+}
+.launch-dashboard .lcc-team-item .ti-bar {
+  height: 5px; border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+.launch-dashboard .lcc-team-item .ti-bar > span {
+  display: block; height: 100%;
+  background: var(--lcc-green);
+}
+.launch-dashboard .lcc-team-item[data-risk="high"] .ti-bar > span {
+  background: var(--lcc-red);
+}
+.launch-dashboard .lcc-team-item[data-risk="med"] .ti-bar > span {
+  background: var(--lcc-amber);
+}
+
+/* ── Sources strip ─────────────────────────────────────────── */
+.launch-dashboard .lcc-src-list { display: flex; flex-direction: column; gap: 10px; }
+.launch-dashboard .lcc-src-item {
+  padding: 8px 0; border-bottom: 1px solid var(--glass-border);
+}
+.launch-dashboard .lcc-src-item:last-child { border-bottom: none; }
+.launch-dashboard .lcc-src-head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 3px;
+}
+.launch-dashboard .lcc-src-key {
+  font-family: var(--aurora-font-mono); font-size: 11px;
+  color: var(--lcc-text); font-weight: 600;
+}
+.launch-dashboard .lcc-src-kind {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 1px 6px; border-radius: 999px;
+  background: var(--glass-hi); color: var(--lcc-text-faint);
+  border: 1px solid var(--glass-border);
+  font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-src-total {
+  margin-left: auto; font-family: var(--aurora-font-mono);
+  font-size: 11px; color: var(--lcc-text-dim);
+}
+.launch-dashboard .lcc-src-name {
+  font-size: 11px; color: var(--lcc-text-faint); margin-bottom: 5px;
+}
+.launch-dashboard .lcc-src-bar {
+  height: 4px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+.launch-dashboard .lcc-src-bar > span {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--lcc-violet), var(--lcc-blue));
+}
+
+/* ── Incident stream rows ───────────────────────────────────── */
+.launch-dashboard .lcc-incident-stream {
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.launch-dashboard .lcc-is-head {
+  padding: 16px 18px 10px; border-bottom: 1px solid var(--glass-border);
+}
+.launch-dashboard .lcc-is-head h3 {
+  margin: 0 0 10px; font-size: 10.5px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--lcc-text-faint); font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.launch-dashboard .lcc-is-head h3 .count {
+  margin-left: auto; color: var(--lcc-text-dim);
+  font-family: var(--aurora-font-mono); letter-spacing: 0;
+  text-transform: none; font-size: 11px;
+}
+.launch-dashboard .lcc-is-tabs { display: flex; gap: 4px; }
+.launch-dashboard .lcc-is-tab {
+  flex: 1;
+  background: transparent; border: 1px solid var(--glass-border);
+  color: var(--lcc-text-dim); font: inherit; font-size: 10.5px;
+  padding: 5px 8px; border-radius: 999px; cursor: pointer;
+  letter-spacing: 0.04em;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  transition: all 0.12s;
+}
+.launch-dashboard .lcc-is-tab span {
+  font-size: 9.5px; color: var(--lcc-text-faint);
+  background: var(--glass-hi);
+  padding: 0 5px; border-radius: 999px;
+  font-family: var(--aurora-font-mono);
+}
+.launch-dashboard .lcc-is-tab:hover {
+  color: var(--lcc-text); border-color: var(--glass-border-strong);
+}
+.launch-dashboard .lcc-is-tab.active {
+  background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
+  color: #fff; border-color: transparent;
+}
+.launch-dashboard .lcc-is-tab.active span {
+  background: rgba(255, 255, 255, 0.18); color: #fff;
+}
+
+.launch-dashboard .lcc-is-body { flex: 1; overflow-y: auto; padding: 8px 0; }
+.launch-dashboard .lcc-is-empty {
+  color: var(--lcc-text-faint); font-size: 12px;
+  padding: 30px 18px; text-align: center; font-style: italic;
+}
+
+.launch-dashboard .lcc-is-item {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--glass-border);
+  cursor: pointer; transition: background 0.12s;
+  position: relative;
+}
+.launch-dashboard .lcc-is-item::before {
+  content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 2px;
+  background: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-is-item[data-kind="prod"]::before    { background: var(--lcc-red); }
+.launch-dashboard .lcc-is-item[data-kind="blocker"]::before { background: var(--lcc-amber); }
+.launch-dashboard .lcc-is-item[data-kind="bug"]::before     { background: var(--lcc-violet); }
+.launch-dashboard .lcc-is-item:hover { background: var(--glass-hi); }
+.launch-dashboard .lcc-is-item:last-child { border-bottom: none; }
+.launch-dashboard .lcc-is-kind {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 9.5px; font-family: var(--aurora-font-mono);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--lcc-text-faint); margin-bottom: 4px;
+}
+.launch-dashboard .lcc-is-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--lcc-neutral);
+}
+.launch-dashboard .lcc-is-dot[data-severity="critical"],
+.launch-dashboard .lcc-is-dot[data-severity="blocker"] { background: var(--lcc-red); }
+.launch-dashboard .lcc-is-dot[data-severity="high"]    { background: var(--lcc-amber); }
+.launch-dashboard .lcc-is-dot[data-severity="medium"]  { background: var(--lcc-blue); }
+.launch-dashboard .lcc-is-dot[data-severity="low"]     { background: var(--lcc-neutral); }
+.launch-dashboard .lcc-is-kind-label { color: var(--lcc-text-dim); font-weight: 600; }
+.launch-dashboard .lcc-is-id { margin-left: auto; color: var(--lcc-text-faint); }
+.launch-dashboard .lcc-is-title {
+  font-size: 12.5px; font-weight: 500;
+  color: var(--lcc-text); line-height: 1.3;
+}
+.launch-dashboard .lcc-is-note {
+  font-size: 11px; color: var(--lcc-text-faint);
+  margin-top: 3px; line-height: 1.35;
+}
+.launch-dashboard .lcc-is-foot {
+  display: flex; align-items: center; gap: 8px; margin-top: 7px;
+  font-size: 10px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-faint);
+}
+.launch-dashboard .lcc-is-meta {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.launch-dashboard .lcc-is-time { color: var(--lcc-text-faint); }
+
+/* ── Side panel ───────────────────────────────────────────── */
+/* Modal scrim — originally `rgba(7,10,28,0.5)` plus `backdrop-filter:
+ * blur(6px)` to soften scrolled content beneath while the side panel
+ * is open. Substitution: bump scrim alpha so the dim alone reads as
+ * "modal up, content paused." No blur needed; the panel itself is
+ * fully opaque. */
+.launch-dashboard-panel-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(7, 10, 28, 0.72);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  z-index: 100;
+}
+.launch-dashboard-panel-backdrop.open { opacity: 1; pointer-events: auto; }
+
+.launch-dashboard-side-panel {
+  position: fixed; top: 16px; right: 16px; bottom: 16px;
+  width: min(870px, calc(100vw - 32px));
+  border-radius: var(--lcc-radius);
+  transform: translateX(calc(100% + 32px));
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 101;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+  font-size: 13px;
+}
+.launch-dashboard-side-panel.open { transform: translateX(0); }
+.launch-dashboard-side-panel .sp-head {
+  padding: 18px 22px; border-bottom: 1px solid var(--glass-border);
+  display: flex; justify-content: space-between; align-items: start; gap: 10px;
+}
+.launch-dashboard-side-panel .sp-head .sp-title {
+  font-size: 18px; font-weight: 600; letter-spacing: -0.01em;
+}
+.launch-dashboard-side-panel .sp-head .sp-area {
+  font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--lcc-text-faint);
+  margin-bottom: 4px; font-family: var(--aurora-font-mono);
+}
+.launch-dashboard-side-panel .sp-close {
+  background: var(--glass-hi); border: 1px solid var(--glass-border);
+  color: var(--lcc-text-dim); cursor: pointer; font-size: 18px;
+  padding: 2px 10px; border-radius: 999px; line-height: 1.2;
+}
+.launch-dashboard-side-panel .sp-close:hover {
+  color: var(--lcc-text); background: var(--glass-bg-strong);
+}
+.launch-dashboard-side-panel .sp-body {
+  overflow-y: auto; padding: 18px 22px; flex: 1;
+}
+.launch-dashboard-side-panel .sp-summary {
+  color: var(--lcc-text-dim); font-size: 12.5px; margin-bottom: 16px;
+  padding: 12px 14px;
+  background: var(--glass-bg-faint);
+  border: 1px solid var(--glass-border);
+  border-left: 2px solid var(--lcc-blue);
+  border-radius: var(--lcc-radius-sm);
+}
+.launch-dashboard-side-panel h4 {
+  font-size: 10.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--lcc-text-faint);
+  margin: 20px 0 10px; font-weight: 600;
+}
+.launch-dashboard-side-panel .sp-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px;
+}
+.launch-dashboard-side-panel .sp-stat {
+  padding: 10px 12px;
+  background: var(--glass-bg-faint);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+}
+.launch-dashboard-side-panel .sp-stat .v {
+  font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.launch-dashboard-side-panel .sp-stat .l {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--lcc-text-faint); margin-top: 2px; font-family: var(--aurora-font-mono);
+}
+.launch-dashboard-side-panel .sp-stat[data-tone="red"]   .v { color: var(--lcc-red); }
+.launch-dashboard-side-panel .sp-stat[data-tone="amber"] .v { color: var(--lcc-amber); }
+.launch-dashboard-side-panel .sp-stat[data-tone="green"] .v { color: var(--lcc-green); }
+
+.launch-dashboard-side-panel table.t {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.launch-dashboard-side-panel table.t th,
+.launch-dashboard-side-panel table.t td {
+  text-align: left; padding: 8px 8px;
+  border-bottom: 1px solid var(--glass-border); vertical-align: middle;
+}
+.launch-dashboard-side-panel table.t th {
+  font-size: 9.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--lcc-text-faint); font-weight: 600;
+}
+.launch-dashboard-side-panel table.t .id {
+  font-family: var(--aurora-font-mono); color: var(--lcc-text-dim); font-size: 11px;
+}
+
+.launch-dashboard-side-panel .sp-vault-md {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--lcc-text-dim);
+  padding: 14px 16px;
+  background: var(--glass-bg-faint);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  overflow-wrap: anywhere;
+}
+.launch-dashboard-side-panel .sp-vault-md h1,
+.launch-dashboard-side-panel .sp-vault-md h2,
+.launch-dashboard-side-panel .sp-vault-md h3,
+.launch-dashboard-side-panel .sp-vault-md h4,
+.launch-dashboard-side-panel .sp-vault-md h5,
+.launch-dashboard-side-panel .sp-vault-md h6 {
+  color: var(--lcc-text);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 16px 0 8px;
+  text-transform: none;
+}
+.launch-dashboard-side-panel .sp-vault-md h1 { font-size: 16px; }
+.launch-dashboard-side-panel .sp-vault-md h2 { font-size: 14.5px; }
+.launch-dashboard-side-panel .sp-vault-md h3 { font-size: 13.5px; }
+.launch-dashboard-side-panel .sp-vault-md h4,
+.launch-dashboard-side-panel .sp-vault-md h5,
+.launch-dashboard-side-panel .sp-vault-md h6 { font-size: 12.5px; }
+.launch-dashboard-side-panel .sp-vault-md h1:first-child,
+.launch-dashboard-side-panel .sp-vault-md h2:first-child,
+.launch-dashboard-side-panel .sp-vault-md h3:first-child { margin-top: 0; }
+.launch-dashboard-side-panel .sp-vault-md p { margin: 0 0 10px; }
+.launch-dashboard-side-panel .sp-vault-md a {
+  color: var(--lcc-blue);
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(110,199,255,0.4);
+}
+.launch-dashboard-side-panel .sp-vault-md a:hover { border-bottom-style: solid; }
+.launch-dashboard-side-panel .sp-vault-md strong { color: var(--lcc-text); }
+.launch-dashboard-side-panel .sp-vault-md ul,
+.launch-dashboard-side-panel .sp-vault-md ol { margin: 0 0 10px; padding-left: 24px; }
+.launch-dashboard-side-panel .sp-vault-md ul { list-style-type: disc; }
+.launch-dashboard-side-panel .sp-vault-md ol { list-style-type: decimal; }
+.launch-dashboard-side-panel .sp-vault-md li { margin-bottom: 3px; }
+.launch-dashboard-side-panel .sp-vault-md li::marker { color: var(--lcc-text-dim); }
+.launch-dashboard-side-panel .sp-vault-md img.sp-vault-thumb {
+  max-width: 180px;
+  max-height: 180px;
+  border-radius: var(--lcc-radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-hi);
+  margin: 4px 6px 4px 0;
+  cursor: zoom-in;
+  display: inline-block;
+  vertical-align: middle;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.launch-dashboard-side-panel .sp-vault-md img.sp-vault-thumb:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+.sp-vault-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  cursor: zoom-out;
+  padding: 24px;
+}
+.sp-vault-lightbox img {
+  max-width: 95vw;
+  max-height: 95vh;
+  border-radius: var(--lcc-radius-sm);
+  box-shadow: 0 10px 60px rgba(0, 0, 0, 0.6);
+}
+.launch-dashboard-side-panel .sp-vault-md code {
+  font-family: var(--aurora-font-mono);
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--glass-hi);
+  color: var(--lcc-text);
+}
+.launch-dashboard-side-panel .sp-vault-md pre {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  overflow-x: auto;
+}
+.launch-dashboard-side-panel .sp-vault-md pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 11.5px;
+}
+.launch-dashboard-side-panel .sp-vault-md blockquote {
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-left: 2px solid var(--lcc-blue);
+  background: var(--glass-bg-faint);
+  color: var(--lcc-text-dim);
+}
+.launch-dashboard-side-panel .sp-vault-md table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  margin: 0 0 10px;
+}
+.launch-dashboard-side-panel .sp-vault-md th,
+.launch-dashboard-side-panel .sp-vault-md td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--glass-border);
+  vertical-align: top;
+}
+.launch-dashboard-side-panel .sp-vault-md th {
+  color: var(--lcc-text-faint);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.launch-dashboard-side-panel .sp-vault-md hr {
+  border: 0;
+  border-top: 1px solid var(--glass-border);
+  margin: 14px 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ *  APP CHROME
+ *
+ *  Phase 3 of the Aurora rollout deleted the legacy `.aurora`
+ *  body wrapper and `.aurora-sidebar` floating-card sidebar — production
+ *  AppLayout now renders `<div class="beacon beacon-shell dark aurora">`
+ *  with `<BeaconSidebar>` inside. Body background, sidebar styling, and
+ *  header banner are all owned by the `.beacon-*` rules in `aurora.css`,
+ *  scoped under the `.aurora` ancestor that the new shell guarantees.
+ *
+ *  What used to live here (now removed):
+ *    - .aurora — body bg with layered radial gradients
+ *    - .aurora-sidebar* — floating-card sidebar (8 rules, ~80 lines)
+ *    - .aurora-header-divider, .aurora-page-title,
+ *      .aurora-page-description — pieces of the legacy two-row Header
+ *      banner that no longer exists
+ *
+ *  Two reusable primitives from this section survive — they're applied
+ *  by inline JSX outside any chrome wrapper, so they stay global:
+ * ══════════════════════════════════════════════════════════════════ */
+
+.aurora-panel {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  border-radius: var(--lcc-radius);
+  color: var(--lcc-text);
+}
+
+/* ── Reusable content primitives ───────────────────────────────────── */
+
+/* Section heading + subtitle pair, used above panels on regular pages. */
+.aurora-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora-section-subtitle {
+  font-size: 12px;
+  color: var(--lcc-text-dim);
+  font-family: var(--aurora-font-sans);
+  margin-top: 2px;
+}
+
+/* Eyebrow row above a panel (small uppercase mono label). */
+.aurora-eyebrow {
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+}
+
+/* Inline text-color helpers so component code can pick the aurora token
+ * without restyling the surrounding shadcn class soup. */
+.aurora-text       { color: var(--lcc-text); }
+.aurora-text-dim   { color: var(--lcc-text-dim); }
+.aurora-text-faint { color: var(--lcc-text-faint); }
+
+/* Sub-header strip inside a panel (e.g. "Site name" above a table). */
+.aurora-panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+
+/* Tables that live inside an .aurora-panel. Headers get the mono eyebrow
+ * treatment; rows get glass dividers and a subtle hover sheen. */
+.aurora-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+  font-size: 12.5px;
+}
+.aurora-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+  border-bottom: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+.aurora-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--lcc-text);
+  vertical-align: middle;
+}
+.aurora-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.aurora-table tbody tr:hover td {
+  background: var(--glass-hi);
+}
+.aurora-table .aurora-num {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--aurora-font-mono);
+  font-size: 12px;
+  color: var(--lcc-text-dim);
+}
+
+/* Icon tile for category cards (Lighthouse explanation, Setup, etc.). */
+.aurora-icon-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--lcc-radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-hi);
+  color: var(--lcc-text);
+  flex-shrink: 0;
+}
+.aurora-icon-tile[data-tone="violet"] { color: var(--lcc-violet); background: var(--lcc-violet-bg); border-color: transparent; }
+.aurora-icon-tile[data-tone="blue"]   { color: var(--lcc-blue);   background: var(--lcc-blue-bg);   border-color: transparent; }
+.aurora-icon-tile[data-tone="green"]  { color: var(--lcc-green);  background: var(--lcc-green-bg);  border-color: transparent; }
+.aurora-icon-tile[data-tone="amber"]  { color: var(--lcc-amber);  background: var(--lcc-amber-bg);  border-color: transparent; }
+.aurora-icon-tile[data-tone="pink"]   { color: var(--lcc-red);    background: var(--lcc-red-bg);    border-color: transparent; }
+
+/* Tabs strip styled like the lcc topbar filters. Apply to TabsList +
+ * TabsTrigger via className overrides so the shadcn defaults stop
+ * leaking through. */
+.aurora-tabs-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  height: auto;
+}
+.aurora-tabs-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--lcc-text-dim);
+  white-space: nowrap;
+  transition: all 0.12s;
+  cursor: pointer;
+}
+.aurora-tabs-trigger:hover {
+  color: var(--lcc-text);
+  background: var(--glass-hi);
+}
+.aurora-tabs-trigger[data-active="true"],
+.aurora-tabs-trigger[data-state="active"] {
+  background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
+  color: #fff;
+  border-color: transparent;
+}
+
+/* Progress bar: dim glass track + violet gradient fill. */
+.aurora-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--glass-hi);
+  overflow: hidden;
+  width: 100%;
+}
+.aurora-progress > [data-slot="progress-track"],
+.aurora-progress [data-slot="progress-track"] {
+  height: 100%;
+  background: transparent;
+  border-radius: inherit;
+}
+.aurora-progress [data-slot="progress-indicator"] {
+  height: 100%;
+  background: linear-gradient(90deg, var(--lcc-blue), var(--lcc-violet));
+  border-radius: inherit;
+}
+
+/* Dialog content as a glass surface. The base-ui dialog uses
+ * data-slot="dialog-content"; layering on aurora-dialog ensures
+ * targeted shadcn classes don't fight us. */
+.aurora-dialog[data-slot="dialog-content"],
+[data-slot="dialog-content"].aurora-dialog {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  color: var(--lcc-text);
+}
+.aurora-dialog [data-slot="dialog-title"] {
+  color: var(--lcc-text);
+}
+.aurora-dialog [data-slot="dialog-description"] {
+  color: var(--lcc-text-dim);
+}
+
+/* Native form controls in glass aesthetic. Apply directly to <select>,
+ * <input>, <label> on regular pages — no wrapper required. */
+.aurora-label {
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+}
+.aurora-select,
+.aurora-input {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  font-family: var(--aurora-font-sans);
+  color: var(--lcc-text);
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  outline: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+.aurora-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--lcc-text-dim) 50%),
+    linear-gradient(135deg, var(--lcc-text-dim) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) center,
+    calc(100% - 9px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.aurora-select:hover,
+.aurora-input:hover { border-color: var(--glass-border-strong); }
+.aurora-select:focus,
+.aurora-input:focus {
+  border-color: var(--lcc-violet);
+  background: var(--glass-bg-strong);
+}
+.aurora-select:disabled,
+.aurora-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.aurora-select option {
+  background: var(--aurora-2);
+  color: var(--lcc-text);
+}
+
+/* Subtle inset banner — diff summaries, callouts. */
+.aurora-callout {
+  border: 1px solid var(--glass-border);
+  background: var(--glass-hi);
+  border-radius: var(--lcc-radius-sm);
+  padding: 10px 14px;
+  color: var(--lcc-text);
+}
+
+/* Score badge — fixed-width pill for Lighthouse scores. Uses solid
+ * (not translucent) backgrounds so it doesn't blur into the aurora
+ * backdrop, plus mono numerics for crisp digit alignment. */
+.aurora-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-family: var(--aurora-font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+  line-height: 1;
+}
+.aurora-score[data-rating="good"] {
+  color: var(--lcc-green);
+  background: var(--lcc-green-bg);
+  border-color: color-mix(in srgb, var(--lcc-green) 40%, transparent);
+}
+.aurora-score[data-rating="average"] {
+  color: var(--lcc-amber);
+  background: var(--lcc-amber-bg);
+  border-color: color-mix(in srgb, var(--lcc-amber) 40%, transparent);
+}
+.aurora-score[data-rating="poor"] {
+  color: var(--lcc-red);
+  background: var(--lcc-red-bg);
+  border-color: color-mix(in srgb, var(--lcc-red) 40%, transparent);
+}
+.aurora-score[data-rating="unknown"] {
+  color: var(--lcc-text-faint);
+  background: var(--glass-hi);
+  border-color: var(--glass-border);
+}
+
+/* Comparison bar track for radar/CWV bars. */
+.aurora-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--glass-hi);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+}
+.aurora-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.2s ease;
+}
+
+/* ── shadcn Switch / Checkbox aurora overrides ─────────────────────
+ * These are scoped to .aurora so the whole app inherits
+ * them automatically. Targeting base-ui's data-slot attributes keeps
+ * the override resilient to className changes in shadcn defaults. */
+.aurora [data-slot="switch"] {
+  background: var(--glass-hi);
+  border-color: var(--glass-border);
+  height: 20px;
+  width: 36px;
+}
+.aurora [data-slot="switch"][data-checked] {
+  background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
+  border-color: transparent;
+}
+.aurora [data-slot="switch-thumb"] {
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.aurora [data-slot="checkbox"] {
+  border-color: var(--glass-border-strong);
+  background: var(--glass-hi);
+}
+.aurora [data-slot="checkbox"][data-checked],
+.aurora [data-slot="checkbox"][data-indeterminate] {
+  background: var(--lcc-violet);
+  border-color: var(--lcc-violet);
+  color: #fff;
+}
+
+/* ── Expandable site row (Setup) ─────────────────────────────────── */
+.aurora-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+  transition: background 0.12s;
+}
+.aurora-row:hover { background: var(--glass-hi); }
+
+.aurora-divider {
+  height: 1px;
+  background: var(--glass-border);
+}
+
+/* Aurora kbd / inline code for the cron syntax reference. */
+.aurora-code {
+  font-family: var(--aurora-font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  color: var(--lcc-text);
+}
+
+/* Strategy radio group — pill-style segmented control. */
+.aurora-radio-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--lcc-text-dim);
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+}
+.aurora-radio-pill:hover {
+  color: var(--lcc-text);
+  border-color: var(--glass-border-strong);
+}
+.aurora-radio-pill[data-checked="true"] {
+  background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
+  color: #fff;
+  border-color: transparent;
+}
+.aurora-radio-pill input { position: absolute; opacity: 0; pointer-events: none; }
+
+/* Multi-line text input — used for NRQL queries, KQL queries, etc. */
+.aurora-textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 8px 10px;
+  font-family: var(--aurora-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lcc-text);
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.12s, background 0.12s;
+}
+.aurora-textarea:hover { border-color: var(--glass-border-strong); }
+.aurora-textarea:focus {
+  border-color: var(--lcc-violet);
+  background: var(--glass-bg-strong);
+}
+
+/* Code block / preformatted output — JSON results, log dumps, etc. */
+.aurora-pre {
+  font-family: var(--aurora-font-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--lcc-text-dim);
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  padding: 10px 12px;
+  overflow: auto;
+  white-space: pre;
+}
+
+/* Stat tile — for KPI card layouts (StatCard pattern). */
+.aurora-stat-label {
+  font-size: 11px;
+  color: var(--lcc-text-dim);
+  font-family: var(--aurora-font-sans);
+}
+.aurora-stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--lcc-text);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--aurora-font-sans);
+}
+.aurora-stat-value-lg {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--lcc-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Global shadcn primitive overrides ────────────────────────────
+ * Scoped to .aurora so already-converted pages (which use
+ * .aurora-panel / .aurora-input directly) are unaffected. These let
+ * pages that still render shadcn Card/Input/Select/Table inherit the
+ * Aurora Glass aesthetic without rewriting every JSX file. */
+
+/* Card → glass panel. Targets both the shadcn Card primitive AND any
+ * raw Tailwind .bg-card wrapper used in unconverted pages (e.g. the
+ * Load Testing page hand-rolls <section class="bg-card border-border">). */
+.aurora [data-slot="card"],
+.aurora .bg-card {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  border-radius: var(--lcc-radius);
+  color: var(--lcc-text);
+}
+
+/* Standalone Tailwind utility overrides — for hand-rolled wrappers
+ * that don't go through the shadcn primitives. These make sure any
+ * unconverted page picks up the aurora palette automatically. */
+.aurora .border-border {
+  border-color: var(--glass-border);
+}
+.aurora .bg-input {
+  background: var(--glass-hi);
+}
+.aurora .bg-muted,
+.aurora .bg-muted\/50,
+.aurora .bg-muted\/30 {
+  background: var(--glass-hi);
+}
+.aurora .text-foreground {
+  color: var(--lcc-text);
+}
+.aurora .text-muted-foreground {
+  color: var(--lcc-text-dim);
+}
+
+.aurora [data-slot="card-title"] {
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora [data-slot="card-description"] {
+  color: var(--lcc-text-dim);
+  font-family: var(--aurora-font-sans);
+}
+
+/* Input → glass field */
+.aurora [data-slot="input"] {
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora [data-slot="input"]::placeholder {
+  color: var(--lcc-text-faint);
+}
+.aurora [data-slot="input"]:hover {
+  border-color: var(--glass-border-strong);
+}
+.aurora [data-slot="input"]:focus {
+  border-color: var(--lcc-violet);
+  background: var(--glass-bg-strong);
+}
+
+/* Select trigger → glass field with chevron */
+.aurora [data-slot="select-trigger"] {
+  background: var(--glass-hi);
+  border: 1px solid var(--glass-border);
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora [data-slot="select-trigger"]:hover {
+  border-color: var(--glass-border-strong);
+}
+.aurora [data-slot="select-trigger"][data-popup-open],
+.aurora [data-slot="select-trigger"]:focus-visible {
+  border-color: var(--lcc-violet);
+  background: var(--glass-bg-strong);
+}
+
+/* Select dropdown content (rendered via portal — not under .aurora,
+ * so target globally via the data-slot attribute). */
+[data-slot="select-content"] {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border-strong);
+  box-shadow: var(--glass-shadow);
+  color: var(--lcc-text);
+}
+[data-slot="select-item"] {
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+[data-slot="select-item"][data-highlighted] {
+  background: var(--glass-hi);
+  color: var(--lcc-text);
+}
+
+/* Table → aurora table styling on shadcn primitives */
+.aurora [data-slot="table"] {
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-sans);
+}
+.aurora [data-slot="table-head"] {
+  font-family: var(--aurora-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+  border-bottom: 1px solid var(--glass-border);
+  background: transparent;
+}
+.aurora [data-slot="table-row"] {
+  border-bottom: 1px solid var(--glass-border);
+}
+.aurora [data-slot="table-row"]:last-child {
+  border-bottom: none;
+}
+.aurora [data-slot="table-row"]:hover {
+  background: var(--glass-hi);
+}
+.aurora [data-slot="table-cell"] {
+  color: var(--lcc-text);
+}
+
+/* Badge: keep shadcn variants (they map to semantic colors), but
+ * lift the border tone for the "outline" variant so it reads on
+ * glass. */
+.aurora [data-slot="badge"][class*="border-border"],
+.aurora .group\/badge[class*="border-border"] {
+  border-color: var(--glass-border-strong);
+  color: var(--lcc-text);
+}
+
+/* Textarea — same shape as input but multi-line. shadcn Textarea
+ * doesn't carry data-slot, so target by tag inside the app shell. */
+.aurora textarea:not(.aurora-textarea):not([data-slot="dialog-content"] textarea) {
+  background: var(--glass-hi);
+  border-color: var(--glass-border);
+  color: var(--lcc-text);
+  font-family: var(--aurora-font-mono);
+}
+.aurora textarea:not(.aurora-textarea):focus {
+  border-color: var(--lcc-violet);
+  background: var(--glass-bg-strong);
+}
+
+/* ── Rendered markdown (.lcc-markdown) ──────────────────────────────
+ * Used by the per-ticket drawer in ProjectDashboard (and any other
+ * surface that renders marked.parse output via dangerouslySetInnerHTML).
+ * Without these rules tables collapse to inline content, lists lose
+ * their bullets, and headings inherit body weight.                   */
+.lcc-markdown {
+  color: var(--lcc-text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.lcc-markdown > *:first-child {
+  margin-top: 0;
+}
+.lcc-markdown > *:last-child {
+  margin-bottom: 0;
+}
+.lcc-markdown p {
+  margin: 0 0 10px;
+}
+.lcc-markdown a {
+  color: var(--lcc-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.lcc-markdown a:hover {
+  text-decoration: none;
+}
+
+/* Headings — keep the rhythm tight inside a drawer. */
+.lcc-markdown h1,
+.lcc-markdown h2,
+.lcc-markdown h3,
+.lcc-markdown h4,
+.lcc-markdown h5,
+.lcc-markdown h6 {
+  margin: 14px 0 6px;
+  color: var(--lcc-text);
+  font-weight: 700;
+  line-height: 1.25;
+}
+.lcc-markdown h1 { font-size: 16px; }
+.lcc-markdown h2 { font-size: 15px; }
+.lcc-markdown h3 { font-size: 14px; }
+.lcc-markdown h4,
+.lcc-markdown h5,
+.lcc-markdown h6 { font-size: 13px; color: var(--lcc-text-dim); }
+
+/* Lists — restore default-ish indentation and tighten spacing. */
+.lcc-markdown ul,
+.lcc-markdown ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+.lcc-markdown ul { list-style: disc outside; }
+.lcc-markdown ol { list-style: decimal outside; }
+.lcc-markdown li {
+  margin: 2px 0;
+}
+.lcc-markdown li > ul,
+.lcc-markdown li > ol {
+  margin: 2px 0;
+}
+
+/* Tables — the main offender. Standard markdown tables come out as
+ * <table><thead><tr><th>…<tbody><tr><td>… with no styling, and inside
+ * a flex parent they collapse to inline content. Style them like the
+ * rest of the dashboard's data tables. */
+.lcc-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 12px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  overflow: hidden;
+  display: table;
+}
+.lcc-markdown thead {
+  background: rgba(255, 255, 255, 0.04);
+}
+.lcc-markdown th,
+.lcc-markdown td {
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-right: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
+  word-break: break-word;
+}
+.lcc-markdown th:last-child,
+.lcc-markdown td:last-child {
+  border-right: 0;
+}
+.lcc-markdown tbody tr:last-child td {
+  border-bottom: 0;
+}
+.lcc-markdown th {
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lcc-text-faint);
+  white-space: nowrap;
+}
+.lcc-markdown tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.015);
+}
+.lcc-markdown tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Code — inline + fenced. */
+.lcc-markdown code {
+  font-family: var(--aurora-font-mono, ui-monospace, monospace);
+  font-size: 0.92em;
+  padding: 1px 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: 3px;
+  color: var(--lcc-text);
+}
+.lcc-markdown pre {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.lcc-markdown pre code {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Blockquotes. */
+.lcc-markdown blockquote {
+  margin: 8px 0 12px;
+  padding: 6px 12px;
+  border-left: 3px solid var(--lcc-violet, rgba(167, 139, 250, 0.7));
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lcc-text-dim);
+  font-style: italic;
+}
+
+/* Horizontal rule. */
+.lcc-markdown hr {
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+}
+
+/* Inline images — keep them inside the drawer's max width. */
+.lcc-markdown img {
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+}

@@ -30,6 +30,7 @@ logging.basicConfig(
 logging.getLogger('apscheduler').setLevel(logging.DEBUG)
 
 from config import (
+    APPLITOOLS_HELPER_TOKEN,
     ASANA_PAT,
     ASANA_PROJECT_MAP,
     BLAZEMETER_API_KEY_ID,
@@ -48,6 +49,9 @@ from config import (
     OBSIDIAN_VAULT_ROOT,
     PAGESPEED_API_KEY,
     PORT,
+    VAULT_ACTIVE_HOURS_END,
+    VAULT_ACTIVE_HOURS_START,
+    VAULT_ACTIVE_HOURS_TZ,
     VAULT_BOT_TOKEN,
     VAULT_COMMITTER_EMAIL,
     VAULT_COMMITTER_NAME,
@@ -72,11 +76,13 @@ from exceptions import (
     SchedulerError,
     ValidationError,
 )
+from services.applitools_storage import ApplitoolsBatchStore
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService, SyncAlreadyRunning
 from services.obsidian_sync.vault_reader import VaultReader
+from services.scheduling_window import ActiveHoursWindow
 from services.snapshot_service import SnapshotService
 from services.pagespeed_client import PageSpeedClient
 from services.vault_git_service import VaultGitService
@@ -140,6 +146,12 @@ def create_app() -> Flask:
 
     site_service = SiteService(site_repo, url_repo, test_result_repo)
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
+
+    # Process-wide cache for Applitools batches uploaded by the desktop
+    # helper. One instance per app so all workers share state — important
+    # because Gunicorn forks but the cache is per-process; if QA hits a
+    # different worker, they'll get a 404 and just rerun the helper.
+    applitools_store = ApplitoolsBatchStore()
 
     # ---- Scheduler ----
     # Explicit UTC timezone ensures cron expressions fire at the same time
@@ -285,6 +297,27 @@ def create_app() -> Flask:
         except Exception:
             logging.exception("Snapshot ingest after vault refresh failed")
 
+    # Active-hours gate for periodic vault jobs. Both the auto-refresh
+    # tick and the Jira/Asana sync tick consult this before doing any
+    # real work; outside the window the tick still fires (APScheduler
+    # keeps its own cadence) but no-ops at the top so we don't hammer
+    # upstream APIs overnight when no human is around to read the
+    # output.
+    try:
+        active_hours = ActiveHoursWindow(
+            start_hour=VAULT_ACTIVE_HOURS_START,
+            end_hour=VAULT_ACTIVE_HOURS_END,
+            timezone=VAULT_ACTIVE_HOURS_TZ,
+        )
+        logging.info(
+            "Vault scheduler active-hours window: %s", active_hours.describe()
+        )
+    except Exception:
+        logging.exception(
+            "Invalid VAULT_ACTIVE_HOURS_* config — falling back to 24/7 schedule"
+        )
+        active_hours = None
+
     # Schedule a periodic pull from origin so orchestrator commits land
     # on the Railway clone without waiting for the user to click refresh.
     # 10 minutes is responsive enough for hourly orchestration without
@@ -295,6 +328,12 @@ def create_app() -> Flask:
         AUTO_REFRESH_INTERVAL_MIN = int(os.environ.get("VAULT_AUTO_REFRESH_MINUTES", "10"))
 
         def _vault_auto_refresh_tick() -> None:
+            if active_hours is not None and not active_hours.is_open():
+                logging.debug(
+                    "Vault auto-refresh skipped — outside active-hours window (%s)",
+                    active_hours.describe(),
+                )
+                return
             prev_head = vault_git.auto_refresh_status().get("lastRefreshedHead")
             result = vault_git.auto_refresh()
             if result.get("ok") and result.get("head") and result["head"] != prev_head:
@@ -309,13 +348,29 @@ def create_app() -> Flask:
             next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30),
         )
 
-    # Hourly Jira/Asana sync. Configurable via OBSIDIAN_SYNC_INTERVAL_MIN
-    # so we can dial it back if the upstream APIs start rate-limiting.
-    # If a sync is already running when the tick fires, skip — don't queue
-    # up a second one. The next tick will pick up where this left off.
-    OBSIDIAN_SYNC_INTERVAL_MIN = int(os.environ.get("OBSIDIAN_SYNC_INTERVAL_MIN", "60"))
+    # Hourly Jira/Asana sync, locked to a wall-clock minute via cron.
+    #
+    # The previous interval schedule (60 min, first fire 2 min after
+    # boot) re-armed every container restart, so a busy deploy hour
+    # would produce one sync per deploy — and each sync pushes raw
+    # files which retriggers the orchestrator. Switching to a cron
+    # trigger pins firing to the same wall-clock minute every hour
+    # regardless of when we redeploy, so N deploys in an hour produce
+    # at most one sync.
+    #
+    # OBSIDIAN_SYNC_CRON_MINUTE accepts any APScheduler minute
+    # expression: "5" (default, fires at :05), "*/30" (every 30 min),
+    # "0,30" (top + half), etc. The active-hours gate still applies
+    # so overnight ticks no-op even if the cron fires.
+    OBSIDIAN_SYNC_CRON_MINUTE = os.environ.get("OBSIDIAN_SYNC_CRON_MINUTE", "5")
 
     def _obsidian_sync_tick() -> None:
+        if active_hours is not None and not active_hours.is_open():
+            logging.debug(
+                "Obsidian sync skipped — outside active-hours window (%s)",
+                active_hours.describe(),
+            )
+            return
         try:
             obsidian_sync_service.start_sync(source="both")
         except SyncAlreadyRunning:
@@ -325,11 +380,14 @@ def create_app() -> Flask:
 
     scheduler.add_job(
         _obsidian_sync_tick,
-        trigger="interval",
-        minutes=OBSIDIAN_SYNC_INTERVAL_MIN,
+        trigger="cron",
+        minute=OBSIDIAN_SYNC_CRON_MINUTE,
         id="obsidian-hourly-sync",
         replace_existing=True,
-        next_run_time=datetime.now(timezone.utc) + timedelta(minutes=2),
+    )
+    logging.info(
+        "Obsidian sync cron registered: minute=%s (cron expression)",
+        OBSIDIAN_SYNC_CRON_MINUTE,
     )
 
     # ---- Blueprints ----
@@ -350,6 +408,8 @@ def create_app() -> Flask:
         devops_project=DEVOPS_PROJECT,
         devops_orchestrator_pipeline_id=DEVOPS_ORCHESTRATOR_PIPELINE_ID,
         devops_pipeline_map=DEVOPS_PIPELINE_MAP,
+        applitools_store=applitools_store,
+        applitools_helper_token=APPLITOOLS_HELPER_TOKEN,
     )
 
     # ---- Centralized error handlers ----

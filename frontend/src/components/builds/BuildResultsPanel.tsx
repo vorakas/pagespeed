@@ -39,7 +39,8 @@ function linkifyIssues(text: string): React.ReactNode {
         href={issueHref(token)}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sky-400 underline hover:no-underline"
+        className="underline hover:no-underline"
+        style={{ color: "var(--beacon-amber)" }}
         onClick={(event) => event.stopPropagation()}
       >
         {token}
@@ -328,7 +329,8 @@ export function BuildResultsPanel({
                             href={test.zephyrUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm font-semibold text-sidebar-primary hover:underline flex items-center gap-1"
+                            className="text-sm font-semibold hover:underline flex items-center gap-1"
+                            style={{ color: "var(--beacon-amber)" }}
                           >
                             {test.testId} <ExternalLink className="h-3 w-3" />
                           </a>

@@ -10,6 +10,7 @@ from flask import Flask
 
 from data_access import BlazemeterPresetRepository, BlazemeterRunRepository, TestResultRepository
 from routes.ai_api import create_ai_blueprint
+from routes.applitools_api import create_applitools_blueprint
 from routes.azure_api import create_azure_blueprint
 from routes.blazemeter_api import create_blazemeter_blueprint
 from routes.dashboard_api import create_dashboard_blueprint
@@ -22,6 +23,7 @@ from routes.pages import create_pages_blueprint
 from routes.sites_api import create_sites_blueprint
 from routes.testing_api import create_testing_blueprint
 from routes.triggers_api import create_triggers_blueprint
+from services.applitools_storage import ApplitoolsBatchStore
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
@@ -54,6 +56,8 @@ def register_blueprints(
     devops_project: str = "TestAutomation",
     devops_orchestrator_pipeline_id: "int | None" = None,
     devops_pipeline_map: "dict | None" = None,
+    applitools_store: "ApplitoolsBatchStore | None" = None,
+    applitools_helper_token: "str | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -79,6 +83,12 @@ def register_blueprints(
         server_orchestrator_pipeline_id=devops_orchestrator_pipeline_id,
         server_pipeline_map=devops_pipeline_map,
     ))
+    app.register_blueprint(
+        create_applitools_blueprint(
+            applitools_store or ApplitoolsBatchStore(),
+            applitools_helper_token,
+        )
+    )
     app.register_blueprint(
         create_blazemeter_blueprint(
             blazemeter_queue,

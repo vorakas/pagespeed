@@ -133,6 +133,11 @@ def run_jira_sync(
             for project_key in project_list:
                 jira_sync.sync_project(session, project_key, force_full=full_refresh)
 
+            # Sweep for any references to attachments that didn't land
+            # (Jira's /secure/attachment servlet intermittently 403s the
+            # first try; the backfill retries via the REST endpoint).
+            jira_sync.backfill_missing_attachments(session, vault_root, project_list)
+
             print("🏁 All projects synced!")
         return SyncResult(success=True, lines=buffer)
     except SystemExit as exc:
@@ -190,6 +195,8 @@ def run_jira_jql_sync(
             print()
 
             jira_sync.sync_jql(session, jql, output_name, force_full=full_refresh)
+
+            jira_sync.backfill_missing_attachments(session, vault_root, [output_name])
 
             print(f"🏁 JQL feed '{output_name}' synced!")
         return SyncResult(success=True, lines=buffer)

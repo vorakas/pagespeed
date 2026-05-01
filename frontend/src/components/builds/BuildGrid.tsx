@@ -67,6 +67,15 @@ interface BuildGridProps {
   triggerErrors: Record<string, string>
   cancellingKeys: Set<string>
   selectedBuildId?: number
+  applitoolsBatchIds: Record<string, string>
+  onApplitoolsBatchIdChange: (roleKey: string, value: string) => void
+  recentApplitoolsBatches: Array<{
+    batchId: string
+    fetchedAt: string
+    uploadedAt: number
+    platform: string | null
+    testCount: number
+  }>
 }
 
 export function BuildGrid({
@@ -75,14 +84,16 @@ export function BuildGrid({
   overrides, onOverrideChange, onTrigger, onStop, onShowResults, onShowSkipped,
   onAddToSheet, sheetData, onSheetClear, prefetchingTests,
   triggeringKeys, triggerErrors, cancellingKeys, selectedBuildId,
+  applitoolsBatchIds, onApplitoolsBatchIdChange, recentApplitoolsBatches,
 }: BuildGridProps) {
   return (
     <div className="space-y-6">
       {/* WarmUp row + Spreadsheet Widget */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-          WarmUp
-        </h3>
+        <div className="beacon-section">
+          <span className="beacon-label">WARMUP</span>
+          <hr className="beacon-rule" />
+        </div>
         <div className="grid grid-cols-[24rem_1fr] gap-4 items-start">
           <div>
             <BuildCard
@@ -120,14 +131,15 @@ export function BuildGrid({
 
       {/* Platform rows: Functional -> Visual */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-          Functional &rarr; Visual
-        </h3>
+        <div className="beacon-section">
+          <span className="beacon-label">FUNCTIONAL &rarr; VISUAL</span>
+          <hr className="beacon-rule" />
+        </div>
         <div className="space-y-3 max-w-4xl">
           {PLATFORM_ROLES.map(({ platform, functional, visual }) => (
             <div key={platform} className="flex items-start gap-3">
-              <p className="w-16 shrink-0 pt-3 text-xs font-medium text-muted-foreground">
-                {platform}
+              <p className="w-16 shrink-0 pt-3 beacon-label">
+                {platform.toUpperCase()}
               </p>
               <div className="flex-1">
                 <BuildCard
@@ -186,6 +198,16 @@ export function BuildGrid({
                   triggering={triggeringKeys.has(visual.key)}
                   triggerError={triggerErrors[visual.key]}
                   selected={builds[visual.key]?.id === selectedBuildId}
+                  applitoolsBatchId={applitoolsBatchIds[visual.key]}
+                  onApplitoolsBatchIdChange={onApplitoolsBatchIdChange}
+                  recentApplitoolsBatches={recentApplitoolsBatches.filter(
+                    // Only show uploads tagged with this card's platform.
+                    // Untagged (legacy) entries fall through to all cards
+                    // so cache wipes don't strand them; new helper builds
+                    // always tag, so this only matters during a deploy
+                    // straddling the schema change.
+                    (b) => !b.platform || b.platform === visual.key.split("_")[0],
+                  )}
                 />
               </div>
             </div>
@@ -194,12 +216,13 @@ export function BuildGrid({
       </div>
 
       {/* Dependency notes */}
-      <div className="rounded-lg border border-dashed border-muted-foreground/30 p-3">
-        <p className="text-xs text-muted-foreground">
-          <span className="font-semibold">Orchestrator dependency chain:</span>{" "}
-          WarmUp &rarr; Win/Mac/iPhone Functional (parallel) &rarr; Android Functional &rarr;
-          Win/Mac Visual (parallel) &rarr; iPhone Visual &rarr; Android Visual.{" "}
-          iPhone &amp; Android share LambdaTest devices and cannot run simultaneously.
+      <div className="border-t border-dashed pt-3" style={{ borderColor: "var(--beacon-hairline)" }}>
+        <p className="beacon-label mb-1.5">DEPENDENCY CHAIN</p>
+        <p className="text-xs text-muted-foreground beacon-mono leading-relaxed">
+          warmup &rarr; win / mac / iphone functional (parallel) &rarr; android functional &rarr;{" "}
+          win / mac visual (parallel) &rarr; iphone visual &rarr; android visual.
+          <br />
+          iphone &amp; android share lambdatest devices and cannot run simultaneously.
         </p>
       </div>
     </div>

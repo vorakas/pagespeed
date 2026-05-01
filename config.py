@@ -187,6 +187,19 @@ DEVOPS_PIPELINE_MAP: dict[str, int] = _parse_pipeline_map(os.getenv('DEVOPS_PIPE
 """Map of role key (e.g. ``Windows_Functional``) → pipeline definition id."""
 
 # ---------------------------------------------------------------------------
+# Applitools helper-upload token
+# ---------------------------------------------------------------------------
+
+APPLITOOLS_HELPER_TOKEN: str | None = os.getenv('APPLITOOLS_HELPER_TOKEN')
+"""Shared secret the desktop helper sends in ``X-Pharos-Helper-Token``.
+
+The helper runs on a QA machine (where the corporate firewall actually
+permits Applitools API calls) and POSTs fetched batch rows to
+``/api/applitools/upload-batch``. Without this env var, uploads are
+disabled and the endpoint returns 503 — failing closed so a misconfigured
+production deploy never silently accepts unauthenticated writes."""
+
+# ---------------------------------------------------------------------------
 # BlazeMeter defaults
 # ---------------------------------------------------------------------------
 
@@ -251,6 +264,23 @@ VAULT_COMMITTER_NAME: str = os.getenv('VAULT_COMMITTER_NAME', 'pharos-sync-bot')
 
 VAULT_COMMITTER_EMAIL: str = os.getenv('VAULT_COMMITTER_EMAIL', 'sync@pharos.local')
 """Email on commits created by the Railway sync hook."""
+
+VAULT_ACTIVE_HOURS_TZ: str = os.getenv('VAULT_ACTIVE_HOURS_TZ', 'America/Los_Angeles')
+"""IANA timezone whose hours the active-hours window is interpreted in.
+
+The vault auto-refresh and Jira/Asana sync schedulers only fire their
+real work when the local-clock hour in this timezone is within the
+``[VAULT_ACTIVE_HOURS_START, VAULT_ACTIVE_HOURS_END]`` window."""
+
+VAULT_ACTIVE_HOURS_START: int = int(os.getenv('VAULT_ACTIVE_HOURS_START', '8'))
+"""Earliest local hour (0-23) at which periodic vault jobs may run. Default 8 AM."""
+
+VAULT_ACTIVE_HOURS_END: int = int(os.getenv('VAULT_ACTIVE_HOURS_END', '22'))
+"""Latest local hour (0-23, inclusive) at which periodic vault jobs may run.
+
+Default 22 (10 PM) — meaning the last fire window of the day spans
+22:00–22:59 local time, and nothing runs between 23:00 and the start
+hour the next morning."""
 
 GITHUB_WEBHOOK_SECRET: str | None = os.getenv('GITHUB_WEBHOOK_SECRET')
 """Shared secret for verifying GitHub webhook HMAC signatures.

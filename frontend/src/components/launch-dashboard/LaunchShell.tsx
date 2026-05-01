@@ -1,6 +1,6 @@
-import { useEffect } from "react"
 import type { ReactNode } from "react"
-import "@/styles/aurora-glass.css"
+// Aurora register CSS is loaded globally by main.tsx — no per-component
+// import needed here.
 
 type Theme = "dark" | "light"
 type Palette = "traffic" | "muted" | "mono"
@@ -14,12 +14,23 @@ interface LaunchShellProps {
 }
 
 /**
- * Aurora Glass wrapper for the Launch Command Center.
+ * Page-scoped wrapper for the Launch Command Center cluster
+ * (`/dashboard`, `/dashboard/history`, `/dashboard/workstreams/:id`,
+ * `/dashboard/projects/:key`).
  *
- * Applies the design's animated gradient background, token overrides,
- * and glass-panel styles — all scoped under `.launch-dashboard` so
- * nothing leaks into the rest of Pharos. Tweaks-panel persistence
- * will hook into these attributes in a later phase.
+ * Carries two responsibilities:
+ *
+ *   1. Applies the `.launch-dashboard` class so all the
+ *      `.launch-dashboard .lcc-*` rules in `aurora-glass.css` resolve.
+ *      Every panel, chip, dot, sticky rail, and inline `--lcc-*` token
+ *      reference inside the cluster depends on this scope.
+ *   2. Forwards `data-theme`, `data-palette`, `data-density` attributes
+ *      so the cluster's CSS can pick up palette / density variants.
+ *
+ * Phase 2 of the Aurora rollout removed an obsolete `useEffect` that
+ * stripped the legacy AppLayout main's padding to let the dashboard
+ * bleed edge-to-edge. The new BeaconLayout main has no padding to
+ * strip, so the effect was a no-op — deleted.
  */
 export function LaunchShell({
   children,
@@ -27,19 +38,6 @@ export function LaunchShell({
   palette = "traffic",
   density = "normal",
 }: LaunchShellProps) {
-  useEffect(() => {
-    // AppLayout's main element has ml-[232px] + min-h-screen + pb-3. We
-    // want the dashboard to bleed edge-to-edge inside that main, so strip
-    // the bottom padding only while this page is mounted.
-    const main = document.querySelector<HTMLElement>("main.ml-\\[232px\\]")
-    if (!main) return
-    const prev = main.style.padding
-    main.style.padding = "0"
-    return () => {
-      main.style.padding = prev
-    }
-  }, [])
-
   return (
     <div
       className="launch-dashboard"

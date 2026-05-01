@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
+import { useDashboardLinks } from "@/lib/dashboard-links"
 import type { MigrationHistoryEntry, SnapshotKpiDelta } from "@/types"
 
 type FilterKey = "all" | "changes" | "regressions" | "resolutions"
@@ -28,6 +29,15 @@ const KPI_VIEW: Array<{ key: string; label: string; goodWhen: "up" | "down" }> =
   { key: "wpm", label: "WPM", goodWhen: "up" },
 ]
 
+/**
+ * Body of the Status History page — reverse-chron snapshot cards inside
+ * `LaunchShell` so all the `.launch-dashboard .lcc-*` and `--lcc-*` token
+ * references resolve. The Aurora prototype at
+ * `/prototype/dashboard-history/aurora` mounts this body inside
+ * `BeaconLayout`; the production export below renders it directly under
+ * `AppLayout`. No internal logic changed during the extraction — only
+ * the function name.
+ */
 export function StatusHistory() {
   const [entries, setEntries] = useState<MigrationHistoryEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -126,6 +136,7 @@ export function StatusHistory() {
 }
 
 function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
+  const links = useDashboardLinks()
   const curr = entry.currentPayload
   const areaChanges = entry.diff.areaStatuses
   return (
@@ -164,7 +175,7 @@ function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
           <ul style={areaListStyle}>
             {areaChanges.map((c) => (
               <li key={c.ws} style={areaItemStyle}>
-                <Link to={`/dashboard/workstreams/${c.ws}`} style={areaLinkStyle}>
+                <Link to={links.workstreamPath(c.ws)} style={areaLinkStyle}>
                   {c.ws}
                 </Link>
                 <span style={{ color: healthColor(c.from) }}>{c.from}</span>

@@ -242,7 +242,7 @@ export function OrchestratorPanel({
     <Card className="max-w-4xl">
       <CardContent className="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Run All Builds</h3>
+          <h3 className="text-base beacon-headline">Run All Builds</h3>
           <div className="flex items-center gap-2">
             <Button
               variant="destructive"
@@ -269,7 +269,7 @@ export function OrchestratorPanel({
 
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Build Types</p>
+            <p className="beacon-label">BUILD TYPES</p>
             <div className="flex flex-wrap gap-3">
               <CheckboxOption label="WarmUp" checked={runWarmUp} onChange={setRunWarmUp} />
               <CheckboxOption label="Functional" checked={runFunctional} onChange={setRunFunctional} />
@@ -277,7 +277,7 @@ export function OrchestratorPanel({
             </div>
           </div>
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Platforms</p>
+            <p className="beacon-label">PLATFORMS</p>
             <div className="flex flex-wrap gap-3">
               <CheckboxOption label="Windows" checked={runWindows} onChange={setRunWindows} />
               <CheckboxOption label="Mac" checked={runMac} onChange={setRunMac} />
@@ -289,11 +289,11 @@ export function OrchestratorPanel({
 
         <div className="flex gap-x-6 gap-y-2">
           <div className="space-y-1.5 flex-1">
-            <p className="text-xs font-medium text-muted-foreground">Branch</p>
+            <p className="beacon-label">BRANCH</p>
             <select
               value={branch}
               onChange={(e) => onBranchChange(e.target.value)}
-              className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
+              className="h-8 w-full rounded border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             >
               {branches.length === 0 && <option value="master">master</option>}
               {branches.map((b) => (
@@ -302,11 +302,11 @@ export function OrchestratorPanel({
             </select>
           </div>
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">PROD Instance</p>
+            <p className="beacon-label">PROD</p>
             <select
               value={targetInstance}
               onChange={(e) => onTargetInstanceChange(e.target.value)}
-              className="h-8 w-14 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
+              className="h-8 w-14 rounded border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             >
               {TARGET_INSTANCES.map((i) => (
                 <option key={i} value={i}>{i}</option>
@@ -315,15 +315,15 @@ export function OrchestratorPanel({
           </div>
           <div className="space-y-1.5">
             <p
-              className="text-xs font-medium text-muted-foreground"
+              className="beacon-label"
               title="Applied only to Visual builds; WarmUp and Functional ignore this."
             >
-              PPE Instance
+              PPE
             </p>
             <select
               value={stagingInstance}
               onChange={(e) => onStagingInstanceChange(e.target.value)}
-              className="h-8 w-14 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
+              className="h-8 w-14 rounded border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             >
               {TARGET_INSTANCES.map((i) => (
                 <option key={i} value={i}>{i}</option>

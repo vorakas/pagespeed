@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react"
-import { Header } from "@/components/layout/Header"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AiConfigPanel } from "@/components/ai-analysis/AiConfigPanel"
@@ -317,10 +317,7 @@ export function AiAnalysis() {
 
   return (
     <>
-      <Header
-        title="AI Analysis"
-        description="AI-powered performance analysis"
-      />
+      <PageHeader title="AI Analysis" description="AI-powered performance analysis" />
       <div className="space-y-6 p-6">
         {/* Disclaimer */}
         <div

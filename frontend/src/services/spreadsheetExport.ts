@@ -13,7 +13,7 @@
  */
 
 import ExcelJS from "exceljs"
-import type { FailedTest, SkippedTest } from "@/types"
+import type { FailedTest, SkippedTest, UnresolvedTest } from "@/types"
 
 // ---------- Types ----------
 
@@ -23,6 +23,9 @@ export interface SheetEntry {
   type: string
   failed: FailedTest[]
   skipped: SkippedTest[]
+  /** Applitools Unresolved/Failed rows — only populated on Visual entries
+   *  when QA supplied a batch id on the card. Empty otherwise. */
+  unresolved: UnresolvedTest[]
 }
 
 // ---------- Constants ----------
@@ -220,10 +223,42 @@ export async function generateSpreadsheet(
     )
   }
 
-  // ---------- Unresolved + Manual Execution placeholders ----------
+  // ---------- Unresolved (Applitools) ----------
   for (const platform of PLATFORMS) {
-    addSection(`Automated ${platform} Unresolved`, [], platform, "", "Failed")
+    const entry = entries.get(`${platform}_Visual`)
+    const rows = entry?.unresolved ?? []
+    // Preserve the per-row Unresolved/Failed status from Applitools so
+    // mixed-status batches don't get collapsed under a single label.
+    const headerRow = sheet.addRow([`Automated ${platform} Unresolved`])
+    sheet.mergeCells(headerRow.number, 1, headerRow.number, 9)
+    styleHeaderRow(headerRow, FILL_SECTION_HEADER)
+
+    for (const test of rows) {
+      const dataRow = sheet.addRow([
+        platform,
+        "Visual",
+        buildTcUrl(test.testId),
+        test.status,
+        "",
+        "",
+        "",
+        "",
+        "",
+      ])
+      const urlCell = dataRow.getCell(3)
+      urlCell.value = {
+        text: String(urlCell.value ?? ""),
+        hyperlink: buildTcUrl(test.testId),
+        tooltip: buildTcUrl(test.testId),
+      }
+      styleDataRow(dataRow)
+    }
+    if (rows.length === 0) {
+      sheet.addRow([])
+    }
   }
+
+  // ---------- Manual Execution placeholder ----------
   addSection("Manual Execution", [], "", "", "Failed")
 
   const buffer = await workbook.xlsx.writeBuffer()

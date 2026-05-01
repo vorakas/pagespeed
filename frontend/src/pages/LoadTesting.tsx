@@ -21,7 +21,7 @@ import {
   XCircle,
 } from "lucide-react"
 
-import { Header } from "@/components/layout/Header"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -562,12 +562,12 @@ export function LoadTesting() {
   }, [queue])
 
   return (
-    <div className="pb-8">
-      <Header
+    <>
+      <PageHeader
         title="Load Testing"
         description="Queue and orchestrate BlazeMeter load tests sequentially"
       />
-
+      <div className="pb-8">
       <div className="mx-3 mt-3 space-y-3">
         {/* ---------- Config status ---------- */}
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -1431,5 +1431,6 @@ export function LoadTesting() {
         )}
       </div>
     </div>
+    </>
   )
 }

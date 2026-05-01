@@ -295,6 +295,23 @@ export interface SkippedTest {
   zephyrUrl: string
 }
 
+// ---------- Applitools ----------
+//
+// The browser no longer talks to the Applitools API directly — Railway's
+// egress is blocked at the corporate firewall. Instead, a desktop helper
+// fetches batches and POSTs the rows to the Pharos backend; the dashboard
+// reads them back via ``GET /api/applitools/batch/<batch_id>``. So no
+// per-user ``ApplitoolsConfig`` lives in localStorage; only the test row
+// shape used by the spreadsheet export remains.
+
+export interface UnresolvedTest {
+  testId: string
+  testName: string
+  /** "Unresolved" or "Failed" — capitalized from the Eyes API status field. */
+  status: string
+  zephyrUrl: string
+}
+
 // ---------- BlazeMeter (Load Testing) ----------
 
 export interface BlazemeterConfigStatus {
@@ -1087,6 +1104,48 @@ export interface MigrationSnapshotDiffResponse {
   latest: MigrationSnapshot | null
   previous: MigrationSnapshot | null
   diff: MigrationSnapshotDiff | null
+}
+
+/**
+ * Tickets created and resolved on a given calendar day, sourced from
+ * raw Jira/Asana frontmatter timestamps. Independent of the orchestrator
+ * snapshot pipeline — see ``GET /api/dashboard/daily-activity``.
+ */
+export interface MigrationDailyActivity {
+  date: string
+  createdCount: number
+  resolvedCount: number
+  created: RawTaskRecord[]
+  resolved: RawTaskRecord[]
+}
+
+/**
+ * All raw tickets for a single project plus a status histogram.
+ * Backs the per-project dashboard page — see
+ * ``GET /api/dashboard/projects/<key>/tasks``.
+ */
+export interface MigrationProjectTasks {
+  project: string
+  total: number
+  active: number
+  resolved: number
+  statusCounts: MigrationTaskStatusRow[]
+  tasks: RawTaskRecord[]
+}
+
+/**
+ * One raw ticket's full content — frontmatter + markdown body. Backs
+ * the inline ticket drawer on the project page (clicking the key
+ * expands detail instead of jumping to Jira). See
+ * ``GET /api/dashboard/task-detail?relPath=…``.
+ */
+export interface MigrationTaskDetail {
+  relPath: string
+  name: string
+  frontmatter: Record<string, unknown>
+  body: string
+  size: number | null
+  modified: number | null
 }
 
 export interface MigrationHistoryEntry {

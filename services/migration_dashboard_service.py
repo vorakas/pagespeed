@@ -24,6 +24,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 from services.obsidian_sync.raw_scanner import (
     RawTask,
     RawTaskScanner,
+    daily_activity,
     new_bugs,
     production_failures,
     source_counts,
@@ -162,6 +163,70 @@ class MigrationDashboardService:
     def get_new_bugs(self, window_days: int = 7) -> List[dict]:
         return self._cached(f"newBugs:{window_days}", lambda: self._compute_new_bugs(window_days))
 
+    def get_daily_activity(self, on_date: date) -> dict:
+        """Return tickets created and resolved on ``on_date``.
+
+        Sourced from per-ticket ``created`` / ``resolved`` ISO date strings
+        in the raw frontmatter — so the result is always in sync with what
+        Jira/Asana actually have, regardless of whether the orchestrator's
+        daily status file populated its summary sections. Callers are
+        expected to pass a ``date`` already resolved in the user's
+        reporting timezone (typically Pacific) so the day boundary lines
+        up with the wall clock.
+        """
+        cache_key = f"dailyActivity:{on_date.isoformat()}"
+        return self._cached(cache_key, lambda: self._compute_daily_activity(on_date))
+
+    def get_task_detail(self, rel_path: str) -> dict:
+        """Return one raw ticket's full record — frontmatter + body markdown.
+
+        Used by the per-project ticket drawer: clicking the key on a row
+        expands inline detail instead of jumping to Jira. Reads through
+        :class:`VaultReader.read_page` so path validation (no ``..``,
+        within vault root, supported extension) is enforced consistently
+        with every other vault read endpoint.
+
+        Output shape mirrors what the frontend already expects from the
+        task dicts in :meth:`get_project_tasks`, plus a ``body`` field
+        carrying the markdown after the frontmatter so the drawer can
+        render the description / acceptance criteria / etc.
+        """
+        page = self._vault.read_page(rel_path)
+        fm = page.get("frontmatter") or {}
+        body = page.get("body") or ""
+        return {
+            "relPath": page.get("path"),
+            "name": page.get("name"),
+            "frontmatter": fm,
+            "body": body,
+            "size": page.get("size"),
+            "modified": page.get("modified"),
+        }
+
+    def get_project_tasks(self, project_key: str) -> dict:
+        """Return all raw tickets for a single project plus a status histogram.
+
+        Used by the per-project dashboard page. The ``project`` field on
+        each ``RawTask`` matches its top-level folder under ``raw/``
+        (e.g. ``ACE2E``, ``WPM``, ``LAMPSPLUS``); the ``asana`` source
+        flattens its sub-projects up so e.g. ``raw/asana/LAMPSPLUS/...``
+        becomes project=``LAMPSPLUS``.
+
+        Output shape:
+            {
+              "project": "ACE2E",
+              "total": 412,
+              "active": 187,
+              "resolved": 225,
+              "statusCounts": [{"status": "Open", "count": 132}, ...],
+              "tasks": [<all task dicts, newest-updated first>],
+            }
+        """
+        cache_key = f"projectTasks:{project_key}"
+        return self._cached(
+            cache_key, lambda: self._compute_project_tasks(project_key)
+        )
+
     def get_task_status(self) -> List[dict]:
         return self._cached("taskStatus", self._compute_task_status)
 
@@ -191,7 +256,39 @@ class MigrationDashboardService:
         return value
 
     def _raw_tasks(self) -> List[RawTask]:
-        return self._cached("raw_tasks", lambda: list(self._scanner.iter_tasks()))
+        return self._cached("raw_tasks", self._compute_raw_tasks)
+
+    def _compute_raw_tasks(self) -> List[RawTask]:
+        """Walk ``raw/`` and deduplicate by ticket key.
+
+        The Jira sync currently writes a brand-new file when a ticket is
+        renamed instead of replacing the old one (see
+        ``session_state.md`` — "Sync script creates a new file on rename
+        instead of updating the existing one"). So one ticket key can
+        end up with multiple frontmatter files on disk, and every
+        downstream caller — KPIs, daily activity, project pages, status
+        histograms — would double-count.
+
+        We keep one canonical record per key, picking the
+        lexicographically-smallest ``rel_path``. That's stable across
+        runs (no dependency on file mtime), tolerable when the duplicate
+        files have the same ticket data (the common case for whitespace-
+        only filename drift), and the user-visible effect is that
+        ``ACE2E-329`` etc. now each appear exactly once.
+
+        Records with no key (e.g. "Map of Content" docs) pass through
+        untouched; deduping on an empty key would collapse them all.
+        """
+        by_key: Dict[str, RawTask] = {}
+        no_key: List[RawTask] = []
+        for task in self._scanner.iter_tasks():
+            if not task.key:
+                no_key.append(task)
+                continue
+            existing = by_key.get(task.key)
+            if existing is None or task.rel_path < existing.rel_path:
+                by_key[task.key] = task
+        return list(by_key.values()) + no_key
 
     def _latest_status(self) -> Optional[StatusSnapshot]:
         return self._cached("latest_status", lambda: latest_status_snapshot(self._vault))
@@ -328,6 +425,48 @@ class MigrationDashboardService:
 
     def _compute_new_bugs(self, window_days: int) -> List[dict]:
         return [t.to_dict() for t in new_bugs(self._raw_tasks(), window_days=window_days)]
+
+    def _compute_daily_activity(self, on_date: date) -> dict:
+        activity = daily_activity(self._raw_tasks(), on_date=on_date)
+        return {
+            "date": on_date.isoformat(),
+            "createdCount": len(activity["created"]),
+            "resolvedCount": len(activity["resolved"]),
+            "created": [t.to_dict() for t in activity["created"]],
+            "resolved": [t.to_dict() for t in activity["resolved"]],
+        }
+
+    def _compute_project_tasks(self, project_key: str) -> dict:
+        # Filter raw tasks to this project. Pre-collect into a list since
+        # we walk it twice (histogram + serialization) and the iterator
+        # would be exhausted after the first pass.
+        tasks = [t for t in self._raw_tasks() if t.project == project_key]
+        # Newest-updated first; tickets without an `updated` date sink to
+        # the bottom rather than crashing on None comparisons.
+        tasks.sort(key=lambda t: (t.updated or "", t.key), reverse=True)
+
+        hist = status_histogram(tasks)
+        status_counts = [
+            {
+                "status": status,
+                "count": count,
+                "color": _STATUS_COLOR_MAP.get(status.lower(), "neutral"),
+                "group": _STATUS_GROUP_MAP.get(status.lower(), "backlog"),
+            }
+            for status, count in hist.items()
+        ]
+
+        active = sum(1 for t in tasks if not t.is_resolved)
+        resolved = len(tasks) - active
+
+        return {
+            "project": project_key,
+            "total": len(tasks),
+            "active": active,
+            "resolved": resolved,
+            "statusCounts": status_counts,
+            "tasks": [t.to_dict() for t in tasks],
+        }
 
     def _compute_task_status(self) -> List[dict]:
         hist = status_histogram(self._raw_tasks(), project=_ACE2E_PROJECT_KEY)

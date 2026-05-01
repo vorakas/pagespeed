@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { WorkstreamRail } from "@/components/launch-dashboard/WorkstreamRail"
+import { useDashboardLinks } from "@/lib/dashboard-links"
 import type {
   MigrationBlocker,
   MigrationWorkstream,
@@ -29,6 +30,16 @@ import type {
 // items, key risks, burndown chart, dev workload, recent activity,
 // decisions, and cross-refs.
 
+/**
+ * Body of the Workstream Detail page — full markdown-driven layout
+ * (overview, sources, scope, epics, 8-bucket progress, active items,
+ * key risks, burndown, dev workload, recent activity, decisions,
+ * cross-refs) inside `LaunchShell` so all `.launch-dashboard .lcc-*`
+ * and `--lcc-*` token references resolve. The Aurora prototype at
+ * `/prototype/dashboard-workstream/aurora/:id` mounts this body inside
+ * `BeaconLayout`; production renders it directly under `AppLayout`.
+ * No internal logic changed during the extraction.
+ */
 export function WorkstreamDetail() {
   const { id = "" } = useParams<{ id: string }>()
   const [detail, setDetail] = useState<MigrationWorkstreamDetail | null>(null)
@@ -817,6 +828,7 @@ function DecisionsPanel({ md }: { md: WorkstreamMdPayload }) {
 // ── Cross-refs ────────────────────────────────────────────────────────
 
 function CrossRefsPanel({ md }: { md: WorkstreamMdPayload }) {
+  const links = useDashboardLinks()
   return (
     <section className="panel">
       <h3 style={panelHeadStyle}>
@@ -825,7 +837,7 @@ function CrossRefsPanel({ md }: { md: WorkstreamMdPayload }) {
       <ul style={listResetStyle}>
         {md.crossRefs.map((x, i) => (
           <li key={`${x.ws}-${i}`} style={crossRefRowStyle}>
-            <Link to={`/dashboard/workstreams/${x.ws}`} style={crossRefLinkStyle}>
+            <Link to={links.workstreamPath(x.ws)} style={crossRefLinkStyle}>
               {x.ws}
             </Link>
             <span style={{ color: "var(--lcc-text-dim)", fontSize: 12 }}>{x.area}</span>

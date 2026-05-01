@@ -1,29 +1,53 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import type { MigrationKpis, MigrationWorkstream } from "@/types"
+import { ChevronDown, ChevronRight } from "lucide-react"
+import { formatPacificDate } from "@/lib/datetime"
+import { useDashboardLinks } from "@/lib/dashboard-links"
+import type {
+  MigrationBlocker,
+  MigrationSource,
+  MigrationWorkstream,
+  RawTaskRecord,
+} from "@/types"
 
 interface LeftRailProps {
-  kpis: MigrationKpis | null
+  sources: MigrationSource[] | null
   workstreams: MigrationWorkstream[] | null
+  blockers: MigrationBlocker[] | null
+  prodFailures: RawTaskRecord[] | null
   vaultLastSynced: string | null
 }
 
 /**
- * Sticky left rail: at-a-glance KPIs + a ranked "Needs attention" shortlist.
+ * Sticky left rail: a Projects list (primary nav) + a collapsed
+ * Rollups section (workstreams, demoted).
  *
- * The shortlist replaces the old Areas filter — most workstreams fell under
- * "Unsorted" because the status page's Project Health by Area table only
- * categorized ~8 of 34, and the Workstreams picker rail already covers
- * per-area navigation. This surfaces the top handful of workstreams with
- * open blockers / failed QA / risky status so the dashboard gives an
- * actionable triage queue instead of a cold filter list.
+ * The KPI summary that used to sit at the top now lives in the hero
+ * strip, freeing this rail to act as a pure project navigator. Each
+ * project row carries a red/amber/green status dot derived from its
+ * incident footprint (prod fail → red, open blocker → amber, else
+ * green) so health is readable without opening the project.
  */
 export function LeftRail({
-  kpis,
+  sources,
   workstreams,
+  blockers,
+  prodFailures,
   vaultLastSynced,
 }: LeftRailProps) {
   const navigate = useNavigate()
+  const links = useDashboardLinks()
+  const [rollupsOpen, setRollupsOpen] = useState(false)
+
+  const sortedProjects = useMemo(() => {
+    if (!sources) return []
+    return [...sources].sort((a, b) => b.total - a.total)
+  }, [sources])
+
+  const projectStatus = useMemo(
+    () => buildProjectStatusMap(sortedProjects, blockers, prodFailures),
+    [sortedProjects, blockers, prodFailures],
+  )
 
   const needsAttention = useMemo(() => {
     if (!workstreams) return []
@@ -31,98 +55,79 @@ export function LeftRail({
       .map((ws) => ({ ws, score: attentionScore(ws) }))
       .filter(({ score }) => score > 0)
     scored.sort((a, b) => b.score - a.score)
-    return scored.slice(0, 7)
+    return scored.slice(0, 5)
   }, [workstreams])
 
   return (
     <aside className="lcc-left-rail">
       <div className="lcc-lr-section">
-        <div className="lcc-lr-label">At a glance</div>
-        <div className="lcc-lr-stat">
-          <div className="lcc-lr-stat-num">{fmt(kpis?.combinedUnique)}</div>
-          <div className="lcc-lr-stat-sub">Combined unique tasks</div>
+        <div className="lcc-lr-label">
+          Projects
+          {sortedProjects.length > 0 && (
+            <span className="lcc-lr-label-count">{sortedProjects.length}</span>
+          )}
         </div>
-        <div className="lcc-lr-stat-row">
-          <div className="lcc-lr-stat-mini" data-tone="green">
-            <div className="v">{kpis?.resolvedPct ?? "—"}%</div>
-            <div className="l">Resolved</div>
-          </div>
-          <div className="lcc-lr-stat-mini" data-tone="red">
-            <div className="v">{fmt(kpis?.productionFailures)}</div>
-            <div className="l">Prod fail</div>
-          </div>
-        </div>
-        <div className="lcc-lr-stat-row">
-          <div className="lcc-lr-stat-mini" data-tone="amber">
-            <div className="v">{fmt(kpis?.openBlockers)}</div>
-            <div className="l">Blockers</div>
-          </div>
-          <div className="lcc-lr-stat-mini" data-tone="red">
-            <div className="v">{fmt(kpis?.newBugs24h)}</div>
-            <div className="l">New / 24h</div>
-          </div>
-        </div>
+        {sortedProjects.length === 0 ? (
+          <div className="lcc-lr-empty">No source feeds.</div>
+        ) : (
+          sortedProjects.map((src) => (
+            <ProjectRow
+              key={src.key}
+              source={src}
+              tone={projectStatus[src.key] ?? "green"}
+              onOpen={() => navigate(links.projectPath(src.key))}
+            />
+          ))
+        )}
       </div>
 
       <div className="lcc-lr-section">
-        <div className="lcc-lr-label">
-          Needs attention
+        <button
+          type="button"
+          className="lcc-lr-label"
+          onClick={() => setRollupsOpen((v) => !v)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            background: "transparent",
+            border: 0,
+            padding: 0,
+            cursor: "pointer",
+            color: "inherit",
+            font: "inherit",
+            width: "100%",
+          }}
+          aria-expanded={rollupsOpen}
+        >
+          {rollupsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          Rollups
           {needsAttention.length > 0 && (
             <span className="lcc-lr-label-count">{needsAttention.length}</span>
           )}
-        </div>
-        {needsAttention.length === 0 ? (
-          <div className="lcc-lr-empty">No open blockers or at-risk streams.</div>
-        ) : (
-          needsAttention.map(({ ws }) => (
-            <button
-              key={ws.id}
-              type="button"
-              className="lcc-lr-area"
-              onClick={() => navigate(`/dashboard/workstreams/${ws.id}`)}
-              title={ws.name}
+        </button>
+        {rollupsOpen && (
+          <>
+            {needsAttention.length === 0 ? (
+              <div className="lcc-lr-empty">No at-risk rollups.</div>
+            ) : (
+              needsAttention.map(({ ws }) => (
+                <RollupRow
+                  key={ws.id}
+                  workstream={ws}
+                  onOpen={() => navigate(links.workstreamPath(ws.id))}
+                />
+              ))
+            )}
+            <div
+              className="lcc-lr-empty"
+              style={{ marginTop: 6, fontStyle: "italic" }}
             >
-              <span
-                className="lcc-lr-dot"
-                data-tone={toneForStatus(ws.status)}
-                aria-hidden
-              />
-              <span className="lcc-lr-area-name">{ws.name}</span>
-              <span className="lcc-lr-area-meta">
-                {ws.blockedCount > 0 && (
-                  <span className="lcc-lr-area-risk" title={`${ws.blockedCount} blocker(s)`}>
-                    {ws.blockedCount}
-                  </span>
-                )}
-                {ws.failedQa > 0 && (
-                  <span
-                    className="lcc-lr-area-count"
-                    data-tone="amber"
-                    title={`${ws.failedQa} failed QA`}
-                  >
-                    {ws.failedQa}
-                  </span>
-                )}
-              </span>
-            </button>
-          ))
+              Workstreams are an editorial cross-project view. Numbers here
+              aggregate the project feeds above.
+            </div>
+          </>
         )}
-        <div className="lcc-lr-legend">
-          <div className="lcc-lr-legend-row">
-            <span className="lcc-lr-dot" data-tone="red" aria-hidden />
-            <span>blocked</span>
-            <span className="lcc-lr-dot" data-tone="amber" aria-hidden />
-            <span>at-risk</span>
-            <span className="lcc-lr-dot" data-tone="green" aria-hidden />
-            <span>on-track</span>
-          </div>
-          <div className="lcc-lr-legend-row">
-            <span className="lcc-lr-area-risk">N</span>
-            <span>blockers</span>
-            <span className="lcc-lr-area-count" data-tone="amber">N</span>
-            <span>failed QA</span>
-          </div>
-        </div>
       </div>
 
       <div className="lcc-lr-section">
@@ -130,16 +135,100 @@ export function LeftRail({
         <div className="lcc-lr-crumb">obsidian-vault</div>
         <div className="lcc-lr-crumb">└ /api/dashboard</div>
         <div className="lcc-lr-crumb">
-          └ {vaultLastSynced ? `synced ${new Date(vaultLastSynced).toLocaleDateString()}` : "not synced"}
+          └ {vaultLastSynced ? `synced ${formatPacificDate(vaultLastSynced)}` : "not synced"}
         </div>
       </div>
     </aside>
   )
 }
 
-function fmt(n: number | null | undefined): string {
-  if (n == null) return "—"
-  return Number(n).toLocaleString()
+interface ProjectRowProps {
+  source: MigrationSource
+  tone: ProjectTone
+  onOpen: () => void
+}
+
+function ProjectRow({ source, tone, onOpen }: ProjectRowProps) {
+  return (
+    <button
+      type="button"
+      className="lcc-lr-area"
+      onClick={onOpen}
+      title={`${source.name} — ${source.total.toLocaleString()} tasks`}
+    >
+      <span className="lcc-lr-dot" data-tone={tone} aria-hidden />
+      <span className="lcc-lr-area-name">{source.key}</span>
+      <span className="lcc-lr-area-meta">
+        <span className="lcc-lr-area-count">
+          {source.total.toLocaleString()}
+        </span>
+      </span>
+    </button>
+  )
+}
+
+interface RollupRowProps {
+  workstream: MigrationWorkstream
+  onOpen: () => void
+}
+
+function RollupRow({ workstream: ws, onOpen }: RollupRowProps) {
+  return (
+    <button
+      type="button"
+      className="lcc-lr-area"
+      onClick={onOpen}
+      title={ws.name}
+    >
+      <span className="lcc-lr-dot" data-tone={toneForStatus(ws.status)} aria-hidden />
+      <span className="lcc-lr-area-name">{ws.name}</span>
+      <span className="lcc-lr-area-meta">
+        {ws.blockedCount > 0 && (
+          <span className="lcc-lr-area-risk" title={`${ws.blockedCount} blocker(s)`}>
+            {ws.blockedCount}
+          </span>
+        )}
+        {ws.failedQa > 0 && (
+          <span
+            className="lcc-lr-area-count"
+            data-tone="amber"
+            title={`${ws.failedQa} failed QA`}
+          >
+            {ws.failedQa}
+          </span>
+        )}
+      </span>
+    </button>
+  )
+}
+
+type ProjectTone = "red" | "amber" | "green"
+
+function buildProjectStatusMap(
+  projects: MigrationSource[],
+  blockers: MigrationBlocker[] | null,
+  prodFailures: RawTaskRecord[] | null,
+): Record<string, ProjectTone> {
+  const out: Record<string, ProjectTone> = {}
+  for (const p of projects) {
+    const upper = p.key.toUpperCase()
+    const hasProdFail = (prodFailures ?? []).some(
+      (t) =>
+        t.project?.toUpperCase() === upper ||
+        t.key?.toUpperCase().startsWith(`${upper}-`),
+    )
+    if (hasProdFail) {
+      out[p.key] = "red"
+      continue
+    }
+    const hasBlocker = (blockers ?? []).some(
+      (b) =>
+        b.id?.toUpperCase().startsWith(`${upper}-`) ||
+        b.affects?.some((a) => a?.toUpperCase().includes(upper)),
+    )
+    out[p.key] = hasBlocker ? "amber" : "green"
+  }
+  return out
 }
 
 function attentionScore(ws: MigrationWorkstream): number {

@@ -3,13 +3,11 @@ import { useLocation } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
-import { TopBar, type HealthFilter } from "@/components/launch-dashboard/TopBar"
+import { TopBar } from "@/components/launch-dashboard/TopBar"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import { HeroStrip } from "@/components/launch-dashboard/HeroStrip"
 import { TrendChart } from "@/components/launch-dashboard/TrendChart"
 import { TaskStatusStrip } from "@/components/launch-dashboard/TaskStatusStrip"
-import { TeamsStrip } from "@/components/launch-dashboard/TeamsStrip"
-import { SourcesStrip } from "@/components/launch-dashboard/SourcesStrip"
 import {
   IncidentStream,
   type IncidentFilter,
@@ -25,12 +23,20 @@ import type {
   MigrationSnapshotDiffResponse,
   MigrationSource,
   MigrationTaskStatusRow,
-  MigrationTeam,
   MigrationTrendPoint,
   MigrationWorkstream,
   RawTaskRecord,
 } from "@/types"
 
+/**
+ * Body of the Launch Command Center — the entire dashboard tree from
+ * TopBar through SidePanel, scoped under `LaunchShell` so all the
+ * `.launch-dashboard .lcc-*` rules in `aurora-glass.css` resolve. The
+ * Aurora prototype at `/prototype/dashboard-launch/aurora` mounts this
+ * body inside `BeaconLayout`; the production export below renders it
+ * directly under `AppLayout`. No internal logic was changed during the
+ * extraction — only the function name.
+ */
 export function LaunchDashboard() {
   const [health, setHealth] = useState<MigrationHealthSnapshot | null>(null)
   const [kpis, setKpis] = useState<MigrationKpis | null>(null)
@@ -40,13 +46,11 @@ export function LaunchDashboard() {
   const [newBugs, setNewBugs] = useState<RawTaskRecord[] | null>(null)
   const [taskStatus, setTaskStatus] = useState<MigrationTaskStatusRow[] | null>(null)
   const [trend, setTrend] = useState<MigrationTrendPoint[] | null>(null)
-  const [teams, setTeams] = useState<MigrationTeam[] | null>(null)
   const [sources, setSources] = useState<MigrationSource[] | null>(null)
   const [snapshotDiff, setSnapshotDiff] = useState<MigrationSnapshotDiffResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  const [filter, setFilter] = useState<HealthFilter>("all")
   const location = useLocation()
 
   useEffect(() => {
@@ -85,7 +89,7 @@ export function LaunchDashboard() {
         await fetch("/api/dashboard/cache/invalidate", { method: "POST" }).catch(() => null)
         await fetch("/api/dashboard/snapshots/reingest", { method: "POST" }).catch(() => null)
       }
-      const [h, k, ws, bl, pf, nb, ts, tr, tm, sr, sd] = await Promise.all([
+      const [h, k, ws, bl, pf, nb, ts, tr, sr, sd] = await Promise.all([
         api.getMigrationHealth(),
         api.getMigrationKpis(),
         api.getMigrationWorkstreams(),
@@ -94,7 +98,6 @@ export function LaunchDashboard() {
         api.getMigrationNewBugs(),
         api.getMigrationTaskStatus(),
         api.getMigrationTrend(),
-        api.getMigrationTeams(),
         api.getMigrationSources(),
         // Snapshots may be empty on a fresh DB — swallow 503/404 and keep the rest.
         api.getMigrationSnapshotDiff().catch(() => null),
@@ -107,7 +110,6 @@ export function LaunchDashboard() {
       setNewBugs(nb)
       setTaskStatus(ts)
       setTrend(tr)
-      setTeams(tm)
       setSources(sr)
       setSnapshotDiff(sd)
     } catch (err) {
@@ -169,27 +171,25 @@ export function LaunchDashboard() {
     <LaunchShell>
       <TopBar
         health={health}
-        filter={filter}
-        onFilterChange={setFilter}
         onRefresh={() => void loadAll(true)}
         refreshing={refreshing}
       />
       <div className="lcc-shell">
         <LeftRail
-          kpis={kpis}
+          sources={sources}
           workstreams={workstreams}
+          blockers={blockers}
+          prodFailures={prodFailures}
           vaultLastSynced={health.lastSynced}
         />
 
         <main className="lcc-main">
-          <HeroStrip health={health} />
+          <HeroStrip health={health} kpis={kpis} />
 
-          {snapshotDiff?.latest && snapshotDiff.diff && (
-            <WhatChangedToday latest={snapshotDiff.latest} diff={snapshotDiff.diff} />
-          )}
+          <WhatChangedToday />
 
           {snapshotDiff?.latest && (
-            <DailyStatusSummary snapshot={snapshotDiff.latest} workstreams={workstreams} />
+            <DailyStatusSummary snapshot={snapshotDiff.latest} sources={sources} />
           )}
 
           <div
@@ -201,11 +201,6 @@ export function LaunchDashboard() {
           >
             {trend && <TrendChart rows={trend} />}
             {taskStatus && <TaskStatusStrip rows={taskStatus} />}
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            {teams && <TeamsStrip rows={teams} />}
-            {sources && <SourcesStrip rows={sources} />}
           </div>
         </main>
 
@@ -223,3 +218,4 @@ export function LaunchDashboard() {
     </LaunchShell>
   )
 }
+

@@ -7,9 +7,14 @@ so the dashboard can poll freely.
 
 from __future__ import annotations
 
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
 from flask import Blueprint, jsonify, request
 
+from config import VAULT_ACTIVE_HOURS_TZ
 from services.migration_dashboard_service import MigrationDashboardService
+from services.obsidian_sync.vault_reader import VaultNotFoundError, VaultPathError
 from services.snapshot_service import SnapshotService, diff_snapshots
 
 
@@ -62,6 +67,66 @@ def create_dashboard_blueprint(
             return jsonify({"error": "vault not found"}), 404
         window = int(request.args.get("windowDays", "7"))
         return jsonify(service.get_new_bugs(window_days=window))
+
+    @bp.route("/api/dashboard/task-detail", methods=["GET"])
+    def task_detail():
+        """Return one raw ticket's full record (frontmatter + body markdown).
+
+        Backs the per-row drawer on the project page: clicking the ticket
+        key expands inline detail instead of jumping to Jira. Pass the
+        ``relPath`` of the raw .md file (matching the value the project-
+        tasks endpoint returns on each task).
+        """
+        if not service.is_available():
+            return jsonify({"error": "vault not found"}), 404
+        rel_path = request.args.get("relPath")
+        if not rel_path:
+            return jsonify({"error": "relPath query parameter is required"}), 400
+        try:
+            return jsonify(service.get_task_detail(rel_path))
+        except VaultNotFoundError:
+            return jsonify({"error": "vault not found"}), 404
+        except VaultPathError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @bp.route("/api/dashboard/projects/<path:project_key>/tasks", methods=["GET"])
+    def project_tasks(project_key: str):
+        """All raw tickets for a single project, newest-updated first.
+
+        Backs the per-project dashboard page. ``project_key`` is the
+        top-level folder name under ``raw/`` (e.g. ``ACE2E``, ``WPM``,
+        ``LAMPSPLUS``). Unknown keys return an empty task list rather
+        than 404, since that's how the page surfaces "this project has
+        no synced tickets yet" without an error state.
+        """
+        if not service.is_available():
+            return jsonify({"error": "vault not found"}), 404
+        return jsonify(service.get_project_tasks(project_key))
+
+    @bp.route("/api/dashboard/daily-activity", methods=["GET"])
+    def daily_activity():
+        """Tickets created and resolved on a given day, from raw timestamps.
+
+        Date defaults to today in the configured reporting timezone
+        (Pacific by default), so "today" rolls over at PT midnight to
+        match the user's wall clock. Pass ``?date=YYYY-MM-DD`` to look
+        at any prior day.
+        """
+        if not service.is_available():
+            return jsonify({"error": "vault not found"}), 404
+        date_param = request.args.get("date")
+        if date_param:
+            try:
+                on_date = date.fromisoformat(date_param)
+            except ValueError:
+                return jsonify({"error": f"invalid date: {date_param!r}"}), 400
+        else:
+            try:
+                tz = ZoneInfo(VAULT_ACTIVE_HOURS_TZ)
+            except Exception:
+                tz = ZoneInfo("America/Los_Angeles")
+            on_date = datetime.now(tz).date()
+        return jsonify(service.get_daily_activity(on_date))
 
     @bp.route("/api/dashboard/task-status", methods=["GET"])
     def task_status():

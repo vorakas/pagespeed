@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { Header } from "@/components/layout/Header"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { DevOpsConfigPanel } from "@/components/builds/DevOpsConfigPanel"
+import { ApplitoolsConfigPanel } from "@/components/builds/ApplitoolsConfigPanel"
 import { PipelineMapper } from "@/components/builds/PipelineMapper"
 import { OrchestratorPanel } from "@/components/builds/OrchestratorPanel"
 import { BuildGrid } from "@/components/builds/BuildGrid"
@@ -8,14 +9,14 @@ import { BuildResultsPanel, type PanelMode } from "@/components/builds/BuildResu
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import { useLocalConfig } from "@/hooks/use-local-config"
 import { api, RateLimitError } from "@/services/api"
-import type { DevOpsConfig, DevOpsBuild, FailedTest, SkippedTest } from "@/types"
+import type { DevOpsConfig, DevOpsBuild, FailedTest, SkippedTest, UnresolvedTest } from "@/types"
 import type { SheetEntry } from "@/services/spreadsheetExport"
 
 const DEFAULT_DEVOPS_CONFIG: DevOpsConfig = {
   pat: "",
   organization: "LampsPlus",
   project: "TestAutomation",
-  orchestratorPipelineId: null,
+  orchestratorPipelineId: 261,
   pipelineMap: {
     WarmUp: 219,
     Windows_Functional: 167,
@@ -47,6 +48,22 @@ const MAX_POLL_INTERVAL_MS = 120_000
 export function Builds() {
   const [config, setConfig] = useLocalConfig<DevOpsConfig>("devOpsConfig", DEFAULT_DEVOPS_CONFIG)
   const [serverManaged, setServerManaged] = useState(false)
+  // Applitools batch id per Visual role key — cleared per session since
+  // Applitools generates a fresh batch id for every run. The actual
+  // batch rows are fetched by the desktop helper (which has corporate-
+  // network access) and uploaded to /api/applitools/upload-batch; the
+  // browser then reads them back from /api/applitools/batch/<id>.
+  const [applitoolsBatchIds, setApplitoolsBatchIds] = useState<Record<string, string>>({})
+  // Helper-uploaded batches surfaced as autocomplete options in the
+  // batch-id input. Polled lightly so a fresh helper run shows up
+  // without a page refresh.
+  const [recentApplitoolsBatches, setRecentApplitoolsBatches] = useState<Array<{
+    batchId: string
+    fetchedAt: string
+    uploadedAt: number
+    platform: string | null
+    testCount: number
+  }>>([])
   const [connected, setConnected] = useState(false)
   const [autoConnecting, setAutoConnecting] = useState(false)
   const [recentBuilds, setRecentBuilds] = useState<Record<string, DevOpsBuild[]>>({})
@@ -469,6 +486,7 @@ export function Builds() {
     if (!build) return
     const platform = roleKey === "WarmUp" ? "Windows" : roleKey.split("_")[0]
     const type = roleKey === "WarmUp" ? "Warmup" : roleKey.split("_")[1] || "Functional"
+    const isVisual = roleKey.endsWith("_Visual")
 
     // Use cached data or fetch on demand
     let failed = failedTestsCache[build.id] ?? []
@@ -499,25 +517,72 @@ export function Builds() {
       !t.errorMessage?.includes("Baseline visual test failed and comparison test shouldn't be executed")
     )
 
+    // Applitools unresolved rows — Visual cards only. The browser asks
+    // the backend whether the desktop helper has uploaded results for
+    // this batch id; missing uploads return null and we just skip the
+    // section so the rest of the spreadsheet is still useful.
+    let unresolved: UnresolvedTest[] = []
+    if (isVisual) {
+      const batchId = applitoolsBatchIds[roleKey]?.trim()
+      if (batchId) {
+        try {
+          const cached = await api.getApplitoolsBatch(batchId)
+          if (cached) unresolved = cached.tests
+        } catch (err) {
+          console.warn(`Applitools lookup failed for ${roleKey}:`, err)
+        }
+      }
+    }
+
     setSheetData((prev) => {
       const next = new Map(prev)
-      next.set(roleKey, { roleKey, platform, type, failed: filteredFailed, skipped })
+      next.set(roleKey, {
+        roleKey, platform, type,
+        failed: filteredFailed,
+        skipped,
+        unresolved,
+      })
       return next
     })
-  }, [builds, config, failedTestsCache, skippedTestsCache])
+  }, [builds, config, failedTestsCache, skippedTestsCache, applitoolsBatchIds])
 
   const handleSheetClear = useCallback(() => {
     setSheetData(new Map())
   }, [])
 
+  const handleApplitoolsBatchIdChange = useCallback((roleKey: string, value: string) => {
+    setApplitoolsBatchIds((prev) => ({ ...prev, [roleKey]: value }))
+  }, [])
+
+  // Pull the helper-upload list on mount, when the window regains
+  // focus (likely just-after a helper run), and every 30s while the
+  // tab is open. The endpoint is cheap (metadata only, no test rows)
+  // and unauthenticated, so polling without backoff is fine.
+  useEffect(() => {
+    let cancelled = false
+    const refresh = () => {
+      api.getRecentApplitoolsBatches()
+        .then((list) => { if (!cancelled) setRecentApplitoolsBatches(list) })
+        .catch(() => {})
+    }
+    refresh()
+    const interval = setInterval(refresh, 30_000)
+    window.addEventListener("focus", refresh)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      window.removeEventListener("focus", refresh)
+    }
+  }, [])
+
   return (
     <>
-      <Header
+      <PageHeader
         title="Automation Builds"
         description="Trigger and monitor Azure DevOps automation builds"
       />
 
-      <div className="space-y-6 p-6">
+      <div className="beacon space-y-6 p-6">
         {/* Config — only shown when the server hasn't supplied a PAT. When
             DEVOPS_PAT is set on the backend, every user is auto-connected
             and the panel is hidden so nobody has to paste credentials. */}
@@ -529,19 +594,34 @@ export function Builds() {
           />
         )}
 
+        {/* Applitools config — collapsed by default; QA rarely touches it
+            after initial setup since the API key is stable. */}
+        <details className="rounded border border-border bg-card">
+          <summary className="beacon-summary cursor-pointer px-4 py-3 text-muted-foreground hover:text-foreground">
+            APPLITOOLS CONFIGURATION
+          </summary>
+          <div className="px-4 pb-4">
+            <ApplitoolsConfigPanel />
+          </div>
+        </details>
+
         {rateLimited && (
-          <div className="mx-6 mt-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-300">
-            Azure DevOps rate limit reached — polling slowed to {Math.round(pollIntervalRef.current / 1000)}s.
-            It will resume normal speed automatically.
+          <div className="beacon-banner">
+            <span className="beacon-dot beacon-dot--pulse" style={{ color: "var(--beacon-amber)" }} aria-hidden />
+            <span>
+              Azure DevOps rate limit reached — polling slowed to{" "}
+              <span className="beacon-mono">{Math.round(pollIntervalRef.current / 1000)}s</span>.
+              It will resume normal speed automatically.
+            </span>
           </div>
         )}
 
         {connected && (
           <>
             {/* Pipeline mapping — collapsed by default, rarely needed */}
-            <details className="rounded-lg border border-border bg-card shadow-sm">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
-                Pipeline Mapping (advanced)
+            <details className="rounded border border-border bg-card">
+              <summary className="beacon-summary cursor-pointer px-4 py-3 text-muted-foreground hover:text-foreground">
+                PIPELINE MAPPING (ADVANCED)
               </summary>
               <div className="px-4 pb-4">
                 <PipelineMapper config={config} onConfigChange={setConfig} />
@@ -590,6 +670,9 @@ export function Builds() {
                   triggerErrors={triggerErrors}
                   cancellingKeys={cancellingKeys}
                   selectedBuildId={selectedBuild?.id}
+                  applitoolsBatchIds={applitoolsBatchIds}
+                  onApplitoolsBatchIdChange={handleApplitoolsBatchIdChange}
+                  recentApplitoolsBatches={recentApplitoolsBatches}
                 />
               </div>
 

@@ -32,11 +32,13 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
   const totals = useMemo(() => {
     let failed = 0
     let skipped = 0
+    let unresolved = 0
     sheetData.forEach((entry) => {
       failed += entry.failed.length
       skipped += entry.skipped.length
+      unresolved += entry.unresolved.length
     })
-    return { failed, skipped }
+    return { failed, skipped, unresolved }
   }, [sheetData])
 
   const handleDownload = useCallback(async () => {
@@ -49,20 +51,20 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
       <CardContent className="p-3 flex flex-col flex-1 min-h-0 gap-2">
         {/* Header */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <FileSpreadsheet className="h-4 w-4 text-score-good" />
-          <p className="text-sm font-medium text-foreground">Spreadsheet Export</p>
+          <FileSpreadsheet className="h-4 w-4" style={{ color: "var(--beacon-amber)" }} />
+          <p className="text-sm beacon-headline">Spreadsheet Export</p>
           {prefetchingTests && (
-            <span className="flex items-center gap-1 ml-auto text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1 ml-auto beacon-label">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Loading data...
+              LOADING
             </span>
           )}
         </div>
 
         {/* Release name input */}
         <div className="shrink-0">
-          <label className="text-[10px] text-muted-foreground" htmlFor="release-name">
-            Release / Tab Name
+          <label className="beacon-label" htmlFor="release-name">
+            RELEASE / TAB NAME
           </label>
           <input
             id="release-name"
@@ -70,7 +72,7 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
             placeholder="e.g. LPv310.0"
             value={releaseName}
             onChange={(e) => setReleaseName(e.target.value)}
-            className="mt-0.5 h-7 w-full rounded border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-sidebar-primary"
+            className="mt-1 h-7 w-full rounded border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
 
@@ -83,34 +85,48 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
             <table className="w-full text-[11px] table-fixed">
               <colgroup>
                 <col />
+                <col className="w-14" />
                 <col className="w-16" />
-                <col className="w-20" />
+                <col className="w-16" />
               </colgroup>
               <thead className="sticky top-0 z-10 bg-muted/50">
                 <tr>
-                  <th className="px-2 py-1 text-left font-medium text-muted-foreground">Build</th>
-                  <th className="px-2 py-1 text-right font-medium text-muted-foreground">Failed</th>
-                  <th className="px-2 py-1 text-right font-medium text-muted-foreground">Skipped</th>
+                  <th className="px-2 py-1 text-left beacon-label">BUILD</th>
+                  <th className="px-2 py-1 text-right beacon-label">FAIL</th>
+                  <th className="px-2 py-1 text-right beacon-label">SKIP</th>
+                  <th className="px-2 py-1 text-right beacon-label">UNRES</th>
                 </tr>
               </thead>
               <tbody>
                 {DISPLAY_ORDER.filter((d) => sheetData.has(d.key)).map((d) => {
                   const entry = sheetData.get(d.key)!
+                  const isVisual = d.key.endsWith("_Visual")
                   return (
                     <tr key={d.key} className="border-t border-border">
-                      <td className="px-2 py-0.5 text-foreground">{d.label}</td>
-                      <td className="px-2 py-0.5 text-right tabular-nums">
+                      <td className="px-2 py-0.5 text-foreground beacon-mono">{d.label}</td>
+                      <td className="px-2 py-0.5 text-right beacon-mono">
                         {entry.failed.length > 0 ? (
                           <span className="text-score-poor">{entry.failed.length}</span>
                         ) : (
                           <span className="text-muted-foreground">0</span>
                         )}
                       </td>
-                      <td className="px-2 py-0.5 text-right tabular-nums">
+                      <td className="px-2 py-0.5 text-right beacon-mono">
                         {entry.skipped.length > 0 ? (
                           <span className="text-amber-500">{entry.skipped.length}</span>
                         ) : (
                           <span className="text-muted-foreground">0</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-0.5 text-right beacon-mono">
+                        {isVisual ? (
+                          entry.unresolved.length > 0 ? (
+                            <span className="text-blue-500">{entry.unresolved.length}</span>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                     </tr>
@@ -118,10 +134,11 @@ export function SpreadsheetWidget({ sheetData, onClear, prefetchingTests }: Spre
                 })}
               </tbody>
               <tfoot className="sticky bottom-0 z-10 bg-muted/50">
-                <tr className="border-t border-border font-medium">
-                  <td className="px-2 py-1 text-foreground">Total</td>
-                  <td className="px-2 py-1 text-right tabular-nums text-score-poor">{totals.failed}</td>
-                  <td className="px-2 py-1 text-right tabular-nums text-amber-500">{totals.skipped}</td>
+                <tr className="border-t font-medium" style={{ borderColor: "var(--beacon-amber-line)" }}>
+                  <td className="px-2 py-1 beacon-label">TOTAL</td>
+                  <td className="px-2 py-1 text-right beacon-mono text-score-poor">{totals.failed}</td>
+                  <td className="px-2 py-1 text-right beacon-mono text-amber-500">{totals.skipped}</td>
+                  <td className="px-2 py-1 text-right beacon-mono text-blue-500">{totals.unresolved}</td>
                 </tr>
               </tfoot>
             </table>
