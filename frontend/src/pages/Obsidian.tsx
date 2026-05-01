@@ -9,7 +9,7 @@ import type {
   ObsidianVaultPage,
 } from "@/types"
 import { Button } from "@/components/ui/button"
-import { BeaconHeader } from "@/components/layout/BeaconHeader"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { cn } from "@/lib/utils"
 
 /**
@@ -164,7 +164,7 @@ export function Obsidian() {
 
   return (
     <>
-      <BeaconHeader
+      <PageHeader
         title="Obsidian Bridge"
         description="Sync Jira and Asana into the LLM-maintained Adobe Commerce migration vault."
       />

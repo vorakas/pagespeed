@@ -66,17 +66,27 @@ const NAV: NavSection[] = [
   },
 ]
 
-interface BeaconSidebarProps {
-  /** Path of the active nav item. */
+interface AppSidebarProps {
+  /** Path of the active nav item — typically `useLocation().pathname`,
+   *  optionally with a `#hash` appended for hash-link items like
+   *  /dashboard#incidents. */
   activePath: string
-  /** Polling state (kept for API compatibility — no longer drives the
-   *  brand mark animation since the static Pharos logo is used). */
-  polling: boolean
 }
 
 const BASE_URL = import.meta.env.BASE_URL
 
-export function BeaconSidebar({ activePath }: BeaconSidebarProps) {
+/**
+ * Pharos sidebar — left-rail navigation rendered by the production
+ * `AppLayout`. The class name `.beacon-sidebar` (and its descendants)
+ * comes from the underlying CSS register and stays unchanged across
+ * the component rename — the register is the cross-cutting visual
+ * spec, the component is its mount point.
+ *
+ * Was named `BeaconSidebar` during the prototype phase. Phase 3C of
+ * the Aurora rollout renamed it to `AppSidebar` since the prototype
+ * is gone and the component is now the singular sidebar for production.
+ */
+export function AppSidebar({ activePath }: AppSidebarProps) {
   const { theme, toggleTheme } = useTheme()
   return (
     <aside className="beacon-sidebar fixed left-0 top-0 bottom-0 z-40 flex w-[208px] flex-col">

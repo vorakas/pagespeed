@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Monitor, Smartphone } from "lucide-react"
-import { BeaconHeader } from "@/components/layout/BeaconHeader"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { PageComparison } from "@/components/metrics/PageComparison"
 import { HistoricalChart } from "@/components/metrics/HistoricalChart"
@@ -52,7 +52,7 @@ export function Metrics() {
   const [strategy, setStrategy] = useState<Strategy>("desktop")
   return (
     <>
-      <BeaconHeader
+      <PageHeader
         title="Performance Metrics"
         description="Historical performance data and comparisons"
         actions={

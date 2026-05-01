@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { BeaconHeader } from "@/components/layout/BeaconHeader"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { DevOpsConfigPanel } from "@/components/builds/DevOpsConfigPanel"
 import { ApplitoolsConfigPanel } from "@/components/builds/ApplitoolsConfigPanel"
 import { PipelineMapper } from "@/components/builds/PipelineMapper"
@@ -577,7 +577,7 @@ export function Builds() {
 
   return (
     <>
-      <BeaconHeader
+      <PageHeader
         title="Automation Builds"
         description="Trigger and monitor Azure DevOps automation builds"
       />

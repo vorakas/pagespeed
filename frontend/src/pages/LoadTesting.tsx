@@ -21,7 +21,7 @@ import {
   XCircle,
 } from "lucide-react"
 
-import { BeaconHeader } from "@/components/layout/BeaconHeader"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -563,7 +563,7 @@ export function LoadTesting() {
 
   return (
     <>
-      <BeaconHeader
+      <PageHeader
         title="Load Testing"
         description="Queue and orchestrate BlazeMeter load tests sequentially"
       />

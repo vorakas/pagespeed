@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
-import { BeaconHeader } from "@/components/layout/BeaconHeader"
+import { PageHeader } from "@/components/layout/PageHeader"
 import { SiteUrlManager } from "@/components/setup/SiteUrlManager"
 import { TriggerForm } from "@/components/setup/TriggerForm"
 import { TriggerList } from "@/components/setup/TriggerList"
@@ -50,7 +50,7 @@ export function Setup() {
   if (sitesLoading) {
     return (
       <>
-        <BeaconHeader title="Setup" description="Manage sites, URLs, and scheduled triggers" />
+        <PageHeader title="Setup" description="Manage sites, URLs, and scheduled triggers" />
         <div className="p-6">
           <LoadingSpinner message="Loading sites..." />
         </div>
@@ -60,7 +60,7 @@ export function Setup() {
 
   return (
     <>
-      <BeaconHeader
+      <PageHeader
         title="Setup"
         description="Manage sites, URLs, and scheduled triggers"
       />
