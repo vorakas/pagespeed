@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Monitor, Smartphone } from "lucide-react"
-import { Header } from "@/components/layout/Header"
+import { BeaconHeader } from "@/components/layout/BeaconHeader"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { PageComparison } from "@/components/metrics/PageComparison"
 import { HistoricalChart } from "@/components/metrics/HistoricalChart"
@@ -9,7 +9,7 @@ import type { Strategy } from "@/types"
 /**
  * Pure body — takes the desktop/mobile strategy as a prop. The
  * production page keeps `strategy` state in the wrapper so the toggle
- * can live in the production `<Header actions={...}>` slot. The Aurora
+ * can live in the production `<BeaconHeader actions={...}>` slot. The Aurora
  * prototype at `/prototype/metrics/aurora` owns its own copy of state
  * and renders the toggle inline above the body, since `BeaconHeader`
  * doesn't accept an actions slot.
@@ -68,7 +68,7 @@ export function Metrics() {
   const [strategy, setStrategy] = useState<Strategy>("desktop")
   return (
     <>
-      <Header
+      <BeaconHeader
         title="Performance Metrics"
         description="Historical performance data and comparisons"
         actions={

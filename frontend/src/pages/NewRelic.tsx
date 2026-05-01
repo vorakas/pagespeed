@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import { Header } from "@/components/layout/Header"
+import { BeaconHeader } from "@/components/layout/BeaconHeader"
 import { Button } from "@/components/ui/button"
 import { NewRelicConfigPanel } from "@/components/newrelic/NewRelicConfig"
 import { CwvMetrics } from "@/components/newrelic/CwvMetrics"
@@ -171,7 +171,7 @@ export function NewRelicBody() {
 export function NewRelic() {
   return (
     <>
-      <Header title="New Relic" description="Core Web Vitals and APM metrics" />
+      <BeaconHeader title="New Relic" description="Core Web Vitals and APM metrics" />
       <NewRelicBody />
     </>
   )

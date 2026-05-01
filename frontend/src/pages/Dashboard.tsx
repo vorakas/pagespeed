@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
-import { Header } from "@/components/layout/Header"
+import { BeaconHeader } from "@/components/layout/BeaconHeader"
 import { WorstPerformersSection } from "@/components/dashboard/WorstPerformersSection"
 import { CwvReferenceSection } from "@/components/dashboard/CwvReferenceSection"
 import { LighthouseExplanation } from "@/components/dashboard/LighthouseExplanation"
@@ -106,7 +106,7 @@ export function Dashboard() {
   const { data, loading, error } = useWorstPerformersByStrategy(strategy)
   return (
     <>
-      <Header
+      <BeaconHeader
         title="Dashboard"
         description="Monitor and compare website performance over time"
         actions={

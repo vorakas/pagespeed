@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react"
-import { Header } from "@/components/layout/Header"
+import { BeaconHeader } from "@/components/layout/BeaconHeader"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AiConfigPanel } from "@/components/ai-analysis/AiConfigPanel"
@@ -486,7 +486,7 @@ export function AiAnalysisBody() {
 export function AiAnalysis() {
   return (
     <>
-      <Header title="AI Analysis" description="AI-powered performance analysis" />
+      <BeaconHeader title="AI Analysis" description="AI-powered performance analysis" />
       <AiAnalysisBody />
     </>
   )

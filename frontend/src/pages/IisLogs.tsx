@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
-import { Header } from "@/components/layout/Header"
+import { BeaconHeader } from "@/components/layout/BeaconHeader"
 import { AzureConfigPanel } from "@/components/iis-logs/AzureConfigPanel"
 import { LogSearchPanel } from "@/components/iis-logs/LogSearchPanel"
 import { DashboardSummary } from "@/components/iis-logs/DashboardSummary"
@@ -98,7 +98,7 @@ export function IisLogsBody() {
 export function IisLogs() {
   return (
     <>
-      <Header title="IIS Logs" description="Azure Log Analytics and KQL queries" />
+      <BeaconHeader title="IIS Logs" description="Azure Log Analytics and KQL queries" />
       <IisLogsBody />
     </>
   )

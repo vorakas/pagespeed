@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
-import { BeaconSidebar } from "./BeaconSidebar"
-import { BeaconHeader } from "./BeaconHeader"
+import { BeaconSidebar } from "@/components/layout/BeaconSidebar"
+import { BeaconHeader } from "@/components/layout/BeaconHeader"
 
 interface BeaconLayoutProps {
   title: string

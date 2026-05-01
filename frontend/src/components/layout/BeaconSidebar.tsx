@@ -14,8 +14,11 @@ import {
   Waves,
   Network,
   Settings,
+  Sun,
+  Moon,
   type LucideIcon,
 } from "lucide-react"
+import { useTheme } from "@/hooks/use-theme"
 
 interface NavItem {
   label: string
@@ -80,6 +83,7 @@ interface BeaconSidebarProps {
 const BASE_URL = import.meta.env.BASE_URL
 
 export function BeaconSidebar({ activePath }: BeaconSidebarProps) {
+  const { theme, toggleTheme } = useTheme()
   return (
     <aside className="beacon-sidebar fixed left-0 top-0 bottom-0 z-40 flex w-[208px] flex-col">
       {/* Brand — static Pharos logo. The image carries the "Pharos"
@@ -143,11 +147,17 @@ export function BeaconSidebar({ activePath }: BeaconSidebarProps) {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-border px-3 py-2.5">
-        <p className="beacon-label" style={{ fontSize: "9px" }}>
-          v1.0 · prototype
-        </p>
+      {/* Footer — theme toggle */}
+      <div className="border-t border-border p-2">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="beacon-sidebar-item w-full"
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+          <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+        </button>
       </div>
     </aside>
   )
