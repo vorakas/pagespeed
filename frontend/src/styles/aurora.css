@@ -602,11 +602,11 @@
   --aurora-2: #151b3d;
   --aurora-3: #1b1747;
   --aurora-4: #0f2847;
-  --aurora-glow-teal:   rgba(56, 224, 208, 0.55);
-  --aurora-glow-violet: rgba(156, 108, 255, 0.55);
-  --aurora-glow-pink:   rgba(255, 110, 196, 0.45);
-  --aurora-glow-cyan:   rgba(100, 200, 255, 0.45);
-  --aurora-glow-lime:   rgba(130, 240, 170, 0.40);
+  /* `--aurora-glow-*` tokens (teal / violet / pink / cyan / lime) used
+   * to drive the animated body-blob backdrop. Phase 1 of the de-slop
+   * pass replaced that with hardcoded RGBA radial-gradient stops in
+   * `.aurora-app-shell`'s background, so these tokens are unreferenced
+   * — deleted. */
 
   /* Glass surfaces */
   --glass-bg:         rgba(22, 28, 58, 0.48);
@@ -617,6 +617,19 @@
   --glass-hi:            rgba(255, 255, 255, 0.06);
   --glass-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
   --glass-inner:  inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* `--lcc-*` aliases for the glass surface tokens. Consumed via
+   * inline styles in DailyStatusSummary and ProjectDashboard
+   * (e.g. `var(--lcc-glass-border, rgba(255,255,255,0.08))`). The
+   * fallbacks meant the inline styles still rendered, but the named
+   * tokens never resolved — defining them here lets the inline styles
+   * pick up the actual register values, so a future palette tweak
+   * propagates to those sites as well. */
+  --lcc-glass-bg-faint: var(--glass-bg-faint);
+  --lcc-glass-border:   var(--glass-border);
+  /* `--lcc-border-faint` is used by ProjectDashboard's row dividers
+   * — slightly more transparent than the default glass-border. */
+  --lcc-border-faint:   rgba(255, 255, 255, 0.06);
 
   /* Text */
   --lcc-text:       #eef1ff;
@@ -648,10 +661,6 @@
 :root.light,
 .launch-dashboard[data-theme="light"] {
   --aurora-1: #e8ecff; --aurora-2: #dfe5ff; --aurora-3: #e4daff; --aurora-4: #d8eaff;
-  --aurora-glow-teal:   rgba(56, 224, 208, 0.35);
-  --aurora-glow-violet: rgba(156, 108, 255, 0.35);
-  --aurora-glow-pink:   rgba(255, 110, 196, 0.30);
-  --aurora-glow-cyan:   rgba(100, 200, 255, 0.30);
   --glass-bg:        rgba(255,255,255,0.60);
   --glass-bg-strong: rgba(255,255,255,0.78);
   --glass-bg-faint:  rgba(255,255,255,0.40);
