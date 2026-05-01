@@ -417,3 +417,165 @@
   background: linear-gradient(135deg, var(--aurora-violet), #38e0d0);
   filter: brightness(1.08);
 }
+
+/* ==========================================================================
+   Legacy aurora-* class re-map.
+
+   The wider Pharos app already has a body of `.aurora-panel`, `.aurora-input`,
+   `.aurora-text*`, `.aurora-radio-pill`, etc. styled via `--lcc-*` and
+   `--glass-*` tokens. Those classes are a faithful implementation of the
+   original handoff at `~/Downloads/Pharos/handoff/design/styles.css` —
+   value-for-value matching the dark-theme `--text`, `--red`, `--violet`,
+   `--glass-bg`, `--glass-border`, `--radius`, etc.
+
+   Two differences from the new Aurora register at .beacon.aurora:
+     1. Brand accent shifted from violet (#b08cff) → periwinkle blue
+        (#7cb0ff) — the user's blue-palette decision.
+     2. Card surfaces use solid colors instead of `backdrop-filter: blur`,
+        per the non-slop substitution rule.
+
+   So we re-map the legacy tokens under .beacon.aurora rather than forking
+   every component. This cascades to every `aurora-*` class AND every
+   inline `style={{ color: 'var(--lcc-red)' }}` reference because they
+   all read these CSS variables. ~40 lines, vs ~750 of forked component
+   code.
+   ========================================================================== */
+.aurora {
+  /* Text — values already match handoff, but keep the cascade explicit so
+     a future palette change in .beacon.aurora flows through automatically. */
+  --lcc-text:       var(--beacon-text);
+  --lcc-text-dim:   var(--beacon-text-muted);
+  --lcc-text-faint: var(--beacon-text-faint);
+
+  /* State palette — preserve handoff hex except violet, which becomes the
+     periwinkle-blue brand accent the new register uses. */
+  --lcc-red:    var(--aurora-red);     --lcc-red-bg:    var(--aurora-red-bg);
+  --lcc-amber:  var(--aurora-amber);   --lcc-amber-bg:  var(--aurora-amber-bg);
+  --lcc-green:  var(--aurora-green);   --lcc-green-bg:  var(--aurora-green-bg);
+  --lcc-blue:   var(--aurora-blue);    --lcc-blue-bg:   var(--aurora-blue-bg);
+  --lcc-violet: var(--aurora-violet);  --lcc-violet-bg: var(--aurora-violet-bg);
+
+  /* Surfaces — kill the heavy translucent glass in favor of the new
+     register's solid layered depth. The legacy `--glass-*` tokens still
+     drive `.aurora-panel`, `.aurora-input`, `.aurora-callout`, etc. */
+  --glass-bg:            var(--beacon-surface);
+  --glass-bg-strong:     var(--beacon-elevated);
+  --glass-bg-faint:      var(--beacon-surface);
+  --glass-border:        var(--beacon-border);
+  --glass-border-strong: var(--beacon-hairline);
+  --glass-hi:            rgba(255, 255, 255, 0.04);
+
+  /* Radii — already 14 / 8 in both systems, but route them through the
+     register so a token change in one place propagates. */
+  --lcc-radius:    var(--radius);
+  --lcc-radius-sm: var(--radius-sm);
+}
+
+/* `.aurora-panel` had `backdrop-filter: blur(22px) saturate(140%)` baked
+   in — a glass-blur slop tactic. Inside the new register we substitute
+   the same lifted-card depth used by `[data-slot="card"]` (solid surface
+   + real drop shadow + 1px white inset highlight). */
+.aurora .aurora-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--beacon-surface);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    0 8px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   Number rendering — Test URLs page numbers (Lighthouse scores in
+   ScoreBadge, CWV / FCP / LCP / CLS / TTFB metric cells via .aurora-num)
+   read soft in the legacy implementation. Three things were softening
+   them:
+
+     1. `.aurora-num` color was `--lcc-text-dim` (#a9b3d6) — low-contrast
+        body text on a dark surface, so digits already faded at 12px.
+     2. `.aurora-score` borders used `color-mix(in srgb, hue 40%,
+        transparent)` — a soft halo that made the badge edge fuzzy and
+        bled into the contained number visually.
+     3. `.aurora-tabs-list` had `backdrop-filter: blur(22px)
+        saturate(140%)` — backdrop-filter is known to disable subpixel
+        text antialiasing in WebKit/Blink, so any text rendered inside
+        (or, due to compositing, near) such a layer reads softer.
+
+   Substitutions, scoped to .beacon.aurora so production is untouched:
+
+     - Number text uses --beacon-text (full contrast) at weight 500
+       with `font-feature-settings: "lnum","tnum"` so digits are lining
+       (not old-style) and tabular (column-aligned).
+     - ScoreBadge keeps its tinted background but gains a solid 1px
+       border at higher alpha — the rim is sharp, the digits crisp.
+       Badge color stays the rating hue at full saturation.
+     - Tabs lose backdrop-filter; pick up a solid surface and 1px
+       border instead.
+   -------------------------------------------------------------------------- */
+/* Specificity note: the legacy `.aurora-table .aurora-num` rule is two
+   classes deep (0,0,2,0) — same as `.aurora .aurora-num`. Source order
+   then decides, and `aurora-glass.css` loads after `aurora.css`, so the
+   dim color wins. We re-anchor on `.aurora-table .aurora-num` to match
+   specificity, then bump to `.aurora .aurora-table .aurora-num` for a
+   clean win without resorting to !important. */
+.aurora .aurora-table .aurora-num,
+.aurora .aurora-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--beacon-text);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
+}
+
+.aurora .aurora-score {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
+  /* No backdrop-filter, no soft 40%-alpha rim; per-rating selectors
+     below set a solid border at 60% alpha for a sharp edge. */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.aurora .aurora-score[data-rating="good"] {
+  color: var(--aurora-green);
+  background: var(--aurora-green-bg);
+  border-color: rgba(110, 231, 168, 0.6);
+}
+.aurora .aurora-score[data-rating="average"] {
+  color: var(--aurora-amber);
+  background: var(--aurora-amber-bg);
+  border-color: rgba(255, 196, 107, 0.6);
+}
+.aurora .aurora-score[data-rating="poor"] {
+  color: var(--aurora-red);
+  background: var(--aurora-red-bg);
+  border-color: rgba(255, 107, 139, 0.6);
+}
+.aurora .aurora-score[data-rating="unknown"] {
+  color: var(--beacon-text-faint);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--beacon-border);
+}
+
+/* Tab rail — solid surface, no backdrop blur. The original was a
+   translucent capsule riding the page gradient; here we mount it on
+   the same elevated layer popovers use, with a hairline border. */
+.aurora .aurora-tabs-list {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--beacon-elevated);
+  border: 1px solid var(--beacon-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Table cell text gets the same lining + tabular treatment so the
+   "Last Tested" column and any future numeric content stay aligned. */
+.aurora .aurora-table {
+  font-feature-settings: "lnum" 1, "tnum" 1;
+}
+.aurora .aurora-table tbody td {
+  color: var(--beacon-text);
+}

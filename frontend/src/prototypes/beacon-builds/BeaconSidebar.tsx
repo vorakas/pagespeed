@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom"
 import {
   Rocket,
   History,
@@ -18,7 +19,13 @@ import {
 
 interface NavItem {
   label: string
+  /** Logical path used for active-state matching — production URL of the
+   *  page this nav item represents. */
   href: string
+  /** Optional override: if the page has been ported into the prototype
+   *  shell, route to its prototype URL instead. Active matching still
+   *  uses `href`. */
+  prototypeHref?: string
   icon: LucideIcon
 }
 
@@ -41,7 +48,7 @@ const NAV: NavSection[] = [
     label: "MONITORING",
     items: [
       { label: "PageSpeed", href: "/", icon: LayoutDashboard },
-      { label: "Test URLs", href: "/test", icon: Gauge },
+      { label: "Test URLs", href: "/test", prototypeHref: "/prototype/test/aurora", icon: Gauge },
       { label: "Performance Metrics", href: "/metrics", icon: BarChart3 },
     ],
   },
@@ -51,14 +58,14 @@ const NAV: NavSection[] = [
       { label: "New Relic", href: "/newrelic", icon: Activity },
       { label: "IIS Logs", href: "/iislogs", icon: FileText },
       { label: "AI Analysis", href: "/ai-analysis", icon: Brain },
-      { label: "Automation Builds", href: "/builds", icon: Hammer },
+      { label: "Automation Builds", href: "/builds", prototypeHref: "/prototype/builds/aurora", icon: Hammer },
       { label: "Load Testing", href: "/load-testing", icon: Waves },
       { label: "Obsidian Vault", href: "/obsidian", icon: Network },
     ],
   },
   {
     label: "CONFIG",
-    items: [{ label: "Setup", href: "/setup", icon: Settings }],
+    items: [{ label: "Setup", href: "/setup", prototypeHref: "/prototype/setup/aurora", icon: Settings }],
   },
 ]
 
@@ -101,16 +108,30 @@ export function BeaconSidebar({ activePath }: BeaconSidebarProps) {
             <div className="flex flex-col gap-px">
               {section.items.map((item) => {
                 const Icon = item.icon
+                const isActive = item.href === activePath
+                // Ported pages route inside the prototype shell via SPA
+                // navigation; un-ported pages still bounce out to the
+                // production route on a real anchor click so the user is
+                // never trapped.
+                if (item.prototypeHref) {
+                  return (
+                    <Link
+                      key={item.href}
+                      to={item.prototypeHref}
+                      className="beacon-sidebar-item"
+                      data-active={isActive}
+                    >
+                      <Icon size={14} className="shrink-0" aria-hidden />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  )
+                }
                 return (
                   <a
                     key={item.href}
                     href={item.href}
                     className="beacon-sidebar-item"
-                    data-active={item.href === activePath}
-                    onClick={(e) => {
-                      // Prototype: keep navigation contained.
-                      if (item.href !== activePath) e.preventDefault()
-                    }}
+                    data-active={isActive}
                   >
                     <Icon size={14} className="shrink-0" aria-hidden />
                     <span className="truncate">{item.label}</span>
