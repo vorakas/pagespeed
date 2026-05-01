@@ -22,13 +22,7 @@ import { useTheme } from "@/hooks/use-theme"
 
 interface NavItem {
   label: string
-  /** Logical path used for active-state matching — production URL of the
-   *  page this nav item represents. */
   href: string
-  /** Optional override: if the page has been ported into the prototype
-   *  shell, route to its prototype URL instead. Active matching still
-   *  uses `href`. */
-  prototypeHref?: string
   icon: LucideIcon
 }
 
@@ -41,34 +35,34 @@ const NAV: NavSection[] = [
   {
     label: "MIGRATION",
     items: [
-      { label: "Launch Dashboard", href: "/dashboard", prototypeHref: "/prototype/dashboard-launch/aurora", icon: Rocket },
-      { label: "Status History", href: "/dashboard/history", prototypeHref: "/prototype/dashboard-history/aurora", icon: History },
-      { label: "Workstreams", href: "/dashboard/workstreams/ws-data-platform", prototypeHref: "/prototype/dashboard-workstream/aurora/ws-data-platform", icon: ListTree },
-      { label: "Blockers", href: "/dashboard#incidents", prototypeHref: "/prototype/dashboard-launch/aurora#incidents", icon: AlertTriangle },
+      { label: "Launch Dashboard", href: "/dashboard", icon: Rocket },
+      { label: "Status History", href: "/dashboard/history", icon: History },
+      { label: "Workstreams", href: "/dashboard/workstreams/ws-data-platform", icon: ListTree },
+      { label: "Blockers", href: "/dashboard#incidents", icon: AlertTriangle },
     ],
   },
   {
     label: "MONITORING",
     items: [
-      { label: "PageSpeed", href: "/", prototypeHref: "/prototype/dashboard/aurora", icon: LayoutDashboard },
-      { label: "Test URLs", href: "/test", prototypeHref: "/prototype/test/aurora", icon: Gauge },
-      { label: "Performance Metrics", href: "/metrics", prototypeHref: "/prototype/metrics/aurora", icon: BarChart3 },
+      { label: "PageSpeed", href: "/", icon: LayoutDashboard },
+      { label: "Test URLs", href: "/test", icon: Gauge },
+      { label: "Performance Metrics", href: "/metrics", icon: BarChart3 },
     ],
   },
   {
     label: "INTEGRATIONS",
     items: [
-      { label: "New Relic", href: "/newrelic", prototypeHref: "/prototype/newrelic/aurora", icon: Activity },
-      { label: "IIS Logs", href: "/iislogs", prototypeHref: "/prototype/iislogs/aurora", icon: FileText },
-      { label: "AI Analysis", href: "/ai-analysis", prototypeHref: "/prototype/ai-analysis/aurora", icon: Brain },
-      { label: "Automation Builds", href: "/builds", prototypeHref: "/prototype/builds/aurora", icon: Hammer },
-      { label: "Load Testing", href: "/load-testing", prototypeHref: "/prototype/load-testing/aurora", icon: Waves },
-      { label: "Obsidian Vault", href: "/obsidian", prototypeHref: "/prototype/obsidian/aurora", icon: Network },
+      { label: "New Relic", href: "/newrelic", icon: Activity },
+      { label: "IIS Logs", href: "/iislogs", icon: FileText },
+      { label: "AI Analysis", href: "/ai-analysis", icon: Brain },
+      { label: "Automation Builds", href: "/builds", icon: Hammer },
+      { label: "Load Testing", href: "/load-testing", icon: Waves },
+      { label: "Obsidian Vault", href: "/obsidian", icon: Network },
     ],
   },
   {
     label: "CONFIG",
-    items: [{ label: "Setup", href: "/setup", prototypeHref: "/prototype/setup/aurora", icon: Settings }],
+    items: [{ label: "Setup", href: "/setup", icon: Settings }],
   },
 ]
 
@@ -112,34 +106,24 @@ export function BeaconSidebar({ activePath }: BeaconSidebarProps) {
             <div className="flex flex-col gap-px">
               {section.items.map((item) => {
                 const Icon = item.icon
-                const isActive = item.href === activePath
-                // Ported pages route inside the prototype shell via SPA
-                // navigation; un-ported pages still bounce out to the
-                // production route on a real anchor click so the user is
-                // never trapped.
-                if (item.prototypeHref) {
-                  return (
-                    <Link
-                      key={item.href}
-                      to={item.prototypeHref}
-                      className="beacon-sidebar-item"
-                      data-active={isActive}
-                    >
-                      <Icon size={14} className="shrink-0" aria-hidden />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  )
-                }
+                // Active when pathname+hash match the link target. The
+                // hash split lets `/dashboard#incidents` light up only
+                // when the user is actually scrolled to that anchor,
+                // and a bare `/dashboard` doesn't trigger the Blockers
+                // item.
+                const [linkPath, linkHash = ""] = item.href.split("#")
+                const isActive = linkPath === activePath.split("#")[0] &&
+                  linkHash === (activePath.split("#")[1] ?? "")
                 return (
-                  <a
+                  <Link
                     key={item.href}
-                    href={item.href}
+                    to={item.href}
                     className="beacon-sidebar-item"
                     data-active={isActive}
                   >
                     <Icon size={14} className="shrink-0" aria-hidden />
                     <span className="truncate">{item.label}</span>
-                  </a>
+                  </Link>
                 )
               })}
             </div>

@@ -9,6 +9,7 @@ import type {
   ObsidianVaultPage,
 } from "@/types"
 import { Button } from "@/components/ui/button"
+import { BeaconHeader } from "@/components/layout/BeaconHeader"
 import { cn } from "@/lib/utils"
 
 /**
@@ -19,7 +20,7 @@ import { cn } from "@/lib/utils"
  * single-page preview so Claude Design can replace the layout and styling
  * later without re-plumbing the API layer.
  */
-export function ObsidianBody() {
+export function Obsidian() {
   const [capabilities, setCapabilities] = useState<ObsidianCapabilities | null>(null)
   const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null)
   const [activeJob, setActiveJob] = useState<ObsidianSyncJob | null>(null)
@@ -162,7 +163,12 @@ export function ObsidianBody() {
   const canSyncBoth = canSyncJira && canSyncAsana
 
   return (
-    <div className="p-6 space-y-6">
+    <>
+      <BeaconHeader
+        title="Obsidian Bridge"
+        description="Sync Jira and Asana into the LLM-maintained Adobe Commerce migration vault."
+      />
+      <div className="p-6 space-y-6">
       {capabilitiesError && (
         <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {capabilitiesError}
@@ -314,26 +320,7 @@ export function ObsidianBody() {
           ) : null}
         </div>
       </section>
-    </div>
-  )
-}
-
-/**
- * Production page — inline title (no Header component yet, the page is
- * an explicit scaffold awaiting design) + body. The Aurora prototype
- * at `/prototype/obsidian/aurora` renders `<ObsidianBody />` inside
- * `BeaconLayout`, where BeaconHeader supplies the title.
- */
-export function Obsidian() {
-  return (
-    <>
-      <div className="px-6 pt-6">
-        <h1 className="text-2xl font-semibold">Obsidian Bridge</h1>
-        <p className="text-sm text-muted-foreground">
-          Sync Jira and Asana into the LLM-maintained Adobe Commerce migration vault.
-        </p>
       </div>
-      <ObsidianBody />
     </>
   )
 }

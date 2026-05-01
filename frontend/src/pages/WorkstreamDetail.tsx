@@ -40,7 +40,7 @@ import type {
  * `BeaconLayout`; production renders it directly under `AppLayout`.
  * No internal logic changed during the extraction.
  */
-export function WorkstreamDetailBody() {
+export function WorkstreamDetail() {
   const { id = "" } = useParams<{ id: string }>()
   const [detail, setDetail] = useState<MigrationWorkstreamDetail | null>(null)
   const [workstreams, setWorkstreams] = useState<MigrationWorkstream[] | null>(null)
@@ -176,15 +176,6 @@ export function WorkstreamDetailBody() {
       </div>
     </LaunchShell>
   )
-}
-
-/**
- * Production export — renders `WorkstreamDetailBody` as-is. Kept as a
- * separate export so `App.tsx` continues to import `{ WorkstreamDetail }`
- * unchanged.
- */
-export function WorkstreamDetail() {
-  return <WorkstreamDetailBody />
 }
 
 // ── Hero ──────────────────────────────────────────────────────────────

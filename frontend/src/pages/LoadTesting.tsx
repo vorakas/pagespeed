@@ -108,7 +108,7 @@ function formatDuration(
 
 const PROJECT_STORAGE_KEY = "blazemeter.selectedProjectId"
 
-export function LoadTestingBody() {
+export function LoadTesting() {
   const [config, setConfig] = useState<BlazemeterConfigStatus | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
   const [connectionChecked, setConnectionChecked] = useState(false)
@@ -562,7 +562,12 @@ export function LoadTestingBody() {
   }, [queue])
 
   return (
-    <div className="pb-8">
+    <>
+      <BeaconHeader
+        title="Load Testing"
+        description="Queue and orchestrate BlazeMeter load tests sequentially"
+      />
+      <div className="pb-8">
       <div className="mx-3 mt-3 space-y-3">
         {/* ---------- Config status ---------- */}
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -1426,22 +1431,6 @@ export function LoadTestingBody() {
         )}
       </div>
     </div>
-  )
-}
-
-/**
- * Production page — Header + body. The Aurora prototype at
- * `/prototype/load-testing/aurora` renders `<LoadTestingBody />`
- * inside `BeaconLayout` instead of this Header.
- */
-export function LoadTesting() {
-  return (
-    <>
-      <BeaconHeader
-        title="Load Testing"
-        description="Queue and orchestrate BlazeMeter load tests sequentially"
-      />
-      <LoadTestingBody />
     </>
   )
 }

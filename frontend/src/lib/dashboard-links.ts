@@ -1,59 +1,45 @@
-import { useLocation } from "react-router-dom"
-
 /**
- * In-page navigation helper for the Launch Dashboard cluster.
+ * Centralized path builders for the Launch Dashboard cluster.
  *
- * When the user is viewing the Aurora prototype shell (any path under
- * `/prototype/`), in-page links to projects and workstreams must route
- * to the prototype-shell variants instead of the production paths —
- * otherwise clicking a project in the LeftRail or a workstream chip in
- * the SidePanel boots the user out of the prototype mid-session.
+ * Was previously a `useDashboardLinks()` hook that detected prototype
+ * context from `useLocation()` and rewrote targets to the matching
+ * `/prototype/...` route. Phase 2C of the Aurora rollout deleted the
+ * prototype routes — production and prototype URLs collapsed into a
+ * single set, so detection and rewriting are no longer needed.
  *
- * SOLID — Single Responsibility: this hook only translates resource
- * IDs into paths; it does not navigate, render, or mutate. Each
- * consumer reads the appropriate `*Path()` builder and feeds it into
- * `<Link to=…>` or `navigate(…)`.
+ * Kept as a tiny module of pure functions (rather than inlining the
+ * template strings everywhere) so a future move of the migration
+ * cluster to a different URL prefix lands in one place. The signatures
+ * match the previous hook's shape so consumers didn't have to change
+ * call sites — they simply stopped reading from `useLocation` under
+ * the hood.
  *
- * Detection is via `useLocation().pathname` — no provider, no prop
- * threading. Callers that don't live under a `BrowserRouter` would
- * crash; every consumer here is mounted within `App.tsx`'s router.
+ * SOLID — Single Responsibility: this module only translates IDs to
+ * paths; it does not navigate, render, or mutate.
  */
+
+const PROJECT_ROUTE = "/dashboard/projects"
+const WORKSTREAM_ROUTE = "/dashboard/workstreams"
+const LAUNCH_ROUTE = "/dashboard"
+
 export interface DashboardLinks {
-  /** Path to the per-project dashboard for a given project key. */
   projectPath: (key: string) => string
-  /** Path to the workstream-detail view for a given workstream id. */
   workstreamPath: (id: string) => string
-  /** Path to the Launch Dashboard root (with optional hash). */
   launchDashboardPath: (hash?: string) => string
 }
 
-const PROTOTYPE_PROJECT_ROUTE = "/prototype/dashboard-project/aurora"
-const PROTOTYPE_WORKSTREAM_ROUTE = "/prototype/dashboard-workstream/aurora"
-const PROTOTYPE_LAUNCH_ROUTE = "/prototype/dashboard-launch/aurora"
+const LINKS: DashboardLinks = {
+  projectPath: (key) => `${PROJECT_ROUTE}/${encodeURIComponent(key)}`,
+  workstreamPath: (id) => `${WORKSTREAM_ROUTE}/${id}`,
+  launchDashboardPath: (hash) =>
+    hash ? `${LAUNCH_ROUTE}#${hash}` : LAUNCH_ROUTE,
+}
 
-const PRODUCTION_PROJECT_ROUTE = "/dashboard/projects"
-const PRODUCTION_WORKSTREAM_ROUTE = "/dashboard/workstreams"
-const PRODUCTION_LAUNCH_ROUTE = "/dashboard"
-
+/**
+ * Returns path builders for project / workstream / launch-dashboard
+ * routes. Stable identity across renders — safe to destructure inside
+ * effects and useCallback deps.
+ */
 export function useDashboardLinks(): DashboardLinks {
-  const { pathname } = useLocation()
-  const inPrototype = pathname.startsWith("/prototype/")
-
-  if (inPrototype) {
-    return {
-      projectPath: (key) =>
-        `${PROTOTYPE_PROJECT_ROUTE}/${encodeURIComponent(key)}`,
-      workstreamPath: (id) => `${PROTOTYPE_WORKSTREAM_ROUTE}/${id}`,
-      launchDashboardPath: (hash) =>
-        hash ? `${PROTOTYPE_LAUNCH_ROUTE}#${hash}` : PROTOTYPE_LAUNCH_ROUTE,
-    }
-  }
-
-  return {
-    projectPath: (key) =>
-      `${PRODUCTION_PROJECT_ROUTE}/${encodeURIComponent(key)}`,
-    workstreamPath: (id) => `${PRODUCTION_WORKSTREAM_ROUTE}/${id}`,
-    launchDashboardPath: (hash) =>
-      hash ? `${PRODUCTION_LAUNCH_ROUTE}#${hash}` : PRODUCTION_LAUNCH_ROUTE,
-  }
+  return LINKS
 }

@@ -37,7 +37,7 @@ import type {
  * directly under `AppLayout`. No internal logic was changed during the
  * extraction — only the function name.
  */
-export function LaunchDashboardBody() {
+export function LaunchDashboard() {
   const [health, setHealth] = useState<MigrationHealthSnapshot | null>(null)
   const [kpis, setKpis] = useState<MigrationKpis | null>(null)
   const [workstreams, setWorkstreams] = useState<MigrationWorkstream[] | null>(null)
@@ -219,11 +219,3 @@ export function LaunchDashboardBody() {
   )
 }
 
-/**
- * Production export — renders `LaunchDashboardBody` as-is. Kept as a
- * separate export so `App.tsx` and the rest of the app continue to
- * import `{ LaunchDashboard }` unchanged.
- */
-export function LaunchDashboard() {
-  return <LaunchDashboardBody />
-}

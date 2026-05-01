@@ -27,7 +27,7 @@ const DEFAULT_CONFIG: NewRelicConfig = {
   appName: "",
 }
 
-export function NewRelicBody() {
+export function NewRelic() {
   const [config, setConfig] = useLocalConfig<NewRelicConfig>("nrConfig", DEFAULT_CONFIG)
   const [, setConnected] = useState(false)
   const [pageUrl, setPageUrl] = useState("https://www.lampsplus.com/")
@@ -78,7 +78,9 @@ export function NewRelicBody() {
   const interactionsCount = (cwvMetrics?.interactions as number) ?? null
 
   return (
-    <div className="space-y-6 p-6">
+    <>
+      <BeaconHeader title="New Relic" description="Core Web Vitals and APM metrics" />
+      <div className="space-y-6 p-6">
         {/* Configuration */}
         <NewRelicConfigPanel
           config={config}
@@ -159,20 +161,7 @@ export function NewRelicBody() {
           <h2 className="aurora-section-title mb-3">Custom NerdGraph Query</h2>
           <CustomQuery config={config} />
         </div>
-    </div>
-  )
-}
-
-/**
- * Production page — Header + body. The Aurora prototype at
- * `/prototype/newrelic/aurora` renders `<NewRelicBody />` inside
- * `BeaconLayout` instead.
- */
-export function NewRelic() {
-  return (
-    <>
-      <BeaconHeader title="New Relic" description="Core Web Vitals and APM metrics" />
-      <NewRelicBody />
+      </div>
     </>
   )
 }

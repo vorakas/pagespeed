@@ -18,10 +18,14 @@ import "@/styles/aurora-glass.css"
  * logo + tagline.
  */
 export function AppLayout() {
-  const { pathname } = useLocation()
+  const { pathname, hash } = useLocation()
+  // BeaconSidebar's active-state matcher splits href on '#' so
+  // `/dashboard#incidents` lights up only when both pathname and
+  // hash match. Concatenate them here so the matcher has full input.
+  const activePath = hash ? `${pathname}${hash}` : pathname
   return (
     <div className="beacon beacon-shell dark aurora min-h-screen">
-      <BeaconSidebar activePath={pathname} polling={false} />
+      <BeaconSidebar activePath={activePath} polling={false} />
       <main className="beacon-main ml-[208px] min-h-screen">
         <Outlet />
       </main>

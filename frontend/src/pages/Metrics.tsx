@@ -7,27 +7,11 @@ import { HistoricalChart } from "@/components/metrics/HistoricalChart"
 import type { Strategy } from "@/types"
 
 /**
- * Pure body — takes the desktop/mobile strategy as a prop. The
- * production page keeps `strategy` state in the wrapper so the toggle
- * can live in the production `<BeaconHeader actions={...}>` slot. The Aurora
- * prototype at `/prototype/metrics/aurora` owns its own copy of state
- * and renders the toggle inline above the body, since `BeaconHeader`
- * doesn't accept an actions slot.
+ * Desktop / mobile toggle rendered as the Metrics page's header
+ * actions. Internal helper — kept as its own component so the toggle
+ * markup stays out of the page-level return.
  */
-export function MetricsBody({ strategy }: { strategy: Strategy }) {
-  return (
-    <div className="space-y-8 p-6">
-      <PageComparison />
-      <HistoricalChart strategy={strategy} />
-    </div>
-  )
-}
-
-/**
- * Reusable desktop/mobile toggle — exported so the Aurora prototype
- * can render the same control inline above the body.
- */
-export function MetricsStrategyToggle({
+function StrategyToggle({
   strategy,
   onStrategyChange,
 }: {
@@ -72,10 +56,13 @@ export function Metrics() {
         title="Performance Metrics"
         description="Historical performance data and comparisons"
         actions={
-          <MetricsStrategyToggle strategy={strategy} onStrategyChange={setStrategy} />
+          <StrategyToggle strategy={strategy} onStrategyChange={setStrategy} />
         }
       />
-      <MetricsBody strategy={strategy} />
+      <div className="space-y-8 p-6">
+        <PageComparison />
+        <HistoricalChart strategy={strategy} />
+      </div>
     </>
   )
 }

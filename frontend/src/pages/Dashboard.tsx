@@ -8,33 +8,12 @@ import { api } from "@/services/api"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Monitor, Smartphone } from "lucide-react"
 
-interface DashboardBodyProps {
-  data: Record<string, WorstPerformer[]>
-  loading: boolean
-  error: string | null
-}
-
 /**
- * Pure body — props-driven. The Aurora prototype at
- * `/prototype/dashboard/aurora` reuses this body with its own copy of
- * the data-fetching effect, so the toggle can move out of the Header
- * actions slot (which BeaconHeader doesn't have) into the body itself.
+ * Desktop / mobile toggle rendered as the Dashboard's header actions.
+ * Internal helper — kept as its own component so the toggle markup
+ * stays out of the page-level return.
  */
-export function DashboardBody({ data, loading, error }: DashboardBodyProps) {
-  return (
-    <div className="space-y-8 p-6">
-      <WorstPerformersSection data={data} loading={loading} error={error} />
-      <CwvReferenceSection />
-      <LighthouseExplanation />
-    </div>
-  )
-}
-
-/**
- * Reusable desktop/mobile toggle. Exported so the Aurora prototype can
- * render the same control inline above the body.
- */
-export function DashboardStrategyToggle({
+function StrategyToggle({
   strategy,
   onStrategyChange,
 }: {
@@ -71,12 +50,8 @@ export function DashboardStrategyToggle({
   )
 }
 
-/**
- * Hook owning the worst-performers fetch keyed by strategy. Both the
- * production wrapper and the Aurora prototype call this so the data
- * lifecycle stays in one place.
- */
-export function useWorstPerformersByStrategy(strategy: Strategy) {
+export function Dashboard() {
+  const [strategy, setStrategy] = useState<Strategy>("desktop")
   const [data, setData] = useState<Record<string, WorstPerformer[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -98,22 +73,20 @@ export function useWorstPerformersByStrategy(strategy: Strategy) {
     loadData(strategy)
   }, [strategy, loadData])
 
-  return { data, loading, error }
-}
-
-export function Dashboard() {
-  const [strategy, setStrategy] = useState<Strategy>("desktop")
-  const { data, loading, error } = useWorstPerformersByStrategy(strategy)
   return (
     <>
       <BeaconHeader
         title="Dashboard"
         description="Monitor and compare website performance over time"
         actions={
-          <DashboardStrategyToggle strategy={strategy} onStrategyChange={setStrategy} />
+          <StrategyToggle strategy={strategy} onStrategyChange={setStrategy} />
         }
       />
-      <DashboardBody data={data} loading={loading} error={error} />
+      <div className="space-y-8 p-6">
+        <WorstPerformersSection data={data} loading={loading} error={error} />
+        <CwvReferenceSection />
+        <LighthouseExplanation />
+      </div>
     </>
   )
 }

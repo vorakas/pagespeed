@@ -38,7 +38,7 @@ import type {
  * `BeaconLayout`; production renders it directly under `AppLayout`.
  * No internal logic changed during the extraction.
  */
-export function ProjectDashboardBody() {
+export function ProjectDashboard() {
   const { key: rawKey } = useParams<{ key: string }>()
   const projectKey = rawKey ? decodeURIComponent(rawKey) : ""
 
@@ -213,14 +213,6 @@ export function ProjectDashboardBody() {
   )
 }
 
-/**
- * Production export — renders `ProjectDashboardBody` as-is. Kept as a
- * separate export so `App.tsx` continues to import `{ ProjectDashboard }`
- * unchanged.
- */
-export function ProjectDashboard() {
-  return <ProjectDashboardBody />
-}
 
 // ── Layout frame ───────────────────────────────────────────────────────
 

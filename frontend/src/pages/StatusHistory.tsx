@@ -38,7 +38,7 @@ const KPI_VIEW: Array<{ key: string; label: string; goodWhen: "up" | "down" }> =
  * `AppLayout`. No internal logic changed during the extraction — only
  * the function name.
  */
-export function StatusHistoryBody() {
+export function StatusHistory() {
   const [entries, setEntries] = useState<MigrationHistoryEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterKey>("all")
@@ -133,15 +133,6 @@ export function StatusHistoryBody() {
       </div>
     </LaunchShell>
   )
-}
-
-/**
- * Production export — renders `StatusHistoryBody` as-is. Kept as a
- * separate export so `App.tsx` continues to import `{ StatusHistory }`
- * unchanged.
- */
-export function StatusHistory() {
-  return <StatusHistoryBody />
 }
 
 function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
