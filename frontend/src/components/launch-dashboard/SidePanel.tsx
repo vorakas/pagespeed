@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { marked } from "marked"
 import { api } from "@/services/api"
+import { useDashboardLinks } from "@/lib/dashboard-links"
 import type {
   MigrationBlocker,
   MigrationWorkstream,
@@ -89,6 +90,7 @@ function WorkstreamDetail({
   loading: boolean
   onClose: () => void
 }) {
+  const links = useDashboardLinks()
   return (
     <>
       <div className="sp-head">
@@ -107,7 +109,7 @@ function WorkstreamDetail({
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <Link
-            to={`/dashboard/workstreams/${ws.id}`}
+            to={links.workstreamPath(ws.id)}
             onClick={onClose}
             style={{
               fontSize: 10.5,

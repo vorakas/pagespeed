@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import type { MigrationWorkstream } from "@/types"
+import { useDashboardLinks } from "@/lib/dashboard-links"
 
 interface WorkstreamRailProps {
   workstreams: MigrationWorkstream[] | null
@@ -19,6 +20,7 @@ interface WorkstreamRailProps {
  */
 export function WorkstreamRail({ workstreams, activeId }: WorkstreamRailProps) {
   const navigate = useNavigate()
+  const links = useDashboardLinks()
 
   const groups = useMemo(() => {
     const byArea: Record<string, MigrationWorkstream[]> = {}
@@ -107,7 +109,7 @@ export function WorkstreamRail({ workstreams, activeId }: WorkstreamRailProps) {
                 key={w.id}
                 type="button"
                 className={`lcc-lr-area${isActive ? " active" : ""}`}
-                onClick={() => navigate(`/dashboard/workstreams/${w.id}`)}
+                onClick={() => navigate(links.workstreamPath(w.id))}
                 title={w.name}
               >
                 <span

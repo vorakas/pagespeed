@@ -6,6 +6,7 @@ import { api } from "@/services/api"
 import { repairJiraMarkdownSource } from "@/lib/markdown-source"
 import { normalizeJiraMergedHeaderTables } from "@/lib/markdown-tables"
 import { shortenLinksInHtml } from "@/lib/url-shortening"
+import { useDashboardLinks } from "@/lib/dashboard-links"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import type {
   MigrationBlocker,
@@ -230,10 +231,11 @@ function PageFrame({
   projectKey: string
   children: React.ReactNode
 }) {
+  const links = useDashboardLinks()
   return (
     <div style={{ padding: 18 }}>
       <Link
-        to="/dashboard"
+        to={links.launchDashboardPath()}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -402,6 +404,7 @@ function BlockersPanel({ blockers }: { blockers: MigrationBlocker[] }) {
 // ── Rollups (workstreams) ──────────────────────────────────────────────
 
 function RollupsPanel({ rollups }: { rollups: MigrationWorkstream[] }) {
+  const links = useDashboardLinks()
   return (
     <div className="panel" style={{ padding: "14px 18px" }}>
       <h3>
@@ -434,7 +437,7 @@ function RollupsPanel({ rollups }: { rollups: MigrationWorkstream[] }) {
               }}
             >
               <Link
-                to={`/dashboard/workstreams/${ws.id}`}
+                to={links.workstreamPath(ws.id)}
                 style={{
                   fontSize: 12,
                   flex: 1,

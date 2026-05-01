@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
+import { useDashboardLinks } from "@/lib/dashboard-links"
 import type { MigrationHistoryEntry, SnapshotKpiDelta } from "@/types"
 
 type FilterKey = "all" | "changes" | "regressions" | "resolutions"
@@ -144,6 +145,7 @@ export function StatusHistory() {
 }
 
 function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
+  const links = useDashboardLinks()
   const curr = entry.currentPayload
   const areaChanges = entry.diff.areaStatuses
   return (
@@ -182,7 +184,7 @@ function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
           <ul style={areaListStyle}>
             {areaChanges.map((c) => (
               <li key={c.ws} style={areaItemStyle}>
-                <Link to={`/dashboard/workstreams/${c.ws}`} style={areaLinkStyle}>
+                <Link to={links.workstreamPath(c.ws)} style={areaLinkStyle}>
                   {c.ws}
                 </Link>
                 <span style={{ color: healthColor(c.from) }}>{c.from}</span>

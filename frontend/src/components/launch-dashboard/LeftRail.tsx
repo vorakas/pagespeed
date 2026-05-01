@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { formatPacificDate } from "@/lib/datetime"
+import { useDashboardLinks } from "@/lib/dashboard-links"
 import type {
   MigrationBlocker,
   MigrationSource,
@@ -35,6 +36,7 @@ export function LeftRail({
   vaultLastSynced,
 }: LeftRailProps) {
   const navigate = useNavigate()
+  const links = useDashboardLinks()
   const [rollupsOpen, setRollupsOpen] = useState(false)
 
   const sortedProjects = useMemo(() => {
@@ -73,7 +75,7 @@ export function LeftRail({
               key={src.key}
               source={src}
               tone={projectStatus[src.key] ?? "green"}
-              onOpen={() => navigate(`/dashboard/projects/${encodeURIComponent(src.key)}`)}
+              onOpen={() => navigate(links.projectPath(src.key))}
             />
           ))
         )}
@@ -113,7 +115,7 @@ export function LeftRail({
                 <RollupRow
                   key={ws.id}
                   workstream={ws}
-                  onOpen={() => navigate(`/dashboard/workstreams/${ws.id}`)}
+                  onOpen={() => navigate(links.workstreamPath(ws.id))}
                 />
               ))
             )}
