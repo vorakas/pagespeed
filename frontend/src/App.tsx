@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { ThemeProvider } from "@/context/ThemeContext"
 
 import { SitesProvider } from "@/context/SitesContext"
@@ -41,6 +41,10 @@ export default function App() {
                 <Route path="dashboard/history" element={<StatusHistory />} />
                 <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
                 <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
+                {/* Catch-all — covers retired /prototype/* URLs and
+                    any other unmatched path. Sends the user back to
+                    PageSpeed home rather than rendering a blank page. */}
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>
           </SitesProvider>
