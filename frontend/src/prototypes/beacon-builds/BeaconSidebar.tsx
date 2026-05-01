@@ -39,7 +39,7 @@ const NAV: NavSection[] = [
     label: "MIGRATION",
     items: [
       { label: "Launch Dashboard", href: "/dashboard", prototypeHref: "/prototype/dashboard-launch/aurora", icon: Rocket },
-      { label: "Status History", href: "/dashboard/history", icon: History },
+      { label: "Status History", href: "/dashboard/history", prototypeHref: "/prototype/dashboard-history/aurora", icon: History },
       { label: "Workstreams", href: "/dashboard/workstreams/ws-data-platform", icon: ListTree },
       { label: "Blockers", href: "/dashboard#incidents", icon: AlertTriangle },
     ],

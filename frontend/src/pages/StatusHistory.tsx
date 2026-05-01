@@ -28,7 +28,16 @@ const KPI_VIEW: Array<{ key: string; label: string; goodWhen: "up" | "down" }> =
   { key: "wpm", label: "WPM", goodWhen: "up" },
 ]
 
-export function StatusHistory() {
+/**
+ * Body of the Status History page — reverse-chron snapshot cards inside
+ * `LaunchShell` so all the `.launch-dashboard .lcc-*` and `--lcc-*` token
+ * references resolve. The Aurora prototype at
+ * `/prototype/dashboard-history/aurora` mounts this body inside
+ * `BeaconLayout`; the production export below renders it directly under
+ * `AppLayout`. No internal logic changed during the extraction — only
+ * the function name.
+ */
+export function StatusHistoryBody() {
   const [entries, setEntries] = useState<MigrationHistoryEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterKey>("all")
@@ -123,6 +132,15 @@ export function StatusHistory() {
       </div>
     </LaunchShell>
   )
+}
+
+/**
+ * Production export — renders `StatusHistoryBody` as-is. Kept as a
+ * separate export so `App.tsx` continues to import `{ StatusHistory }`
+ * unchanged.
+ */
+export function StatusHistory() {
+  return <StatusHistoryBody />
 }
 
 function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {

@@ -29,6 +29,7 @@ import { PrototypeAuroraNewRelic } from "@/prototypes/aurora-newrelic/PrototypeA
 import { PrototypeAuroraMetrics } from "@/prototypes/aurora-metrics/PrototypeAuroraMetrics"
 import { PrototypeAuroraDashboard } from "@/prototypes/aurora-dashboard/PrototypeAuroraDashboard"
 import { PrototypeAuroraLaunchDashboard } from "@/prototypes/aurora-launch-dashboard/PrototypeAuroraLaunchDashboard"
+import { PrototypeAuroraStatusHistory } from "@/prototypes/aurora-status-history/PrototypeAuroraStatusHistory"
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
               <Route path="prototype/metrics/aurora" element={<PrototypeAuroraMetrics />} />
               <Route path="prototype/dashboard/aurora" element={<PrototypeAuroraDashboard />} />
               <Route path="prototype/dashboard-launch/aurora" element={<PrototypeAuroraLaunchDashboard />} />
+              <Route path="prototype/dashboard-history/aurora" element={<PrototypeAuroraStatusHistory />} />
 
               <Route element={<AppLayout />}>
                 <Route index element={<Dashboard />} />
