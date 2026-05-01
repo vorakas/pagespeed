@@ -314,6 +314,20 @@ All 8 pages are fully implemented and served at `/`.
 ## Recent Commit History (newest first)
 
 ```
+3cfe5d2 Phase 3D: token audit — drop dead --aurora-glow-*, add 3 missing --lcc-* aliases
+[6ae0913 / d6c68f7] Phase 3C: rename Beacon* components → AppSidebar / PageHeader
+6ae0913 Phase 3B: merge aurora-glass.css into aurora.css
+d6c68f7 Phase 3A: delete dead app-chrome rules, rebrand surviving overrides
+19a9530 Add catch-all route for retired /prototype/* URLs
+57a98cf Phase 2C: delete prototype scaffolding, inline page bodies
+0c64aa5 Phase 2B: promote Beacon chrome to production AppLayout
+669e9e2 Phase 2A: refactor BeaconHeader into a generic page header
+9999f76 De-slop: kill pulse animation, isotropic glow shadows, conic brand orbs
+069b715 De-slop: replace gradient text with solid color
+72d3865 De-slop: strip backdrop-filter blur from every glass surface
+b8aea62 De-slop: replace .aurora-app-shell blur blobs with static layered radials
+56f29bf Make Launch Dashboard in-page links prototype-aware
+926c143 Update CLAUDE.md: Aurora prototype rollout complete
 6311fa9 Wire Blockers nav into Aurora prototype Launch Dashboard
 28473ca Port Project Dashboard into Aurora prototype shell
 d654a92 Port Workstream Detail into Aurora prototype shell
@@ -514,15 +528,32 @@ The legacy Flask/template frontend (`templates/`, `static/`) is archived at `/le
 
 **React frontend is the primary (and only active) frontend**, served at `/`. The legacy Flask/template site is archived at `/legacy/` and must not be updated.
 
-**App rebranded to "Lamps Plus Pharos"** with lighthouse logo in header (dark/light variants).
+**App rebranded to "Lamps Plus Pharos"** — Pharos lighthouse logo + LampsPlus brand carried by the sidebar. The two-row brand banner that used to sit above each page title is retired.
 
-**Aurora prototype rollout COMPLETE.** All 14 nav-reachable pages now have a parallel `/prototype/<page>/aurora` route running under the lifted-card "Aurora" register (faithful to Claude Design's handoff, with slop tactics — animated drift blobs, backdrop-filter blur, gradient text — substituted out). Every nav item in the prototype's `BeaconSidebar` SPA-routes inside the prototype shell via `prototypeHref`. Production routes are visually unchanged. Pages live at:
-- MIGRATION: `/prototype/dashboard-launch/aurora`, `/prototype/dashboard-history/aurora`, `/prototype/dashboard-workstream/aurora/:id`, `/prototype/dashboard-project/aurora/:key`. "Blockers" is a SPA hash link to `/prototype/dashboard-launch/aurora#incidents`.
-- MONITORING: `/prototype/dashboard/aurora` (PageSpeed home), `/prototype/test/aurora`, `/prototype/metrics/aurora`.
-- INTEGRATIONS: `/prototype/newrelic/aurora`, `/prototype/iislogs/aurora`, `/prototype/ai-analysis/aurora`, `/prototype/builds/aurora`, `/prototype/load-testing/aurora`, `/prototype/obsidian/aurora`.
-- CONFIG: `/prototype/setup/aurora`.
+**Aurora rollout — Phase 1 + 2 + 3 COMPLETE.** Production now renders the lifted-card Aurora register at every URL: `/`, `/dashboard`, `/test`, `/metrics`, `/newrelic`, `/iislogs`, `/ai-analysis`, `/builds`, `/load-testing`, `/obsidian`, `/setup`, plus the four migration cluster pages (`/dashboard/history`, `/dashboard/workstreams/:id`, `/dashboard/projects/:key`, hash-link `/dashboard#incidents`). The parallel `/prototype/<page>/aurora` URL space has been retired — a catch-all route redirects orphan URLs to `/`.
 
-The port pattern is body-extraction + legacy-token re-map: `pages/<Page>.tsx` exports a `PageBody` function plus a thin production wrapper, and `prototypes/aurora-<page>/PrototypeAurora<Page>.tsx` mounts `<PageBody />` inside `<BeaconLayout register="aurora">`. The legacy `--lcc-*` and `--glass-*` CSS tokens get re-pointed under `.beacon.aurora` in `frontend/src/styles/aurora.css`, so every existing `.aurora-*` class and inline `style={{ color: 'var(--lcc-red)' }}` reference re-skins automatically — no component forks. See `feedback_aurora_porting_pattern.md` in user memory for the full pattern.
+**Phase 1 (de-slop)** stripped every slop tactic from the legacy production CSS: animated `filter: blur(60px)` backdrop blobs replaced with static layered radial gradients, `backdrop-filter: blur(22px)` removed from every glass surface (substituted with solid `--glass-bg-strong` + drop shadow + 1px white inset highlight), gradient text on numbers/headlines replaced with solid `--lcc-text`, isotropic `box-shadow` glow halos around status dots and KPIs deleted, infinite `lcc-pulse` keyframe deleted, conic-rainbow brand orbs replaced with solid violet dots. Net: ~30 deleted slop sites, no component forks.
+
+**Phase 2 (route promotion)** promoted the prototype shell to production: `BeaconHeader` → page-agnostic `PageHeader` with `actions` slot, `BeaconSidebar` → `AppSidebar` with hash-aware active matching, theme toggle moved into the sidebar footer, `AppLayout` rewritten to `<div class="beacon beacon-shell dark aurora">` + `<AppSidebar>` + `<main class="beacon-main">`. All 13 PrototypeAurora wrapper files deleted, all `/prototype/...` routes removed, body-extraction artifacts inlined back into single page functions.
+
+**Phase 3 (consolidate)** merged the two-file CSS split into a single `frontend/src/styles/aurora.css` (~2,600 lines), deleted ~190 lines of dead `.aurora-app-shell` / `.aurora-sidebar` rules left over from the legacy AppLayout, rebranded surviving shadcn primitive overrides to scope under the new `.aurora` ancestor, dropped 5 dead `--aurora-glow-*` tokens, and added 3 missing `--lcc-*` aliases that consumers were silently falling back on. Component naming dropped the prototype-era `Beacon*` prefix.
+
+**Architecture:**
+```
+frontend/src/
+├── components/layout/
+│   ├── AppLayout.tsx       # the production shell — beacon-shell aurora
+│   ├── AppSidebar.tsx      # left rail with hash-aware active matching + theme toggle
+│   └── PageHeader.tsx      # sticky title strip with optional actions slot
+├── styles/
+│   └── aurora.css          # single CSS source: tokens + chrome + page primitives + Launch Cluster
+├── lib/
+│   └── dashboard-links.ts  # path builders for the migration cluster (project / workstream / launch)
+└── pages/
+    └── *.tsx               # each page renders <PageHeader /> + body content
+```
+
+CSS class names: the `.beacon-*` family (`.beacon-shell`, `.beacon-sidebar`, `.beacon-header`, `.beacon-label`, etc.) is the underlying register name, intentionally kept after the `Beacon*` component rename — components are mount points, the register is the visual spec. The `.aurora-*` family (`.aurora-panel`, `.aurora-input`, `.aurora-num`, `.aurora-score`, `.aurora-tabs-list`, `.aurora-radio-pill`, etc.) is the page-primitive name shared by every consumer page.
 
 **Infrastructure:** Backend is 3-layer architecture with DI. Dockerfile uses multi-stage build (node:20-alpine → python:3.11-slim). Railway GitHub webhook integration is broken; deploy via Railway CLI (`RAILWAY_API_TOKEN="$RAILWAY_TOKEN" npx @railway/cli up -m "$(git log -1 --pretty=%s)"`). Railway CLI v4.37.3 installed globally. The GraphQL `serviceInstanceDeploy` mutation reliably serves stale `master` images while the working tree is on `feature/obsidian-bridge` — skip it and go straight to the CLI.
 
@@ -530,13 +561,11 @@ The port pattern is body-extraction + legacy-token re-map: `pages/<Page>.tsx` ex
 - Railway GitHub webhook does not auto-create on repo connect — manual deploy required
 - Railway GraphQL `serviceInstanceDeploy` mutation serves stale master images on this branch — use `railway up` CLI directly
 - `.gitignore` root `lib/` rule was anchored to `/lib/` to avoid ignoring `frontend/src/lib/`
-- **Aurora prototype in-page nav leaks:** The prototype sidebar SPA-routes correctly, but in-page links inside the prototype (e.g., `WorkstreamRail` picker `<Link to="/dashboard/workstreams/:id">`, Status History workstream-change rows) still target production paths and bounce the user out of the prototype shell. Acceptable for an evaluation prototype; can be threaded with a `prototypeMode` context if/when needed.
 - **Dashboard table column alignment:** The "Worst Performing URLs" section renders separate `<table>` elements per site. With `table-auto`, sites with shorter URLs (e.g., Adobe) still have wider metric columns than sites with longer URLs (e.g., LampsPlus) because the browser distributes surplus space proportionally. The `width: 1px` trick on metric headers + `width: 100%` on the URL header improved it but didn't fully resolve cross-table alignment. A definitive fix would require a single table for all sites, CSS `table-layout: fixed` with explicit pixel widths on every column including URL, or JavaScript-based column width synchronization across tables.
 
 **Potential next steps:**
-- **Promote Aurora to production:** if user signs off on the prototype, replace production `AppLayout` with `BeaconLayout register="aurora"` and retire the `/prototype/...` routes. The per-page Aurora wrappers become trivially deletable.
-- **Tackle the in-page nav leaks** so the prototype is fully self-contained.
-- **Merge `feature/obsidian-bridge` → `master`** — branch is now ~15 commits ahead; durable fix for protecting Aurora work from a Railway env-var-driven master redeploy.
+- **Merge `feature/obsidian-bridge` → `master`** — branch is now ~30 commits ahead. Durable fix for protecting the rollout from a Railway env-var-driven master redeploy. Master will then visually match feature/obsidian-bridge.
+- **Visual polish** on the now-unified production register — anything the user spots while using it day-to-day.
 - **Spreadsheet export data refinement (WIP):** Skipped test counts need validation across all build types; the `outcome == "NotExecuted"` filter may need adjustment. Unresolved section (Applitools integration) is a placeholder.
 - Resolve Dashboard cross-table column alignment (see known issues above)
 - Automated testing
