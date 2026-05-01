@@ -60,7 +60,7 @@ const NAV: NavSection[] = [
       { label: "AI Analysis", href: "/ai-analysis", icon: Brain },
       { label: "Automation Builds", href: "/builds", prototypeHref: "/prototype/builds/aurora", icon: Hammer },
       { label: "Load Testing", href: "/load-testing", prototypeHref: "/prototype/load-testing/aurora", icon: Waves },
-      { label: "Obsidian Vault", href: "/obsidian", icon: Network },
+      { label: "Obsidian Vault", href: "/obsidian", prototypeHref: "/prototype/obsidian/aurora", icon: Network },
     ],
   },
   {
