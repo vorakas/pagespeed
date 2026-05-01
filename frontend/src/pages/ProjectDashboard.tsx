@@ -28,7 +28,16 @@ import type {
  * raw tasks; today we only have aggregated lists (prod failures, new
  * bugs) which we surface as "Recent activity."
  */
-export function ProjectDashboard() {
+/**
+ * Body of the per-project dashboard. The route key
+ * (`/dashboard/projects/:key`) maps 1:1 to a `MigrationSource.key`.
+ * Wraps in `LaunchShell` so all `.launch-dashboard .lcc-*` and `--lcc-*`
+ * token references resolve. The Aurora prototype at
+ * `/prototype/dashboard-project/aurora/:key` mounts this body inside
+ * `BeaconLayout`; production renders it directly under `AppLayout`.
+ * No internal logic changed during the extraction.
+ */
+export function ProjectDashboardBody() {
   const { key: rawKey } = useParams<{ key: string }>()
   const projectKey = rawKey ? decodeURIComponent(rawKey) : ""
 
@@ -201,6 +210,15 @@ export function ProjectDashboard() {
       </PageFrame>
     </LaunchShell>
   )
+}
+
+/**
+ * Production export — renders `ProjectDashboardBody` as-is. Kept as a
+ * separate export so `App.tsx` continues to import `{ ProjectDashboard }`
+ * unchanged.
+ */
+export function ProjectDashboard() {
+  return <ProjectDashboardBody />
 }
 
 // ── Layout frame ───────────────────────────────────────────────────────
