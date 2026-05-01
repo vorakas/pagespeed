@@ -55,7 +55,7 @@ const NAV: NavSection[] = [
   {
     label: "INTEGRATIONS",
     items: [
-      { label: "New Relic", href: "/newrelic", icon: Activity },
+      { label: "New Relic", href: "/newrelic", prototypeHref: "/prototype/newrelic/aurora", icon: Activity },
       { label: "IIS Logs", href: "/iislogs", prototypeHref: "/prototype/iislogs/aurora", icon: FileText },
       { label: "AI Analysis", href: "/ai-analysis", prototypeHref: "/prototype/ai-analysis/aurora", icon: Brain },
       { label: "Automation Builds", href: "/builds", prototypeHref: "/prototype/builds/aurora", icon: Hammer },
