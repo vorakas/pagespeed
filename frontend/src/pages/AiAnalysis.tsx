@@ -60,7 +60,7 @@ const INITIAL_CONVERSATION: ConversationState = {
   openaiError: null,
 }
 
-export function AiAnalysis() {
+export function AiAnalysisBody() {
   const [aiConfig, setAiConfig] = useLocalConfig<AiConfig>("aiConfig", DEFAULT_AI_CONFIG)
   const [nrConfig] = useLocalConfig<NewRelicConfig>("nrConfig", { apiKey: "", accountId: "", appName: "" })
   const [azConfig] = useLocalConfig<AzureConfig>("azureConfig", {
@@ -316,12 +316,7 @@ export function AiAnalysis() {
   const showOpenai = conversation.providers.includes("openai") || useOpenai
 
   return (
-    <>
-      <Header
-        title="AI Analysis"
-        description="AI-powered performance analysis"
-      />
-      <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6">
         {/* Disclaimer */}
         <div
           className="aurora-panel p-4 text-sm"
@@ -479,7 +474,20 @@ export function AiAnalysis() {
             </div>
           </div>
         )}
-      </div>
+    </div>
+  )
+}
+
+/**
+ * Production page — Header + body. The Aurora prototype at
+ * `/prototype/ai-analysis/aurora` renders `<AiAnalysisBody />` inside
+ * `BeaconLayout` instead.
+ */
+export function AiAnalysis() {
+  return (
+    <>
+      <Header title="AI Analysis" description="AI-powered performance analysis" />
+      <AiAnalysisBody />
     </>
   )
 }
