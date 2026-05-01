@@ -47,7 +47,7 @@ const NAV: NavSection[] = [
   {
     label: "MONITORING",
     items: [
-      { label: "PageSpeed", href: "/", icon: LayoutDashboard },
+      { label: "PageSpeed", href: "/", prototypeHref: "/prototype/dashboard/aurora", icon: LayoutDashboard },
       { label: "Test URLs", href: "/test", prototypeHref: "/prototype/test/aurora", icon: Gauge },
       { label: "Performance Metrics", href: "/metrics", prototypeHref: "/prototype/metrics/aurora", icon: BarChart3 },
     ],

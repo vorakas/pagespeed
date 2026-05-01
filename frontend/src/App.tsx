@@ -27,6 +27,7 @@ import { PrototypeAuroraAiAnalysis } from "@/prototypes/aurora-ai-analysis/Proto
 import { PrototypeAuroraIisLogs } from "@/prototypes/aurora-iis-logs/PrototypeAuroraIisLogs"
 import { PrototypeAuroraNewRelic } from "@/prototypes/aurora-newrelic/PrototypeAuroraNewRelic"
 import { PrototypeAuroraMetrics } from "@/prototypes/aurora-metrics/PrototypeAuroraMetrics"
+import { PrototypeAuroraDashboard } from "@/prototypes/aurora-dashboard/PrototypeAuroraDashboard"
 
 export default function App() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
               <Route path="prototype/iislogs/aurora" element={<PrototypeAuroraIisLogs />} />
               <Route path="prototype/newrelic/aurora" element={<PrototypeAuroraNewRelic />} />
               <Route path="prototype/metrics/aurora" element={<PrototypeAuroraMetrics />} />
+              <Route path="prototype/dashboard/aurora" element={<PrototypeAuroraDashboard />} />
 
               <Route element={<AppLayout />}>
                 <Route index element={<Dashboard />} />
