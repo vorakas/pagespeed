@@ -142,7 +142,7 @@
  * non-supporting browsers.
  *
  * Substitution: skip the slop blur entirely and use the fallback
- * surface as the default. With `.aurora-app-shell` providing a static
+ * surface as the default. With `.aurora` providing a static
  * radial gradient body and panels rendering on a solid mid-tone
  * surface, the depth comes from the existing `--glass-shadow` drop
  * shadow + `--glass-inner` 1px white inset highlight — the same
@@ -1228,141 +1228,26 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════
- *  APP CHROME — sidebar, header banner, and gradient shell that wrap
- *  every Pharos page. Scoped so they don't collide with the launch
- *  dashboard's own layout rules.
+ *  APP CHROME
+ *
+ *  Phase 3 of the Aurora rollout deleted the legacy `.aurora`
+ *  body wrapper and `.aurora-sidebar` floating-card sidebar — production
+ *  AppLayout now renders `<div class="beacon beacon-shell dark aurora">`
+ *  with `<BeaconSidebar>` inside. Body background, sidebar styling, and
+ *  header banner are all owned by the `.beacon-*` rules in `aurora.css`,
+ *  scoped under the `.aurora` ancestor that the new shell guarantees.
+ *
+ *  What used to live here (now removed):
+ *    - .aurora — body bg with layered radial gradients
+ *    - .aurora-sidebar* — floating-card sidebar (8 rules, ~80 lines)
+ *    - .aurora-header-divider, .aurora-page-title,
+ *      .aurora-page-description — pieces of the legacy two-row Header
+ *      banner that no longer exists
+ *
+ *  Two reusable primitives from this section survive — they're applied
+ *  by inline JSX outside any chrome wrapper, so they stay global:
  * ══════════════════════════════════════════════════════════════════ */
 
-/* ── App shell: layered static radial gradients behind every page ──
- *
- * Originally two `::before`/`::after` pseudo-elements with `filter:
- * blur(60px); opacity: 0.65` softening four violet/teal/pink/cyan
- * radial-gradient blobs. The blur was a slop tactic — soft radial
- * gradients don't need blur to feel diffuse, and `filter: blur` on a
- * fixed/full-viewport surface forces the GPU to rasterize the
- * pseudo-element every paint, with measurable cost on retina displays.
- *
- * Substitution: merge all four blobs into the `.aurora-app-shell`
- * background as layered radial gradients with lower alpha (0.18-0.22
- * vs the original 0.55). The diffuse "light source from off-screen"
- * read survives — the blur was masking the high alpha, not creating
- * the softness. Pseudo-elements deleted.
- *
- * Layer order (paint order, top to bottom):
- *   1. Upper-left violet ambient    (was ::before #1)
- *   2. Upper-right teal ambient     (was ::before #2)
- *   3. Lower-right pink ambient     (was ::after  #1)
- *   4. Lower-left cyan ambient      (was ::after  #2)
- *   5. Bottom-center aurora-4 base  (kept from original)
- *   6. Vertical aurora-1 → aurora-2 ground (kept)
- *
- * `background-attachment: fixed` keeps the gradient stationary as the
- * page scrolls — same effect as the original fixed-positioned pseudos.
- */
-.aurora-app-shell {
-  position: relative;
-  min-height: 100vh;
-  overflow-x: clip;
-  background:
-    radial-gradient(40% 40% at 18% 22%, rgba(156, 108, 255, 0.20), transparent 70%),
-    radial-gradient(45% 50% at 72% 18%, rgba(56, 224, 208, 0.14), transparent 70%),
-    radial-gradient(40% 45% at 82% 78%, rgba(255, 110, 196, 0.14), transparent 70%),
-    radial-gradient(45% 50% at 18% 82%, rgba(100, 200, 255, 0.12), transparent 70%),
-    radial-gradient(60% 45% at 50% 105%, var(--aurora-4) 0%, transparent 60%),
-    linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
-  background-attachment: fixed;
-  color: var(--lcc-text);
-}
-/* Keep main above the (no-longer-existing) blob backdrop without
- * overriding the sidebar's Tailwind `.fixed` class. Retained for
- * defense-in-depth even though the z-index race is gone. */
-.aurora-app-shell > main { position: relative; z-index: 1; }
-
-/* ── Sidebar ─────────────────────────────────────────────────────── */
-.aurora-sidebar {
-  background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow), var(--glass-inner);
-  border-radius: var(--lcc-radius);
-  color: var(--lcc-text);
-  font-family: var(--aurora-font-sans);
-}
-
-.aurora-sidebar-head {
-  display: flex; align-items: center; gap: 10px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--glass-border);
-}
-/* Sidebar brand dot — same conic-rainbow + violet halo treatment as
- * the launch-dashboard `.lcc-brand-dot`. Substitution: solid violet
- * dot. Brand identity is carried by the adjacent Pharos wordmark and
- * LampsPlus logo, not the dot. */
-.aurora-sidebar-brand-dot {
-  width: 24px; height: 24px; border-radius: 50%;
-  background: var(--lcc-violet);
-  flex-shrink: 0;
-}
-.aurora-sidebar-brand-name {
-  font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
-  color: var(--lcc-text);
-  line-height: 1.1;
-}
-.aurora-sidebar-brand-sub {
-  font-size: 9.5px;
-  font-family: var(--aurora-font-mono);
-  letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--lcc-text-faint);
-  margin-top: 2px;
-}
-
-.aurora-sidebar-nav {
-  flex: 1; min-height: 0; overflow-y: auto;
-  padding: 10px 10px 6px;
-  display: flex; flex-direction: column; gap: 14px;
-}
-.aurora-sidebar-section-label {
-  font-family: var(--aurora-font-mono);
-  font-size: 9.5px; font-weight: 600;
-  letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--lcc-text-faint);
-  padding: 0 8px 6px;
-}
-
-.aurora-sidebar-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 7px 10px;
-  border-radius: var(--lcc-radius-sm);
-  font-size: 12.5px;
-  color: var(--lcc-text-dim);
-  text-decoration: none;
-  border: 1px solid transparent;
-  transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
-}
-.aurora-sidebar-item:hover {
-  background: var(--glass-hi);
-  color: var(--lcc-text);
-}
-.aurora-sidebar-item[data-active="true"] {
-  background: var(--glass-bg-strong);
-  color: var(--lcc-text);
-  border-color: var(--glass-border-strong);
-  box-shadow: inset 2px 0 0 var(--lcc-violet);
-  font-weight: 500;
-}
-.aurora-sidebar-item svg { flex-shrink: 0; }
-
-.aurora-sidebar-separator {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
-  margin: 0;
-}
-
-.aurora-sidebar-footer {
-  border-top: 1px solid var(--glass-border);
-  padding: 10px;
-}
-
-/* ── Header banner + page-title strip ────────────────────────────── */
 .aurora-panel {
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
@@ -1371,25 +1256,7 @@
   color: var(--lcc-text);
 }
 
-.aurora-header-divider {
-  width: 1px; height: 32px;
-  background: var(--glass-border);
-}
-
-.aurora-page-title {
-  font-size: 18px; font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--lcc-text);
-  font-family: var(--aurora-font-sans);
-}
-.aurora-page-description {
-  font-size: 12px;
-  color: var(--lcc-text-dim);
-  font-family: var(--aurora-font-sans);
-  margin-top: 2px;
-}
-
-/* ── Reusable content primitives (any page under .aurora-app-shell) ── */
+/* ── Reusable content primitives ───────────────────────────────────── */
 
 /* Section heading + subtitle pair, used above panels on regular pages. */
 .aurora-section-title {
@@ -1687,30 +1554,30 @@
 }
 
 /* ── shadcn Switch / Checkbox aurora overrides ─────────────────────
- * These are scoped to .aurora-app-shell so the whole app inherits
+ * These are scoped to .aurora so the whole app inherits
  * them automatically. Targeting base-ui's data-slot attributes keeps
  * the override resilient to className changes in shadcn defaults. */
-.aurora-app-shell [data-slot="switch"] {
+.aurora [data-slot="switch"] {
   background: var(--glass-hi);
   border-color: var(--glass-border);
   height: 20px;
   width: 36px;
 }
-.aurora-app-shell [data-slot="switch"][data-checked] {
+.aurora [data-slot="switch"][data-checked] {
   background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
   border-color: transparent;
 }
-.aurora-app-shell [data-slot="switch-thumb"] {
+.aurora [data-slot="switch-thumb"] {
   background: #fff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
-.aurora-app-shell [data-slot="checkbox"] {
+.aurora [data-slot="checkbox"] {
   border-color: var(--glass-border-strong);
   background: var(--glass-hi);
 }
-.aurora-app-shell [data-slot="checkbox"][data-checked],
-.aurora-app-shell [data-slot="checkbox"][data-indeterminate] {
+.aurora [data-slot="checkbox"][data-checked],
+.aurora [data-slot="checkbox"][data-indeterminate] {
   background: var(--lcc-violet);
   border-color: var(--lcc-violet);
   color: #fff;
@@ -1835,7 +1702,7 @@
 }
 
 /* ── Global shadcn primitive overrides ────────────────────────────
- * Scoped to .aurora-app-shell so already-converted pages (which use
+ * Scoped to .aurora so already-converted pages (which use
  * .aurora-panel / .aurora-input directly) are unaffected. These let
  * pages that still render shadcn Card/Input/Select/Table inherit the
  * Aurora Glass aesthetic without rewriting every JSX file. */
@@ -1843,8 +1710,8 @@
 /* Card → glass panel. Targets both the shadcn Card primitive AND any
  * raw Tailwind .bg-card wrapper used in unconverted pages (e.g. the
  * Load Testing page hand-rolls <section class="bg-card border-border">). */
-.aurora-app-shell [data-slot="card"],
-.aurora-app-shell .bg-card {
+.aurora [data-slot="card"],
+.aurora .bg-card {
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-inner);
@@ -1855,68 +1722,68 @@
 /* Standalone Tailwind utility overrides — for hand-rolled wrappers
  * that don't go through the shadcn primitives. These make sure any
  * unconverted page picks up the aurora palette automatically. */
-.aurora-app-shell .border-border {
+.aurora .border-border {
   border-color: var(--glass-border);
 }
-.aurora-app-shell .bg-input {
+.aurora .bg-input {
   background: var(--glass-hi);
 }
-.aurora-app-shell .bg-muted,
-.aurora-app-shell .bg-muted\/50,
-.aurora-app-shell .bg-muted\/30 {
+.aurora .bg-muted,
+.aurora .bg-muted\/50,
+.aurora .bg-muted\/30 {
   background: var(--glass-hi);
 }
-.aurora-app-shell .text-foreground {
+.aurora .text-foreground {
   color: var(--lcc-text);
 }
-.aurora-app-shell .text-muted-foreground {
+.aurora .text-muted-foreground {
   color: var(--lcc-text-dim);
 }
 
-.aurora-app-shell [data-slot="card-title"] {
+.aurora [data-slot="card-title"] {
   color: var(--lcc-text);
   font-family: var(--aurora-font-sans);
 }
-.aurora-app-shell [data-slot="card-description"] {
+.aurora [data-slot="card-description"] {
   color: var(--lcc-text-dim);
   font-family: var(--aurora-font-sans);
 }
 
 /* Input → glass field */
-.aurora-app-shell [data-slot="input"] {
+.aurora [data-slot="input"] {
   background: var(--glass-hi);
   border: 1px solid var(--glass-border);
   color: var(--lcc-text);
   font-family: var(--aurora-font-sans);
 }
-.aurora-app-shell [data-slot="input"]::placeholder {
+.aurora [data-slot="input"]::placeholder {
   color: var(--lcc-text-faint);
 }
-.aurora-app-shell [data-slot="input"]:hover {
+.aurora [data-slot="input"]:hover {
   border-color: var(--glass-border-strong);
 }
-.aurora-app-shell [data-slot="input"]:focus {
+.aurora [data-slot="input"]:focus {
   border-color: var(--lcc-violet);
   background: var(--glass-bg-strong);
 }
 
 /* Select trigger → glass field with chevron */
-.aurora-app-shell [data-slot="select-trigger"] {
+.aurora [data-slot="select-trigger"] {
   background: var(--glass-hi);
   border: 1px solid var(--glass-border);
   color: var(--lcc-text);
   font-family: var(--aurora-font-sans);
 }
-.aurora-app-shell [data-slot="select-trigger"]:hover {
+.aurora [data-slot="select-trigger"]:hover {
   border-color: var(--glass-border-strong);
 }
-.aurora-app-shell [data-slot="select-trigger"][data-popup-open],
-.aurora-app-shell [data-slot="select-trigger"]:focus-visible {
+.aurora [data-slot="select-trigger"][data-popup-open],
+.aurora [data-slot="select-trigger"]:focus-visible {
   border-color: var(--lcc-violet);
   background: var(--glass-bg-strong);
 }
 
-/* Select dropdown content (rendered via portal — not under aurora-app-shell,
+/* Select dropdown content (rendered via portal — not under .aurora,
  * so target globally via the data-slot attribute). */
 [data-slot="select-content"] {
   background: var(--glass-bg-strong);
@@ -1934,11 +1801,11 @@
 }
 
 /* Table → aurora table styling on shadcn primitives */
-.aurora-app-shell [data-slot="table"] {
+.aurora [data-slot="table"] {
   color: var(--lcc-text);
   font-family: var(--aurora-font-sans);
 }
-.aurora-app-shell [data-slot="table-head"] {
+.aurora [data-slot="table-head"] {
   font-family: var(--aurora-font-mono);
   font-size: 10px;
   font-weight: 600;
@@ -1948,37 +1815,37 @@
   border-bottom: 1px solid var(--glass-border);
   background: transparent;
 }
-.aurora-app-shell [data-slot="table-row"] {
+.aurora [data-slot="table-row"] {
   border-bottom: 1px solid var(--glass-border);
 }
-.aurora-app-shell [data-slot="table-row"]:last-child {
+.aurora [data-slot="table-row"]:last-child {
   border-bottom: none;
 }
-.aurora-app-shell [data-slot="table-row"]:hover {
+.aurora [data-slot="table-row"]:hover {
   background: var(--glass-hi);
 }
-.aurora-app-shell [data-slot="table-cell"] {
+.aurora [data-slot="table-cell"] {
   color: var(--lcc-text);
 }
 
 /* Badge: keep shadcn variants (they map to semantic colors), but
  * lift the border tone for the "outline" variant so it reads on
  * glass. */
-.aurora-app-shell [data-slot="badge"][class*="border-border"],
-.aurora-app-shell .group\/badge[class*="border-border"] {
+.aurora [data-slot="badge"][class*="border-border"],
+.aurora .group\/badge[class*="border-border"] {
   border-color: var(--glass-border-strong);
   color: var(--lcc-text);
 }
 
 /* Textarea — same shape as input but multi-line. shadcn Textarea
  * doesn't carry data-slot, so target by tag inside the app shell. */
-.aurora-app-shell textarea:not(.aurora-textarea):not([data-slot="dialog-content"] textarea) {
+.aurora textarea:not(.aurora-textarea):not([data-slot="dialog-content"] textarea) {
   background: var(--glass-hi);
   border-color: var(--glass-border);
   color: var(--lcc-text);
   font-family: var(--aurora-font-mono);
 }
-.aurora-app-shell textarea:not(.aurora-textarea):focus {
+.aurora textarea:not(.aurora-textarea):focus {
   border-color: var(--lcc-violet);
   background: var(--glass-bg-strong);
 }
