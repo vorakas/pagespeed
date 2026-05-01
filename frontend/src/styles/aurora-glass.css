@@ -98,24 +98,17 @@
   background: transparent;
 }
 
-/* Scroll mask — a sticky 14px strip at the viewport top that heavily
- * blurs whatever main content scrolls beneath it, so the topbar can
- * sit 14px below the edge (floating-card aesthetic) without exposing
- * scrolling content in that gap. Pointer-events:none so it never
- * steals clicks. Sits at z-index 49 — below the topbar (50) and
- * above main content children (1). */
-.launch-dashboard::before {
-  content: "";
-  position: sticky;
-  top: 0;
-  display: block;
-  height: 14px;
-  z-index: 49;
-  backdrop-filter: blur(28px) saturate(140%);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  background: transparent;
-  pointer-events: none;
-}
+/* The original implementation had a `.launch-dashboard::before` sticky
+ * 14px strip at viewport top with `backdrop-filter: blur(28px)` whose
+ * sole job was to blur whatever scrolling content showed in the gap
+ * between the viewport edge and the floating topbar (which sits at
+ * `top: 14px`). With the slop blur tactic stripped, the gap simply
+ * shows the underlying page gradient — and since `.launch-dashboard`'s
+ * background is transparent and the main element's gradient is
+ * continuous, scrolling content never reaches this strip in the first
+ * place. The mask was load-bearing only in the slop implementation;
+ * removing it leaves the floating-card silhouette intact.
+ */
 
 /* ── Palette + density overrides ────────────────────────────────── */
 .launch-dashboard[data-palette="muted"] {
@@ -132,55 +125,41 @@
 .launch-dashboard[data-density="compact"] { font-size: 12px; }
 .launch-dashboard[data-density="roomy"]   { font-size: 14px; }
 
-/* ── Aurora blob animations ─────────────────────────────────────── */
-/* Blobs are now provided by .aurora-app-shell so the backdrop is
- * continuous between the sidebar and the main content. Keyframes stay
- * here because both .aurora-app-shell::before/::after use them. */
-@keyframes lcc-drift1 {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(4vw, 3vh, 0) scale(1.08); }
-}
-@keyframes lcc-drift2 {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(-4vw, -3vh, 0) scale(1.1); }
-}
-
-/* Dashboard children must sit above the blobs. */
+/* Dashboard children sit above the (now non-existent) blob backdrop.
+ * Retained as defense-in-depth — if any future rule reintroduces a
+ * fixed-position pseudo behind the dashboard, this still wins. */
 .launch-dashboard > * {
   position: relative;
   z-index: 1;
 }
 
-/* ── Glass surface primitive ────────────────────────────────────── */
+/* ── Glass surface primitive ────────────────────────────────────── *
+ *
+ * Originally `background: var(--glass-bg)` (rgba ~48% alpha) plus
+ * `backdrop-filter: blur(22px) saturate(140%)` to fake real depth via
+ * blurring whatever sat behind the panel. The `@supports not` fallback
+ * promoted `--glass-bg-strong` (66% alpha) to opaque-enough for
+ * non-supporting browsers.
+ *
+ * Substitution: skip the slop blur entirely and use the fallback
+ * surface as the default. With `.aurora-app-shell` providing a static
+ * radial gradient body and panels rendering on a solid mid-tone
+ * surface, the depth comes from the existing `--glass-shadow` drop
+ * shadow + `--glass-inner` 1px white inset highlight — the same
+ * lifted-card depth model used by the Aurora prototype's `[data-slot=
+ * "card"]` rule.
+ */
 .launch-dashboard .panel,
 .launch-dashboard .lcc-topbar,
 .launch-dashboard .lcc-left-rail,
 .launch-dashboard .lcc-hero-strip,
 .launch-dashboard .lcc-incident-stream,
 .launch-dashboard .lcc-side-panel {
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  backdrop-filter: blur(22px) saturate(140%);
+  background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-inner);
   border-radius: var(--lcc-radius);
 }
-
-/* If backdrop-filter isn't supported, fall back to a more opaque solid so
- * the glass "feel" degrades gracefully without becoming unreadable. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .launch-dashboard .panel,
-  .launch-dashboard .lcc-topbar,
-  .launch-dashboard .lcc-left-rail,
-  .launch-dashboard .lcc-hero-strip,
-  .launch-dashboard .lcc-incident-stream,
-  .launch-dashboard .lcc-side-panel {
-    background: var(--glass-bg-strong);
-  }
-}
-
-/* Reduced-motion behavior for blobs now lives next to
- * .aurora-app-shell::before/::after further down this file. */
 
 /* ── Layout shell ────────────────────────────────────────────────── */
 .launch-dashboard .lcc-shell {
@@ -627,7 +606,6 @@
   padding: 5px 11px; border-radius: 999px;
   text-transform: uppercase; font-weight: 600;
   border: 1px solid transparent;
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   display: inline-block;
 }
 .launch-dashboard .lcc-health-badge.lg { font-size: 11.5px; padding: 6px 14px; }
@@ -1027,10 +1005,14 @@
 .launch-dashboard .lcc-is-time { color: var(--lcc-text-faint); }
 
 /* ── Side panel ───────────────────────────────────────────── */
+/* Modal scrim — originally `rgba(7,10,28,0.5)` plus `backdrop-filter:
+ * blur(6px)` to soften scrolled content beneath while the side panel
+ * is open. Substitution: bump scrim alpha so the dim alone reads as
+ * "modal up, content paused." No blur needed; the panel itself is
+ * fully opaque. */
 .launch-dashboard-panel-backdrop {
   position: fixed; inset: 0;
-  background: rgba(7, 10, 28, 0.5);
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  background: rgba(7, 10, 28, 0.72);
   opacity: 0; pointer-events: none; transition: opacity 0.2s;
   z-index: 100;
 }
@@ -1044,9 +1026,7 @@
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   z-index: 101;
   display: flex; flex-direction: column; overflow: hidden;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  backdrop-filter: blur(22px) saturate(140%);
+  background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-inner);
   color: var(--lcc-text);
@@ -1198,7 +1178,6 @@
   z-index: 9999;
   cursor: zoom-out;
   padding: 24px;
-  backdrop-filter: blur(4px);
 }
 .sp-vault-lightbox img {
   max-width: 95vw;
@@ -1311,17 +1290,12 @@
 
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 .aurora-sidebar {
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  backdrop-filter: blur(22px) saturate(140%);
+  background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-inner);
   border-radius: var(--lcc-radius);
   color: var(--lcc-text);
   font-family: var(--aurora-font-sans);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .aurora-sidebar { background: var(--glass-bg-strong); }
 }
 
 .aurora-sidebar-head {
@@ -1397,16 +1371,11 @@
 
 /* ── Header banner + page-title strip ────────────────────────────── */
 .aurora-panel {
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  backdrop-filter: blur(22px) saturate(140%);
+  background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-inner);
   border-radius: var(--lcc-radius);
   color: var(--lcc-text);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .aurora-panel { background: var(--glass-bg-strong); }
 }
 
 .aurora-header-divider {
@@ -1539,9 +1508,7 @@
   gap: 4px;
   padding: 4px;
   border-radius: 999px;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  backdrop-filter: blur(22px) saturate(140%);
+  background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-inner);
   height: auto;
@@ -1601,8 +1568,6 @@
 .aurora-dialog[data-slot="dialog-content"],
 [data-slot="dialog-content"].aurora-dialog {
   background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  backdrop-filter: blur(28px) saturate(150%);
   border: 1px solid var(--glass-border-strong);
   box-shadow: var(--glass-shadow), var(--glass-inner);
   color: var(--lcc-text);
@@ -1895,17 +1860,11 @@
  * Load Testing page hand-rolls <section class="bg-card border-border">). */
 .aurora-app-shell [data-slot="card"],
 .aurora-app-shell .bg-card {
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  backdrop-filter: blur(22px) saturate(140%);
+  background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-inner);
   border-radius: var(--lcc-radius);
   color: var(--lcc-text);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .aurora-app-shell [data-slot="card"],
-  .aurora-app-shell .bg-card { background: var(--glass-bg-strong); }
 }
 
 /* Standalone Tailwind utility overrides — for hand-rolled wrappers
@@ -1976,8 +1935,6 @@
  * so target globally via the data-slot attribute). */
 [data-slot="select-content"] {
   background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  backdrop-filter: blur(28px) saturate(150%);
   border: 1px solid var(--glass-border-strong);
   box-shadow: var(--glass-shadow);
   color: var(--lcc-text);
