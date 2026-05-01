@@ -40,7 +40,7 @@ const NAV: NavSection[] = [
     items: [
       { label: "Launch Dashboard", href: "/dashboard", prototypeHref: "/prototype/dashboard-launch/aurora", icon: Rocket },
       { label: "Status History", href: "/dashboard/history", prototypeHref: "/prototype/dashboard-history/aurora", icon: History },
-      { label: "Workstreams", href: "/dashboard/workstreams/ws-data-platform", icon: ListTree },
+      { label: "Workstreams", href: "/dashboard/workstreams/ws-data-platform", prototypeHref: "/prototype/dashboard-workstream/aurora/ws-data-platform", icon: ListTree },
       { label: "Blockers", href: "/dashboard#incidents", icon: AlertTriangle },
     ],
   },

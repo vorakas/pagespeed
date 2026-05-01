@@ -29,7 +29,17 @@ import type {
 // items, key risks, burndown chart, dev workload, recent activity,
 // decisions, and cross-refs.
 
-export function WorkstreamDetail() {
+/**
+ * Body of the Workstream Detail page — full markdown-driven layout
+ * (overview, sources, scope, epics, 8-bucket progress, active items,
+ * key risks, burndown, dev workload, recent activity, decisions,
+ * cross-refs) inside `LaunchShell` so all `.launch-dashboard .lcc-*`
+ * and `--lcc-*` token references resolve. The Aurora prototype at
+ * `/prototype/dashboard-workstream/aurora/:id` mounts this body inside
+ * `BeaconLayout`; production renders it directly under `AppLayout`.
+ * No internal logic changed during the extraction.
+ */
+export function WorkstreamDetailBody() {
   const { id = "" } = useParams<{ id: string }>()
   const [detail, setDetail] = useState<MigrationWorkstreamDetail | null>(null)
   const [workstreams, setWorkstreams] = useState<MigrationWorkstream[] | null>(null)
@@ -165,6 +175,15 @@ export function WorkstreamDetail() {
       </div>
     </LaunchShell>
   )
+}
+
+/**
+ * Production export — renders `WorkstreamDetailBody` as-is. Kept as a
+ * separate export so `App.tsx` continues to import `{ WorkstreamDetail }`
+ * unchanged.
+ */
+export function WorkstreamDetail() {
+  return <WorkstreamDetailBody />
 }
 
 // ── Hero ──────────────────────────────────────────────────────────────

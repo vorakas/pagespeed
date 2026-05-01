@@ -30,6 +30,7 @@ import { PrototypeAuroraMetrics } from "@/prototypes/aurora-metrics/PrototypeAur
 import { PrototypeAuroraDashboard } from "@/prototypes/aurora-dashboard/PrototypeAuroraDashboard"
 import { PrototypeAuroraLaunchDashboard } from "@/prototypes/aurora-launch-dashboard/PrototypeAuroraLaunchDashboard"
 import { PrototypeAuroraStatusHistory } from "@/prototypes/aurora-status-history/PrototypeAuroraStatusHistory"
+import { PrototypeAuroraWorkstreamDetail } from "@/prototypes/aurora-workstream-detail/PrototypeAuroraWorkstreamDetail"
 
 export default function App() {
   return (
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="prototype/dashboard/aurora" element={<PrototypeAuroraDashboard />} />
               <Route path="prototype/dashboard-launch/aurora" element={<PrototypeAuroraLaunchDashboard />} />
               <Route path="prototype/dashboard-history/aurora" element={<PrototypeAuroraStatusHistory />} />
+              <Route path="prototype/dashboard-workstream/aurora/:id" element={<PrototypeAuroraWorkstreamDetail />} />
 
               <Route element={<AppLayout />}>
                 <Route index element={<Dashboard />} />
