@@ -17,7 +17,7 @@ const DEFAULT_AZURE_CONFIG: AzureConfig = {
   site: "",
 }
 
-export function IisLogs() {
+export function IisLogsBody() {
   const [config, setConfig] = useLocalConfig<AzureConfig>("azureConfig", DEFAULT_AZURE_CONFIG)
   const [connected, setConnected] = useState(false)
   const [sites, setSites] = useState<string[]>([])
@@ -53,12 +53,7 @@ export function IisLogs() {
   }
 
   return (
-    <>
-      <Header
-        title="IIS Logs"
-        description="Azure Log Analytics and KQL queries"
-      />
-      <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6">
         {/* Azure Config */}
         <AzureConfigPanel
           config={config}
@@ -91,7 +86,20 @@ export function IisLogs() {
             <KqlQueryPanel config={config} />
           </>
         )}
-      </div>
+    </div>
+  )
+}
+
+/**
+ * Production page — Header + body. The Aurora prototype at
+ * `/prototype/iislogs/aurora` renders `<IisLogsBody />` inside
+ * `BeaconLayout` instead.
+ */
+export function IisLogs() {
+  return (
+    <>
+      <Header title="IIS Logs" description="Azure Log Analytics and KQL queries" />
+      <IisLogsBody />
     </>
   )
 }

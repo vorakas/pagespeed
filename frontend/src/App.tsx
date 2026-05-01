@@ -24,6 +24,7 @@ import { PrototypeAuroraTestUrls } from "@/prototypes/aurora-test-urls/Prototype
 import { PrototypeAuroraLoadTesting } from "@/prototypes/aurora-load-testing/PrototypeAuroraLoadTesting"
 import { PrototypeAuroraObsidian } from "@/prototypes/aurora-obsidian/PrototypeAuroraObsidian"
 import { PrototypeAuroraAiAnalysis } from "@/prototypes/aurora-ai-analysis/PrototypeAuroraAiAnalysis"
+import { PrototypeAuroraIisLogs } from "@/prototypes/aurora-iis-logs/PrototypeAuroraIisLogs"
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
               <Route path="prototype/load-testing/aurora" element={<PrototypeAuroraLoadTesting />} />
               <Route path="prototype/obsidian/aurora" element={<PrototypeAuroraObsidian />} />
               <Route path="prototype/ai-analysis/aurora" element={<PrototypeAuroraAiAnalysis />} />
+              <Route path="prototype/iislogs/aurora" element={<PrototypeAuroraIisLogs />} />
 
               <Route element={<AppLayout />}>
                 <Route index element={<Dashboard />} />
