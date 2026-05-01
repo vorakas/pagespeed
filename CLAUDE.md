@@ -557,15 +557,17 @@ CSS class names: the `.beacon-*` family (`.beacon-shell`, `.beacon-sidebar`, `.b
 
 **Infrastructure:** Backend is 3-layer architecture with DI. Dockerfile uses multi-stage build (node:20-alpine → python:3.11-slim). Railway GitHub webhook integration is broken; deploy via Railway CLI (`RAILWAY_API_TOKEN="$RAILWAY_TOKEN" npx @railway/cli up -m "$(git log -1 --pretty=%s)"`). Railway CLI v4.37.3 installed globally. The GraphQL `serviceInstanceDeploy` mutation reliably serves stale `master` images while the working tree is on `feature/obsidian-bridge` — skip it and go straight to the CLI.
 
+**Active branch:** `master` is the only working branch. `feature/obsidian-bridge` was merged into master (commit `9059b98`) and deleted both locally and on the remote. New work happens directly on master, or on a fresh feature branch off it.
+
 **Known issues:**
 - Railway GitHub webhook does not auto-create on repo connect — manual deploy required
-- Railway GraphQL `serviceInstanceDeploy` mutation serves stale master images on this branch — use `railway up` CLI directly
+- Railway GraphQL `serviceInstanceDeploy` mutation has historically served stale master images even after a `git push` — use `railway up` CLI directly. (May be less of an issue now that master IS the working branch; worth re-testing the GraphQL path next deploy.)
 - `.gitignore` root `lib/` rule was anchored to `/lib/` to avoid ignoring `frontend/src/lib/`
 - **Dashboard table column alignment:** The "Worst Performing URLs" section renders separate `<table>` elements per site. With `table-auto`, sites with shorter URLs (e.g., Adobe) still have wider metric columns than sites with longer URLs (e.g., LampsPlus) because the browser distributes surplus space proportionally. The `width: 1px` trick on metric headers + `width: 100%` on the URL header improved it but didn't fully resolve cross-table alignment. A definitive fix would require a single table for all sites, CSS `table-layout: fixed` with explicit pixel widths on every column including URL, or JavaScript-based column width synchronization across tables.
 
 **Potential next steps:**
-- **Merge `feature/obsidian-bridge` → `master`** — branch is now ~30 commits ahead. Durable fix for protecting the rollout from a Railway env-var-driven master redeploy. Master will then visually match feature/obsidian-bridge.
-- **Visual polish** on the now-unified production register — anything the user spots while using it day-to-day.
+- **Visual polish** on the unified production register — anything spotted in day-to-day use of the de-slopped Aurora register.
 - **Spreadsheet export data refinement (WIP):** Skipped test counts need validation across all build types; the `outcome == "NotExecuted"` filter may need adjustment. Unresolved section (Applitools integration) is a placeholder.
-- Resolve Dashboard cross-table column alignment (see known issues above)
-- Automated testing
+- **Jira sync rename-ghost** in `services/obsidian_sync/jira_sync.py` — match by key, not filename, when overwriting vs creating. Read-time dedup is in place but underlying issue accumulates orphans in `raw/`. Most user-visible of the carried-over follow-ups.
+- Resolve Dashboard cross-table column alignment (see known issues above).
+- Automated testing.
