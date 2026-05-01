@@ -314,6 +314,20 @@ All 8 pages are fully implemented and served at `/`.
 ## Recent Commit History (newest first)
 
 ```
+6311fa9 Wire Blockers nav into Aurora prototype Launch Dashboard
+28473ca Port Project Dashboard into Aurora prototype shell
+d654a92 Port Workstream Detail into Aurora prototype shell
+53deeb3 Port Status History into Aurora prototype shell
+45cb94b Port Launch Dashboard into Aurora prototype shell
+e3ea0a8 Port PageSpeed Dashboard into Aurora prototype shell
+a230b60 Port Performance Metrics into Aurora prototype shell
+75ab1e7 Port New Relic into Aurora prototype shell
+beb4452 Port IIS Logs into Aurora prototype shell
+84ab780 Port AI Analysis into Aurora prototype shell
+e37f286 Port Obsidian Bridge into Aurora prototype shell
+14315d6 Port Load Testing into Aurora prototype shell
+10467f0 Port Setup and Test URLs into Aurora prototype shell
+242b305 Port Builds into Aurora prototype shell (original keeper)
 e5579f9 Fix WarmUp card width to fit all 4 buttons on one row
 e284cd1 Fix skipped tests: filter by outcome=NotExecuted server-side
 834b47b Fix button clipping, widget height lock, and skipped test counts
@@ -502,15 +516,27 @@ The legacy Flask/template frontend (`templates/`, `static/`) is archived at `/le
 
 **App rebranded to "Lamps Plus Pharos"** with lighthouse logo in header (dark/light variants).
 
-**Infrastructure:** Backend is 3-layer architecture with DI. Dockerfile uses multi-stage build (node:20-alpine → python:3.11-slim). Railway GitHub webhook integration is broken; deploy via Railway GraphQL API (see Deploy Rules) or `npx @railway/cli up -m "$(git log -1 --pretty=%s)"`. Railway CLI v4.37.3 installed globally.
+**Aurora prototype rollout COMPLETE.** All 14 nav-reachable pages now have a parallel `/prototype/<page>/aurora` route running under the lifted-card "Aurora" register (faithful to Claude Design's handoff, with slop tactics — animated drift blobs, backdrop-filter blur, gradient text — substituted out). Every nav item in the prototype's `BeaconSidebar` SPA-routes inside the prototype shell via `prototypeHref`. Production routes are visually unchanged. Pages live at:
+- MIGRATION: `/prototype/dashboard-launch/aurora`, `/prototype/dashboard-history/aurora`, `/prototype/dashboard-workstream/aurora/:id`, `/prototype/dashboard-project/aurora/:key`. "Blockers" is a SPA hash link to `/prototype/dashboard-launch/aurora#incidents`.
+- MONITORING: `/prototype/dashboard/aurora` (PageSpeed home), `/prototype/test/aurora`, `/prototype/metrics/aurora`.
+- INTEGRATIONS: `/prototype/newrelic/aurora`, `/prototype/iislogs/aurora`, `/prototype/ai-analysis/aurora`, `/prototype/builds/aurora`, `/prototype/load-testing/aurora`, `/prototype/obsidian/aurora`.
+- CONFIG: `/prototype/setup/aurora`.
+
+The port pattern is body-extraction + legacy-token re-map: `pages/<Page>.tsx` exports a `PageBody` function plus a thin production wrapper, and `prototypes/aurora-<page>/PrototypeAurora<Page>.tsx` mounts `<PageBody />` inside `<BeaconLayout register="aurora">`. The legacy `--lcc-*` and `--glass-*` CSS tokens get re-pointed under `.beacon.aurora` in `frontend/src/styles/aurora.css`, so every existing `.aurora-*` class and inline `style={{ color: 'var(--lcc-red)' }}` reference re-skins automatically — no component forks. See `feedback_aurora_porting_pattern.md` in user memory for the full pattern.
+
+**Infrastructure:** Backend is 3-layer architecture with DI. Dockerfile uses multi-stage build (node:20-alpine → python:3.11-slim). Railway GitHub webhook integration is broken; deploy via Railway CLI (`RAILWAY_API_TOKEN="$RAILWAY_TOKEN" npx @railway/cli up -m "$(git log -1 --pretty=%s)"`). Railway CLI v4.37.3 installed globally. The GraphQL `serviceInstanceDeploy` mutation reliably serves stale `master` images while the working tree is on `feature/obsidian-bridge` — skip it and go straight to the CLI.
 
 **Known issues:**
 - Railway GitHub webhook does not auto-create on repo connect — manual deploy required
+- Railway GraphQL `serviceInstanceDeploy` mutation serves stale master images on this branch — use `railway up` CLI directly
 - `.gitignore` root `lib/` rule was anchored to `/lib/` to avoid ignoring `frontend/src/lib/`
+- **Aurora prototype in-page nav leaks:** The prototype sidebar SPA-routes correctly, but in-page links inside the prototype (e.g., `WorkstreamRail` picker `<Link to="/dashboard/workstreams/:id">`, Status History workstream-change rows) still target production paths and bounce the user out of the prototype shell. Acceptable for an evaluation prototype; can be threaded with a `prototypeMode` context if/when needed.
 - **Dashboard table column alignment:** The "Worst Performing URLs" section renders separate `<table>` elements per site. With `table-auto`, sites with shorter URLs (e.g., Adobe) still have wider metric columns than sites with longer URLs (e.g., LampsPlus) because the browser distributes surplus space proportionally. The `width: 1px` trick on metric headers + `width: 100%` on the URL header improved it but didn't fully resolve cross-table alignment. A definitive fix would require a single table for all sites, CSS `table-layout: fixed` with explicit pixel widths on every column including URL, or JavaScript-based column width synchronization across tables.
 
 **Potential next steps:**
-- **Spreadsheet export data refinement (WIP):** Skipped test counts need validation across all build types; the `outcome == "NotExecuted"` filter may need adjustment. Unresolved section (Applitools integration) is a placeholder
+- **Promote Aurora to production:** if user signs off on the prototype, replace production `AppLayout` with `BeaconLayout register="aurora"` and retire the `/prototype/...` routes. The per-page Aurora wrappers become trivially deletable.
+- **Tackle the in-page nav leaks** so the prototype is fully self-contained.
+- **Merge `feature/obsidian-bridge` → `master`** — branch is now ~15 commits ahead; durable fix for protecting Aurora work from a Railway env-var-driven master redeploy.
+- **Spreadsheet export data refinement (WIP):** Skipped test counts need validation across all build types; the `outcome == "NotExecuted"` filter may need adjustment. Unresolved section (Applitools integration) is a placeholder.
 - Resolve Dashboard cross-table column alignment (see known issues above)
-- Visual polish and customization of the React frontend
 - Automated testing
