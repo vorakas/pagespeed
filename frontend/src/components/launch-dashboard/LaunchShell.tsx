@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
-import "@/styles/aurora-glass.css"
+// Aurora register CSS is loaded globally by main.tsx — no per-component
+// import needed here.
 
 type Theme = "dark" | "light"
 type Palette = "traffic" | "muted" | "mono"

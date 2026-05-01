@@ -1,7 +1,6 @@
 import { Outlet, useLocation } from "react-router-dom"
 import { BeaconSidebar } from "./BeaconSidebar"
 import { Toaster } from "@/components/ui/sonner"
-import "@/styles/aurora-glass.css"
 
 /**
  * Production application shell — paints the beacon-shell aurora register
