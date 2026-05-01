@@ -1264,51 +1264,50 @@
  *  dashboard's own layout rules.
  * ══════════════════════════════════════════════════════════════════ */
 
-/* ── App shell: gradient background + aurora blobs behind content ── */
+/* ── App shell: layered static radial gradients behind every page ──
+ *
+ * Originally two `::before`/`::after` pseudo-elements with `filter:
+ * blur(60px); opacity: 0.65` softening four violet/teal/pink/cyan
+ * radial-gradient blobs. The blur was a slop tactic — soft radial
+ * gradients don't need blur to feel diffuse, and `filter: blur` on a
+ * fixed/full-viewport surface forces the GPU to rasterize the
+ * pseudo-element every paint, with measurable cost on retina displays.
+ *
+ * Substitution: merge all four blobs into the `.aurora-app-shell`
+ * background as layered radial gradients with lower alpha (0.18-0.22
+ * vs the original 0.55). The diffuse "light source from off-screen"
+ * read survives — the blur was masking the high alpha, not creating
+ * the softness. Pseudo-elements deleted.
+ *
+ * Layer order (paint order, top to bottom):
+ *   1. Upper-left violet ambient    (was ::before #1)
+ *   2. Upper-right teal ambient     (was ::before #2)
+ *   3. Lower-right pink ambient     (was ::after  #1)
+ *   4. Lower-left cyan ambient      (was ::after  #2)
+ *   5. Bottom-center aurora-4 base  (kept from original)
+ *   6. Vertical aurora-1 → aurora-2 ground (kept)
+ *
+ * `background-attachment: fixed` keeps the gradient stationary as the
+ * page scrolls — same effect as the original fixed-positioned pseudos.
+ */
 .aurora-app-shell {
   position: relative;
   min-height: 100vh;
   overflow-x: clip;
   background:
+    radial-gradient(40% 40% at 18% 22%, rgba(156, 108, 255, 0.20), transparent 70%),
+    radial-gradient(45% 50% at 72% 18%, rgba(56, 224, 208, 0.14), transparent 70%),
+    radial-gradient(40% 45% at 82% 78%, rgba(255, 110, 196, 0.14), transparent 70%),
+    radial-gradient(45% 50% at 18% 82%, rgba(100, 200, 255, 0.12), transparent 70%),
     radial-gradient(60% 45% at 50% 105%, var(--aurora-4) 0%, transparent 60%),
     linear-gradient(180deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
+  background-attachment: fixed;
   color: var(--lcc-text);
 }
-.aurora-app-shell::before,
-.aurora-app-shell::after {
-  content: "";
-  position: fixed;
-  pointer-events: none;
-  z-index: 0;
-  /* Smaller blur + tighter gradient stops = less banding. Dropping blur
-   * from 90px to 60px sharpens the gradient enough that each color step
-   * covers fewer pixels, which keeps 8-bit banding below the perceptual
-   * threshold on most displays. */
-  filter: blur(60px);
-  opacity: 0.65;
-}
-.aurora-app-shell::before {
-  top: -20%; left: -10%;
-  width: 70%; height: 70%;
-  background:
-    radial-gradient(40% 40% at 30% 40%, var(--aurora-glow-violet) 0%, transparent 55%),
-    radial-gradient(45% 50% at 70% 30%, var(--aurora-glow-teal) 0%, transparent 55%);
-}
-.aurora-app-shell::after {
-  bottom: -25%; right: -15%;
-  width: 80%; height: 80%;
-  background:
-    radial-gradient(40% 45% at 70% 60%, var(--aurora-glow-pink) 0%, transparent 55%),
-    radial-gradient(45% 50% at 30% 60%, var(--aurora-glow-cyan) 0%, transparent 55%);
-}
-/* Keep main above the blob backdrop without overriding the sidebar's
- * Tailwind `.fixed` class (equal specificity; later-loaded rule wins). */
+/* Keep main above the (no-longer-existing) blob backdrop without
+ * overriding the sidebar's Tailwind `.fixed` class. Retained for
+ * defense-in-depth even though the z-index race is gone. */
 .aurora-app-shell > main { position: relative; z-index: 1; }
-
-@media (prefers-reduced-motion: reduce) {
-  .aurora-app-shell::before,
-  .aurora-app-shell::after { animation: none; }
-}
 
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 .aurora-sidebar {
