@@ -268,13 +268,14 @@
 .launch-dashboard .lcc-dot[data-health="in-progress"]   { background: var(--lcc-blue); }
 .launch-dashboard .lcc-dot[data-health="near-complete"] { background: var(--lcc-green); }
 
-/* Gradient-text utility (topbar countdown, hero headline, rail stat) */
+/* Gradient-text utility — originally a warm amber→pink→violet gradient
+ * fill clipped to glyph outlines. Gradient text on numbers/headlines is
+ * a slop tactic that sacrifices subpixel antialiasing and contrast for
+ * decorative chroma. Substitution: solid `--lcc-text` at the consumer's
+ * existing weight/size. The class is retained so JSX consumers don't
+ * have to change. */
 .launch-dashboard .lcc-gradient-text {
-  background: linear-gradient(90deg, #ffd57a 0%, #ff94bd 50%, #b08cff 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  color: var(--lcc-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -316,8 +317,7 @@
 .launch-dashboard .lcc-tb-countdown-num {
   font-size: 18px; font-weight: 700; letter-spacing: -0.02em; line-height: 1;
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(135deg, #ffc46b 0%, #ff6ec4 60%, #b08cff 100%);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  color: var(--lcc-text);
 }
 .launch-dashboard .lcc-tb-countdown-sub {
   font-size: 10px; color: var(--lcc-text-faint);
@@ -392,8 +392,7 @@
 .launch-dashboard .lcc-lr-stat-num {
   font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1;
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(135deg, #fff, #cfd5ff);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  color: var(--lcc-text);
 }
 .launch-dashboard .lcc-lr-stat-sub {
   font-size: 10px; color: var(--lcc-text-faint);
@@ -522,8 +521,7 @@
 .launch-dashboard .lcc-hs-status { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
 .launch-dashboard .lcc-hs-headline {
   font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1;
-  background: linear-gradient(135deg, #fff, #cfd5ff);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  color: var(--lcc-text);
 }
 .launch-dashboard .lcc-hs-kpis {
   display: flex; flex-wrap: wrap; gap: 10px;
@@ -544,8 +542,7 @@
   font-family: var(--aurora-font-mono);
 }
 .launch-dashboard .lcc-hs-kpi[data-tone="primary"] .lcc-hs-kpi-v {
-  background: linear-gradient(135deg, #fff, #cfd5ff);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  color: var(--lcc-text);
 }
 .launch-dashboard .lcc-hs-kpi[data-tone="green"] .lcc-hs-kpi-v { color: var(--lcc-green); text-shadow: 0 0 12px rgba(110, 231, 168, 0.4); }
 .launch-dashboard .lcc-hs-kpi[data-tone="amber"] .lcc-hs-kpi-v { color: var(--lcc-amber); text-shadow: 0 0 12px rgba(255, 196, 107, 0.4); }
@@ -576,8 +573,7 @@
 .launch-dashboard .lcc-hs-cd-num {
   font-size: 52px; font-weight: 700; letter-spacing: -0.04em; line-height: 1;
   font-variant-numeric: tabular-nums; margin: 4px 0;
-  background: linear-gradient(135deg, #ffc46b 0%, #ff6ec4 55%, #b08cff 100%);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  color: var(--lcc-text);
 }
 .launch-dashboard .lcc-hs-cd-num span {
   font-size: 18px; margin-left: 4px;
@@ -1843,10 +1839,6 @@
   letter-spacing: -0.02em;
   color: var(--lcc-text);
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(135deg, #fff, #cfd5ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 /* ── Global shadcn primitive overrides ────────────────────────────
