@@ -18,9 +18,6 @@ export function PrototypeAuroraNewRelic() {
       title="New Relic"
       description="Core Web Vitals and APM metrics"
       activePath="/newrelic"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <NewRelicBody />

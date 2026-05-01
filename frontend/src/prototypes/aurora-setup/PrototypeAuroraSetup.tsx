@@ -56,9 +56,6 @@ export function PrototypeAuroraSetup() {
       title="Setup"
       description="Manage sites, URLs, and scheduled triggers"
       activePath="/setup"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       {sitesLoading ? (

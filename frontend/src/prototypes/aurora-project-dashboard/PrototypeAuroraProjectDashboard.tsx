@@ -25,9 +25,6 @@ export function PrototypeAuroraProjectDashboard() {
       title="Project Dashboard"
       description={decoded ? `Project: ${decoded}` : "Per-project view"}
       activePath="/dashboard"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <ProjectDashboardBody />

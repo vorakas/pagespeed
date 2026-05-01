@@ -25,9 +25,6 @@ export function PrototypeAuroraWorkstreamDetail() {
       title="Workstream Detail"
       description={id ? `Workstream: ${id}` : "Workstream view"}
       activePath="/dashboard/workstreams/ws-data-platform"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <WorkstreamDetailBody />

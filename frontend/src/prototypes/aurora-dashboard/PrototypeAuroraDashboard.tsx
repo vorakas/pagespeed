@@ -22,9 +22,6 @@ export function PrototypeAuroraDashboard() {
       title="Dashboard"
       description="Monitor and compare website performance over time"
       activePath="/"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <div className="flex items-center justify-end px-6 pt-6">

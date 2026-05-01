@@ -15,9 +15,6 @@ export function PrototypeAuroraAiAnalysis() {
       title="AI Analysis"
       description="AI-powered performance analysis"
       activePath="/ai-analysis"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <AiAnalysisBody />

@@ -1,81 +1,39 @@
-import { useEffect, useState } from "react"
+import type { ReactNode } from "react"
 
 interface BeaconHeaderProps {
   title: string
   description?: string
-  /** Number of builds currently running or queued. */
-  activeBuildCount: number
-  /** Whether polling is currently active (drives the brand sweep + UI). */
-  polling: boolean
-  /** Last time data was synced from the server. */
-  lastSync: Date | null
+  /**
+   * Optional right-aligned slot for page-specific status, controls, or
+   * filters. Replaces the Builds-specific ACTIVE/POLLING/LAST_SYNC
+   * triplet that used to live here — pages that want those stats now
+   * render their own block and pass it through this slot, keeping the
+   * header itself page-agnostic.
+   */
+  actions?: ReactNode
 }
 
-function formatLastSync(d: Date | null, now: number): string {
-  if (!d) return "—"
-  const diffSec = Math.floor((now - d.getTime()) / 1000)
-  if (diffSec < 5) return "just now"
-  if (diffSec < 60) return `${diffSec}s ago`
-  const diffMin = Math.floor(diffSec / 60)
-  if (diffMin < 60) return `${diffMin}m ago`
-  const diffHr = Math.floor(diffMin / 60)
-  return `${diffHr}h ago`
-}
-
-export function BeaconHeader({
-  title,
-  description,
-  activeBuildCount,
-  polling,
-  lastSync,
-}: BeaconHeaderProps) {
-  // Tick once a second so the "last sync" relative time stays fresh
-  // without forcing a re-render of the whole page.
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [])
-
+/**
+ * Application header — sticky title strip rendered above page bodies.
+ * Page-agnostic: title + description on the left, optional `actions`
+ * slot on the right. The visual register (radii, shadows, type stack)
+ * is owned by `aurora-glass.css`'s `.beacon-header` class, scoped to
+ * either the prototype shell or the production AppLayout depending on
+ * where this is mounted.
+ */
+export function BeaconHeader({ title, description, actions }: BeaconHeaderProps) {
   return (
     <header className="beacon-header sticky top-0 z-30">
-      <div className="flex items-end justify-between gap-6 px-6 py-3.5">
-        {/* Left — page title + description */}
+      <div className="flex items-center justify-between gap-6 px-6 py-3.5">
         <div className="min-w-0">
           <h1 className="beacon-header-title leading-tight">{title}</h1>
           {description && (
             <p className="beacon-header-description mt-0.5">{description}</p>
           )}
         </div>
-
-        {/* Right — operational status block */}
-        <div className="flex items-center gap-7 shrink-0">
-          <div className="beacon-header-stat">
-            <span className="beacon-header-stat-label">ACTIVE</span>
-            <span
-              className={`beacon-header-stat-value ${
-                activeBuildCount > 0 ? "beacon-header-stat-value--accent" : ""
-              }`}
-            >
-              {activeBuildCount}
-            </span>
-          </div>
-          <div className="beacon-header-stat">
-            <span className="beacon-header-stat-label">POLLING</span>
-            <span
-              className="beacon-header-stat-value"
-              style={polling ? { color: "var(--beacon-pass)" } : undefined}
-            >
-              {polling ? "LIVE" : "IDLE"}
-            </span>
-          </div>
-          <div className="beacon-header-stat">
-            <span className="beacon-header-stat-label">LAST SYNC</span>
-            <span className="beacon-header-stat-value">
-              {formatLastSync(lastSync, now)}
-            </span>
-          </div>
-        </div>
+        {actions && (
+          <div className="flex items-center gap-3 shrink-0">{actions}</div>
+        )}
       </div>
     </header>
   )

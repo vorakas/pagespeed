@@ -208,9 +208,6 @@ export function PrototypeAuroraTestUrls() {
       title="Test URLs"
       description="Run PageSpeed tests on monitored URLs"
       activePath="/test"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       {sitesLoading ? (

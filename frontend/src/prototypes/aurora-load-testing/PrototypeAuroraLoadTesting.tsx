@@ -16,9 +16,6 @@ export function PrototypeAuroraLoadTesting() {
       title="Load Testing"
       description="Queue and orchestrate BlazeMeter load tests sequentially"
       activePath="/load-testing"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <LoadTestingBody />

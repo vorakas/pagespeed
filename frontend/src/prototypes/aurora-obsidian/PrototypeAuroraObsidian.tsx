@@ -16,9 +16,6 @@ export function PrototypeAuroraObsidian() {
       title="Obsidian Bridge"
       description="Sync Jira and Asana into the LLM-maintained Adobe Commerce migration vault"
       activePath="/obsidian"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <ObsidianBody />

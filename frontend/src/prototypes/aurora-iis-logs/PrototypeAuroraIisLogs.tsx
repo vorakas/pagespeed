@@ -20,9 +20,6 @@ export function PrototypeAuroraIisLogs() {
       title="IIS Logs"
       description="Azure Log Analytics and KQL queries"
       activePath="/iislogs"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <IisLogsBody />

@@ -27,9 +27,6 @@ export function PrototypeAuroraStatusHistory() {
       title="Status History"
       description="Day-over-day snapshot deltas across the migration"
       activePath="/dashboard/history"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <StatusHistoryBody />

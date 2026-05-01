@@ -17,9 +17,6 @@ export function PrototypeAuroraMetrics() {
       title="Performance Metrics"
       description="Historical performance data and comparisons"
       activePath="/metrics"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <div className="flex items-center justify-end px-6 pt-6">

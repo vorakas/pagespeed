@@ -26,9 +26,6 @@ export function PrototypeAuroraLaunchDashboard() {
       title="Launch Dashboard"
       description="Adobe Commerce migration command center"
       activePath="/dashboard"
-      activeBuildCount={0}
-      polling={false}
-      lastSync={null}
       register="aurora"
     >
       <LaunchDashboardBody />
