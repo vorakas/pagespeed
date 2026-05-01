@@ -28,7 +28,16 @@ import type {
   RawTaskRecord,
 } from "@/types"
 
-export function LaunchDashboard() {
+/**
+ * Body of the Launch Command Center — the entire dashboard tree from
+ * TopBar through SidePanel, scoped under `LaunchShell` so all the
+ * `.launch-dashboard .lcc-*` rules in `aurora-glass.css` resolve. The
+ * Aurora prototype at `/prototype/dashboard-launch/aurora` mounts this
+ * body inside `BeaconLayout`; the production export below renders it
+ * directly under `AppLayout`. No internal logic was changed during the
+ * extraction — only the function name.
+ */
+export function LaunchDashboardBody() {
   const [health, setHealth] = useState<MigrationHealthSnapshot | null>(null)
   const [kpis, setKpis] = useState<MigrationKpis | null>(null)
   const [workstreams, setWorkstreams] = useState<MigrationWorkstream[] | null>(null)
@@ -208,4 +217,13 @@ export function LaunchDashboard() {
       <SidePanel target={sidePanelTarget} onClose={() => setSidePanelTarget(null)} />
     </LaunchShell>
   )
+}
+
+/**
+ * Production export — renders `LaunchDashboardBody` as-is. Kept as a
+ * separate export so `App.tsx` and the rest of the app continue to
+ * import `{ LaunchDashboard }` unchanged.
+ */
+export function LaunchDashboard() {
+  return <LaunchDashboardBody />
 }
