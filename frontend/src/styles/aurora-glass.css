@@ -221,13 +221,10 @@
   height: 8px;
   border-radius: 50%;
   background: var(--lcc-green);
-  box-shadow: 0 0 0 0 rgba(110, 231, 168, 0.55);
-  animation: lcc-pulse 2.2s ease-in-out infinite;
-}
-@keyframes lcc-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(110, 231, 168, 0.55); }
-  80%  { box-shadow: 0 0 0 10px rgba(110, 231, 168, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(110, 231, 168, 0); }
+  /* Originally a 2.2s infinite expanding-ring animation. The ring was
+   * decorative — the dot's solid green is sufficient sync-OK signal,
+   * and infinite animations are eye-catching slop in a status indicator
+   * that should fade into the chrome once read. */
 }
 
 .launch-dashboard .lcc-chip {
@@ -295,10 +292,15 @@
   z-index: 50;
 }
 .launch-dashboard .lcc-brand { display: flex; align-items: center; gap: 12px; }
+/* Brand mark — originally a conic gradient orb (rainbow pinwheel) with
+ * a violet halo. The conic gradient + glow was the most slop-heavy
+ * micro-element in the file. Substitution: solid violet dot, the same
+ * accent the prototype uses for active states. The brand identifier
+ * has moved to the LampsPlus + Pharos logo wordmarks adjacent to the
+ * dot anyway, so the dot is just an ambient accent. */
 .launch-dashboard .lcc-brand-dot {
   width: 14px; height: 14px; border-radius: 50%;
-  background: conic-gradient(from 180deg, #6ec7ff, #b08cff, #ff6ec4, #6ee7a8, #6ec7ff);
-  box-shadow: 0 0 14px 2px rgba(176, 140, 255, 0.5);
+  background: var(--lcc-violet);
 }
 .launch-dashboard .lcc-brand-name {
   font-weight: 600; font-size: 13.5px; letter-spacing: -0.01em;
@@ -332,11 +334,11 @@
 .launch-dashboard .lcc-tb-health-dot {
   width: 8px; height: 8px; border-radius: 50%; background: var(--lcc-neutral);
 }
-.launch-dashboard .lcc-tb-health-dot[data-health="at-risk"]     { background: var(--lcc-amber); box-shadow: 0 0 10px var(--lcc-amber); }
-.launch-dashboard .lcc-tb-health-dot[data-health="blocked"]     { background: var(--lcc-red);   box-shadow: 0 0 10px var(--lcc-red); }
-.launch-dashboard .lcc-tb-health-dot[data-health="in-progress"] { background: var(--lcc-blue);  box-shadow: 0 0 10px var(--lcc-blue); }
+.launch-dashboard .lcc-tb-health-dot[data-health="at-risk"]     { background: var(--lcc-amber); }
+.launch-dashboard .lcc-tb-health-dot[data-health="blocked"]     { background: var(--lcc-red); }
+.launch-dashboard .lcc-tb-health-dot[data-health="in-progress"] { background: var(--lcc-blue); }
 .launch-dashboard .lcc-tb-health-dot[data-health="near-complete"],
-.launch-dashboard .lcc-tb-health-dot[data-health="improving"]   { background: var(--lcc-green); box-shadow: 0 0 10px var(--lcc-green); }
+.launch-dashboard .lcc-tb-health-dot[data-health="improving"]   { background: var(--lcc-green); }
 
 .launch-dashboard .lcc-spacer { flex: 1; }
 
@@ -354,7 +356,6 @@
 .launch-dashboard .lcc-tb-filter.active {
   background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
   color: #fff; border-color: transparent;
-  box-shadow: 0 0 14px rgba(176, 140, 255, 0.4);
 }
 
 .launch-dashboard .lcc-sync {
@@ -414,9 +415,9 @@
   color: var(--lcc-text-faint); margin-top: 1px;
   font-family: var(--aurora-font-mono);
 }
-.launch-dashboard .lcc-lr-stat-mini[data-tone="red"]   .v { color: var(--lcc-red);   text-shadow: 0 0 12px rgba(255, 107, 139, 0.4); }
-.launch-dashboard .lcc-lr-stat-mini[data-tone="amber"] .v { color: var(--lcc-amber); text-shadow: 0 0 12px rgba(255, 196, 107, 0.4); }
-.launch-dashboard .lcc-lr-stat-mini[data-tone="green"] .v { color: var(--lcc-green); text-shadow: 0 0 12px rgba(110, 231, 168, 0.4); }
+.launch-dashboard .lcc-lr-stat-mini[data-tone="red"]   .v { color: var(--lcc-red); }
+.launch-dashboard .lcc-lr-stat-mini[data-tone="amber"] .v { color: var(--lcc-amber); }
+.launch-dashboard .lcc-lr-stat-mini[data-tone="green"] .v { color: var(--lcc-green); }
 
 .launch-dashboard .lcc-lr-area {
   background: transparent; border: 1px solid transparent;
@@ -491,9 +492,9 @@
   width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0;
   background: var(--lcc-text-faint);
 }
-.launch-dashboard .lcc-lr-dot[data-tone="red"]   { background: var(--lcc-red);   box-shadow: 0 0 8px rgba(255, 107, 139, 0.5); }
-.launch-dashboard .lcc-lr-dot[data-tone="amber"] { background: var(--lcc-amber); box-shadow: 0 0 8px rgba(255, 196, 107, 0.5); }
-.launch-dashboard .lcc-lr-dot[data-tone="green"] { background: var(--lcc-green); box-shadow: 0 0 8px rgba(110, 231, 168, 0.5); }
+.launch-dashboard .lcc-lr-dot[data-tone="red"]   { background: var(--lcc-red); }
+.launch-dashboard .lcc-lr-dot[data-tone="amber"] { background: var(--lcc-amber); }
+.launch-dashboard .lcc-lr-dot[data-tone="green"] { background: var(--lcc-green); }
 
 .launch-dashboard .lcc-lr-crumb {
   font-size: 10.5px; color: var(--lcc-text-faint);
@@ -544,9 +545,9 @@
 .launch-dashboard .lcc-hs-kpi[data-tone="primary"] .lcc-hs-kpi-v {
   color: var(--lcc-text);
 }
-.launch-dashboard .lcc-hs-kpi[data-tone="green"] .lcc-hs-kpi-v { color: var(--lcc-green); text-shadow: 0 0 12px rgba(110, 231, 168, 0.4); }
-.launch-dashboard .lcc-hs-kpi[data-tone="amber"] .lcc-hs-kpi-v { color: var(--lcc-amber); text-shadow: 0 0 12px rgba(255, 196, 107, 0.4); }
-.launch-dashboard .lcc-hs-kpi[data-tone="red"]   .lcc-hs-kpi-v { color: var(--lcc-red);   text-shadow: 0 0 12px rgba(255, 107, 139, 0.4); }
+.launch-dashboard .lcc-hs-kpi[data-tone="green"] .lcc-hs-kpi-v { color: var(--lcc-green); }
+.launch-dashboard .lcc-hs-kpi[data-tone="amber"] .lcc-hs-kpi-v { color: var(--lcc-amber); }
+.launch-dashboard .lcc-hs-kpi[data-tone="red"]   .lcc-hs-kpi-v { color: var(--lcc-red); }
 
 .launch-dashboard .lcc-hs-reasons {
   display: flex; flex-wrap: wrap; gap: 14px 28px;
@@ -559,7 +560,6 @@
 .launch-dashboard .lcc-hs-reasons li::before {
   content: ""; position: absolute; left: 0; top: 7px;
   width: 5px; height: 5px; background: var(--lcc-red); border-radius: 50%;
-  box-shadow: 0 0 8px var(--lcc-red);
 }
 
 .launch-dashboard .lcc-hs-countdown {
@@ -589,7 +589,6 @@
 .launch-dashboard .lcc-hs-cd-bar > span {
   display: block; height: 100%;
   background: linear-gradient(90deg, var(--lcc-amber), var(--lcc-red) 60%, var(--lcc-violet));
-  box-shadow: 0 0 14px rgba(255, 110, 196, 0.55);
 }
 .launch-dashboard .lcc-hs-cd-sub {
   font-size: 11px; color: var(--lcc-text-faint);
@@ -605,11 +604,11 @@
   display: inline-block;
 }
 .launch-dashboard .lcc-health-badge.lg { font-size: 11.5px; padding: 6px 14px; }
-.launch-dashboard .lcc-health-badge[data-health="at-risk"]       { background: var(--lcc-amber-bg); color: var(--lcc-amber); border-color: rgba(255,196,107,0.4); box-shadow: 0 0 20px -8px var(--lcc-amber); }
-.launch-dashboard .lcc-health-badge[data-health="blocked"]       { background: var(--lcc-red-bg);   color: var(--lcc-red);   border-color: rgba(255,107,139,0.4); box-shadow: 0 0 20px -8px var(--lcc-red); }
-.launch-dashboard .lcc-health-badge[data-health="in-progress"]   { background: var(--lcc-blue-bg);  color: var(--lcc-blue);  border-color: rgba(110,199,255,0.4); box-shadow: 0 0 20px -8px var(--lcc-blue); }
+.launch-dashboard .lcc-health-badge[data-health="at-risk"]       { background: var(--lcc-amber-bg); color: var(--lcc-amber); border-color: rgba(255,196,107,0.4); }
+.launch-dashboard .lcc-health-badge[data-health="blocked"]       { background: var(--lcc-red-bg);   color: var(--lcc-red);   border-color: rgba(255,107,139,0.4); }
+.launch-dashboard .lcc-health-badge[data-health="in-progress"]   { background: var(--lcc-blue-bg);  color: var(--lcc-blue);  border-color: rgba(110,199,255,0.4); }
 .launch-dashboard .lcc-health-badge[data-health="near-complete"],
-.launch-dashboard .lcc-health-badge[data-health="improving"]     { background: var(--lcc-green-bg); color: var(--lcc-green); border-color: rgba(110,231,168,0.4); box-shadow: 0 0 20px -8px var(--lcc-green); }
+.launch-dashboard .lcc-health-badge[data-health="improving"]     { background: var(--lcc-green-bg); color: var(--lcc-green); border-color: rgba(110,231,168,0.4); }
 .launch-dashboard .lcc-health-badge[data-health="groomed"]       { background: var(--lcc-neutral-bg); color: var(--lcc-text-dim); border-color: var(--glass-border); }
 
 /* ── Panel heading pattern (shared by wall, charts, etc.) ─────── */
@@ -649,10 +648,10 @@
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--lcc-neutral);
 }
-.launch-dashboard .lcc-wall-legend .d[data-health="blocked"]       { background: var(--lcc-red);   box-shadow: 0 0 8px var(--lcc-red); }
-.launch-dashboard .lcc-wall-legend .d[data-health="at-risk"]       { background: var(--lcc-amber); box-shadow: 0 0 8px var(--lcc-amber); }
-.launch-dashboard .lcc-wall-legend .d[data-health="in-progress"]   { background: var(--lcc-blue);  box-shadow: 0 0 8px var(--lcc-blue); }
-.launch-dashboard .lcc-wall-legend .d[data-health="near-complete"] { background: var(--lcc-green); box-shadow: 0 0 8px var(--lcc-green); }
+.launch-dashboard .lcc-wall-legend .d[data-health="blocked"]       { background: var(--lcc-red); }
+.launch-dashboard .lcc-wall-legend .d[data-health="at-risk"]       { background: var(--lcc-amber); }
+.launch-dashboard .lcc-wall-legend .d[data-health="in-progress"]   { background: var(--lcc-blue); }
+.launch-dashboard .lcc-wall-legend .d[data-health="near-complete"] { background: var(--lcc-green); }
 
 .launch-dashboard .lcc-wall-body { display: flex; flex-direction: column; gap: 18px; }
 .launch-dashboard .lcc-wall-empty {
@@ -699,11 +698,11 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   border-color: var(--glass-border-strong);
 }
-.launch-dashboard .lcc-wall-cell[data-status="at-risk"]::after       { background: var(--lcc-amber); box-shadow: 0 0 14px var(--lcc-amber); }
-.launch-dashboard .lcc-wall-cell[data-status="blocked"]::after       { background: var(--lcc-red);   box-shadow: 0 0 14px var(--lcc-red); }
-.launch-dashboard .lcc-wall-cell[data-status="in-progress"]::after   { background: var(--lcc-blue);  box-shadow: 0 0 14px var(--lcc-blue); }
+.launch-dashboard .lcc-wall-cell[data-status="at-risk"]::after       { background: var(--lcc-amber); }
+.launch-dashboard .lcc-wall-cell[data-status="blocked"]::after       { background: var(--lcc-red); }
+.launch-dashboard .lcc-wall-cell[data-status="in-progress"]::after   { background: var(--lcc-blue); }
 .launch-dashboard .lcc-wall-cell[data-status="near-complete"]::after,
-.launch-dashboard .lcc-wall-cell[data-status="improving"]::after     { background: var(--lcc-green); box-shadow: 0 0 14px var(--lcc-green); }
+.launch-dashboard .lcc-wall-cell[data-status="improving"]::after     { background: var(--lcc-green); }
 
 .launch-dashboard .lcc-wc-top {
   display: flex; justify-content: space-between; align-items: center;
@@ -735,7 +734,6 @@
 .launch-dashboard .lcc-wc-progress-bar > span {
   display: block; height: 100%;
   background: linear-gradient(90deg, var(--lcc-violet), var(--lcc-blue));
-  box-shadow: 0 0 8px rgba(176, 140, 255, 0.4);
 }
 .launch-dashboard .lcc-wall-cell[data-status="blocked"] .lcc-wc-progress-bar > span,
 .launch-dashboard .lcc-wall-cell[data-status="at-risk"] .lcc-wc-progress-bar > span {
@@ -797,10 +795,10 @@
 .launch-dashboard .lcc-ts-fill {
   position: absolute; inset: 0 auto 0 0; border-radius: 999px;
 }
-.launch-dashboard .lcc-ts-fill[data-color="red"]    { background: linear-gradient(90deg, var(--lcc-red),   rgba(255,107,139,0.5));  box-shadow: 0 0 10px rgba(255,107,139,0.5); }
-.launch-dashboard .lcc-ts-fill[data-color="amber"]  { background: linear-gradient(90deg, var(--lcc-amber), rgba(255,196,107,0.5));  box-shadow: 0 0 10px rgba(255,196,107,0.5); }
-.launch-dashboard .lcc-ts-fill[data-color="green"]  { background: linear-gradient(90deg, var(--lcc-green), rgba(110,231,168,0.5));  box-shadow: 0 0 10px rgba(110,231,168,0.5); }
-.launch-dashboard .lcc-ts-fill[data-color="blue"]   { background: linear-gradient(90deg, var(--lcc-blue),  rgba(110,199,255,0.5));  box-shadow: 0 0 10px rgba(110,199,255,0.5); }
+.launch-dashboard .lcc-ts-fill[data-color="red"]    { background: var(--lcc-red); }
+.launch-dashboard .lcc-ts-fill[data-color="amber"]  { background: var(--lcc-amber); }
+.launch-dashboard .lcc-ts-fill[data-color="green"]  { background: var(--lcc-green); }
+.launch-dashboard .lcc-ts-fill[data-color="blue"]   { background: var(--lcc-blue); }
 .launch-dashboard .lcc-ts-fill[data-color="neutral"]{ background: linear-gradient(90deg, var(--lcc-neutral), rgba(122,131,168,0.4)); }
 .launch-dashboard .lcc-ts-num {
   text-align: right; font-family: var(--aurora-font-mono);
@@ -810,10 +808,10 @@
 .launch-dashboard .lcc-sdot {
   width: 8px; height: 8px; border-radius: 50%; background: var(--lcc-neutral);
 }
-.launch-dashboard .lcc-sdot[data-color="red"]    { background: var(--lcc-red);   box-shadow: 0 0 8px var(--lcc-red); }
-.launch-dashboard .lcc-sdot[data-color="amber"]  { background: var(--lcc-amber); box-shadow: 0 0 8px var(--lcc-amber); }
-.launch-dashboard .lcc-sdot[data-color="green"]  { background: var(--lcc-green); box-shadow: 0 0 8px var(--lcc-green); }
-.launch-dashboard .lcc-sdot[data-color="blue"]   { background: var(--lcc-blue);  box-shadow: 0 0 8px var(--lcc-blue); }
+.launch-dashboard .lcc-sdot[data-color="red"]    { background: var(--lcc-red); }
+.launch-dashboard .lcc-sdot[data-color="amber"]  { background: var(--lcc-amber); }
+.launch-dashboard .lcc-sdot[data-color="green"]  { background: var(--lcc-green); }
+.launch-dashboard .lcc-sdot[data-color="blue"]   { background: var(--lcc-blue); }
 
 /* ── Teams strip ───────────────────────────────────────────── */
 .launch-dashboard .lcc-teams-list {
@@ -848,16 +846,13 @@
 }
 .launch-dashboard .lcc-team-item .ti-bar > span {
   display: block; height: 100%;
-  background: linear-gradient(90deg, var(--lcc-green), rgba(110,231,168,0.5));
-  box-shadow: 0 0 8px rgba(110,231,168,0.5);
+  background: var(--lcc-green);
 }
 .launch-dashboard .lcc-team-item[data-risk="high"] .ti-bar > span {
-  background: linear-gradient(90deg, var(--lcc-red), rgba(255,107,139,0.5));
-  box-shadow: 0 0 8px rgba(255,107,139,0.5);
+  background: var(--lcc-red);
 }
 .launch-dashboard .lcc-team-item[data-risk="med"] .ti-bar > span {
-  background: linear-gradient(90deg, var(--lcc-amber), rgba(255,196,107,0.5));
-  box-shadow: 0 0 8px rgba(255,196,107,0.5);
+  background: var(--lcc-amber);
 }
 
 /* ── Sources strip ─────────────────────────────────────────── */
@@ -896,7 +891,6 @@
 .launch-dashboard .lcc-src-bar > span {
   display: block; height: 100%;
   background: linear-gradient(90deg, var(--lcc-violet), var(--lcc-blue));
-  box-shadow: 0 0 8px rgba(176, 140, 255, 0.4);
 }
 
 /* ── Incident stream rows ───────────────────────────────────── */
@@ -960,8 +954,8 @@
   content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 2px;
   background: var(--lcc-neutral);
 }
-.launch-dashboard .lcc-is-item[data-kind="prod"]::before    { background: var(--lcc-red);    box-shadow: 0 0 10px var(--lcc-red); }
-.launch-dashboard .lcc-is-item[data-kind="blocker"]::before { background: var(--lcc-amber); box-shadow: 0 0 10px var(--lcc-amber); }
+.launch-dashboard .lcc-is-item[data-kind="prod"]::before    { background: var(--lcc-red); }
+.launch-dashboard .lcc-is-item[data-kind="blocker"]::before { background: var(--lcc-amber); }
 .launch-dashboard .lcc-is-item[data-kind="bug"]::before     { background: var(--lcc-violet); }
 .launch-dashboard .lcc-is-item:hover { background: var(--glass-hi); }
 .launch-dashboard .lcc-is-item:last-child { border-bottom: none; }
@@ -976,8 +970,8 @@
   background: var(--lcc-neutral);
 }
 .launch-dashboard .lcc-is-dot[data-severity="critical"],
-.launch-dashboard .lcc-is-dot[data-severity="blocker"] { background: var(--lcc-red);    box-shadow: 0 0 8px var(--lcc-red); }
-.launch-dashboard .lcc-is-dot[data-severity="high"]    { background: var(--lcc-amber); box-shadow: 0 0 6px var(--lcc-amber); }
+.launch-dashboard .lcc-is-dot[data-severity="blocker"] { background: var(--lcc-red); }
+.launch-dashboard .lcc-is-dot[data-severity="high"]    { background: var(--lcc-amber); }
 .launch-dashboard .lcc-is-dot[data-severity="medium"]  { background: var(--lcc-blue); }
 .launch-dashboard .lcc-is-dot[data-severity="low"]     { background: var(--lcc-neutral); }
 .launch-dashboard .lcc-is-kind-label { color: var(--lcc-text-dim); font-weight: 600; }
@@ -1082,9 +1076,9 @@
   font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--lcc-text-faint); margin-top: 2px; font-family: var(--aurora-font-mono);
 }
-.launch-dashboard-side-panel .sp-stat[data-tone="red"]   .v { color: var(--lcc-red);   text-shadow: 0 0 14px rgba(255,107,139,0.35); }
-.launch-dashboard-side-panel .sp-stat[data-tone="amber"] .v { color: var(--lcc-amber); text-shadow: 0 0 14px rgba(255,196,107,0.35); }
-.launch-dashboard-side-panel .sp-stat[data-tone="green"] .v { color: var(--lcc-green); text-shadow: 0 0 14px rgba(110,231,168,0.35); }
+.launch-dashboard-side-panel .sp-stat[data-tone="red"]   .v { color: var(--lcc-red); }
+.launch-dashboard-side-panel .sp-stat[data-tone="amber"] .v { color: var(--lcc-amber); }
+.launch-dashboard-side-panel .sp-stat[data-tone="green"] .v { color: var(--lcc-green); }
 
 .launch-dashboard-side-panel table.t {
   width: 100%; border-collapse: collapse; font-size: 12px;
@@ -1299,10 +1293,13 @@
   padding: 14px 16px;
   border-bottom: 1px solid var(--glass-border);
 }
+/* Sidebar brand dot — same conic-rainbow + violet halo treatment as
+ * the launch-dashboard `.lcc-brand-dot`. Substitution: solid violet
+ * dot. Brand identity is carried by the adjacent Pharos wordmark and
+ * LampsPlus logo, not the dot. */
 .aurora-sidebar-brand-dot {
   width: 24px; height: 24px; border-radius: 50%;
-  background: conic-gradient(from 180deg, #6ec7ff, #b08cff, #ff6ec4, #6ee7a8, #6ec7ff);
-  box-shadow: 0 0 14px 2px rgba(176, 140, 255, 0.5);
+  background: var(--lcc-violet);
   flex-shrink: 0;
 }
 .aurora-sidebar-brand-name {
@@ -1534,7 +1531,6 @@
   background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 0 14px rgba(176, 140, 255, 0.4);
 }
 
 /* Progress bar: dim glass track + violet gradient fill. */
@@ -1554,7 +1550,6 @@
 .aurora-progress [data-slot="progress-indicator"] {
   height: 100%;
   background: linear-gradient(90deg, var(--lcc-blue), var(--lcc-violet));
-  box-shadow: 0 0 12px rgba(176, 140, 255, 0.45);
   border-radius: inherit;
 }
 
@@ -1704,7 +1699,6 @@
 .aurora-app-shell [data-slot="switch"][data-checked] {
   background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
   border-color: transparent;
-  box-shadow: 0 0 12px rgba(176, 140, 255, 0.4);
 }
 .aurora-app-shell [data-slot="switch-thumb"] {
   background: #fff;
@@ -1779,7 +1773,6 @@
   background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 0 12px rgba(176, 140, 255, 0.4);
 }
 .aurora-radio-pill input { position: absolute; opacity: 0; pointer-events: none; }
 
