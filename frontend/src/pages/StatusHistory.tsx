@@ -185,7 +185,7 @@ function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
         )}
       </aside>
       <div style={cardBodyStyle}>
-        {curr.headline && <p style={headlineStyle}>{curr.headline}</p>}
+        {curr.headline && <HeadlineBlocks text={curr.headline} />}
         <div style={kpiGridStyle}>
           {KPI_VIEW.map((k) => {
             const d = entry.diff.kpis?.[k.key] as SnapshotKpiDelta | undefined
@@ -195,6 +195,64 @@ function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
         </div>
       </div>
     </article>
+  )
+}
+
+/**
+ * The backend's snapshot summarizer emits one long prose headline that
+ * narrates the most-recent sync, then chains older syncs with "Earlier
+ * ~HH:MM UTC sync (Job XXXX) surfaced …" markers, then trails into
+ * summary stats ("Active Production Failures unchanged at N. Underlying
+ * …"). Split that into stacked blocks so each sync reads as its own
+ * item and the trailing stats peel off into a final compact line.
+ */
+function HeadlineBlocks({ text }: { text: string }) {
+  // Split at "Earlier ~HH:MM UTC" boundaries while keeping the markers.
+  const events = text
+    .split(/(?=\bEarlier\s+~\d{1,2}:\d{2}\s*UTC\b)/g)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  // The last narrative event often carries trailing summary stats —
+  // sentences like "Active Production Failures unchanged at 7." or
+  // "Underlying LAMPSPLUS raw count unchanged at 2,119; …". Peel those
+  // off the last chunk so they render as a compact factual footer.
+  let trailingStats: string | null = null
+  if (events.length > 0) {
+    const last = events[events.length - 1]
+    const m = last.match(/^(.*?)((?:\s|^)(?:Active Production Failures|Underlying\s)\b.*)$/s)
+    if (m && m[1].trim()) {
+      events[events.length - 1] = m[1].trim()
+      trailingStats = m[2].trim()
+    }
+  }
+
+  return (
+    <div style={headlineStackStyle}>
+      {events.map((chunk, i) => {
+        const tm = chunk.match(/^Earlier\s+~(\d{1,2}:\d{2})\s*UTC/)
+        const time = tm?.[1] ?? null
+        const body = tm ? chunk.slice(tm[0].length).replace(/^[\s—-]+/, "").trim() : chunk
+        return (
+          <div key={i} style={headlineEventStyle}>
+            <div style={headlineEventHeadStyle}>
+              {time ? (
+                <>
+                  <span style={headlineTimePillStyle}>{time} UTC</span>
+                  <span style={headlineEventLabelStyle}>EARLIER SYNC</span>
+                </>
+              ) : (
+                <span style={headlineEventLabelStyle}>LATEST SYNC</span>
+              )}
+            </div>
+            <p style={headlineBodyStyle}>{body}</p>
+          </div>
+        )
+      })}
+      {trailingStats && (
+        <div style={trailingStatsStyle}>{trailingStats}</div>
+      )}
+    </div>
   )
 }
 
@@ -396,14 +454,58 @@ const healthChipStyle: React.CSSProperties = {
   fontWeight: 700,
   border: "1px solid",
 }
-const headlineStyle: React.CSSProperties = {
+const headlineStackStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+}
+const headlineEventStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  paddingLeft: 12,
+  borderLeft: "2px solid var(--lcc-violet)",
+}
+const headlineEventHeadStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+}
+const headlineTimePillStyle: React.CSSProperties = {
+  display: "inline-block",
+  padding: "2px 8px",
+  borderRadius: 999,
+  fontSize: 10,
+  fontFamily: "var(--font-mono, monospace)",
+  fontWeight: 600,
+  letterSpacing: "0.04em",
+  color: "var(--lcc-violet)",
+  background: "var(--lcc-violet-bg, rgba(176,140,255,0.14))",
+  border: "1px solid var(--lcc-violet)",
+}
+const headlineEventLabelStyle: React.CSSProperties = {
+  fontSize: 9.5,
+  fontFamily: "var(--font-mono, monospace)",
+  fontWeight: 700,
+  letterSpacing: "0.14em",
+  color: "var(--lcc-text-faint)",
+  textTransform: "uppercase",
+}
+const headlineBodyStyle: React.CSSProperties = {
   fontSize: 13,
   lineHeight: 1.55,
   color: "var(--lcc-text)",
   margin: 0,
-  paddingLeft: 10,
-  borderLeft: "2px solid var(--lcc-violet)",
-  fontStyle: "italic",
+}
+const trailingStatsStyle: React.CSSProperties = {
+  fontSize: 11.5,
+  lineHeight: 1.5,
+  color: "var(--lcc-text-dim)",
+  fontFamily: "var(--font-mono, monospace)",
+  padding: "8px 12px",
+  borderRadius: 6,
+  background: "rgba(255,255,255,0.03)",
+  border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.08))",
 }
 const kpiGridStyle: React.CSSProperties = {
   display: "grid",
