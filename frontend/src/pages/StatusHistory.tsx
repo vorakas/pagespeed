@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Link } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
-import { useDashboardLinks } from "@/lib/dashboard-links"
 import type { MigrationHistoryEntry, SnapshotKpiDelta } from "@/types"
 
 type FilterKey = "all" | "changes" | "regressions" | "resolutions"
@@ -72,6 +70,23 @@ export function StatusHistory() {
     })
   }, [entries, filter])
 
+  // Group filtered entries by year-month so each month gets its own
+  // section header, breaking up the otherwise endless reverse-chron stack.
+  const grouped = useMemo(() => {
+    const out: Array<{ key: string; label: string; items: MigrationHistoryEntry[] }> = []
+    let current: { key: string; label: string; items: MigrationHistoryEntry[] } | null = null
+    for (const entry of filtered) {
+      const date = entry.currentPayload.date || entry.to
+      const key = date.slice(0, 7) // YYYY-MM
+      if (!current || current.key !== key) {
+        current = { key, label: formatMonthLabel(date), items: [] }
+        out.push(current)
+      }
+      current.items.push(entry)
+    }
+    return out
+  }, [filtered])
+
   if (error) {
     return (
       <LaunchShell>
@@ -124,9 +139,21 @@ export function StatusHistory() {
             No matching snapshots.
           </div>
         ) : (
-          <div style={cardsStyle}>
-            {filtered.map((entry) => (
-              <HistoryCard key={`${entry.from}->${entry.to}`} entry={entry} />
+          <div style={groupsStyle}>
+            {grouped.map((group) => (
+              <section key={group.key} style={groupStyle}>
+                <h2 style={monthHeaderStyle}>
+                  <span>{group.label}</span>
+                  <span style={monthCountStyle}>
+                    {group.items.length} snapshot{group.items.length === 1 ? "" : "s"}
+                  </span>
+                </h2>
+                <div style={cardsStyle}>
+                  {group.items.map((entry) => (
+                    <HistoryCard key={`${entry.from}->${entry.to}`} entry={entry} />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}
@@ -136,58 +163,58 @@ export function StatusHistory() {
 }
 
 function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
-  const links = useDashboardLinks()
   const curr = entry.currentPayload
-  const areaChanges = entry.diff.areaStatuses
+  const dayLabel = formatDayLabel(curr.date)
   return (
-    <article className="panel" style={{ padding: 18 }}>
-      <header style={cardHeaderStyle}>
-        <div>
-          <div style={cardDateStyle}>{curr.date}</div>
-          {curr.overall && (
-            <span
-              style={{
-                ...healthChipStyle,
-                color: healthColor(curr.overall),
-                background: healthBg(curr.overall),
-                borderColor: healthColor(curr.overall),
-              }}
-            >
-              {curr.overall.replace("-", " ").toUpperCase()}
-            </span>
-          )}
-        </div>
+    <article className="panel" style={cardStyle}>
+      <aside style={dateColumnStyle}>
+        <div style={cardDayNumberStyle}>{dayLabel.day}</div>
+        <div style={cardWeekdayStyle}>{dayLabel.weekday}</div>
         <div style={cardFromStyle}>vs {entry.from}</div>
-      </header>
-      {curr.headline && <p style={headlineStyle}>{curr.headline}</p>}
-
-      <div style={kpiGridStyle}>
-        {KPI_VIEW.map((k) => {
-          const d = entry.diff.kpis?.[k.key] as SnapshotKpiDelta | undefined
-          if (!d || d.curr === null) return null
-          return <KpiMini key={k.key} label={k.label} delta={d} goodWhen={k.goodWhen} />
-        })}
-      </div>
-
-      {areaChanges.length > 0 && (
-        <div style={areaBlockStyle}>
-          <div style={areaLabelStyle}>Workstream health changes</div>
-          <ul style={areaListStyle}>
-            {areaChanges.map((c) => (
-              <li key={c.ws} style={areaItemStyle}>
-                <Link to={links.workstreamPath(c.ws)} style={areaLinkStyle}>
-                  {c.ws}
-                </Link>
-                <span style={{ color: healthColor(c.from) }}>{c.from}</span>
-                <span style={{ color: "var(--lcc-text-faint)" }}>→</span>
-                <span style={{ color: healthColor(c.to), fontWeight: 600 }}>{c.to}</span>
-              </li>
-            ))}
-          </ul>
+        {curr.overall && (
+          <span
+            style={{
+              ...healthChipStyle,
+              color: healthColor(curr.overall),
+              background: healthBg(curr.overall),
+              borderColor: healthColor(curr.overall),
+            }}
+          >
+            {curr.overall.replace("-", " ").toUpperCase()}
+          </span>
+        )}
+      </aside>
+      <div style={cardBodyStyle}>
+        {curr.headline && <p style={headlineStyle}>{curr.headline}</p>}
+        <div style={kpiGridStyle}>
+          {KPI_VIEW.map((k) => {
+            const d = entry.diff.kpis?.[k.key] as SnapshotKpiDelta | undefined
+            if (!d || d.curr === null) return null
+            return <KpiMini key={k.key} label={k.label} delta={d} goodWhen={k.goodWhen} />
+          })}
         </div>
-      )}
+      </div>
     </article>
   )
+}
+
+function formatMonthLabel(iso: string): string {
+  // iso may be YYYY-MM-DD or YYYY-MM. Avoid Date() to dodge timezone shift.
+  const [y, m] = iso.split("-")
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ]
+  const idx = Math.max(0, Math.min(11, parseInt(m, 10) - 1))
+  return `${months[idx]} ${y}`
+}
+
+function formatDayLabel(iso: string): { day: string; weekday: string } {
+  const [y, m, d] = iso.split("-").map((s) => parseInt(s, 10))
+  if (!y || !m || !d) return { day: iso, weekday: "" }
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  const weekday = dt.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })
+  return { day: String(d).padStart(2, "0"), weekday: weekday.toUpperCase() }
 }
 
 function KpiMini({
@@ -275,56 +302,113 @@ const pillStyle: React.CSSProperties = {
 }
 const pillActiveStyle: React.CSSProperties = {
   background: "linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue))",
-  color: "#fff",
+  color: "#000",
   borderColor: "transparent",
   boxShadow: "0 0 14px rgba(176,140,255,0.4)",
+}
+const groupsStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 24,
+}
+const groupStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+}
+const monthHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  gap: 12,
+  margin: 0,
+  padding: "0 4px 6px",
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase",
+  color: "var(--lcc-text-dim)",
+  borderBottom: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.1))",
+}
+const monthCountStyle: React.CSSProperties = {
+  fontSize: 10,
+  letterSpacing: "0.08em",
+  color: "var(--lcc-text-faint)",
+  fontFamily: "var(--font-mono, monospace)",
+  fontWeight: 500,
+  textTransform: "uppercase",
 }
 const cardsStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: 14,
+  gap: 10,
 }
-const cardHeaderStyle: React.CSSProperties = {
+const cardStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "120px 1fr",
+  gap: 18,
+  padding: 18,
+}
+const dateColumnStyle: React.CSSProperties = {
   display: "flex",
-  justifyContent: "space-between",
+  flexDirection: "column",
   alignItems: "flex-start",
-  marginBottom: 10,
+  gap: 4,
+  paddingRight: 14,
+  borderRight: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.08))",
 }
-const cardDateStyle: React.CSSProperties = {
-  fontSize: 18,
+const cardBodyStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+  minWidth: 0,
+}
+const cardDayNumberStyle: React.CSSProperties = {
+  fontSize: 32,
   fontWeight: 700,
+  lineHeight: 1,
   color: "var(--lcc-text)",
-  marginBottom: 4,
+  fontVariantNumeric: "tabular-nums",
+  letterSpacing: "-0.02em",
+}
+const cardWeekdayStyle: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: "0.14em",
+  color: "var(--lcc-text-dim)",
+  fontFamily: "var(--font-mono, monospace)",
+  marginBottom: 6,
 }
 const cardFromStyle: React.CSSProperties = {
-  fontSize: 10.5,
+  fontSize: 10,
   color: "var(--lcc-text-faint)",
   fontFamily: "var(--font-mono, monospace)",
-  letterSpacing: "0.08em",
+  letterSpacing: "0.06em",
   textTransform: "uppercase",
+  marginBottom: 4,
 }
 const healthChipStyle: React.CSSProperties = {
   display: "inline-block",
   padding: "3px 9px",
   borderRadius: 999,
-  fontSize: 10,
+  fontSize: 9.5,
   letterSpacing: "0.08em",
   fontWeight: 700,
   border: "1px solid",
 }
 const headlineStyle: React.CSSProperties = {
   fontSize: 13,
-  lineHeight: 1.5,
-  color: "var(--lcc-text-dim)",
-  margin: "0 0 14px",
+  lineHeight: 1.55,
+  color: "var(--lcc-text)",
+  margin: 0,
+  paddingLeft: 10,
+  borderLeft: "2px solid var(--lcc-violet)",
+  fontStyle: "italic",
 }
 const kpiGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
   gap: 8,
-  marginBottom: 10,
-  paddingBottom: 10,
-  borderBottom: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.1))",
 }
 const kpiMiniStyle: React.CSSProperties = { padding: "6px 8px" }
 const kpiMiniLabelStyle: React.CSSProperties = {
@@ -340,34 +424,4 @@ const kpiMiniValueStyle: React.CSSProperties = {
   fontWeight: 700,
   color: "var(--lcc-text)",
   fontVariantNumeric: "tabular-nums",
-}
-const areaBlockStyle: React.CSSProperties = { marginTop: 6 }
-const areaLabelStyle: React.CSSProperties = {
-  fontSize: 10,
-  letterSpacing: "0.14em",
-  textTransform: "uppercase",
-  color: "var(--lcc-text-faint)",
-  fontFamily: "var(--font-mono, monospace)",
-  fontWeight: 700,
-  marginBottom: 8,
-}
-const areaListStyle: React.CSSProperties = {
-  listStyle: "none",
-  padding: 0,
-  margin: 0,
-  display: "flex",
-  flexDirection: "column",
-  gap: 4,
-}
-const areaItemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  fontSize: 12,
-  fontFamily: "var(--font-mono, monospace)",
-}
-const areaLinkStyle: React.CSSProperties = {
-  color: "var(--lcc-blue)",
-  textDecoration: "none",
-  flex: "0 0 200px",
 }

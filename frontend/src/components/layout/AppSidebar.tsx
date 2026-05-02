@@ -3,7 +3,6 @@ import {
   Rocket,
   History,
   ListTree,
-  AlertTriangle,
   LayoutDashboard,
   Gauge,
   BarChart3,
@@ -38,7 +37,6 @@ const NAV: NavSection[] = [
       { label: "Launch Dashboard", href: "/dashboard", icon: Rocket },
       { label: "Status History", href: "/dashboard/history", icon: History },
       { label: "Workstreams", href: "/dashboard/workstreams/ws-data-platform", icon: ListTree },
-      { label: "Blockers", href: "/dashboard#incidents", icon: AlertTriangle },
     ],
   },
   {
@@ -116,11 +114,6 @@ export function AppSidebar({ activePath }: AppSidebarProps) {
             <div className="flex flex-col gap-px">
               {section.items.map((item) => {
                 const Icon = item.icon
-                // Active when pathname+hash match the link target. The
-                // hash split lets `/dashboard#incidents` light up only
-                // when the user is actually scrolled to that anchor,
-                // and a bare `/dashboard` doesn't trigger the Blockers
-                // item.
                 const [linkPath, linkHash = ""] = item.href.split("#")
                 const isActive = linkPath === activePath.split("#")[0] &&
                   linkHash === (activePath.split("#")[1] ?? "")
