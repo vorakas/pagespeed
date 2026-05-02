@@ -91,18 +91,23 @@ export function AppSidebar({ activePath }: AppSidebarProps) {
       {/* Brand — static Pharos logo. The image carries the "Pharos"
           wordmark, so we don't repeat it as text — only the small
           OPERATIONS HUB tagline rides alongside. */}
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border">
+      <div className="flex items-center gap-2.5 pl-2 pr-4 py-3 border-b border-border">
         <img
-          src={`${BASE_URL}images/Pharos-dark.png`}
+          src={`${BASE_URL}images/Pharos-dark-v2.png`}
           alt="Pharos"
-          className="h-12 w-auto"
+          className="h-16 w-auto"
           onError={(e) => {
             e.currentTarget.style.display = "none"
           }}
         />
-        <p className="beacon-label" style={{ fontSize: "9px" }}>
-          OPERATIONS<br />HUB
-        </p>
+        <div className="leading-tight">
+          <div style={{ fontSize: "22px", fontWeight: 700, letterSpacing: "0.04em", color: "#fff" }}>
+            PHAROS
+          </div>
+          <div className="beacon-label" style={{ fontSize: "9px", whiteSpace: "nowrap" }}>
+            OPERATIONS HUB
+          </div>
+        </div>
       </div>
 
       {/* Nav */}
