@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { renderHeadlineSegments } from "@/components/launch-dashboard/headlineWikilinks"
+import { convertUtcTimesToPacific } from "@/lib/datetime"
 import type { MigrationHistoryEntry, SnapshotKpiDelta } from "@/types"
 
 type FilterKey = "all" | "changes" | "regressions" | "resolutions"
@@ -186,7 +187,7 @@ function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
         )}
       </aside>
       <div style={cardBodyStyle}>
-        {curr.headline && <HeadlineBlocks text={curr.headline} />}
+        {curr.headline && <HeadlineBlocks text={curr.headline} dateContext={curr.date} />}
         <div style={kpiGridStyle}>
           {KPI_VIEW.map((k) => {
             const d = entry.diff.kpis?.[k.key] as SnapshotKpiDelta | undefined
@@ -208,17 +209,17 @@ function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
  * fall back to sentence-grouped paragraphs for unmarked walls of text,
  * so every day reads as discrete blocks instead of one giant blob.
  */
-function HeadlineBlocks({ text }: { text: string }) {
-  const blocks = paragraphizeHeadline(text)
+function HeadlineBlocks({ text, dateContext }: { text: string; dateContext: string }) {
+  const blocks = paragraphizeHeadline(text, dateContext)
   return (
     <div style={headlineStackStyle}>
       {blocks.map((block, i) => {
-        const showHead = !!block.time || i === 0
+        const showHead = !!block.timePill || i === 0
         return (
           <div key={i} style={headlineEventStyle}>
             {showHead && (
               <div style={headlineEventHeadStyle}>
-                {block.time && <span style={headlineTimePillStyle}>{block.time} UTC</span>}
+                {block.timePill && <span style={headlineTimePillStyle}>{block.timePill}</span>}
                 <span style={headlineEventLabelStyle}>{block.label}</span>
               </div>
             )}
@@ -231,7 +232,7 @@ function HeadlineBlocks({ text }: { text: string }) {
 }
 
 interface HeadlineBlock {
-  time: string | null
+  timePill: string | null
   label: string
   body: string
 }
@@ -239,7 +240,7 @@ interface HeadlineBlock {
 const SOFT_PARAGRAPH_LIMIT = 600
 const HARD_PARAGRAPH_LIMIT = 900
 
-function paragraphizeHeadline(text: string): HeadlineBlock[] {
+function paragraphizeHeadline(text: string, dateContext: string): HeadlineBlock[] {
   // Mask `[[wikilinks]]` before any splitting. Wikilink display text
   // can contain periods (e.g. "Mao.ATP.EnableTokenCaching"), and
   // without masking the sentence-grouper splits the wikilink across
@@ -279,7 +280,14 @@ function paragraphizeHeadline(text: string): HeadlineBlock[] {
     const { time, body } = extractLeadingTime(unmaskedChunk)
     const startsWithEarlier = /^Earlier\b/.test(unmaskedChunk)
     const label = i === 0 && !startsWithEarlier ? "LATEST" : "EARLIER"
-    return { time, label, body }
+    // Convert UTC times in prose → Pacific (e.g. "Leslie 02:28 UTC" →
+    // "Leslie 7:28 PM PT"). Uses the snapshot date as context for bare
+    // HH:MM times, since a bare time alone is timezone-agnostic.
+    const pacificBody = convertUtcTimesToPacific(body, dateContext)
+    // The time pill stores just the extracted HH:MM. Convert via the
+    // same helper so it shows "8:06 PM PT" instead of "03:06 UTC".
+    const timePill = time ? convertUtcTimesToPacific(`${time} UTC`, dateContext) : null
+    return { timePill, label, body: pacificBody }
   })
 }
 

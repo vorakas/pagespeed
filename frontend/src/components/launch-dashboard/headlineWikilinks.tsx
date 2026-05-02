@@ -164,9 +164,9 @@ const inlineTaskIdStyle: React.CSSProperties = {
   fontSize: "0.92em",
   padding: "1px 6px",
   borderRadius: 4,
-  background: "rgba(255,255,255,0.06)",
-  color: "var(--lcc-text)",
-  border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.1))",
+  background: "#6d28d9",
+  color: "#fff",
+  border: "1px solid #5b21b6",
   whiteSpace: "nowrap",
 }
 
