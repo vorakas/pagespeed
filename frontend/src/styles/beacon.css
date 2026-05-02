@@ -380,8 +380,8 @@
    sidebar-primary ring.
    -------------------------------------------------------------------------- */
 .beacon [data-slot="card"].is-selected {
-  border-color: var(--beacon-amber);
-  box-shadow: inset 0 0 0 1px var(--beacon-amber-line);
+  border-color: var(--aurora-blue, #6ec7ff);
+  box-shadow: inset 0 0 0 1px rgba(110, 199, 255, 0.30);
 }
 
 /* --------------------------------------------------------------------------

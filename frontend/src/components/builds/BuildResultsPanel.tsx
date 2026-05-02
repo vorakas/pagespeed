@@ -40,7 +40,7 @@ function linkifyIssues(text: string): React.ReactNode {
         target="_blank"
         rel="noopener noreferrer"
         className="underline hover:no-underline"
-        style={{ color: "var(--beacon-amber)" }}
+        style={{ color: "var(--aurora-blue)" }}
         onClick={(event) => event.stopPropagation()}
       >
         {token}
@@ -330,7 +330,7 @@ export function BuildResultsPanel({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm font-semibold hover:underline flex items-center gap-1"
-                            style={{ color: "var(--beacon-amber)" }}
+                            style={{ color: "var(--aurora-blue)" }}
                           >
                             {test.testId} <ExternalLink className="h-3 w-3" />
                           </a>
