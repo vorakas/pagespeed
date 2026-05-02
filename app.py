@@ -8,6 +8,8 @@ error handlers.
 import logging
 import os
 import sys
+import tempfile
+import atexit
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, Response, jsonify, send_from_directory
@@ -92,6 +94,65 @@ from services.testing_service import TestingService
 from services.trigger_service import TriggerService
 
 
+class SchedulerLease:
+    """Best-effort cross-process lease for in-process background jobs.
+
+    APScheduler's in-memory scheduler is safe only when one web worker owns
+    it. Gunicorn may import this module in multiple workers, so we take a
+    non-blocking file lock before starting scheduled work.
+    """
+
+    def __init__(self, path: str | None = None) -> None:
+        self.path = path or os.environ.get(
+            "PHAROS_SCHEDULER_LOCK",
+            os.path.join(tempfile.gettempdir(), "pharos-scheduler.lock"),
+        )
+        self._handle = None
+
+    def acquire(self) -> bool:
+        lock_dir = os.path.dirname(self.path)
+        if lock_dir:
+            os.makedirs(lock_dir, exist_ok=True)
+        handle = open(self.path, "a+", encoding="utf-8")
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            handle.seek(0)
+            handle.truncate()
+            handle.write(str(os.getpid()))
+            handle.flush()
+            self._handle = handle
+            return True
+        except OSError:
+            handle.close()
+            return False
+
+    def release(self) -> None:
+        if self._handle is None:
+            return
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                self._handle.seek(0)
+                msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            self._handle.close()
+            self._handle = None
+
+
 def _seed_vault_wiki(vault_root: str) -> None:
     """Populate ``<vault_root>/wiki/`` from the shipped seed on first boot.
 
@@ -132,6 +193,7 @@ def create_app() -> Flask:
 
     # ---- Dependency wiring ----
     conn_mgr = ConnectionManager()
+    atexit.register(conn_mgr.close_all)
     conn_mgr.init_schema()
 
     site_repo = SiteRepository(conn_mgr)
@@ -157,10 +219,34 @@ def create_app() -> Flask:
     # Explicit UTC timezone ensures cron expressions fire at the same time
     # regardless of where the server is hosted (Railway, local dev, etc.).
     scheduler = BackgroundScheduler(timezone='UTC')
-    scheduler.start()
+    scheduler_lease = SchedulerLease()
+    scheduler_enabled = scheduler_lease.acquire()
+    flask_app.extensions["scheduler_lease"] = scheduler_lease
+    flask_app.extensions["scheduler_enabled"] = scheduler_enabled
 
     trigger_service = TriggerService(trigger_repo, preset_repo, testing_service, scheduler)
-    trigger_service.sync_all_jobs()
+    if scheduler_enabled:
+        atexit.register(scheduler_lease.release)
+        scheduler.start()
+        logging.info(
+            "Scheduler lease acquired at %s; this worker owns background jobs",
+            scheduler_lease.path,
+        )
+        trigger_service.sync_all_jobs()
+        scheduler.add_job(
+            trigger_service.sync_all_jobs,
+            trigger="interval",
+            minutes=1,
+            id="trigger-job-reconcile",
+            replace_existing=True,
+            max_instances=1,
+        )
+    else:
+        logging.warning(
+            "Scheduler lease held by another worker; this worker will serve requests "
+            "without starting background jobs (%s)",
+            scheduler_lease.path,
+        )
 
     # ---- BlazeMeter (optional; only wired when env vars are present) ----
     blazemeter_client: BlazemeterClient | None = None
@@ -172,10 +258,15 @@ def create_app() -> Flask:
                 api_key_secret=BLAZEMETER_API_SECRET,
                 workspace_id=BLAZEMETER_WORKSPACE_ID,
             )
-            blazemeter_queue = BlazemeterQueueService(
-                blazemeter_client, scheduler, run_repo=blazemeter_run_repo,
-            )
-            logging.info("BlazeMeter integration enabled")
+            if scheduler_enabled:
+                blazemeter_queue = BlazemeterQueueService(
+                    blazemeter_client, scheduler, run_repo=blazemeter_run_repo,
+                )
+                logging.info("BlazeMeter integration enabled")
+            else:
+                logging.info(
+                    "BlazeMeter client enabled; queue polling is owned by the scheduler worker"
+                )
         except Exception:
             logging.exception("Failed to initialise BlazeMeter integration")
             blazemeter_client = None
@@ -220,25 +311,6 @@ def create_app() -> Flask:
         repository=snapshot_repo,
         vault_reader=VaultReader(OBSIDIAN_VAULT_ROOT),
     )
-    # Pull the latest vault state before the first ingest so we pick up
-    # orchestrator commits pushed between syncs (otherwise the DB lags
-    # one sync cycle behind the remote).
-    if vault_git is not None:
-        vault_git.pull_latest()
-        # Seed the cached orchestration push timestamp from the freshly
-        # pulled clone so the dashboard header renders it immediately,
-        # rather than waiting for the first auto-refresh tick.
-        vault_git.refresh_orchestration_marker()
-
-    # Seed the DB on boot so the dashboard has history even before the
-    # first sync cycle runs.
-    try:
-        seeded = snapshot_service.ingest_vault()
-        if seeded:
-            logging.info("Snapshot ingest seeded %d dates: %s", len(seeded), ", ".join(seeded))
-    except Exception:
-        logging.exception("Snapshot ingest on startup failed")
-
     def _post_sync(_job):
         migration_dashboard_service.invalidate_cache()
         # Touch a sentinel so the dashboard's "synced X ago" advances even
@@ -297,6 +369,41 @@ def create_app() -> Flask:
         except Exception:
             logging.exception("Snapshot ingest after vault refresh failed")
 
+    def _run_startup_vault_refresh() -> None:
+        """Refresh vault-backed data after the web worker is available."""
+        logging.info("Starting deferred vault refresh")
+        if vault_git is not None:
+            try:
+                # Pick up orchestrator commits pushed between syncs without
+                # making the web worker wait during application startup.
+                vault_git.pull_latest()
+                vault_git.refresh_orchestration_marker()
+            except Exception:
+                logging.exception("Deferred vault pull failed")
+
+        migration_dashboard_service.invalidate_cache()
+        try:
+            seeded = snapshot_service.ingest_vault()
+            if seeded:
+                logging.info(
+                    "Snapshot ingest refreshed %d dates: %s",
+                    len(seeded), ", ".join(seeded),
+                )
+        except Exception:
+            logging.exception("Deferred snapshot ingest failed")
+
+    if scheduler_enabled:
+        scheduler.add_job(
+            _run_startup_vault_refresh,
+            trigger="date",
+            run_date=datetime.now(timezone.utc) + timedelta(seconds=5),
+            id="startup-vault-refresh",
+            replace_existing=True,
+            max_instances=1,
+        )
+    else:
+        logging.info("Deferred vault refresh will run in the scheduler-owning worker")
+
     # Active-hours gate for periodic vault jobs. Both the auto-refresh
     # tick and the Jira/Asana sync tick consult this before doing any
     # real work; outside the window the tick still fires (APScheduler
@@ -324,7 +431,7 @@ def create_app() -> Flask:
     # hammering the git remote. When the pull reports a new HEAD, the
     # same refresh hooks used by reset-to-origin fire so the dashboard
     # cache and snapshot DB follow along automatically.
-    if vault_git is not None:
+    if scheduler_enabled and vault_git is not None:
         AUTO_REFRESH_INTERVAL_MIN = int(os.environ.get("VAULT_AUTO_REFRESH_MINUTES", "10"))
 
         def _vault_auto_refresh_tick() -> None:
@@ -378,17 +485,18 @@ def create_app() -> Flask:
         except Exception:
             logging.exception("Scheduled obsidian sync failed to start")
 
-    scheduler.add_job(
-        _obsidian_sync_tick,
-        trigger="cron",
-        minute=OBSIDIAN_SYNC_CRON_MINUTE,
-        id="obsidian-hourly-sync",
-        replace_existing=True,
-    )
-    logging.info(
-        "Obsidian sync cron registered: minute=%s (cron expression)",
-        OBSIDIAN_SYNC_CRON_MINUTE,
-    )
+    if scheduler_enabled:
+        scheduler.add_job(
+            _obsidian_sync_tick,
+            trigger="cron",
+            minute=OBSIDIAN_SYNC_CRON_MINUTE,
+            id="obsidian-hourly-sync",
+            replace_existing=True,
+        )
+        logging.info(
+            "Obsidian sync cron registered: minute=%s (cron expression)",
+            OBSIDIAN_SYNC_CRON_MINUTE,
+        )
 
     # ---- Blueprints ----
     register_blueprints(

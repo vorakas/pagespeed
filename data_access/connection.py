@@ -7,14 +7,16 @@ import database drivers or branch on the database engine themselves.
 """
 
 import sqlite3
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 
-from config import DATABASE_URL
+from config import DATABASE_URL, DB_POOL_MAX_CONNECTIONS, DB_POOL_MIN_CONNECTIONS
 from exceptions import DatabaseError
 
 _SQLITE_PATH = "pagespeed.db"
@@ -30,6 +32,8 @@ class ConnectionManager:
 
     def __init__(self, db_url: str | None = None) -> None:
         self._db_url: str | None = db_url or DATABASE_URL
+        self._pool: psycopg2.pool.ThreadedConnectionPool | None = None
+        self._pool_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Connection lifecycle
@@ -39,13 +43,43 @@ class ConnectionManager:
     def _is_postgres(self) -> bool:
         return self._db_url is not None
 
+    def _get_pool(self) -> psycopg2.pool.ThreadedConnectionPool:
+        """Return the process-local PostgreSQL connection pool."""
+        if self._pool is None:
+            with self._pool_lock:
+                if self._pool is None:
+                    self._pool = psycopg2.pool.ThreadedConnectionPool(
+                        DB_POOL_MIN_CONNECTIONS,
+                        DB_POOL_MAX_CONNECTIONS,
+                        self._db_url,
+                    )
+        return self._pool
+
     def _create_connection(self) -> Any:
-        """Open a raw connection (caller is responsible for closing)."""
+        """Borrow a connection from the pool or open a local SQLite connection."""
         if self._is_postgres:
-            return psycopg2.connect(self._db_url)
+            return self._get_pool().getconn()
         conn = sqlite3.connect(_SQLITE_PATH)
         conn.row_factory = sqlite3.Row
         return conn
+
+    def _release_connection(self, conn: Any, discard: bool = False) -> None:
+        """Return a PostgreSQL connection to the pool, or close SQLite."""
+        if self._is_postgres:
+            pool = self._pool
+            if pool is not None:
+                pool.putconn(conn, close=discard)
+            return
+        conn.close()
+
+    def close_all(self) -> None:
+        """Close all pooled PostgreSQL connections owned by this process."""
+        if self._pool is None:
+            return
+        with self._pool_lock:
+            if self._pool is not None:
+                self._pool.closeall()
+                self._pool = None
 
     @contextmanager
     def get_connection(self) -> Iterator[Any]:
@@ -54,17 +88,24 @@ class ConnectionManager:
         * On clean exit the transaction is committed.
         * On exception the transaction is rolled back and the error
           propagates.
-        * The connection is always closed in the ``finally`` block.
+        * PostgreSQL connections are returned to the pool in ``finally``.
+          SQLite connections are closed, matching local-dev behavior.
         """
         conn = self._create_connection()
+        discard = False
         try:
             yield conn
             conn.commit()
         except Exception:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except Exception:
+                discard = True
             raise
         finally:
-            conn.close()
+            if self._is_postgres and getattr(conn, "closed", 0):
+                discard = True
+            self._release_connection(conn, discard=discard)
 
     # ------------------------------------------------------------------
     # Dialect helpers (package-internal — used by repositories)

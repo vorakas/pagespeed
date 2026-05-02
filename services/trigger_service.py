@@ -329,13 +329,23 @@ class TriggerService:
     # ------------------------------------------------------------------
 
     def sync_all_jobs(self) -> None:
-        """Restore APScheduler jobs for all enabled triggers.
+        """Reconcile APScheduler jobs with all enabled triggers.
 
         Called once during application startup (after ``scheduler.start()``)
-        to ensure every enabled trigger has a corresponding job.
+        and periodically by the scheduler-owning worker. The periodic
+        reconcile lets non-scheduler web workers accept trigger CRUD while
+        the single scheduler worker remains the only process that runs jobs.
         """
         enabled_triggers = self._triggers.get_all_enabled()
-        print(f"Syncing {len(enabled_triggers)} enabled trigger(s) to scheduler")
+        print(f"Reconciling {len(enabled_triggers)} enabled trigger(s) to scheduler")
+
+        for job in self._scheduler.get_jobs():
+            if not job.id.startswith(TRIGGER_JOB_PREFIX):
+                continue
+            try:
+                self._scheduler.remove_job(job.id)
+            except Exception:
+                pass
 
         for trigger in enabled_triggers:
             try:

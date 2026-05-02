@@ -17,6 +17,12 @@ import os
 DATABASE_URL: str | None = os.getenv('DATABASE_URL')
 """PostgreSQL connection string (set by Railway). None falls back to SQLite."""
 
+DB_POOL_MIN_CONNECTIONS: int = int(os.getenv('DB_POOL_MIN_CONNECTIONS', '1'))
+"""Minimum PostgreSQL connections kept open per app process."""
+
+DB_POOL_MAX_CONNECTIONS: int = int(os.getenv('DB_POOL_MAX_CONNECTIONS', '10'))
+"""Maximum PostgreSQL connections opened per app process."""
+
 PORT: int = int(os.getenv('PORT', '5000'))
 """HTTP listen port. Railway sets this automatically; defaults to 5000 locally."""
 
