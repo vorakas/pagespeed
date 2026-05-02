@@ -1,19 +1,66 @@
 import type React from "react"
 
 // Render Obsidian wikilinks ([[Stem|ID]] / [[Stem\|ID]]) inline as
-// styled chips. The orchestrator sometimes leaks the table-cell form
-// (with backslash-escaped pipe) into the status-page headline, which
-// is prose. Without this the dashboard would show raw `[[…]]` markup.
+// styled chips, plus highlight known team-member names so prose like
+// "Leslie 02:28 UTC replied to Miguel Garrido…" reads as a sequence
+// of named actors instead of a wall of identical white text.
 //
 // Used by both `DailyStatusSummary` (Daily Status panel bullets) and
-// `HeroStrip` (Project Status reasons under the AT RISK badge). They
-// consume the same `snap.headline` field in the snapshot payload, so
-// the rendering rule lives here to stay consistent across both views.
+// `HeroStrip` (Project Status reasons under the AT RISK badge), and
+// `StatusHistory` (per-snapshot headlines). They all consume the same
+// `snap.headline` field in the snapshot payload, so the rendering
+// rule lives here to stay consistent across views.
 //
 // Works on historical payloads — cleanup happens at render time,
 // independent of what the parser stored.
 
 const HEADLINE_WIKILINK_RE = /\[\[([^\]]+?)\]\]/g
+
+// Curated list of teammates that appear in the vault's status-page
+// prose. Curated rather than regex-detected because a generic
+// "two consecutive Capitalized words" pattern false-matches every
+// proper noun in the codebase ("MAO Order Integration", "Cybersource
+// Failover", "Asana Export", etc.). Add new names here as the team
+// grows.
+const KNOWN_TEAM = [
+  "Leslie Manzanera Ornelas",
+  "Harry Donihue",
+  "Miguel Garrido",
+  "Tan Nguyen",
+  "Eilat Vardi",
+  "Saurabh Wawarkar",
+  "Jagrit Raizada",
+  "Adam Blais",
+  "Kyle Walters",
+  "Kyle Williams",
+  "Seth Wilde",
+  "Denzel Perez",
+  "Estele Kim",
+  // First-name-only references that appear independently in prose.
+  // Listed last so the longer full names match first via length sort.
+  "Leslie",
+  "Harry",
+  "Miguel",
+  "Tan",
+  "Eilat",
+  "Saurabh",
+  "Jagrit",
+  "Adam",
+  "Kyle",
+  "Seth",
+  "Denzel",
+  "Estele",
+  "Sakshi",
+  "Héctor",
+] as const
+
+const NAME_PATTERN = new RegExp(
+  `\\b(${[...KNOWN_TEAM]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")})\\b`,
+  "g",
+)
 
 export function renderHeadlineSegments(text: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
@@ -22,20 +69,40 @@ export function renderHeadlineSegments(text: string): React.ReactNode[] {
   HEADLINE_WIKILINK_RE.lastIndex = 0
   while ((match = HEADLINE_WIKILINK_RE.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      out.push(text.slice(lastIndex, match.index))
+      out.push(...renderTextWithNames(text.slice(lastIndex, match.index), `pre-${match.index}`))
     }
     out.push(
       <code key={`wl-${match.index}`} style={inlineTaskIdStyle}>
         {wikilinkDisplay(match[1])}
-      </code>
+      </code>,
     )
     lastIndex = HEADLINE_WIKILINK_RE.lastIndex
   }
   if (lastIndex < text.length) {
-    out.push(text.slice(lastIndex))
+    out.push(...renderTextWithNames(text.slice(lastIndex), `tail-${lastIndex}`))
   }
-  // Collapse to bare string when no wikilinks were found, so the DOM
-  // doesn't gain a one-element array wrapper for every plain bullet.
+  // Collapse to bare string when no wikilinks or names were found, so
+  // the DOM doesn't gain a one-element array wrapper for every plain
+  // bullet.
+  if (out.length === 1 && typeof out[0] === "string") return out
+  return out.length === 0 ? [text] : out
+}
+
+function renderTextWithNames(text: string, keyPrefix: string): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  NAME_PATTERN.lastIndex = 0
+  while ((match = NAME_PATTERN.exec(text)) !== null) {
+    if (match.index > lastIndex) out.push(text.slice(lastIndex, match.index))
+    out.push(
+      <span key={`${keyPrefix}-${match.index}`} style={inlineNameStyle}>
+        {match[0]}
+      </span>,
+    )
+    lastIndex = NAME_PATTERN.lastIndex
+  }
+  if (lastIndex < text.length) out.push(text.slice(lastIndex))
   return out.length === 0 ? [text] : out
 }
 
@@ -63,5 +130,11 @@ const inlineTaskIdStyle: React.CSSProperties = {
   background: "rgba(255,255,255,0.06)",
   color: "var(--lcc-text)",
   border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.1))",
+  whiteSpace: "nowrap",
+}
+
+const inlineNameStyle: React.CSSProperties = {
+  color: "var(--lcc-violet)",
+  fontWeight: 500,
   whiteSpace: "nowrap",
 }

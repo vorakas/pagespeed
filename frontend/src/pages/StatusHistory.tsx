@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
+import { renderHeadlineSegments } from "@/components/launch-dashboard/headlineWikilinks"
 import type { MigrationHistoryEntry, SnapshotKpiDelta } from "@/types"
 
 type FilterKey = "all" | "changes" | "regressions" | "resolutions"
@@ -199,61 +200,132 @@ function HistoryCard({ entry }: { entry: MigrationHistoryEntry }) {
 }
 
 /**
- * The backend's snapshot summarizer emits one long prose headline that
- * narrates the most-recent sync, then chains older syncs with "Earlier
- * ~HH:MM UTC sync (Job XXXX) surfaced …" markers, then trails into
- * summary stats ("Active Production Failures unchanged at N. Underlying
- * …"). Split that into stacked blocks so each sync reads as its own
- * item and the trailing stats peel off into a final compact line.
+ * The vault-authored headlines are wildly inconsistent: some chain syncs
+ * with "Earlier ~HH:MM UTC sync …" markers, others use bare "Earlier
+ * HH:MM UTC sync …" (no tilde), some have "Earlier mid-morning resync
+ * (YYYY-MM-DD HH:MM UTC)", and some are pure narrative with no markers
+ * at all. Split aggressively at any sentence-boundary "Earlier" and
+ * fall back to sentence-grouped paragraphs for unmarked walls of text,
+ * so every day reads as discrete blocks instead of one giant blob.
  */
 function HeadlineBlocks({ text }: { text: string }) {
-  // Split at "Earlier ~HH:MM UTC" boundaries while keeping the markers.
-  const events = text
-    .split(/(?=\bEarlier\s+~\d{1,2}:\d{2}\s*UTC\b)/g)
-    .map((s) => s.trim())
-    .filter(Boolean)
-
-  // The last narrative event often carries trailing summary stats —
-  // sentences like "Active Production Failures unchanged at 7." or
-  // "Underlying LAMPSPLUS raw count unchanged at 2,119; …". Peel those
-  // off the last chunk so they render as a compact factual footer.
-  let trailingStats: string | null = null
-  if (events.length > 0) {
-    const last = events[events.length - 1]
-    const m = last.match(/^(.*?)((?:\s|^)(?:Active Production Failures|Underlying\s)\b.*)$/s)
-    if (m && m[1].trim()) {
-      events[events.length - 1] = m[1].trim()
-      trailingStats = m[2].trim()
-    }
-  }
-
+  const blocks = paragraphizeHeadline(text)
   return (
     <div style={headlineStackStyle}>
-      {events.map((chunk, i) => {
-        const tm = chunk.match(/^Earlier\s+~(\d{1,2}:\d{2})\s*UTC/)
-        const time = tm?.[1] ?? null
-        const body = tm ? chunk.slice(tm[0].length).replace(/^[\s—-]+/, "").trim() : chunk
+      {blocks.map((block, i) => {
+        const showHead = !!block.time || i === 0
         return (
           <div key={i} style={headlineEventStyle}>
-            <div style={headlineEventHeadStyle}>
-              {time ? (
-                <>
-                  <span style={headlineTimePillStyle}>{time} UTC</span>
-                  <span style={headlineEventLabelStyle}>EARLIER SYNC</span>
-                </>
-              ) : (
-                <span style={headlineEventLabelStyle}>LATEST SYNC</span>
-              )}
-            </div>
-            <p style={headlineBodyStyle}>{body}</p>
+            {showHead && (
+              <div style={headlineEventHeadStyle}>
+                {block.time && <span style={headlineTimePillStyle}>{block.time} UTC</span>}
+                <span style={headlineEventLabelStyle}>{block.label}</span>
+              </div>
+            )}
+            <p style={headlineBodyStyle}>{renderHeadlineSegments(block.body)}</p>
           </div>
         )
       })}
-      {trailingStats && (
-        <div style={trailingStatsStyle}>{trailingStats}</div>
-      )}
     </div>
   )
+}
+
+interface HeadlineBlock {
+  time: string | null
+  label: string
+  body: string
+}
+
+const SOFT_PARAGRAPH_LIMIT = 600
+const HARD_PARAGRAPH_LIMIT = 900
+
+function paragraphizeHeadline(text: string): HeadlineBlock[] {
+  // Phase 1: split at any sentence-boundary "Earlier" — covers
+  // "Earlier ~HH:MM UTC sync", "Earlier HH:MM UTC sync", "Earlier
+  // mid-morning resync (…)", "Earlier closures: …", etc. The lookahead
+  // keeps the marker on the right-hand chunk.
+  const earlierSplits = text
+    .split(/(?<=[.!?])\s+(?=Earlier\b)/g)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  // Phase 2: each chunk that's still a wall sub-splits into
+  // sentence-grouped paragraphs of ~400-600 chars. This catches days
+  // with no "Earlier" markers (Apr 26-style narrative).
+  const refined: string[] = []
+  for (const chunk of earlierSplits) {
+    if (chunk.length <= SOFT_PARAGRAPH_LIMIT) {
+      refined.push(chunk)
+      continue
+    }
+    refined.push(...sentenceGroup(chunk))
+  }
+
+  return refined.map((chunk, i) => {
+    const { time, body } = extractLeadingTime(chunk)
+    const startsWithEarlier = /^Earlier\b/.test(chunk)
+    const label = i === 0 && !startsWithEarlier ? "LATEST" : "EARLIER"
+    return { time, label, body }
+  })
+}
+
+/**
+ * Group sentences into paragraphs roughly 400-600 chars long, breaking
+ * only at sentence boundaries. Used for unmarked narrative blocks.
+ */
+function sentenceGroup(text: string): string[] {
+  const sentences = text.match(/[^.!?]+(?:[.!?]+|$)\s*/g) ?? [text]
+  const out: string[] = []
+  let buf = ""
+  for (const sentence of sentences) {
+    const next = buf + sentence
+    if (next.length > HARD_PARAGRAPH_LIMIT && buf) {
+      out.push(buf.trim())
+      buf = sentence
+    } else if (next.length > SOFT_PARAGRAPH_LIMIT && buf.length > 0) {
+      out.push(buf.trim())
+      buf = sentence
+    } else {
+      buf = next
+    }
+  }
+  if (buf.trim()) out.push(buf.trim())
+  return out
+}
+
+/**
+ * Pull a leading "HH:MM" timestamp out of the chunk for display in the
+ * time pill. Recognizes the leading patterns we've actually seen:
+ *   Earlier ~HH:MM UTC …          → HH:MM
+ *   Earlier HH:MM UTC …           → HH:MM
+ *   Earlier mid-morning resync (YYYY-MM-DD HH:MM UTC) … → HH:MM
+ *   YYYY-MM-DD HH:MM UTC …        → HH:MM
+ *   HH:MM UTC sync (Job …) …      → HH:MM
+ * Returns the cleaned body with the matched leader stripped only when
+ * the leader is a pure prefix; otherwise leaves the body intact so we
+ * never lose narrative text.
+ */
+function extractLeadingTime(chunk: string): { time: string | null; body: string } {
+  const patterns: Array<{ re: RegExp; strip: boolean }> = [
+    { re: /^Earlier\s+~?(\d{1,2}:\d{2})\s+UTC\s+(?:sync|resync)\b\s*[—-]?\s*/i, strip: true },
+    { re: /^Earlier\s+\w+(?:-\w+)?\s+(?:sync|resync|closures?)\s+\((?:\d{4}-\d{2}-\d{2}\s+)?(\d{1,2}:\d{2})\s+UTC\)\s*[:—-]?\s*/i, strip: true },
+    { re: /^Earlier\s+(\d{1,2}:\d{2})\s+UTC\b\s*[—-]?\s*/i, strip: true },
+    { re: /^(\d{4}-\d{2}-\d{2}\s+)?(\d{1,2}:\d{2})\s+UTC\s+(?:sync|resync|pass|pushback|closures?)\b\s*[—-]?\s*/i, strip: false },
+  ]
+  for (const { re, strip } of patterns) {
+    const m = chunk.match(re)
+    if (m) {
+      // The capture group with the time may be the last one in
+      // multi-group patterns; pick the last non-undefined capture.
+      const time = m.slice(1).reverse().find((g) => /^\d{1,2}:\d{2}$/.test(g ?? "")) ?? null
+      const body = strip ? chunk.slice(m[0].length).trim() : chunk
+      return { time, body }
+    }
+  }
+  // Last-ditch: any "HH:MM UTC" near the start (first 60 chars).
+  const head = chunk.slice(0, 80)
+  const tm = head.match(/\b(\d{1,2}:\d{2})\s+UTC\b/)
+  return { time: tm?.[1] ?? null, body: chunk }
 }
 
 function formatMonthLabel(iso: string): string {
@@ -496,16 +568,6 @@ const headlineBodyStyle: React.CSSProperties = {
   lineHeight: 1.55,
   color: "var(--lcc-text)",
   margin: 0,
-}
-const trailingStatsStyle: React.CSSProperties = {
-  fontSize: 11.5,
-  lineHeight: 1.5,
-  color: "var(--lcc-text-dim)",
-  fontFamily: "var(--font-mono, monospace)",
-  padding: "8px 12px",
-  borderRadius: 6,
-  background: "rgba(255,255,255,0.03)",
-  border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.08))",
 }
 const kpiGridStyle: React.CSSProperties = {
   display: "grid",
