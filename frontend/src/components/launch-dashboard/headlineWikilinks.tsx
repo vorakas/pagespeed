@@ -62,6 +62,21 @@ const NAME_PATTERN = new RegExp(
   "g",
 )
 
+// Bare task references in prose — same render as wikilink chips so a
+// reader doesn't have to mentally bridge "[[LAMPSPLUS-1070|…]]" and
+// "LAMPSPLUS-1070" as different things.
+//
+//   - PROJECT-NUM:  LAMPSPLUS-1070, LPWE-124, LP-12345, LAMPSPLUS-263
+//     Two-letter minimum so priority labels like "P1" / "P3" don't
+//     trip the pattern.
+//   - 6-DIGIT:      Adobe Commerce task IDs like 393827, 405450, 033744
+//     6 is the canonical width across the corpus; 4-digit "2026" or
+//     time-of-day numbers won't match.
+//
+// Word boundaries on both sides keep us out of the middle of strings
+// like "LP-12345-suffix" or "abc393827def".
+const TASK_ID_PATTERN = /\b(?:[A-Z]{2,}-\d{1,5}|\d{6})\b/g
+
 export function renderHeadlineSegments(text: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
   let lastIndex = 0
@@ -94,13 +109,35 @@ function renderTextWithNames(text: string, keyPrefix: string): React.ReactNode[]
   let match: RegExpExecArray | null
   NAME_PATTERN.lastIndex = 0
   while ((match = NAME_PATTERN.exec(text)) !== null) {
-    if (match.index > lastIndex) out.push(text.slice(lastIndex, match.index))
+    if (match.index > lastIndex) {
+      out.push(...renderTextWithTaskIds(text.slice(lastIndex, match.index), `${keyPrefix}-${match.index}`))
+    }
     out.push(
-      <span key={`${keyPrefix}-${match.index}`} style={inlineNameStyle}>
+      <span key={`${keyPrefix}-name-${match.index}`} style={inlineNameStyle}>
         {match[0]}
       </span>,
     )
     lastIndex = NAME_PATTERN.lastIndex
+  }
+  if (lastIndex < text.length) {
+    out.push(...renderTextWithTaskIds(text.slice(lastIndex), `${keyPrefix}-tail`))
+  }
+  return out.length === 0 ? [text] : out
+}
+
+function renderTextWithTaskIds(text: string, keyPrefix: string): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  TASK_ID_PATTERN.lastIndex = 0
+  while ((match = TASK_ID_PATTERN.exec(text)) !== null) {
+    if (match.index > lastIndex) out.push(text.slice(lastIndex, match.index))
+    out.push(
+      <code key={`${keyPrefix}-id-${match.index}`} style={inlineTaskIdStyle}>
+        {match[0]}
+      </code>,
+    )
+    lastIndex = TASK_ID_PATTERN.lastIndex
   }
   if (lastIndex < text.length) out.push(text.slice(lastIndex))
   return out.length === 0 ? [text] : out

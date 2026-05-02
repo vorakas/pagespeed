@@ -240,11 +240,24 @@ const SOFT_PARAGRAPH_LIMIT = 600
 const HARD_PARAGRAPH_LIMIT = 900
 
 function paragraphizeHeadline(text: string): HeadlineBlock[] {
+  // Mask `[[wikilinks]]` before any splitting. Wikilink display text
+  // can contain periods (e.g. "Mao.ATP.EnableTokenCaching"), and
+  // without masking the sentence-grouper splits the wikilink across
+  // two paragraphs and neither half has a complete `[[…]]` pair, so
+  // both render as raw markup. Restore at the end.
+  const placeholders: string[] = []
+  const masked = text.replace(/\[\[[\s\S]+?\]\]/g, (m) => {
+    placeholders.push(m)
+    return `WL${placeholders.length - 1}`
+  })
+  const unmask = (s: string): string =>
+    s.replace(/WL(\d+)/g, (_, n) => placeholders[parseInt(n, 10)] ?? "")
+
   // Phase 1: split at any sentence-boundary "Earlier" — covers
   // "Earlier ~HH:MM UTC sync", "Earlier HH:MM UTC sync", "Earlier
   // mid-morning resync (…)", "Earlier closures: …", etc. The lookahead
   // keeps the marker on the right-hand chunk.
-  const earlierSplits = text
+  const earlierSplits = masked
     .split(/(?<=[.!?])\s+(?=Earlier\b)/g)
     .map((s) => s.trim())
     .filter(Boolean)
@@ -262,8 +275,9 @@ function paragraphizeHeadline(text: string): HeadlineBlock[] {
   }
 
   return refined.map((chunk, i) => {
-    const { time, body } = extractLeadingTime(chunk)
-    const startsWithEarlier = /^Earlier\b/.test(chunk)
+    const unmaskedChunk = unmask(chunk)
+    const { time, body } = extractLeadingTime(unmaskedChunk)
+    const startsWithEarlier = /^Earlier\b/.test(unmaskedChunk)
     const label = i === 0 && !startsWithEarlier ? "LATEST" : "EARLIER"
     return { time, label, body }
   })
