@@ -710,7 +710,6 @@ class AzureDevOpsClient:
                     continue
                 seen_keys.add(key)
                 result_id = r.get("id", 0)
-                screenshot_id = self._find_screenshot_id(run_id, result_id)
                 failed_tests.append({
                     "testId": test_id,
                     "testName": self._extract_short_name(name),
@@ -721,7 +720,7 @@ class AzureDevOpsClient:
                     "isRerun": True,
                     "runId": run_id,
                     "resultId": result_id,
-                    "screenshotId": screenshot_id,
+                    "screenshotId": None,
                 })
 
         # Then process original failures, skipping any that were re-run
@@ -746,7 +745,6 @@ class AzureDevOpsClient:
                     continue
                 seen_keys.add(key)
                 result_id = r.get("id", 0)
-                screenshot_id = self._find_screenshot_id(run_id, result_id)
                 failed_tests.append({
                     "testId": test_id,
                     "testName": self._extract_short_name(name),
@@ -757,7 +755,7 @@ class AzureDevOpsClient:
                     "isRerun": False,
                     "runId": run_id,
                     "resultId": result_id,
-                    "screenshotId": screenshot_id,
+                    "screenshotId": None,
                 })
 
         failed_tests.sort(key=lambda t: t["testId"])
@@ -1020,6 +1018,12 @@ class AzureDevOpsClient:
         )
         response.raise_for_status()
         return response.content
+
+    def get_screenshot_attachment_id(
+        self, run_id: int, result_id: int
+    ) -> int | None:
+        """Return the screenshot attachment ID for a test result, if present."""
+        return self._find_screenshot_id(run_id, result_id)
 
     @staticmethod
     def _find_screenshot_attachment(

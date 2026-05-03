@@ -61,57 +61,82 @@ interface BuildResultsPanelProps {
   onClose: () => void
 }
 
-type ScreenshotStatus = "loading" | "loaded" | "error"
+type ScreenshotStatus = "loading" | "loaded" | "error" | "none"
 
 /** Cache key for a screenshot, unique per test result. */
 function screenshotKey(test: FailedTest): string {
-  return `${test.runId}-${test.resultId}-${test.screenshotId}`
+  return `${test.runId}-${test.resultId}`
 }
 
 /**
- * Hook that background-fetches all screenshots for a list of failed tests.
- * Returns a Map of key → object URL for ready screenshots, and a status Map.
+ * Hook that fetches screenshot metadata and content only when a failure is expanded.
  */
-function useScreenshotPrefetch(config: DevOpsConfig, tests: FailedTest[]) {
+function useScreenshotLoader(config: DevOpsConfig) {
   const [urls, setUrls] = useState<Map<string, string>>(new Map())
   const [statuses, setStatuses] = useState<Map<string, ScreenshotStatus>>(new Map())
+  const urlsRef = useRef<Map<string, string>>(new Map())
+  const statusesRef = useRef<Map<string, ScreenshotStatus>>(new Map())
   const activeRef = useRef<Set<string>>(new Set())
 
-  useEffect(() => {
-    const testsWithScreenshots = tests.filter(
-      (t) => t.runId != null && t.resultId != null && t.screenshotId != null
-    )
-    if (testsWithScreenshots.length === 0) return
+  const setScreenshotStatus = useCallback((key: string, status: ScreenshotStatus) => {
+    setStatuses((prev) => {
+      const next = new Map(prev).set(key, status)
+      statusesRef.current = next
+      return next
+    })
+  }, [])
 
-    for (const test of testsWithScreenshots) {
-      const key = screenshotKey(test)
-      // Skip if already fetched or in-flight
-      if (activeRef.current.has(key)) continue
-      activeRef.current.add(key)
+  const setScreenshotUrl = useCallback((key: string, objectUrl: string) => {
+    setUrls((prev) => {
+      const next = new Map(prev)
+      const previousUrl = next.get(key)
+      if (previousUrl) URL.revokeObjectURL(previousUrl)
+      next.set(key, objectUrl)
+      urlsRef.current = next
+      return next
+    })
+  }, [])
 
-      setStatuses((prev) => new Map(prev).set(key, "loading"))
+  const loadScreenshot = useCallback((test: FailedTest) => {
+    if (test.runId == null || test.resultId == null) return
 
-      api
-        .getDevOpsTestScreenshot(config, test.runId!, test.resultId!, test.screenshotId!)
-        .then((objectUrl) => {
-          setUrls((prev) => new Map(prev).set(key, objectUrl))
-          setStatuses((prev) => new Map(prev).set(key, "loaded"))
-        })
-        .catch(() => {
-          setStatuses((prev) => new Map(prev).set(key, "error"))
-        })
-    }
-  }, [config, tests])
+    const key = screenshotKey(test)
+    if (activeRef.current.has(key) || statusesRef.current.has(key)) return
+
+    activeRef.current.add(key)
+    setScreenshotStatus(key, "loading")
+
+    api
+      .getDevOpsTestScreenshotMetadata(config, test.runId, test.resultId)
+      .then((metadata) => {
+        if (!metadata.screenshotId) {
+          setScreenshotStatus(key, "none")
+          return null
+        }
+        return api.getDevOpsTestScreenshot(config, test.runId!, test.resultId!, metadata.screenshotId)
+      })
+      .then((objectUrl) => {
+        if (!objectUrl) return
+        setScreenshotUrl(key, objectUrl)
+        setScreenshotStatus(key, "loaded")
+      })
+      .catch(() => {
+        setScreenshotStatus(key, "error")
+      })
+      .finally(() => {
+        activeRef.current.delete(key)
+      })
+  }, [config, setScreenshotStatus, setScreenshotUrl])
 
   // Revoke object URLs on unmount to free memory
   useEffect(() => {
     return () => {
-      urls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl))
+      urlsRef.current.forEach((objectUrl) => URL.revokeObjectURL(objectUrl))
+      urlsRef.current.clear()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { urls, statuses }
+  return { urls, statuses, loadScreenshot }
 }
 
 /** Screenshot thumbnail that reads from the prefetch cache. */
@@ -126,7 +151,7 @@ function ScreenshotThumbnail({
   status: ScreenshotStatus | undefined
   onOpen: (url: string, testId: string) => void
 }) {
-  if (status === "error" || (!status && !screenshotUrl)) return null
+  if (status === "error" || status === "none" || (!status && !screenshotUrl)) return null
   if (status === "loading") {
     return (
       <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -159,28 +184,34 @@ function FailureDetails({
   screenshotUrl,
   screenshotStatus,
   onScreenshotOpen,
+  onExpand,
 }: {
   test: FailedTest
   screenshotUrl: string | undefined
   screenshotStatus: ScreenshotStatus | undefined
   onScreenshotOpen: (url: string, testId: string) => void
+  onExpand: (test: FailedTest) => void
 }) {
-  const hasScreenshot = test.screenshotId != null
+  const canLoadScreenshot = test.runId != null && test.resultId != null
 
-  if (!test.stackTrace && !hasScreenshot) return null
+  if (!test.stackTrace && !canLoadScreenshot) return null
 
   return (
-    <details className="group">
+    <details className="group" onToggle={(event) => {
+      if (event.currentTarget.open) onExpand(test)
+    }}>
       <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1.5">
         {test.stackTrace ? "Stack trace" : "Screenshot"}
-        {hasScreenshot && <ImageIcon className="h-3 w-3" />}
+        {canLoadScreenshot && screenshotStatus !== "none" && screenshotStatus !== "error" && (
+          <ImageIcon className="h-3 w-3" />
+        )}
       </summary>
       {test.stackTrace && (
         <pre className="mt-1 max-h-64 overflow-auto rounded border border-border bg-background p-2 text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
           {test.stackTrace}
         </pre>
       )}
-      {hasScreenshot && (
+      {canLoadScreenshot && (
         <ScreenshotThumbnail
           test={test}
           screenshotUrl={screenshotUrl}
@@ -262,9 +293,11 @@ export function BuildResultsPanel({
       !test.errorMessage?.includes("Baseline visual test failed and comparison test shouldn't be executed")
     ), [failedTests])
 
-  // Background-prefetch all screenshots as soon as failed tests are available
-  const { urls: screenshotUrls, statuses: screenshotStatuses } =
-    useScreenshotPrefetch(config, displayedFailedTests)
+  const {
+    urls: screenshotUrls,
+    statuses: screenshotStatuses,
+    loadScreenshot,
+  } = useScreenshotLoader(config)
 
   const isFailedMode = mode === "failed"
   const tests = isFailedMode ? displayedFailedTests : skippedTests
@@ -363,6 +396,7 @@ export function BuildResultsPanel({
                         screenshotUrl={screenshotUrls.get(key)}
                         screenshotStatus={screenshotStatuses.get(key)}
                         onScreenshotOpen={openLightbox}
+                        onExpand={loadScreenshot}
                       />
                     )}
                   </div>

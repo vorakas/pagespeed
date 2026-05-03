@@ -460,6 +460,17 @@ class ApiClient {
     return URL.createObjectURL(blob)
   }
 
+  async getDevOpsTestScreenshotMetadata(
+    config: DevOpsConfig,
+    runId: number,
+    resultId: number
+  ): Promise<{ success: boolean; screenshotId: number | null }> {
+    return this.request(`/api/devops/test-screenshot-metadata/${runId}/${resultId}`, {
+      method: "POST",
+      body: this.devOpsBody(config),
+    })
+  }
+
   async getDevOpsEffectiveStatus(
     config: DevOpsConfig,
     buildId: number

@@ -147,6 +147,17 @@ def create_devops_blueprint(
         return jsonify({"success": True, "skippedTests": tests})
 
     @bp.route(
+        "/api/devops/test-screenshot-metadata/<int:run_id>/<int:result_id>",
+        methods=["POST"],
+    )
+    def test_screenshot_metadata(run_id: int, result_id: int):
+        data = request.get_json() or {}
+        _validate_body(data)
+        client = _make_client(data)
+        screenshot_id = client.get_screenshot_attachment_id(run_id, result_id)
+        return jsonify({"success": True, "screenshotId": screenshot_id})
+
+    @bp.route(
         "/api/devops/test-screenshot/<int:run_id>/<int:result_id>/<int:attachment_id>",
         methods=["POST"],
     )
