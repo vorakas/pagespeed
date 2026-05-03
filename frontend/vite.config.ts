@@ -34,6 +34,15 @@ const MOCK_MAP: Record<string, string> = {
   "/api/dashboard/snapshots/history": "snapshots-history.json",
   "/api/dashboard/snapshots/diff": "snapshots-diff.json",
   "/api/dashboard/snapshots/latest": "snapshots-latest.json",
+  "/api/sites": "sites.json",
+  "/api/sites/1/urls": "sites-1-urls.json",
+  "/api/sites/2/urls": "sites-2-urls.json",
+  // Latest-results: query-string is stripped so both ?strategy=desktop
+  // and ?strategy=mobile resolve to the same desktop fixture in mocks.
+  // Strategy toggle won't reflect different data offline; that's fine
+  // for UI iteration on table layout, tabs, etc.
+  "/api/sites/1/latest-results": "sites-1-latest-desktop.json",
+  "/api/sites/2/latest-results": "sites-2-latest-desktop.json",
 }
 
 function devMockPlugin(): PluginOption {

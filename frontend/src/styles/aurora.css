@@ -1984,7 +1984,7 @@
   color: var(--lcc-text);
   background: var(--glass-hi);
 }
-.aurora-tabs-trigger[data-active="true"],
+.aurora-tabs-trigger[data-active],
 .aurora-tabs-trigger[data-state="active"] {
   background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
   color: #000;
