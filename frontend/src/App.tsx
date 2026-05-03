@@ -1,23 +1,39 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { Suspense, lazy } from "react"
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { ThemeProvider } from "@/context/ThemeContext"
 
 import { SitesProvider } from "@/context/SitesContext"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AppLayout } from "@/components/layout/AppLayout"
-import { Dashboard } from "@/pages/Dashboard"
-import { TestUrls } from "@/pages/TestUrls"
-import { Metrics } from "@/pages/Metrics"
-import { Setup } from "@/pages/Setup"
-import { NewRelic } from "@/pages/NewRelic"
-import { IisLogs } from "@/pages/IisLogs"
-import { AiAnalysis } from "@/pages/AiAnalysis"
-import { Builds } from "@/pages/Builds"
-import { LoadTesting } from "@/pages/LoadTesting"
-import { Obsidian } from "@/pages/Obsidian"
-import { LaunchDashboard } from "@/pages/LaunchDashboard"
-import { StatusHistory } from "@/pages/StatusHistory"
-import { WorkstreamDetail } from "@/pages/WorkstreamDetail"
-import { ProjectDashboard } from "@/pages/ProjectDashboard"
+
+const Dashboard = lazy(() => import("@/pages/Dashboard").then((module) => ({ default: module.Dashboard })))
+const TestUrls = lazy(() => import("@/pages/TestUrls").then((module) => ({ default: module.TestUrls })))
+const Metrics = lazy(() => import("@/pages/Metrics").then((module) => ({ default: module.Metrics })))
+const Setup = lazy(() => import("@/pages/Setup").then((module) => ({ default: module.Setup })))
+const NewRelic = lazy(() => import("@/pages/NewRelic").then((module) => ({ default: module.NewRelic })))
+const IisLogs = lazy(() => import("@/pages/IisLogs").then((module) => ({ default: module.IisLogs })))
+const AiAnalysis = lazy(() => import("@/pages/AiAnalysis").then((module) => ({ default: module.AiAnalysis })))
+const Builds = lazy(() => import("@/pages/Builds").then((module) => ({ default: module.Builds })))
+const LoadTesting = lazy(() => import("@/pages/LoadTesting").then((module) => ({ default: module.LoadTesting })))
+const Obsidian = lazy(() => import("@/pages/Obsidian").then((module) => ({ default: module.Obsidian })))
+const LaunchDashboard = lazy(() =>
+  import("@/pages/LaunchDashboard").then((module) => ({ default: module.LaunchDashboard })),
+)
+const StatusHistory = lazy(() => import("@/pages/StatusHistory").then((module) => ({ default: module.StatusHistory })))
+const WorkstreamDetail = lazy(() =>
+  import("@/pages/WorkstreamDetail").then((module) => ({ default: module.WorkstreamDetail })),
+)
+const ProjectDashboard = lazy(() =>
+  import("@/pages/ProjectDashboard").then((module) => ({ default: module.ProjectDashboard })),
+)
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[240px] items-center justify-center p-6 text-sm text-muted-foreground">
+      Loading...
+    </div>
+  )
+}
 
 export default function App() {
   return (
@@ -25,28 +41,27 @@ export default function App() {
       <ThemeProvider>
         <TooltipProvider>
           <SitesProvider>
-            <Routes>
-              <Route element={<AppLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="test" element={<TestUrls />} />
-                <Route path="metrics" element={<Metrics />} />
-                <Route path="setup" element={<Setup />} />
-                <Route path="newrelic" element={<NewRelic />} />
-                <Route path="iislogs" element={<IisLogs />} />
-                <Route path="ai-analysis" element={<AiAnalysis />} />
-                <Route path="builds" element={<Builds />} />
-                <Route path="load-testing" element={<LoadTesting />} />
-                <Route path="obsidian" element={<Obsidian />} />
-                <Route path="dashboard" element={<LaunchDashboard />} />
-                <Route path="dashboard/history" element={<StatusHistory />} />
-                <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
-                <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
-                {/* Catch-all — covers retired /prototype/* URLs and
-                    any other unmatched path. Sends the user back to
-                    PageSpeed home rather than rendering a blank page. */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Route>
-            </Routes>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route element={<AppLayout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="test" element={<TestUrls />} />
+                  <Route path="metrics" element={<Metrics />} />
+                  <Route path="setup" element={<Setup />} />
+                  <Route path="newrelic" element={<NewRelic />} />
+                  <Route path="iislogs" element={<IisLogs />} />
+                  <Route path="ai-analysis" element={<AiAnalysis />} />
+                  <Route path="builds" element={<Builds />} />
+                  <Route path="load-testing" element={<LoadTesting />} />
+                  <Route path="obsidian" element={<Obsidian />} />
+                  <Route path="dashboard" element={<LaunchDashboard />} />
+                  <Route path="dashboard/history" element={<StatusHistory />} />
+                  <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
+                  <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Routes>
+            </Suspense>
           </SitesProvider>
         </TooltipProvider>
       </ThemeProvider>

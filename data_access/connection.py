@@ -237,6 +237,7 @@ class ConnectionManager:
         cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS ttfb REAL")
         cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS total_byte_weight REAL")
         cursor.execute("ALTER TABLE test_results ADD COLUMN IF NOT EXISTS strategy TEXT DEFAULT 'desktop'")
+        cursor.execute("UPDATE test_results SET strategy = 'desktop' WHERE strategy IS NULL")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS scheduled_triggers (
@@ -331,6 +332,8 @@ class ConnectionManager:
                 ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        self._create_postgres_indexes(cursor)
 
     def _init_sqlite_schema(self, cursor: Any) -> None:
         cursor.execute("""
@@ -479,3 +482,76 @@ class ConnectionManager:
                 cursor.execute(statement)
             except sqlite3.OperationalError:
                 pass  # Column already exists
+
+        cursor.execute("UPDATE test_results SET strategy = 'desktop' WHERE strategy IS NULL")
+        self._create_sqlite_indexes(cursor)
+
+    def _create_postgres_indexes(self, cursor: Any) -> None:
+        """Create indexes for the repository query shapes used by the app."""
+        index_statements = [
+            """
+            CREATE INDEX IF NOT EXISTS idx_test_results_url_strategy_tested_at
+            ON test_results (url_id, strategy, tested_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_test_results_strategy_url_tested_at
+            ON test_results (strategy, url_id, tested_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_test_results_url_tested_at
+            ON test_results (url_id, tested_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_urls_site_url
+            ON urls (site_id, url)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_trigger_urls_url_id
+            ON trigger_urls (url_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_trigger_urls_trigger_id
+            ON trigger_urls (trigger_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_migration_snapshots_date_desc
+            ON migration_snapshots (snapshot_date DESC)
+            """,
+        ]
+        for statement in index_statements:
+            cursor.execute(statement)
+
+    def _create_sqlite_indexes(self, cursor: Any) -> None:
+        """Create SQLite equivalents of the production indexes."""
+        index_statements = [
+            """
+            CREATE INDEX IF NOT EXISTS idx_test_results_url_strategy_tested_at
+            ON test_results (url_id, strategy, tested_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_test_results_strategy_url_tested_at
+            ON test_results (strategy, url_id, tested_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_test_results_url_tested_at
+            ON test_results (url_id, tested_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_urls_site_url
+            ON urls (site_id, url)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_trigger_urls_url_id
+            ON trigger_urls (url_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_trigger_urls_trigger_id
+            ON trigger_urls (trigger_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_migration_snapshots_date_desc
+            ON migration_snapshots (snapshot_date DESC)
+            """,
+        ]
+        for statement in index_statements:
+            cursor.execute(statement)

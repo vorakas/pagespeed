@@ -63,17 +63,17 @@ class TestResultRepository:
                 tr.best_practices_score, tr.seo_score,
                 tr.fcp, tr.lcp, tr.cls, tr.inp, tr.ttfb,
                 tr.total_byte_weight, tr.tested_at,
-                COALESCE(tr.strategy, 'desktop') AS strategy
+                tr.strategy
             FROM urls u
             LEFT JOIN (
                 SELECT url_id, MAX(tested_at) AS max_date
                 FROM test_results
-                WHERE COALESCE(strategy, 'desktop') = {ph}
+                WHERE strategy = {ph}
                 GROUP BY url_id
             ) latest ON u.id = latest.url_id
             LEFT JOIN test_results tr
                 ON u.id = tr.url_id AND tr.tested_at = latest.max_date
-                AND COALESCE(tr.strategy, 'desktop') = {ph}
+                AND tr.strategy = {ph}
             WHERE u.site_id = {ph}
             ORDER BY u.url
         """
@@ -95,7 +95,7 @@ class TestResultRepository:
             FROM test_results
             WHERE url_id = {ph}
               AND tested_at >= {date_expr}
-              AND COALESCE(strategy, 'desktop') = {ph}
+              AND strategy = {ph}
             ORDER BY tested_at ASC
         """
         with self._cm.get_connection() as conn:
@@ -159,7 +159,7 @@ class TestResultRepository:
                     tr.best_practices_score, tr.seo_score,
                     tr.fcp, tr.lcp, tr.cls, tr.inp, tr.ttfb,
                     tr.total_byte_weight, tr.tested_at,
-                    COALESCE(tr.strategy, 'desktop') AS strategy,
+                    tr.strategy,
                     ROW_NUMBER() OVER (
                         PARTITION BY s.id
                         ORDER BY tr.performance_score ASC
@@ -169,12 +169,12 @@ class TestResultRepository:
                 LEFT JOIN (
                     SELECT url_id, MAX(tested_at) AS max_date
                     FROM test_results
-                    WHERE COALESCE(strategy, 'desktop') = {ph}
+                    WHERE strategy = {ph}
                     GROUP BY url_id
                 ) latest ON u.id = latest.url_id
                 LEFT JOIN test_results tr
                     ON u.id = tr.url_id AND tr.tested_at = latest.max_date
-                    AND COALESCE(tr.strategy, 'desktop') = {ph}
+                    AND tr.strategy = {ph}
                 WHERE tr.performance_score IS NOT NULL
             ) ranked
             WHERE rank <= {ph}
