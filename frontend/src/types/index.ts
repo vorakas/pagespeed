@@ -1106,6 +1106,19 @@ export interface MigrationSnapshotDiffResponse {
   diff: MigrationSnapshotDiff | null
 }
 
+export interface MigrationDashboardOverview {
+  health: MigrationHealthSnapshot
+  kpis: MigrationKpis
+  workstreams: MigrationWorkstream[]
+  blockers: MigrationBlocker[]
+  productionFailures: RawTaskRecord[]
+  newBugs: RawTaskRecord[]
+  taskStatus: MigrationTaskStatusRow[]
+  trend: MigrationTrendPoint[]
+  sources: MigrationSource[]
+  snapshotDiff: MigrationSnapshotDiffResponse | null
+}
+
 /**
  * Tickets created and resolved on a given calendar day, sourced from
  * raw Jira/Asana frontmatter timestamps. Independent of the orchestrator

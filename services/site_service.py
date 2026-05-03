@@ -39,6 +39,27 @@ class SiteService:
         """Return all sites ordered by name."""
         return self._sites.get_all()
 
+    def get_sites_with_urls(self) -> list[dict]:
+        """Return all sites with their URL rows grouped server-side."""
+        sites = self._sites.get_all()
+        urls_by_site: dict[int, list[dict]] = {site['id']: [] for site in sites}
+
+        for url in self._urls.get_all_with_sites():
+            site_id = url['site_id']
+            if site_id not in urls_by_site:
+                continue
+            urls_by_site[site_id].append({
+                "id": url["id"],
+                "site_id": site_id,
+                "url": url["url"],
+                "created_at": url.get("created_at"),
+            })
+
+        for site in sites:
+            site['urls'] = urls_by_site.get(site['id'], [])
+
+        return sites
+
     def create_site(self, name: str) -> int:
         """Create a new site and return its id.
 

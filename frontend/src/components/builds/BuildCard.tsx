@@ -34,6 +34,7 @@ interface BuildCardProps {
   onShowSkipped?: (build: DevOpsBuild) => void
   onAddToSheet?: (roleKey: string) => void
   addedToSheet?: boolean
+  addingToSheet?: boolean
   triggering: boolean
   triggerError?: string
   onStop?: () => void
@@ -114,7 +115,7 @@ export function BuildCard({
   selectedBuildOverrideId, onSelectBuild, effectiveResult,
   branches, globalBranch, globalTargetInstance, globalStagingInstance, override, onOverrideChange,
   onTrigger, onShowResults, onShowSkipped, onAddToSheet, addedToSheet,
-  triggering, triggerError, onStop, cancelling, selected,
+  addingToSheet, triggering, triggerError, onStop, cancelling, selected,
   applitoolsBatchId, onApplitoolsBatchIdChange, recentApplitoolsBatches,
 }: BuildCardProps) {
   const isServerCancelling = build?.status === "cancelling"
@@ -376,10 +377,12 @@ export function BuildCard({
                   size="sm"
                   className={`h-7 text-xs ${addedToSheet ? "border-score-good text-score-good" : ""}`}
                   onClick={() => onAddToSheet(roleKey)}
-                  disabled={addedToSheet}
+                  disabled={addedToSheet || addingToSheet}
                   title={addedToSheet ? "Added to spreadsheet" : "Add failed & skipped tests to spreadsheet"}
                 >
-                  {addedToSheet ? (
+                  {addingToSheet ? (
+                    <><Loader2 className="h-3 w-3 animate-spin" /> Sheet</>
+                  ) : addedToSheet ? (
                     <><Check className="h-3 w-3" /> Sheet</>
                   ) : (
                     <><FileSpreadsheet className="h-3 w-3" /> + Sheet</>

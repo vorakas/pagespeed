@@ -224,7 +224,7 @@ def create_app() -> Flask:
     flask_app.extensions["scheduler_lease"] = scheduler_lease
     flask_app.extensions["scheduler_enabled"] = scheduler_enabled
 
-    trigger_service = TriggerService(trigger_repo, preset_repo, testing_service, scheduler)
+    trigger_service = TriggerService(trigger_repo, preset_repo, url_repo, testing_service, scheduler)
     if scheduler_enabled:
         atexit.register(scheduler_lease.release)
         scheduler.start()

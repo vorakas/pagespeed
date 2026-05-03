@@ -82,14 +82,13 @@ export function Builds() {
   const [panelMode, setPanelMode] = useState<PanelMode>("failed")
   const [failedTestsCache, setFailedTestsCache] = useState<Record<number, FailedTest[]>>({})
   const [skippedTestsCache, setSkippedTestsCache] = useState<Record<number, SkippedTest[]>>({})
-  const prefetchedIdsRef = useRef<Set<number>>(new Set())
-  const prefetchedSkippedIdsRef = useRef<Set<number>>(new Set())
+  const effectiveByBuildIdRef = useRef(effectiveByBuildId)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollIntervalRef = useRef(POLL_INTERVAL_MS)
   const inFlightRef = useRef(false)
   const [rateLimited, setRateLimited] = useState(false)
   const [sheetData, setSheetData] = useState<Map<string, SheetEntry>>(new Map())
-  const [prefetchingTests, setPrefetchingTests] = useState(false)
+  const [sheetLoadingKeys, setSheetLoadingKeys] = useState<Set<string>>(new Set())
   // Epoch ms until which polling runs even when no child build is
   // currently active. The orchestrator itself is a build in a separate
   // pipeline (261) that isn't tracked here, and it queues the 9 child
@@ -126,6 +125,10 @@ export function Builds() {
     }
     return map
   }, [builds, effectiveByBuildId])
+
+  useEffect(() => {
+    effectiveByBuildIdRef.current = effectiveByBuildId
+  }, [effectiveByBuildId])
 
   // On mount: ask the server whether it has credentials configured. If yes,
   // merge the server's non-secret defaults into local config (so any per-
@@ -221,7 +224,8 @@ export function Builds() {
           build &&
           build.status === "completed" &&
           build.result !== "succeeded" &&
-          build.result !== null
+          build.result !== null &&
+          !effectiveByBuildIdRef.current[build.id]
         ) {
           try {
             const res = await api.getDevOpsEffectiveStatus(config, build.id)
@@ -230,52 +234,15 @@ export function Builds() {
                 ...prev,
                 [build.id]: { effectiveResult: res.effectiveResult, hasRerun: res.hasRerun },
               }))
+              effectiveByBuildIdRef.current = {
+                ...effectiveByBuildIdRef.current,
+                [build.id]: { effectiveResult: res.effectiveResult, hasRerun: res.hasRerun },
+              }
             }
           } catch (err) {
             if (err instanceof RateLimitError) { applyBackoff(err.retryAfter); return }
           }
         }
-      }
-
-      // Prefetch failed tests sequentially to avoid overwhelming Azure DevOps
-      const toPrefetch = ALL_ROLE_KEYS
-        .map((key) => displayed[key])
-        .filter((b): b is DevOpsBuild =>
-          b !== null && b.status === "completed" && !prefetchedIdsRef.current.has(b.id)
-        )
-
-      if (toPrefetch.length > 0) {
-        // Run in background — don't block fetchBuilds
-        setPrefetchingTests(true)
-        ;(async () => {
-          for (const build of toPrefetch) {
-            prefetchedIdsRef.current.add(build.id)
-            try {
-              const res = await api.getDevOpsFailedTests(config, build.id)
-              if (res.success) {
-                setFailedTestsCache((prev) => ({ ...prev, [build.id]: res.failedTests }))
-              }
-            } catch (err) {
-              prefetchedIdsRef.current.delete(build.id)
-              if (err instanceof RateLimitError) { applyBackoff(err.retryAfter); break }
-            }
-          }
-          // Then prefetch skipped tests (lower priority, after failed tests finish)
-          for (const build of toPrefetch) {
-            if (prefetchedSkippedIdsRef.current.has(build.id)) continue
-            prefetchedSkippedIdsRef.current.add(build.id)
-            try {
-              const res = await api.getDevOpsSkippedTests(config, build.id)
-              if (res.success) {
-                setSkippedTestsCache((prev) => ({ ...prev, [build.id]: res.skippedTests }))
-              }
-            } catch (err) {
-              prefetchedSkippedIdsRef.current.delete(build.id)
-              if (err instanceof RateLimitError) { applyBackoff(err.retryAfter); break }
-            }
-          }
-          setPrefetchingTests(false)
-        })()
       }
 
       // Successful cycle — restore normal interval
@@ -484,67 +451,78 @@ export function Builds() {
   const handleAddToSheet = useCallback(async (roleKey: string) => {
     const build = builds[roleKey]
     if (!build) return
-    const platform = roleKey === "WarmUp" ? "Windows" : roleKey.split("_")[0]
-    const type = roleKey === "WarmUp" ? "Warmup" : roleKey.split("_")[1] || "Functional"
-    const isVisual = roleKey.endsWith("_Visual")
+    if (sheetLoadingKeys.has(roleKey)) return
+    setSheetLoadingKeys((prev) => new Set(prev).add(roleKey))
 
-    // Use cached data or fetch on demand
-    let failed = failedTestsCache[build.id] ?? []
-    let skipped = skippedTestsCache[build.id] ?? []
+    try {
+      const platform = roleKey === "WarmUp" ? "Windows" : roleKey.split("_")[0]
+      const type = roleKey === "WarmUp" ? "Warmup" : roleKey.split("_")[1] || "Functional"
+      const isVisual = roleKey.endsWith("_Visual")
 
-    if (!failedTestsCache[build.id]) {
-      try {
-        const res = await api.getDevOpsFailedTests(config, build.id)
-        if (res.success) {
-          failed = res.failedTests
-          setFailedTestsCache((prev) => ({ ...prev, [build.id]: failed }))
-        }
-      } catch { /* use empty array */ }
-    }
+      // Use cached data or fetch on demand
+      let failed = failedTestsCache[build.id] ?? []
+      let skipped = skippedTestsCache[build.id] ?? []
 
-    if (!skippedTestsCache[build.id]) {
-      try {
-        const res = await api.getDevOpsSkippedTests(config, build.id)
-        if (res.success) {
-          skipped = res.skippedTests
-          setSkippedTestsCache((prev) => ({ ...prev, [build.id]: skipped }))
-        }
-      } catch { /* use empty array */ }
-    }
+      if (!failedTestsCache[build.id]) {
+        try {
+          const res = await api.getDevOpsFailedTests(config, build.id)
+          if (res.success) {
+            failed = res.failedTests
+            setFailedTestsCache((prev) => ({ ...prev, [build.id]: failed }))
+          }
+        } catch { /* use empty array */ }
+      }
 
-    // Filter out Visual Target tests that only failed because their Baseline failed
-    const filteredFailed = failed.filter((t) =>
-      !t.errorMessage?.includes("Baseline visual test failed and comparison test shouldn't be executed")
-    )
+      if (!skippedTestsCache[build.id]) {
+        try {
+          const res = await api.getDevOpsSkippedTests(config, build.id)
+          if (res.success) {
+            skipped = res.skippedTests
+            setSkippedTestsCache((prev) => ({ ...prev, [build.id]: skipped }))
+          }
+        } catch { /* use empty array */ }
+      }
+
+      // Filter out Visual Target tests that only failed because their Baseline failed
+      const filteredFailed = failed.filter((t) =>
+        !t.errorMessage?.includes("Baseline visual test failed and comparison test shouldn't be executed")
+      )
 
     // Applitools unresolved rows — Visual cards only. The browser asks
     // the backend whether the desktop helper has uploaded results for
     // this batch id; missing uploads return null and we just skip the
     // section so the rest of the spreadsheet is still useful.
-    let unresolved: UnresolvedTest[] = []
-    if (isVisual) {
-      const batchId = applitoolsBatchIds[roleKey]?.trim()
-      if (batchId) {
-        try {
-          const cached = await api.getApplitoolsBatch(batchId)
-          if (cached) unresolved = cached.tests
-        } catch (err) {
-          console.warn(`Applitools lookup failed for ${roleKey}:`, err)
+      let unresolved: UnresolvedTest[] = []
+      if (isVisual) {
+        const batchId = applitoolsBatchIds[roleKey]?.trim()
+        if (batchId) {
+          try {
+            const cached = await api.getApplitoolsBatch(batchId)
+            if (cached) unresolved = cached.tests
+          } catch (err) {
+            console.warn(`Applitools lookup failed for ${roleKey}:`, err)
+          }
         }
       }
-    }
 
-    setSheetData((prev) => {
-      const next = new Map(prev)
-      next.set(roleKey, {
-        roleKey, platform, type,
-        failed: filteredFailed,
-        skipped,
-        unresolved,
+      setSheetData((prev) => {
+        const next = new Map(prev)
+        next.set(roleKey, {
+          roleKey, platform, type,
+          failed: filteredFailed,
+          skipped,
+          unresolved,
+        })
+        return next
       })
-      return next
-    })
-  }, [builds, config, failedTestsCache, skippedTestsCache, applitoolsBatchIds])
+    } finally {
+      setSheetLoadingKeys((prev) => {
+        const next = new Set(prev)
+        next.delete(roleKey)
+        return next
+      })
+    }
+  }, [builds, config, failedTestsCache, skippedTestsCache, applitoolsBatchIds, sheetLoadingKeys])
 
   const handleSheetClear = useCallback(() => {
     setSheetData(new Map())
@@ -664,8 +642,8 @@ export function Builds() {
                   onShowSkipped={(build) => { setSelectedBuild(build); setPanelMode("skipped") }}
                   onAddToSheet={handleAddToSheet}
                   sheetData={sheetData}
+                  sheetLoadingKeys={sheetLoadingKeys}
                   onSheetClear={handleSheetClear}
-                  prefetchingTests={prefetchingTests}
                   triggeringKeys={triggeringKeys}
                   triggerErrors={triggerErrors}
                   cancellingKeys={cancellingKeys}

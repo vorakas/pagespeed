@@ -28,6 +28,10 @@ def create_sites_blueprint(site_service: SiteService) -> Blueprint:
             return jsonify({"success": True, "id": site_id})
         return jsonify(site_service.get_sites())
 
+    @bp.route("/api/sites-with-urls", methods=["GET"])
+    def sites_with_urls():
+        return jsonify(site_service.get_sites_with_urls())
+
     @bp.route("/api/sites/<int:site_id>/urls", methods=["GET", "POST"])
     def site_urls(site_id):
         if request.method == "POST":

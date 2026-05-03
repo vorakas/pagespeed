@@ -1,6 +1,6 @@
 import type {
   Site,
-  // SiteWithUrls used by consumers, not directly by this client
+  SiteWithUrls,
   Url,
   Strategy,
   TestResult,
@@ -51,6 +51,7 @@ import type {
   MigrationTrendPoint,
   MigrationTeam,
   MigrationWorkstreamDetail,
+  MigrationDashboardOverview,
   MigrationSnapshot,
   MigrationSnapshotDiff,
   MigrationSnapshotDiffResponse,
@@ -104,6 +105,10 @@ class ApiClient {
 
   async getSites(): Promise<Site[]> {
     return this.request<Site[]>("/api/sites")
+  }
+
+  async getSitesWithUrls(): Promise<SiteWithUrls[]> {
+    return this.request<SiteWithUrls[]>("/api/sites-with-urls")
   }
 
   async createSite(name: string): Promise<Site> {
@@ -788,6 +793,10 @@ class ApiClient {
 
   async getMigrationHealth(): Promise<MigrationHealthSnapshot> {
     return this.request("/api/dashboard/health")
+  }
+
+  async getMigrationOverview(): Promise<MigrationDashboardOverview> {
+    return this.request("/api/dashboard/overview")
   }
 
   async getMigrationKpis(): Promise<MigrationKpis> {

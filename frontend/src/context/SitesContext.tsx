@@ -1,5 +1,5 @@
 import { createContext, useState, useCallback, useEffect, type ReactNode } from "react"
-import type { Site, SiteWithUrls } from "@/types"
+import type { SiteWithUrls } from "@/types"
 import { api } from "@/services/api"
 
 interface SitesContextValue {
@@ -20,14 +20,7 @@ export function SitesProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const siteList: Site[] = await api.getSites()
-      const sitesWithUrls: SiteWithUrls[] = await Promise.all(
-        siteList.map(async (site) => {
-          const urls = await api.getUrls(site.id)
-          return { ...site, urls }
-        })
-      )
-      setSites(sitesWithUrls)
+      setSites(await api.getSitesWithUrls())
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load sites")
     } finally {

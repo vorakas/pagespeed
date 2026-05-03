@@ -35,11 +35,28 @@ class UrlRepository:
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT u.id, u.url, s.name AS site_name, s.id AS site_id
+                SELECT
+                    u.id, u.site_id, u.url, u.created_at,
+                    s.name AS site_name
                 FROM urls u
                 JOIN sites s ON u.site_id = s.id
                 ORDER BY s.name, u.url
             """)
+            return self._cm._rows_to_dicts(cursor)
+
+    def get_by_ids(self, url_ids: list[int]) -> list[dict]:
+        """Return URL records for the given ids in a single query."""
+        if not url_ids:
+            return []
+
+        ph = self._cm._placeholder()
+        placeholders = ", ".join(ph for _ in url_ids)
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT * FROM urls WHERE id IN ({placeholders})",
+                tuple(url_ids),
+            )
             return self._cm._rows_to_dicts(cursor)
 
     def create(self, site_id: int, url: str) -> int | None:

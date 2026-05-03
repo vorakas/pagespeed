@@ -61,8 +61,8 @@ interface BuildGridProps {
   onShowSkipped: (build: DevOpsBuild) => void
   onAddToSheet: (roleKey: string) => void
   sheetData: Map<string, SheetEntry>
+  sheetLoadingKeys: Set<string>
   onSheetClear: () => void
-  prefetchingTests: boolean
   triggeringKeys: Set<string>
   triggerErrors: Record<string, string>
   cancellingKeys: Set<string>
@@ -82,7 +82,7 @@ export function BuildGrid({
   builds, recentBuilds, buildOverrides, onSelectBuild,
   effectiveResults, branches, globalBranch, globalTargetInstance, globalStagingInstance,
   overrides, onOverrideChange, onTrigger, onStop, onShowResults, onShowSkipped,
-  onAddToSheet, sheetData, onSheetClear, prefetchingTests,
+  onAddToSheet, sheetData, sheetLoadingKeys, onSheetClear,
   triggeringKeys, triggerErrors, cancellingKeys, selectedBuildId,
   applitoolsBatchIds, onApplitoolsBatchIdChange, recentApplitoolsBatches,
 }: BuildGridProps) {
@@ -118,13 +118,14 @@ export function BuildGrid({
               onShowSkipped={onShowSkipped}
               onAddToSheet={onAddToSheet}
               addedToSheet={sheetData.has(WARMUP_ROLE.key)}
+              addingToSheet={sheetLoadingKeys.has(WARMUP_ROLE.key)}
               triggering={triggeringKeys.has(WARMUP_ROLE.key)}
               triggerError={triggerErrors[WARMUP_ROLE.key]}
               selected={builds[WARMUP_ROLE.key]?.id === selectedBuildId}
             />
           </div>
           <div className="min-w-0">
-            <SpreadsheetWidget sheetData={sheetData} onClear={onSheetClear} prefetchingTests={prefetchingTests} />
+            <SpreadsheetWidget sheetData={sheetData} onClear={onSheetClear} />
           </div>
         </div>
       </div>
@@ -164,6 +165,7 @@ export function BuildGrid({
                   onShowSkipped={onShowSkipped}
                   onAddToSheet={onAddToSheet}
                   addedToSheet={sheetData.has(functional.key)}
+                  addingToSheet={sheetLoadingKeys.has(functional.key)}
                   triggering={triggeringKeys.has(functional.key)}
                   triggerError={triggerErrors[functional.key]}
                   selected={builds[functional.key]?.id === selectedBuildId}
@@ -195,6 +197,7 @@ export function BuildGrid({
                   onShowSkipped={onShowSkipped}
                   onAddToSheet={onAddToSheet}
                   addedToSheet={sheetData.has(visual.key)}
+                  addingToSheet={sheetLoadingKeys.has(visual.key)}
                   triggering={triggeringKeys.has(visual.key)}
                   triggerError={triggerErrors[visual.key]}
                   selected={builds[visual.key]?.id === selectedBuildId}

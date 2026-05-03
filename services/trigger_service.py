@@ -20,6 +20,7 @@ from config import (
 )
 from data_access.preset_repository import PresetRepository
 from data_access.trigger_repository import TriggerRepository
+from data_access.url_repository import UrlRepository
 from enums import TriggerStrategy
 from exceptions import SchedulerError, ValidationError
 
@@ -39,6 +40,7 @@ class TriggerService:
     Args:
         trigger_repo:    Repository for the ``scheduled_triggers`` table.
         preset_repo:     Repository for the ``schedule_presets`` table.
+        url_repo:        Repository for trigger URL lookups.
         testing_service: Service that runs PageSpeed tests.
         scheduler:       APScheduler ``BackgroundScheduler`` instance.
     """
@@ -47,11 +49,13 @@ class TriggerService:
         self,
         trigger_repo: TriggerRepository,
         preset_repo: PresetRepository,
+        url_repo: UrlRepository,
         testing_service: TestingService,
         scheduler: BackgroundScheduler,
     ) -> None:
         self._triggers: TriggerRepository = trigger_repo
         self._presets: PresetRepository = preset_repo
+        self._urls: UrlRepository = url_repo
         self._testing: TestingService = testing_service
         self._scheduler: BackgroundScheduler = scheduler
 
@@ -417,6 +421,11 @@ class TriggerService:
             print(f"Trigger '{trigger['name']}' has no URLs — skipping")
             return
 
+        url_map = {
+            row['id']: row
+            for row in self._urls.get_by_ids(url_ids)
+        }
+
         strategy = trigger['strategy']
         strategies = (
             ['desktop', 'mobile']
@@ -441,7 +450,7 @@ class TriggerService:
             for current_strategy in strategies:
                 for index, url_id in enumerate(url_ids):
                     try:
-                        url_data = self._get_url_by_id(url_id)
+                        url_data = url_map.get(url_id)
                         if url_data is None:
                             print(f"  [{successes + failures + 1}/{total_tests}] "
                                   f"URL id {url_id} not found — skipping")
@@ -487,18 +496,6 @@ class TriggerService:
             f"Trigger '{trigger['name']}' completed: "
             f"{successes}/{total_tests} succeeded — {run_status}"
         )
-
-    def _get_url_by_id(self, url_id: int) -> dict | None:
-        """Retrieve a URL record by id using the testing service's repository."""
-        # Access the URL repository through the testing service's injected dependency
-        urls_repo = self._testing._urls
-        ph = urls_repo._cm._placeholder()
-        with urls_repo._cm.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                f"SELECT * FROM urls WHERE id = {ph}", (url_id,),
-            )
-            return urls_repo._cm._row_to_dict(cursor)
 
     # ------------------------------------------------------------------
     # Private — schedule helpers

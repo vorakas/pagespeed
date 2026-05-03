@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
+import hashlib
+import threading
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -35,6 +37,9 @@ class AzureLogAnalyticsClient:
         workspace_id:  Log Analytics workspace id.
     """
 
+    _token_cache: dict[tuple[str, str, str, str], tuple[str, datetime]] = {}
+    _token_cache_lock = threading.Lock()
+
     def __init__(
         self,
         tenant_id: str,
@@ -46,9 +51,13 @@ class AzureLogAnalyticsClient:
         self._client_id: str = client_id
         self._client_secret: str = client_secret
         self._workspace_id: str = workspace_id
-        self._token: Optional[str] = None
-        self._token_expiry: Optional[datetime] = None
         self._base_url: str = f"{AZURE_LOG_ANALYTICS_BASE_URL}/{workspace_id}/query"
+        self._token_cache_key = (
+            tenant_id,
+            client_id,
+            workspace_id,
+            hashlib.sha256(client_secret.encode("utf-8")).hexdigest(),
+        )
 
     # ------------------------------------------------------------------
     # Token management
@@ -63,36 +72,45 @@ class AzureLogAnalyticsClient:
         Raises:
             AuthenticationError: On token acquisition failure.
         """
-        if self._token and self._token_expiry and datetime.now() < self._token_expiry:
-            return self._token
+        now = datetime.now()
+        cached = self._token_cache.get(self._token_cache_key)
+        if cached and now < cached[1]:
+            return cached[0]
 
-        token_url = (
-            f"https://login.microsoftonline.com/{self._tenant_id}/oauth2/v2.0/token"
-        )
-        data = {
-            "grant_type": "client_credentials",
-            "client_id": self._client_id,
-            "client_secret": self._client_secret,
-            "scope": AZURE_LOG_ANALYTICS_SCOPE,
-        }
+        with self._token_cache_lock:
+            now = datetime.now()
+            cached = self._token_cache.get(self._token_cache_key)
+            if cached and now < cached[1]:
+                return cached[0]
 
-        try:
-            response = requests.post(token_url, data=data, timeout=AZURE_TOKEN_TIMEOUT_SECONDS)
-            response.raise_for_status()
-            token_data = response.json()
-        except requests.exceptions.RequestException as exc:
-            raise AuthenticationError(
-                f"Failed to acquire Azure token: {exc}", provider="Azure",
-            ) from exc
-        except (KeyError, json.JSONDecodeError) as exc:
-            raise AuthenticationError(
-                f"Invalid token response from Azure: {exc}", provider="Azure",
-            ) from exc
+            token_url = (
+                f"https://login.microsoftonline.com/{self._tenant_id}/oauth2/v2.0/token"
+            )
+            data = {
+                "grant_type": "client_credentials",
+                "client_id": self._client_id,
+                "client_secret": self._client_secret,
+                "scope": AZURE_LOG_ANALYTICS_SCOPE,
+            }
 
-        self._token = token_data["access_token"]
-        expires_in = token_data.get("expires_in", 3600)
-        self._token_expiry = datetime.now() + timedelta(seconds=expires_in - 60)
-        return self._token
+            try:
+                response = requests.post(token_url, data=data, timeout=AZURE_TOKEN_TIMEOUT_SECONDS)
+                response.raise_for_status()
+                token_data = response.json()
+                token = token_data["access_token"]
+            except requests.exceptions.RequestException as exc:
+                raise AuthenticationError(
+                    f"Failed to acquire Azure token: {exc}", provider="Azure",
+                ) from exc
+            except (KeyError, json.JSONDecodeError) as exc:
+                raise AuthenticationError(
+                    f"Invalid token response from Azure: {exc}", provider="Azure",
+                ) from exc
+
+            expires_in = token_data.get("expires_in", 3600)
+            token_expiry = datetime.now() + timedelta(seconds=max(expires_in - 60, 60))
+            self._token_cache[self._token_cache_key] = (token, token_expiry)
+            return token
 
     # ------------------------------------------------------------------
     # Query execution

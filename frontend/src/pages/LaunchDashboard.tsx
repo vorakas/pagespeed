@@ -28,15 +28,6 @@ import type {
   RawTaskRecord,
 } from "@/types"
 
-/**
- * Body of the Launch Command Center — the entire dashboard tree from
- * TopBar through SidePanel, scoped under `LaunchShell` so all the
- * `.launch-dashboard .lcc-*` rules in `aurora-glass.css` resolve. The
- * Aurora prototype at `/prototype/dashboard-launch/aurora` mounts this
- * body inside `BeaconLayout`; the production export below renders it
- * directly under `AppLayout`. No internal logic was changed during the
- * extraction — only the function name.
- */
 export function LaunchDashboard() {
   const [health, setHealth] = useState<MigrationHealthSnapshot | null>(null)
   const [kpis, setKpis] = useState<MigrationKpis | null>(null)
@@ -50,6 +41,8 @@ export function LaunchDashboard() {
   const [snapshotDiff, setSnapshotDiff] = useState<MigrationSnapshotDiffResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [streamFilter, setStreamFilter] = useState<IncidentFilter>("all")
+  const [sidePanelTarget, setSidePanelTarget] = useState<SidePanelTarget | null>(null)
 
   const location = useLocation()
 
@@ -60,23 +53,17 @@ export function LaunchDashboard() {
     const el = document.getElementById(id)
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [location.hash, location.key, workstreams, blockers])
-  const [streamFilter, setStreamFilter] = useState<IncidentFilter>("all")
-  const [sidePanelTarget, setSidePanelTarget] = useState<SidePanelTarget | null>(null)
 
   const loadAll = useCallback(async (force: boolean = false) => {
     setError(null)
     if (force) setRefreshing(true)
     try {
       if (force) {
-        // Kick off a full vault sync (Jira + Asana → disk) and wait for
-        // completion. If a sync is already running we skip the start and
-        // just poll. Errors swallowed — if sync fails (no creds, network,
-        // etc.) we still want to re-parse whatever's on disk.
         try {
           const start = await api.startObsidianSync({ source: "both" }).catch(() => null)
           if (start?.success || start === null) {
             for (let i = 0; i < 180; i++) {
-              await new Promise((r) => setTimeout(r, 2_000))
+              await new Promise((resolve) => setTimeout(resolve, 2_000))
               const active = await api.getObsidianActiveSync().catch(() => ({ active: null }))
               if (!active.active) break
             }
@@ -84,34 +71,21 @@ export function LaunchDashboard() {
         } catch {
           // Non-fatal; fall through to local refresh.
         }
-        // Drop the in-process service cache and re-parse status files so
-        // the next reads hit the vault fresh.
         await fetch("/api/dashboard/cache/invalidate", { method: "POST" }).catch(() => null)
         await fetch("/api/dashboard/snapshots/reingest", { method: "POST" }).catch(() => null)
       }
-      const [h, k, ws, bl, pf, nb, ts, tr, sr, sd] = await Promise.all([
-        api.getMigrationHealth(),
-        api.getMigrationKpis(),
-        api.getMigrationWorkstreams(),
-        api.getMigrationBlockers(),
-        api.getMigrationProductionFailures(),
-        api.getMigrationNewBugs(),
-        api.getMigrationTaskStatus(),
-        api.getMigrationTrend(),
-        api.getMigrationSources(),
-        // Snapshots may be empty on a fresh DB — swallow 503/404 and keep the rest.
-        api.getMigrationSnapshotDiff().catch(() => null),
-      ])
-      setHealth(h)
-      setKpis(k)
-      setWorkstreams(ws)
-      setBlockers(bl)
-      setProdFailures(pf)
-      setNewBugs(nb)
-      setTaskStatus(ts)
-      setTrend(tr)
-      setSources(sr)
-      setSnapshotDiff(sd)
+
+      const overview = await api.getMigrationOverview()
+      setHealth(overview.health)
+      setKpis(overview.kpis)
+      setWorkstreams(overview.workstreams)
+      setBlockers(overview.blockers)
+      setProdFailures(overview.productionFailures)
+      setNewBugs(overview.newBugs)
+      setTaskStatus(overview.taskStatus)
+      setTrend(overview.trend)
+      setSources(overview.sources)
+      setSnapshotDiff(overview.snapshotDiff)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard")
     } finally {
@@ -161,7 +135,7 @@ export function LaunchDashboard() {
           }}
         >
           <Loader2 size={14} className="animate-spin" />
-          Loading vault data…
+          Loading vault data...
         </div>
       </LaunchShell>
     )
@@ -218,4 +192,3 @@ export function LaunchDashboard() {
     </LaunchShell>
   )
 }
-

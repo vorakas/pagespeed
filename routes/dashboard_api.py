@@ -31,6 +31,36 @@ def create_dashboard_blueprint(
             return jsonify({"error": "vault not found", "vaultRoot": str(service.vault_root)}), 404
         return jsonify(service.get_health())
 
+    @bp.route("/api/dashboard/overview", methods=["GET"])
+    def overview():
+        if not service.is_available():
+            return jsonify({"error": "vault not found", "vaultRoot": str(service.vault_root)}), 404
+
+        snapshot_diff_payload = None
+        if snapshot_service is not None:
+            latest = snapshot_service.latest()
+            previous = snapshot_service.previous()
+            snapshot_diff_payload = {
+                "latest": latest,
+                "previous": previous,
+                "diff": diff_snapshots(previous, latest)
+                if latest is not None and previous is not None
+                else None,
+            }
+
+        return jsonify({
+            "health": service.get_health(),
+            "kpis": service.get_kpis(),
+            "workstreams": service.get_workstreams(),
+            "blockers": service.get_blockers(),
+            "productionFailures": service.get_production_failures(),
+            "newBugs": service.get_new_bugs(window_days=7),
+            "taskStatus": service.get_task_status(),
+            "trend": service.get_trend(),
+            "sources": service.get_sources(),
+            "snapshotDiff": snapshot_diff_payload,
+        })
+
     @bp.route("/api/dashboard/kpis", methods=["GET"])
     def kpis():
         if not service.is_available():
