@@ -93,7 +93,7 @@ export function AzureConfigPanel({ config, onConfigChange, onConnected }: AzureC
             <label htmlFor="azSecret" className="aurora-label block">Client Secret</label>
             <input id="azSecret" type="password" className="aurora-input w-full" value={config.clientSecret} onChange={(e) => updateField("clientSecret", e.target.value)} placeholder="Client Secret Value" />
           </div>
-          <Button onClick={handleSave}>
+          <Button onClick={handleSave} style={{ color: "#000" }}>
             <Save className="h-4 w-4" /> Save Configuration
           </Button>
         </div>

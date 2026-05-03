@@ -122,7 +122,7 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
             <option value="250">250</option>
             <option value="500">500</option>
           </select>
-          <Button onClick={handleSearch} disabled={loading} className="justify-self-start">
+          <Button onClick={handleSearch} disabled={loading} className="justify-self-start" style={{ color: "#000" }}>
             <Search className="h-4 w-4" /> Search
           </Button>
         </div>

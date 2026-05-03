@@ -280,7 +280,7 @@ export function KqlQueryPanel({ config }: KqlQueryPanelProps) {
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>
           )}
-          <Button onClick={handleRun} disabled={running || !query.trim()}>
+          <Button onClick={handleRun} disabled={running || !query.trim()} style={{ color: "#000" }}>
             <Play className="h-4 w-4" /> {running ? "Running..." : "Run Query"}
           </Button>
         </div>

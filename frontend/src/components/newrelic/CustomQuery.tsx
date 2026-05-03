@@ -69,7 +69,7 @@ export function CustomQuery({ config }: CustomQueryProps) {
           rows={3}
         />
       </div>
-      <Button onClick={handleRun} disabled={running || !query.trim()}>
+      <Button onClick={handleRun} disabled={running || !query.trim()} style={{ color: "#000" }}>
         <Play className="h-4 w-4" />
         {running ? "Running..." : "Run Query"}
       </Button>

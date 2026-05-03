@@ -614,7 +614,7 @@ export function LoadTesting() {
                 </>
               )}
               <div className="ml-auto flex items-center gap-2">
-                <Button size="sm" onClick={handleTestConnection}>
+                <Button size="sm" onClick={handleTestConnection} style={{ color: "#000" }}>
                   Test connection
                 </Button>
                 {connectionChecked && (
@@ -669,7 +669,7 @@ export function LoadTesting() {
                   <RefreshCw className={`h-3.5 w-3.5 ${presetsLoading ? "animate-spin" : ""}`} />
                 </Button>
                 {!presetDialogOpen && (
-                  <Button size="sm" onClick={openCreatePreset}>
+                  <Button size="sm" onClick={openCreatePreset} style={{ color: "#000" }}>
                     <Plus className="mr-1 h-3.5 w-3.5" />
                     New preset
                   </Button>
@@ -1026,6 +1026,7 @@ export function LoadTesting() {
                       className="w-full"
                       disabled={presetQueueBusy === preset.id || preset.tests.length === 0}
                       onClick={() => void handleQueuePreset(preset)}
+                      style={{ color: "#000" }}
                     >
                       {presetQueueBusy === preset.id ? (
                         <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -1152,6 +1153,7 @@ export function LoadTesting() {
                                 variant={alreadyQueued ? "outline" : "default"}
                                 disabled={actionBusy === test.id || alreadyQueued}
                                 onClick={() => void handleEnqueue(test)}
+                                style={alreadyQueued ? undefined : { color: "#000" }}
                               >
                                 {actionBusy === test.id ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

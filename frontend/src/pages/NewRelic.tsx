@@ -115,7 +115,7 @@ export function NewRelic() {
                 ))}
               </select>
             </div>
-            <Button onClick={loadAllMetrics} disabled={loading}>
+            <Button onClick={loadAllMetrics} disabled={loading} style={{ color: "#000" }}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {loading ? "Loading..." : "Load Metrics"}
             </Button>

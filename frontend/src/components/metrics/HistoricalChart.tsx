@@ -173,7 +173,7 @@ export function HistoricalChart({ strategy }: HistoricalChartProps) {
             </select>
           </div>
 
-          <Button onClick={loadChart} disabled={!selectedUrlId || loading}>
+          <Button onClick={loadChart} disabled={!selectedUrlId || loading} style={{ color: "#000" }}>
             Load Chart
           </Button>
         </div>

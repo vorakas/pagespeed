@@ -31,7 +31,7 @@ function StrategyToggle({
       <ToggleGroupItem
         value="desktop"
         aria-label="Desktop"
-        className="gap-1.5 px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+        className="gap-1.5 px-3 text-xs aria-pressed:bg-primary aria-pressed:text-black"
       >
         <Monitor size={14} />
         Desktop
@@ -39,7 +39,7 @@ function StrategyToggle({
       <ToggleGroupItem
         value="mobile"
         aria-label="Mobile"
-        className="gap-1.5 px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+        className="gap-1.5 px-3 text-xs aria-pressed:bg-primary aria-pressed:text-black"
       >
         <Smartphone size={14} />
         Mobile

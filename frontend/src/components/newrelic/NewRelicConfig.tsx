@@ -80,7 +80,7 @@ export function NewRelicConfigPanel({ config, onConfigChange, onConnected }: New
             placeholder="Enter your Account ID"
           />
         </div>
-        <Button onClick={handleSave}>
+        <Button onClick={handleSave} style={{ color: "#000" }}>
           <Save className="h-4 w-4" />
           Save Configuration
         </Button>

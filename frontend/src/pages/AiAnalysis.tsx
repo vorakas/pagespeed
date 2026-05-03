@@ -413,7 +413,7 @@ export function AiAnalysis() {
                 OpenAI
               </label>
             </div>
-            <Button onClick={handleAnalyze} disabled={analyzing || !urlPath.trim() || (!useClaude && !useOpenai)}>
+            <Button onClick={handleAnalyze} disabled={analyzing || !urlPath.trim() || (!useClaude && !useOpenai)} style={{ color: "#000" }}>
               {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {analyzing ? "Analyzing..." : "Analyze"}
             </Button>

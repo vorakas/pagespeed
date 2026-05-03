@@ -321,7 +321,7 @@ export function PageComparison() {
             </select>
           </div>
 
-          <Button onClick={handleCompare} disabled={!url1Id || !url2Id || loading}>
+          <Button onClick={handleCompare} disabled={!url1Id || !url2Id || loading} style={{ color: "#000" }}>
             Compare
           </Button>
         </div>
