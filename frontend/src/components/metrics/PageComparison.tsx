@@ -30,6 +30,19 @@ interface MetricRowProps {
   isScore?: boolean
 }
 
+interface VitalBarProps {
+  metric: string
+  value1: number | null
+  value2: number | null
+  benchmark: number
+  format: (value: number | null) => string
+  site1Name: string
+  site2Name: string
+}
+
+const SITE1_COLOR = "var(--lcc-violet)"
+const SITE2_COLOR = "var(--lcc-green)"
+
 function MetricRow({ label, value1, value2, format, isScore }: MetricRowProps) {
   const formatted1 = format ? format(value1 as number | null) : String(value1 ?? "N/A")
   const formatted2 = format ? format(value2 as number | null) : String(value2 ?? "N/A")
@@ -57,8 +70,80 @@ function MetricRow({ label, value1, value2, format, isScore }: MetricRowProps) {
   )
 }
 
-const SITE1_COLOR = "var(--lcc-violet)"
-const SITE2_COLOR = "var(--lcc-green)"
+function VitalBar({
+  metric,
+  value1,
+  value2,
+  benchmark,
+  format,
+  site1Name,
+  site2Name,
+}: VitalBarProps) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="aurora-text-faint text-[11px] font-medium">{metric}</span>
+        <span className="aurora-text-faint aurora-num text-[10px]">
+          target {format(benchmark)}
+        </span>
+      </div>
+      <VitalBarRow
+        siteName={site1Name}
+        value={value1}
+        benchmark={benchmark}
+        format={format}
+        color={SITE1_COLOR}
+      />
+      <VitalBarRow
+        siteName={site2Name}
+        value={value2}
+        benchmark={benchmark}
+        format={format}
+        color={SITE2_COLOR}
+      />
+    </div>
+  )
+}
+
+function VitalBarRow({
+  siteName,
+  value,
+  benchmark,
+  format,
+  color,
+}: {
+  siteName: string
+  value: number | null
+  benchmark: number
+  format: (value: number | null) => string
+  color: string
+}) {
+  const numericValue = value ?? 0
+  const pct = numericValue === 0 ? 0 : Math.max(2, Math.min(100, (numericValue / benchmark) * 100))
+  const overTarget = numericValue > benchmark
+  return (
+    <div className="grid grid-cols-[72px_minmax(120px,360px)_56px] items-center gap-2">
+      <span className="aurora-text-faint truncate text-right text-[10px]" title={siteName}>
+        {siteName}
+      </span>
+      <div
+        className="aurora-bar-track w-full max-w-[360px]"
+        data-over-target={overTarget ? "true" : undefined}
+      >
+        <div
+          className="aurora-bar-fill"
+          style={{
+            width: `${pct}%`,
+            backgroundColor: overTarget ? "var(--lcc-red)" : color,
+          }}
+        />
+      </div>
+      <span className="aurora-text aurora-num text-right text-[11px]">
+        {format(value)}
+      </span>
+    </div>
+  )
+}
 
 function ComparisonResults({ data }: { data: ComparisonResult }) {
   const { url1, url2 } = data
@@ -70,6 +155,10 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
     : scoreDiff < 0
       ? "var(--lcc-red)"
       : "var(--lcc-text-dim)"
+  const weightDiff = (url1.total_byte_weight ?? 0) - (url2.total_byte_weight ?? 0)
+  const weightDiffLabel = weightDiff === 0
+    ? "0 B"
+    : `${weightDiff > 0 ? "+" : "-"}${formatBytes(Math.abs(weightDiff))}`
 
   const radarData = [
     { metric: "Performance", site1: url1.performance_score ?? 0, site2: url2.performance_score ?? 0 },
@@ -79,26 +168,26 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
   ]
 
   const cwvData = [
-    { metric: "FCP", site1: url1.fcp ?? 0, site2: url2.fcp ?? 0 },
-    { metric: "LCP", site1: url1.lcp ?? 0, site2: url2.lcp ?? 0 },
-    { metric: "INP", site1: url1.inp ?? 0, site2: url2.inp ?? 0 },
-    { metric: "TTFB", site1: url1.ttfb ?? 0, site2: url2.ttfb ?? 0 },
+    { metric: "FCP", site1: url1.fcp, site2: url2.fcp, benchmark: 3000, format: formatMilliseconds },
+    { metric: "LCP", site1: url1.lcp, site2: url2.lcp, benchmark: 5000, format: formatMilliseconds },
+    { metric: "CLS", site1: url1.cls, site2: url2.cls, benchmark: 0.25, format: formatCls },
+    { metric: "INP", site1: url1.inp, site2: url2.inp, benchmark: 500, format: formatMilliseconds },
+    { metric: "TTFB", site1: url1.ttfb, site2: url2.ttfb, benchmark: 1000, format: formatMilliseconds },
   ]
 
   return (
-    <div className="space-y-2">
-      {/* Lighthouse Scores — radar chart + metrics side by side */}
+    <div className="space-y-4">
       <div>
-        <h4 className="aurora-text mb-1.5 text-sm font-semibold">Lighthouse Scores</h4>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
+        <h4 className="aurora-text mb-2 text-sm font-semibold">Lighthouse Scores</h4>
+        <div className="grid gap-4 lg:grid-cols-[minmax(360px,1fr)_280px] xl:grid-cols-[minmax(360px,0.95fr)_280px_minmax(220px,0.55fr)]">
+          <div className="divide-y self-start" style={{ borderColor: "var(--glass-border)" }}>
             <div className="flex items-center justify-between px-0 pb-1">
               <div />
               <div className="flex items-center gap-6">
-                <span className="aurora-text-faint w-20 text-right text-xs font-medium truncate" title={url1.site_name}>
+                <span className="aurora-text-faint w-20 truncate text-right text-xs font-medium" title={url1.site_name}>
                   {url1.site_name}
                 </span>
-                <span className="aurora-text-faint w-20 text-right text-xs font-medium truncate" title={url2.site_name}>
+                <span className="aurora-text-faint w-20 truncate text-right text-xs font-medium" title={url2.site_name}>
                   {url2.site_name}
                 </span>
               </div>
@@ -108,9 +197,9 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <MetricRow label="Best Practices" value1={url1.best_practices_score} value2={url2.best_practices_score} isScore />
             <MetricRow label="SEO" value1={url1.seo_score} value2={url2.seo_score} isScore />
           </div>
-          <div>
-            <ResponsiveContainer width="100%" height={240}>
-              <RadarChart data={radarData} margin={{ top: 20, right: 40, bottom: 30, left: 40 }}>
+          <div className="min-w-0">
+            <ResponsiveContainer width="100%" height={176}>
+              <RadarChart data={radarData} margin={{ top: 12, right: 32, bottom: 18, left: 32 }}>
                 <PolarGrid stroke="var(--glass-border)" />
                 <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--lcc-text-dim)", fontFamily: "var(--aurora-font-mono)" }} />
                 <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
@@ -118,7 +207,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
                 <Radar name={url2.site_name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.25} />
               </RadarChart>
             </ResponsiveContainer>
-            <div className="flex items-center justify-center gap-4 text-xs">
+            <div className="flex items-center justify-center gap-3 text-xs">
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SITE1_COLOR }} />
                 <span className="aurora-text">{url1.site_name}</span>
@@ -129,60 +218,61 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
               </span>
             </div>
           </div>
+          <div className="aurora-callout flex flex-col justify-between gap-3 self-start p-3 text-left lg:col-span-2 xl:col-span-1">
+            <div>
+              <span className="aurora-label">Performance delta</span>
+              <div className="aurora-num mt-1 text-2xl font-semibold" style={{ color: diffColor }}>
+                {diffLabel} pts
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="min-w-0">
+                <span className="aurora-text-faint block truncate" title={`${url1.site_name} weight`}>
+                  {url1.site_name}
+                </span>
+                <span className="aurora-text aurora-num font-semibold">{formatBytes(url1.total_byte_weight)}</span>
+              </div>
+              <div className="min-w-0">
+                <span className="aurora-text-faint block truncate" title={`${url2.site_name} weight`}>
+                  {url2.site_name}
+                </span>
+                <span className="aurora-text aurora-num font-semibold">{formatBytes(url2.total_byte_weight)}</span>
+              </div>
+            </div>
+            <div className="aurora-text-faint text-xs">
+              Weight delta <span className="aurora-num aurora-text">{weightDiffLabel}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Core Web Vitals — per-metric bars + metrics side by side */}
       <div>
-        <h4 className="aurora-text mb-1.5 text-sm font-semibold">Core Web Vitals</h4>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
+        <h4 className="aurora-text mb-2 text-sm font-semibold">Core Web Vitals</h4>
+        <div className="grid gap-4 xl:grid-cols-[minmax(360px,0.85fr)_minmax(360px,1fr)]">
+          <div className="divide-y self-start" style={{ borderColor: "var(--glass-border)" }}>
             <MetricRow label="FCP" value1={url1.fcp} value2={url2.fcp} format={formatMilliseconds} />
             <MetricRow label="LCP" value1={url1.lcp} value2={url2.lcp} format={formatMilliseconds} />
             <MetricRow label="CLS" value1={url1.cls} value2={url2.cls} format={formatCls} />
             <MetricRow label="INP" value1={url1.inp} value2={url2.inp} format={formatMilliseconds} />
             <MetricRow label="TTFB" value1={url1.ttfb} value2={url2.ttfb} format={formatMilliseconds} />
           </div>
-          <div className="space-y-1.5">
-            {cwvData.map((item) => {
-              const maxVal = Math.max(item.site1, item.site2, 1)
-              return (
-                <div key={item.metric} className="space-y-0.5">
-                  <span className="aurora-text-faint text-[11px] font-medium">{item.metric}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="aurora-text-faint w-16 text-right text-[10px] truncate" title={url1.site_name}>{url1.site_name}</span>
-                    <div className="aurora-bar-track flex-1">
-                      <div className="aurora-bar-fill" style={{ width: `${(item.site1 / maxVal) * 100}%`, backgroundColor: SITE1_COLOR }} />
-                    </div>
-                    <span className="aurora-text aurora-num w-12 text-right text-[11px]">{formatMilliseconds(item.site1)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="aurora-text-faint w-16 text-right text-[10px] truncate" title={url2.site_name}>{url2.site_name}</span>
-                    <div className="aurora-bar-track flex-1">
-                      <div className="aurora-bar-fill" style={{ width: `${(item.site2 / maxVal) * 100}%`, backgroundColor: SITE2_COLOR }} />
-                    </div>
-                    <span className="aurora-text aurora-num w-12 text-right text-[11px]">{formatMilliseconds(item.site2)}</span>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="max-w-[520px] space-y-3">
+            {cwvData.map((item) => (
+              <VitalBar
+                key={item.metric}
+                metric={item.metric}
+                value1={item.site1}
+                value2={item.site2}
+                benchmark={item.benchmark}
+                format={item.format}
+                site1Name={url1.site_name}
+                site2Name={url2.site_name}
+              />
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Size */}
-      <div>
-        <h4 className="aurora-text mb-2 text-sm font-semibold">Page Size</h4>
-        <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
-          <MetricRow label="Total Weight" value1={url1.total_byte_weight} value2={url2.total_byte_weight} format={formatBytes} />
-        </div>
-      </div>
-
-      {/* Performance diff summary */}
-      <div className="aurora-callout text-center">
-        <span className="aurora-text-dim text-sm">Performance difference: </span>
-        <span className="aurora-num text-sm font-semibold" style={{ color: diffColor }}>{diffLabel} points</span>
-      </div>
     </div>
   )
 }
