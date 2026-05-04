@@ -123,7 +123,7 @@ export function ProjectDashboard() {
   if (loading && !sources) {
     return (
       <LaunchShell>
-        <PageFrame projectKey={projectKey}>
+        <PageFrame>
           <div
             style={{
               padding: 24,
@@ -144,7 +144,7 @@ export function ProjectDashboard() {
   if (error) {
     return (
       <LaunchShell>
-        <PageFrame projectKey={projectKey}>
+        <PageFrame>
           <div className="panel" style={{ padding: 16, color: "var(--lcc-red)" }}>
             {error}
           </div>
@@ -156,7 +156,7 @@ export function ProjectDashboard() {
   if (!project) {
     return (
       <LaunchShell>
-        <PageFrame projectKey={projectKey}>
+        <PageFrame>
           <div className="panel" style={{ padding: 16 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>
               No source feed found for "{projectKey}"
@@ -185,7 +185,7 @@ export function ProjectDashboard() {
           activeProjectKey={projectKey}
         />
         <main className="lcc-main">
-          <PageFrame projectKey={projectKey}>
+          <PageFrame>
             <StatsPanel project={project} blockerCount={projectBlockers.length} />
             <div
               style={{
@@ -230,36 +230,14 @@ export function ProjectDashboard() {
 // ── Layout frame ───────────────────────────────────────────────────────
 
 function PageFrame({
-  projectKey,
   children,
 }: {
-  projectKey: string
   children: React.ReactNode
 }) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, color: "var(--lcc-text-faint)" }}>
-        / dashboard / projects / {projectKey || "—"}
-      </div>
-      <div style={{ display: "grid", gap: 14, marginTop: 14 }}>{children}</div>
-    </div>
-  )
+  return <div style={{ display: "grid", gap: 14 }}>{children}</div>
 }
 
 // ── Header ─────────────────────────────────────────────────────────────
-
-// `MigrationSource.name` is the H1 of the editorial source-summary doc
-// (e.g. "Source Summary: Jira ACE2E (2026-04-23)"). The trailing
-// "(YYYY-MM-DD)" is the ingested date the orchestrator stamped when it
-// last regenerated that doc — and that document gets refreshed far less
-// often than the raw ticket data this page actually shows. Surfacing it
-// in the hero reads as a stale-data warning when the tickets themselves
-// are current, so we strip the suffix.
-const INGESTED_DATE_SUFFIX = /\s*\(\d{4}-\d{2}-\d{2}\)\s*$/
-
-function stripIngestedDateSuffix(name: string): string {
-  return name.replace(INGESTED_DATE_SUFFIX, "")
-}
 
 function ProjectTopBar({
   project,
@@ -305,9 +283,9 @@ function ProjectTopBar({
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}
-          title={stripIngestedDateSuffix(project.name)}
+          title={project.name}
         >
-          {stripIngestedDateSuffix(project.name)}
+          {project.name}
         </div>
         <div className="lcc-brand-sub">
           {project.active.toLocaleString()} active / {project.total.toLocaleString()} total

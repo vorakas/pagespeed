@@ -199,7 +199,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
           </div>
           <div className="min-w-0">
             <ResponsiveContainer width="100%" height={176}>
-              <RadarChart data={radarData} margin={{ top: 12, right: 58, bottom: 18, left: 12 }}>
+              <RadarChart data={radarData} margin={{ top: 12, right: 104, bottom: 18, left: 0 }}>
                 <PolarGrid stroke="var(--glass-border)" />
                 <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--lcc-text-dim)", fontFamily: "var(--aurora-font-mono)" }} />
                 <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
@@ -256,7 +256,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <MetricRow label="INP" value1={url1.inp} value2={url2.inp} format={formatMilliseconds} />
             <MetricRow label="TTFB" value1={url1.ttfb} value2={url2.ttfb} format={formatMilliseconds} />
           </div>
-          <div className="max-w-[520px] space-y-3">
+          <div className="max-w-[492px] space-y-3 xl:ml-7">
             {cwvData.map((item) => (
               <VitalBar
                 key={item.metric}
