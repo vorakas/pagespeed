@@ -309,6 +309,14 @@ _HEADING_NEW = re.compile(r"^#{2,}\s*New Items\b", re.IGNORECASE)
 _HEADING_CHANGE = re.compile(r"^#{2,}\s*Notable Status Changes\b", re.IGNORECASE)
 _HEADING_POSITIVE = re.compile(r"^#{2,}\s*Positive Developments\b", re.IGNORECASE)
 _HEADING_BLOCKED = re.compile(r"^#{2,}\s*Blocked Workstreams\b", re.IGNORECASE)
+_HEADING_ACTIVE_PROD = re.compile(r"^#{2,}\s*Active Production Failures\b", re.IGNORECASE)
+_HEADING_TODAYS_NEW = re.compile(r"^#{2,}\s*Today's New Items\b", re.IGNORECASE)
+_HEADING_TODAYS_CLOSURES = re.compile(r"^#{2,}\s*Today's Closures\b", re.IGNORECASE)
+_HEADING_TODAYS_PROD = re.compile(r"^#{2,}\s*Today's Production Failures\b", re.IGNORECASE)
+_HEADING_TODAYS_PROGRESS = re.compile(r"^#{2,}\s*Today's Progressions\b", re.IGNORECASE)
+_HEADING_TODAYS_RECOVERIES = re.compile(r"^#{2,}\s*Today's Production Failure Recoveries\b", re.IGNORECASE)
+_HEADING_TODAYS_REGRESSIONS = re.compile(r"^#{2,}\s*Today's Regressions", re.IGNORECASE)
+_HEADING_TODAYS_REASSIGN = re.compile(r"^#{2,}\s*Today's Reassignments\b", re.IGNORECASE)
 _SUBHEADING_CRIT_BUGS = re.compile(r"^#{3,}\s*.*Critical Bugs\b", re.IGNORECASE)
 _SUBHEADING_PROD = re.compile(r"^#{3,}\s*.*Production Failures\b", re.IGNORECASE)
 _SUBHEADING_RETEST = re.compile(r"^#{3,}\s*.*Awaiting Retest\b", re.IGNORECASE)
@@ -479,6 +487,8 @@ def _parse_critical_bugs(body: str) -> List[Dict[str, Any]]:
 def _parse_prod_failures(body: str) -> List[Dict[str, Any]]:
     crit_lines = _section_lines(body, _HEADING_CRIT)
     sub_lines = _subsection_lines(crit_lines, _SUBHEADING_PROD)
+    if not sub_lines:
+        sub_lines = _section_lines(body, _HEADING_ACTIVE_PROD)
     out: List[Dict[str, Any]] = []
     for cells in _iter_table_rows(sub_lines):
         if len(cells) < 4:
@@ -551,6 +561,24 @@ def _parse_new_items(body: str) -> List[Dict[str, Any]]:
         if who:
             entry["who"] = who
         out.append(entry)
+    if out:
+        return out
+
+    for item in _parse_bullet_task_section(
+        body,
+        _HEADING_TODAYS_NEW,
+        default_type="new",
+        title_prefix="New item",
+    ):
+        out.append(item)
+    for item in _parse_bullet_task_section(
+        body,
+        _HEADING_TODAYS_PROD,
+        default_type="production failure",
+        title_prefix="Production failure",
+    ):
+        item["isNew"] = True
+        out.append(item)
     return out
 
 
@@ -564,6 +592,20 @@ def _parse_status_changes(body: str) -> List[Dict[str, Any]]:
         change = _strip_markup(cells[1])
         detail = _strip_markup(cells[2])
         out.append({"id": item_id, "change": change, "detail": detail})
+    if out:
+        return out
+
+    for heading, label in (
+        (_HEADING_TODAYS_PROGRESS, "Progression"),
+        (_HEADING_TODAYS_REGRESSIONS, "Regression / Failed QA"),
+        (_HEADING_TODAYS_REASSIGN, "Reassignment"),
+    ):
+        for item in _parse_bullet_task_section(body, heading, title_prefix=label):
+            out.append({
+                "id": item["id"],
+                "change": item.get("title") or label,
+                "detail": item.get("status") or label,
+            })
     return out
 
 
@@ -576,6 +618,19 @@ def _parse_positives(body: str) -> List[Dict[str, Any]]:
         item_id, display = _wikilink_target(cells[0])
         detail = _strip_markup(cells[1])
         out.append({"id": item_id, "title": display, "detail": detail})
+    if out:
+        return out
+
+    for heading, label in (
+        (_HEADING_TODAYS_CLOSURES, "Closure"),
+        (_HEADING_TODAYS_RECOVERIES, "Production failure recovery"),
+    ):
+        for item in _parse_bullet_task_section(body, heading, title_prefix=label):
+            out.append({
+                "id": item["id"],
+                "title": item.get("title") or label,
+                "detail": item.get("status") or label,
+            })
     return out
 
 
@@ -668,7 +723,34 @@ def _parse_open_high_pri(body: str) -> List[Dict[str, Any]]:
             items.append(entry)
         if items:
             out.append({"label": label, "items": items})
-    return out
+    if out:
+        return out
+
+    # Newer orchestrated status pages often inline high-priority work in
+    # the Project Health by Area table instead of emitting a dedicated
+    # "Open High-Priority Bugs" table. Keep the Daily Status tab useful by
+    # deriving one representative item from each high-priority area row.
+    area_rows = _parse_area_health(body)
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for row in area_rows:
+        concern = row.get("concern") or ""
+        priority = _extract_priority_label(concern, row.get("status") or "")
+        if not priority:
+            continue
+        task_id, title = _first_task_from_text(concern)
+        if not task_id:
+            task_id = row.get("ws") or row.get("area") or "high-priority"
+        grouped.setdefault(row.get("area") or "High Priority", []).append({
+            "id": task_id,
+            "title": title or _snippet(concern),
+            "priority": priority,
+            "status": row.get("status") or "",
+        })
+    return [
+        {"label": label, "items": items}
+        for label, items in grouped.items()
+        if items
+    ]
 
 
 def _parse_order_integration(body: str) -> Dict[str, List[Dict[str, Any]]]:
@@ -704,6 +786,28 @@ def _parse_order_integration(body: str) -> Dict[str, List[Dict[str, Any]]]:
                 task_id, _ = _row_id_title(cells[0])
                 field = _strip_markup(cells[1])
                 pl.append({"id": task_id, "field": field})
+    if mao or pl:
+        return {"mao": mao, "privateLink": pl}
+
+    # Newer daily pages roll orders/services into Checkout and Cart rows.
+    # Surface those rows here so the Orders & Services tab does not look
+    # empty on a clearly order-heavy status page.
+    service_terms = re.compile(
+        r"\b(order|orders|service|services|checkout|cart|shipping|ship-to|"
+        r"mao|cybersource|coupon|address|atp|login|session)\b",
+        re.IGNORECASE,
+    )
+    for row in _parse_area_health(body):
+        area = (row.get("area") or "").lower()
+        concern = row.get("concern") or ""
+        if area != "checkout" and not service_terms.search(concern):
+            continue
+        task_id, title = _first_task_from_text(concern)
+        mao.append({
+            "id": task_id or row.get("ws") or "orders-services",
+            "title": title or _snippet(concern),
+            "status": row.get("status") or "",
+        })
     return {"mao": mao, "privateLink": pl}
 
 
@@ -768,6 +872,93 @@ def _parse_bold_subsections(section_lines: List[str]) -> List[Tuple[str, List[Li
     if current_label is not None:
         groups.append((current_label, current_lines))
     return [(label, _iter_table_rows(lines)) for label, lines in groups]
+
+
+def _parse_bullet_task_section(
+    body: str,
+    heading_pattern: re.Pattern,
+    *,
+    default_type: str = "task",
+    title_prefix: str = "Item",
+) -> List[Dict[str, Any]]:
+    """Parse narrative task bullets from a Daily Status section."""
+    out: List[Dict[str, Any]] = []
+    for bullet in _bullet_lines(_section_lines(body, heading_pattern)):
+        task_id, title = _first_task_from_text(bullet)
+        prose = _snippet(bullet)
+        entry: Dict[str, Any] = {
+            "id": task_id or _slug_id(prose or title_prefix),
+            "title": title or prose or title_prefix,
+            "type": default_type,
+        }
+        if prose and prose != entry["title"]:
+            entry["status"] = prose
+        elif title_prefix:
+            entry["status"] = title_prefix
+        out.append(entry)
+    return out
+
+
+def _bullet_lines(lines: List[str]) -> List[str]:
+    """Return top-level markdown bullet paragraphs from section lines."""
+    bullets: List[str] = []
+    current: List[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            if current:
+                bullets.append(" ".join(current).strip())
+            current = [stripped[2:].strip()]
+            continue
+        if current and stripped and not stripped.startswith("|"):
+            current.append(stripped)
+    if current:
+        bullets.append(" ".join(current).strip())
+    return bullets
+
+
+def _first_task_from_text(text: str) -> Tuple[str, str]:
+    """Return the first task id and a readable title from prose."""
+    if _WIKILINK_RE.search(text):
+        task_id, _display = _wikilink_target(text)
+        return task_id, _snippet(text)
+    plain = _strip_markup(_resolve_wikilinks_for_prose(text))
+    m = re.search(r"\b([A-Z][A-Z0-9]*-\d+|\d{3,})\b", plain)
+    if not m:
+        return "", _snippet(plain)
+    task_id = m.group(1)
+    return task_id, _snippet(plain)
+
+
+def _extract_priority_label(text: str, status: str = "") -> Optional[str]:
+    haystack = f"{text} {status}".lower()
+    if (
+        "critical" in haystack
+        or "failed-production" in haystack
+        or "failed - production" in haystack
+    ):
+        return "Critical"
+    m = re.search(r"\bP([0-2])\b", text, re.IGNORECASE)
+    if m:
+        return f"P{m.group(1)}"
+    if "high priority" in haystack:
+        return "High"
+    if status == "blocked":
+        return "Blocked"
+    return None
+
+
+def _snippet(text: str, limit: int = 220) -> str:
+    clean = _strip_markup(_resolve_wikilinks_for_prose(text))
+    clean = re.sub(r"\s+", " ", clean).strip(" -")
+    if len(clean) <= limit:
+        return clean
+    return clean[: limit - 1].rstrip() + "..."
+
+
+def _slug_id(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return slug[:48] or "item"
 
 
 # ── Derivations & normalization ────────────────────────────────────────
