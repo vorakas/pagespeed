@@ -731,7 +731,7 @@ export function LoadTesting() {
                         onValueChange={(val) => setDialogProjectId(val)}
                         disabled={projects.length === 0}
                       >
-                        <SelectTrigger className="h-8 flex-1 text-sm" aria-label="Project">
+                        <SelectTrigger className="h-8 min-w-[22rem] flex-1 text-sm" aria-label="Project">
                           <SelectValue placeholder="Select project">
                             {(val: string) => {
                               const p = projects.find((pp) => String(pp.id) === val)
@@ -740,7 +740,7 @@ export function LoadTesting() {
                             }}
                           </SelectValue>
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent align="start" className="min-w-[22rem]">
                           {projects.map((project) => (
                             <SelectItem key={project.id} value={String(project.id)}>
                               {project.name?.trim() ? project.name : `Project #${project.id}`}
@@ -1061,7 +1061,7 @@ export function LoadTesting() {
                     onValueChange={(val) => setSelectedProjectId(val)}
                     disabled={projectsLoading || projects.length === 0}
                   >
-                    <SelectTrigger className="h-8 w-56 text-sm" aria-label="Project">
+                    <SelectTrigger className="h-8 w-[22rem] max-w-full text-sm" aria-label="Project">
                       <SelectValue placeholder={projectsLoading ? "Loading projects…" : "Select project"}>
                         {(val: string) => {
                           const p = projects.find((pp) => String(pp.id) === val)
@@ -1070,7 +1070,7 @@ export function LoadTesting() {
                         }}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent align="start" className="min-w-[22rem]">
                       {projects.map((project) => (
                         <SelectItem key={project.id} value={String(project.id)}>
                           {project.name?.trim() ? project.name : `Project #${project.id}`}

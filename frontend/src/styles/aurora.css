@@ -2377,7 +2377,7 @@
 /* Select dropdown content (rendered via portal — not under .aurora,
  * so target globally via the data-slot attribute). */
 [data-slot="select-content"] {
-  background: var(--glass-bg-strong);
+  background: var(--popover);
   border: 1px solid var(--glass-border-strong);
   box-shadow: var(--glass-shadow);
   color: var(--lcc-text);
