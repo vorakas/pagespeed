@@ -799,11 +799,6 @@
   padding: 14px;
 }
 
-.launch-dashboard .lcc-project-shell .lcc-left-rail {
-  top: 14px;
-  max-height: calc(100vh - 28px);
-}
-
 .launch-dashboard .lcc-incident-stream {
   position: sticky;
   top: calc(var(--lcc-topbar-h) + 28px);

@@ -7,6 +7,7 @@ import { repairJiraMarkdownSource } from "@/lib/markdown-source"
 import { normalizeJiraMergedHeaderTables } from "@/lib/markdown-tables"
 import { shortenLinksInHtml } from "@/lib/url-shortening"
 import { useDashboardLinks } from "@/lib/dashboard-links"
+import { formatPacificDateTime } from "@/lib/datetime"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import type {
@@ -173,6 +174,7 @@ export function ProjectDashboard() {
 
   return (
     <LaunchShell>
+      <ProjectTopBar project={project} projectKey={projectKey} health={health} />
       <div className="lcc-project-shell">
         <LeftRail
           sources={sources}
@@ -184,7 +186,6 @@ export function ProjectDashboard() {
         />
         <main className="lcc-main">
           <PageFrame projectKey={projectKey}>
-            <ProjectHeader project={project} />
             <StatsPanel project={project} blockerCount={projectBlockers.length} />
             <div
               style={{
@@ -236,7 +237,7 @@ function PageFrame({
   children: React.ReactNode
 }) {
   return (
-    <div style={{ padding: 18 }}>
+    <div>
       <div style={{ fontSize: 11, color: "var(--lcc-text-faint)" }}>
         / dashboard / projects / {projectKey || "—"}
       </div>
@@ -260,24 +261,67 @@ function stripIngestedDateSuffix(name: string): string {
   return name.replace(INGESTED_DATE_SUFFIX, "")
 }
 
-function ProjectHeader({ project }: { project: MigrationSource }) {
+function ProjectTopBar({
+  project,
+  projectKey,
+  health,
+}: {
+  project: MigrationSource
+  projectKey: string
+  health: MigrationHealthSnapshot | null
+}) {
+  const pct = Math.max(0, Math.min(100, Math.round(project.pct ?? 0)))
   return (
-    <div className="panel" style={{ padding: "14px 18px" }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-        <span
+    <div className="lcc-topbar">
+      <div className="lcc-brand">
+        <div className="lcc-brand-dot" />
+        <div>
+          <div className="lcc-brand-name">{project.key || projectKey}</div>
+          <div className="lcc-brand-sub">{project.kind} project</div>
+        </div>
+      </div>
+
+      <div className="lcc-tb-divider" />
+
+      <div className="lcc-tb-countdown">
+        <div className="lcc-tb-countdown-num">{pct}%</div>
+        <div className="lcc-tb-countdown-sub">resolved</div>
+      </div>
+
+      <div
+        className="lcc-src-bar"
+        aria-label={`${pct}% resolved`}
+        style={{ width: 160, height: 6 }}
+      >
+        <span style={{ width: `${pct}%` }} />
+      </div>
+
+      <div style={{ minWidth: 0 }}>
+        <div
+          className="lcc-brand-name"
           style={{
-            fontSize: 10,
-            textTransform: "uppercase",
-            letterSpacing: 0.4,
-            color: "var(--lcc-text-faint)",
+            maxWidth: 520,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
+          title={stripIngestedDateSuffix(project.name)}
         >
-          {project.kind}
-        </span>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>{project.key}</h1>
-        <span style={{ color: "var(--lcc-text-dim)", fontSize: 14 }}>
           {stripIngestedDateSuffix(project.name)}
-        </span>
+        </div>
+        <div className="lcc-brand-sub">
+          {project.active.toLocaleString()} active / {project.total.toLocaleString()} total
+        </div>
+      </div>
+
+      <div className="lcc-spacer" />
+
+      <div className="lcc-sync">
+        <span className="lcc-pulse" />
+        <div>
+          <div>vault synced</div>
+          <div className="lcc-sync-sub">{formatPacificDateTime(health?.lastSynced)}</div>
+        </div>
       </div>
     </div>
   )

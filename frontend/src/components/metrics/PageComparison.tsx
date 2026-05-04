@@ -83,7 +83,7 @@ function VitalBar({
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between gap-3">
         <span className="aurora-text-faint text-[11px] font-medium">{metric}</span>
-        <span className="aurora-text-faint aurora-num text-[10px]">
+        <span className="aurora-num text-[10px]" style={{ color: "var(--lcc-amber)" }}>
           target {format(benchmark)}
         </span>
       </div>
@@ -179,7 +179,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
     <div className="space-y-4">
       <div>
         <h4 className="aurora-text mb-2 text-sm font-semibold">Lighthouse Scores</h4>
-        <div className="grid gap-4 lg:grid-cols-[minmax(360px,1fr)_280px] xl:grid-cols-[minmax(360px,0.95fr)_280px_minmax(220px,0.55fr)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(360px,1fr)_300px] xl:grid-cols-[minmax(360px,0.95fr)_300px_minmax(220px,0.55fr)]">
           <div className="divide-y self-start" style={{ borderColor: "var(--glass-border)" }}>
             <div className="flex items-center justify-between px-0 pb-1">
               <div />
@@ -199,7 +199,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
           </div>
           <div className="min-w-0">
             <ResponsiveContainer width="100%" height={176}>
-              <RadarChart data={radarData} margin={{ top: 12, right: 32, bottom: 18, left: 32 }}>
+              <RadarChart data={radarData} margin={{ top: 12, right: 58, bottom: 18, left: 12 }}>
                 <PolarGrid stroke="var(--glass-border)" />
                 <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--lcc-text-dim)", fontFamily: "var(--aurora-font-mono)" }} />
                 <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
