@@ -21,7 +21,7 @@ class TestResultRepository:
 
     def save(self, url_id: int, result_data: dict, strategy: str = Strategy.DESKTOP) -> int:
         """Persist a PageSpeed test result and return its id."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         cols = ("url_id, performance_score, accessibility_score, best_practices_score, "
                 "seo_score, fcp, lcp, cls, tti, tbt, speed_index, inp, ttfb, "
                 "total_byte_weight, raw_data, strategy")
@@ -30,7 +30,7 @@ class TestResultRepository:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    f"INSERT INTO test_results ({cols}) VALUES ({phs}){self._cm._returning_id()}",
+                    f"INSERT INTO test_results ({cols}) VALUES ({phs}){self._cm.returning_id()}",
                     (url_id,
                      result_data.get("performance_score"), result_data.get("accessibility_score"),
                      result_data.get("best_practices_score"), result_data.get("seo_score"),
@@ -39,13 +39,13 @@ class TestResultRepository:
                      result_data.get("inp"), result_data.get("ttfb"), result_data.get("total_byte_weight"),
                      json.dumps(result_data.get("raw_data", {})), strategy),
                 )
-                return self._cm._last_insert_id(cursor)
+                return self._cm.last_insert_id(cursor)
         except Exception as exc:
             raise DatabaseError(f"Failed to save test result: {exc}") from exc
 
     def delete_by_url(self, url_id: int) -> None:
         """Remove all test results for a given URL (cascade helper)."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
@@ -55,7 +55,7 @@ class TestResultRepository:
 
     def get_latest_by_site(self, site_id: int, strategy: str = Strategy.DESKTOP) -> list[dict]:
         """Latest test result per URL in *site_id*, filtered by strategy."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         query = f"""
             SELECT
                 u.id AS url_id, u.url,
@@ -80,14 +80,14 @@ class TestResultRepository:
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (strategy, strategy, site_id))
-            return self._cm._rows_to_dicts(cursor)
+            return self._cm.rows_to_dicts(cursor)
 
     def get_history(
         self, url_id: int, days: int = 30, strategy: str = Strategy.DESKTOP,
     ) -> list[dict]:
         """Historical scores for *url_id* over the last *days* days."""
-        ph = self._cm._placeholder()
-        date_expr = self._cm._date_ago_expression()
+        ph = self._cm.placeholder()
+        date_expr = self._cm.date_ago_expression()
         query = f"""
             SELECT performance_score, accessibility_score,
                    best_practices_score, seo_score,
@@ -101,11 +101,11 @@ class TestResultRepository:
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (url_id, days, strategy))
-            return self._cm._rows_to_dicts(cursor)
+            return self._cm.rows_to_dicts(cursor)
 
     def get_details(self, url_id: int) -> dict | None:
         """Full detail row (including raw_data JSON) for the latest result."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         query = f"""
             SELECT u.url, s.name AS site_name,
                 tr.performance_score, tr.accessibility_score,
@@ -121,7 +121,7 @@ class TestResultRepository:
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (url_id,))
-            result = self._cm._row_to_dict(cursor)
+            result = self._cm.row_to_dict(cursor)
         if result and result.get("raw_data"):
             result["raw_data"] = json.loads(result["raw_data"])
         return result
@@ -149,7 +149,7 @@ class TestResultRepository:
         Returns:
             List of result dicts ordered by site name then worst score first.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         query = f"""
             SELECT * FROM (
                 SELECT
@@ -183,11 +183,11 @@ class TestResultRepository:
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (strategy, strategy, limit_per_site))
-            return self._cm._rows_to_dicts(cursor)
+            return self._cm.rows_to_dicts(cursor)
 
     def get_url_comparison(self, url1_id: int, url2_id: int) -> dict:
         """Side-by-side latest results for two URLs."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         query = f"""
             SELECT u.url, s.name AS site_name,
                 tr.performance_score, tr.accessibility_score,
@@ -202,7 +202,7 @@ class TestResultRepository:
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (url1_id,))
-            url1_data = self._cm._row_to_dict(cursor)
+            url1_data = self._cm.row_to_dict(cursor)
             cursor.execute(query, (url2_id,))
-            url2_data = self._cm._row_to_dict(cursor)
+            url2_data = self._cm.row_to_dict(cursor)
         return {"url1": url1_data, "url2": url2_data}

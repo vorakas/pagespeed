@@ -24,35 +24,35 @@ class SiteRepository:
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM sites ORDER BY name")
-            return self._cm._rows_to_dicts(cursor)
+            return self._cm.rows_to_dicts(cursor)
 
     def get_by_id(self, site_id: int) -> dict | None:
         """Return a single site, or ``None`` if it does not exist."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(f"SELECT * FROM sites WHERE id = {ph}", (site_id,))
-            return self._cm._row_to_dict(cursor)
+            return self._cm.row_to_dict(cursor)
 
     def create(self, name: str) -> int | None:
         """Insert a new site.  Returns the new id, or ``None`` on duplicate name."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    f"INSERT INTO sites (name) VALUES ({ph}){self._cm._returning_id()}",
+                    f"INSERT INTO sites (name) VALUES ({ph}){self._cm.returning_id()}",
                     (name,),
                 )
-                return self._cm._last_insert_id(cursor)
+                return self._cm.last_insert_id(cursor)
         except Exception as exc:
-            if self._cm._is_integrity_error(exc):
+            if self._cm.is_integrity_error(exc):
                 return None
             raise DatabaseError(f"Failed to create site: {exc}") from exc
 
     def update(self, site_id: int, name: str) -> bool:
         """Rename a site.  Returns ``True`` if the row was found and updated."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
@@ -69,25 +69,26 @@ class SiteRepository:
 
         Returns ``True`` if the site existed and was removed.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # Collect child url ids
+                # Cascade child rows with set-based deletes.
                 cursor.execute(
-                    f"SELECT id FROM urls WHERE site_id = {ph}", (site_id,)
+                    f"""
+                    DELETE FROM trigger_urls
+                    WHERE url_id IN (SELECT id FROM urls WHERE site_id = {ph})
+                    """,
+                    (site_id,),
                 )
-                url_ids = [row[0] for row in cursor.fetchall()]
-
-                # Cascade: trigger_urls -> test_results -> urls -> site
-                for url_id in url_ids:
-                    cursor.execute(
-                        f"DELETE FROM trigger_urls WHERE url_id = {ph}", (url_id,)
-                    )
-                    cursor.execute(
-                        f"DELETE FROM test_results WHERE url_id = {ph}", (url_id,)
-                    )
+                cursor.execute(
+                    f"""
+                    DELETE FROM test_results
+                    WHERE url_id IN (SELECT id FROM urls WHERE site_id = {ph})
+                    """,
+                    (site_id,),
+                )
                 cursor.execute(
                     f"DELETE FROM urls WHERE site_id = {ph}", (site_id,)
                 )

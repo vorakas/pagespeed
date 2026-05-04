@@ -1,22 +1,13 @@
-"""In-memory cache for Applitools batch results uploaded by the helper.
+"""Storage facade for Applitools batch results uploaded by the helper.
 
-Railway's egress can't reach the Applitools Eyes API (corporate IP
-allowlist), so the dashboard cannot call Applitools directly. Instead,
-QA runs a small standalone helper on their own machine — which is on
-the corporate network where Applitools *is* reachable — and the helper
-POSTs its results to the dashboard. The browser then reads the results
-back via :class:`ApplitoolsBatchStore` when generating the regression
-spreadsheet.
+Railway's egress cannot reach the Applitools Eyes API because it is not
+on the corporate allowlist. QA runs a desktop helper from the corporate
+network, the helper uploads normalized rows to Pharos, and the dashboard
+reads them back while generating the regression spreadsheet.
 
-The cache lives in process memory: batches are short-lived (uploaded,
-read, exported in the same QA session, often within minutes) and small
-(a few KB each), so durability across redeploys is not worth the
-schema migration cost. Old entries are evicted by TTL on every read,
-keeping the dictionary bounded without needing a separate sweep job.
-
-This class follows the Single-Responsibility Principle: storage only —
-no HTTP, no auth, no validation. The route layer is responsible for
-those concerns.
+Production storage is database-backed so uploads survive restarts,
+redeploys, and future worker scaling. A small in-memory fallback remains
+for tests and local construction where no repository is injected.
 """
 
 from __future__ import annotations
@@ -26,39 +17,35 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from data_access.applitools_batch_repository import ApplitoolsBatchRepository
 
-# Batches stay queryable for 24h after upload — long enough to cover
-# any plausible "fetch helper output, then click +Sheet" workflow,
-# short enough that stale data doesn't quietly pollute later exports.
+
 _DEFAULT_TTL_SECONDS: int = 24 * 60 * 60
 
 
 @dataclass(frozen=True)
 class _StoredBatch:
-    """Immutable record kept in the cache, indexed by batch id."""
+    """Immutable record kept in the fallback cache, indexed by batch id."""
 
     tests: tuple[dict[str, Any], ...]
     fetched_at: str
     uploaded_at: float
-    # Platform the batch belongs to (Windows/Mac/iPhone/Android). The
-    # helper supplies this at upload time; the dropdown in Pharos uses
-    # it to scope suggestions to the matching Visual card.
     platform: str | None
 
 
 class ApplitoolsBatchStore:
-    """Thread-safe in-memory cache of helper-uploaded Applitools batches.
+    """Storage service for helper-uploaded Applitools batches.
 
-    Exposes only ``put`` and ``get`` — each cache entry is a frozen
-    snapshot, so callers cannot accidentally mutate stored data through
-    the returned dict.
-
-    Args:
-        ttl_seconds: How long an entry remains queryable after upload.
-                     Falls back to a sensible default of 24h.
+    Exposes only the operations the route needs. HTTP/auth/validation stay
+    in the route layer; persistence details stay in the repository.
     """
 
-    def __init__(self, ttl_seconds: int = _DEFAULT_TTL_SECONDS) -> None:
+    def __init__(
+        self,
+        repository: ApplitoolsBatchRepository | None = None,
+        ttl_seconds: int = _DEFAULT_TTL_SECONDS,
+    ) -> None:
+        self._repository = repository
         self._ttl_seconds: int = max(1, ttl_seconds)
         self._lock: threading.Lock = threading.Lock()
         self._entries: dict[str, _StoredBatch] = {}
@@ -70,15 +57,11 @@ class ApplitoolsBatchStore:
         fetched_at: str,
         platform: str | None = None,
     ) -> None:
-        """Store the helper-fetched test rows for *batch_id*.
+        """Store the helper-fetched test rows for *batch_id*."""
+        if self._repository is not None:
+            self._repository.put(batch_id, tests, fetched_at, platform)
+            return
 
-        Re-uploading the same batch id replaces the previous entry —
-        QA may re-run the helper if a batch was incomplete.
-        """
-        # Defensive copy so callers can mutate their own list afterwards
-        # without affecting what we cached. Tuple of read-through dicts
-        # gives us an immutable spine while keeping JSON-serialization
-        # cheap on the read path.
         snapshot = tuple(dict(row) for row in tests)
         with self._lock:
             self._entries[batch_id] = _StoredBatch(
@@ -89,7 +72,10 @@ class ApplitoolsBatchStore:
             )
 
     def get(self, batch_id: str) -> dict[str, Any] | None:
-        """Return the cached payload for *batch_id*, or ``None`` if absent/expired."""
+        """Return the stored payload for *batch_id*, or ``None`` if absent/expired."""
+        if self._repository is not None:
+            return self._repository.get(batch_id)
+
         now = time.time()
         with self._lock:
             self._evict_expired(now)
@@ -105,13 +91,10 @@ class ApplitoolsBatchStore:
             }
 
     def list_recent(self) -> list[dict[str, Any]]:
-        """Return a metadata-only summary of every cached batch, newest first.
+        """Return metadata for recent batches, newest first."""
+        if self._repository is not None:
+            return self._repository.list_recent()
 
-        Used by the Visual-card dropdown so QA can pick a recently
-        uploaded batch instead of retyping its id. Test rows are
-        intentionally not included — the dropdown only needs identity
-        and a row-count hint.
-        """
         now = time.time()
         with self._lock:
             self._evict_expired(now)

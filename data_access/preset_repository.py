@@ -28,36 +28,36 @@ class PresetRepository:
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM schedule_presets ORDER BY name")
-            return self._cm._rows_to_dicts(cursor)
+            return self._cm.rows_to_dicts(cursor)
 
     def get_by_id(self, preset_id: int) -> dict | None:
         """Return a single preset, or ``None`` if it does not exist."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT * FROM schedule_presets WHERE id = {ph}",
                 (preset_id,),
             )
-            return self._cm._row_to_dict(cursor)
+            return self._cm.row_to_dict(cursor)
 
     def create(self, name: str, cron_expression: str) -> int | None:
         """Insert a new preset.
 
         Returns the new id, or ``None`` if the name already exists.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     f"INSERT INTO schedule_presets (name, cron_expression) "
-                    f"VALUES ({ph}, {ph}){self._cm._returning_id()}",
+                    f"VALUES ({ph}, {ph}){self._cm.returning_id()}",
                     (name, cron_expression),
                 )
-                return self._cm._last_insert_id(cursor)
+                return self._cm.last_insert_id(cursor)
         except Exception as exc:
-            if self._cm._is_integrity_error(exc):
+            if self._cm.is_integrity_error(exc):
                 return None
             raise DatabaseError(f"Failed to create preset: {exc}") from exc
 
@@ -66,7 +66,7 @@ class PresetRepository:
 
         Returns ``True`` if the preset existed and was removed.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()

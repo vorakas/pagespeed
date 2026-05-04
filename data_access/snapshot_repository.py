@@ -52,7 +52,7 @@ class SnapshotRepository:
     def upsert(self, record: SnapshotRecord) -> SnapshotRecord:
         """Insert or update one snapshot keyed by date."""
         payload_json = json.dumps(record.payload, ensure_ascii=False)
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             # Try update first
@@ -93,7 +93,7 @@ class SnapshotRepository:
                 ORDER BY snapshot_date ASC
                 """
             )
-            rows = self._cm._rows_to_dicts(cursor)
+            rows = self._cm.rows_to_dicts(cursor)
         return [self._row_to_record(row) for row in rows]
 
     def latest(self) -> Optional[SnapshotRecord]:
@@ -105,7 +105,7 @@ class SnapshotRepository:
         return records[-2] if len(records) >= 2 else None
 
     def get_by_date(self, date: str) -> Optional[SnapshotRecord]:
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -117,7 +117,7 @@ class SnapshotRepository:
                 """,
                 (date,),
             )
-            row = self._cm._row_to_dict(cursor)
+            row = self._cm.row_to_dict(cursor)
         return self._row_to_record(row) if row else None
 
     # ── Private ──────────────────────────────────────────────────────

@@ -57,19 +57,15 @@ export function ProjectDashboard() {
     setError(null)
     setLoading(true)
     try {
-      const [src, ws, bl, pf, nb, pt] = await Promise.all([
-        api.getMigrationSources(),
-        api.getMigrationWorkstreams(),
-        api.getMigrationBlockers(),
-        api.getMigrationProductionFailures(),
-        api.getMigrationNewBugs(),
+      const [overview, pt] = await Promise.all([
+        api.getMigrationOverview(),
         api.getMigrationProjectTasks(projectKey),
       ])
-      setSources(src)
-      setWorkstreams(ws)
-      setBlockers(bl)
-      setProdFailures(pf)
-      setNewBugs(nb)
+      setSources(overview.sources)
+      setWorkstreams(overview.workstreams)
+      setBlockers(overview.blockers)
+      setProdFailures(overview.productionFailures)
+      setNewBugs(overview.newBugs)
       setProjectTasks(pt)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load project")

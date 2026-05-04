@@ -293,6 +293,35 @@ class AzureDevOpsClient:
         data = self._request("GET", "build/builds", params=params)
         return [self._normalize_build(b) for b in data.get("value", [])]
 
+    def list_recent_builds_by_definition(
+        self,
+        definition_ids: list[int],
+        per_definition: int = 5,
+    ) -> dict[str, list[dict]]:
+        """Return the newest builds grouped by pipeline definition.
+
+        Uses Azure DevOps' per-definition cap so the Builds page does not
+        need to fetch a broad global window and filter it in the browser.
+        """
+        if not definition_ids:
+            return {}
+        per_definition = max(1, int(per_definition))
+        params: dict = {
+            "$top": str(len(definition_ids) * per_definition),
+            "definitions": ",".join(str(d) for d in definition_ids),
+            "maxBuildsPerDefinition": str(per_definition),
+            "queryOrder": "startTimeDescending",
+        }
+        data = self._request("GET", "build/builds", params=params)
+        grouped: dict[str, list[dict]] = {str(def_id): [] for def_id in definition_ids}
+        for build in data.get("value", []):
+            normalized = self._normalize_build(build)
+            definition_id = normalized.get("definitionId")
+            if definition_id is None:
+                continue
+            grouped.setdefault(str(definition_id), []).append(normalized)
+        return grouped
+
     def get_build(self, build_id: int) -> dict:
         """Return a single build by ID.
 

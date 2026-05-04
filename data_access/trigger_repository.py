@@ -37,23 +37,19 @@ class TriggerRepository:
             cursor.execute(
                 "SELECT * FROM scheduled_triggers ORDER BY name"
             )
-            triggers = self._cm._rows_to_dicts(cursor)
-
-            for trigger in triggers:
-                trigger['url_ids'] = self._fetch_url_ids(cursor, trigger['id'])
-
-            return triggers
+            triggers = self._cm.rows_to_dicts(cursor)
+            return self._attach_url_ids(cursor, triggers)
 
     def get_by_id(self, trigger_id: int) -> dict | None:
         """Return a single trigger with its ``url_ids``, or ``None``."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT * FROM scheduled_triggers WHERE id = {ph}",
                 (trigger_id,),
             )
-            trigger = self._cm._row_to_dict(cursor)
+            trigger = self._cm.row_to_dict(cursor)
             if trigger is None:
                 return None
 
@@ -71,16 +67,12 @@ class TriggerRepository:
             cursor.execute(
                 "SELECT * FROM scheduled_triggers WHERE enabled = 1 ORDER BY name"
             )
-            triggers = self._cm._rows_to_dicts(cursor)
-
-            for trigger in triggers:
-                trigger['url_ids'] = self._fetch_url_ids(cursor, trigger['id'])
-
-            return triggers
+            triggers = self._cm.rows_to_dicts(cursor)
+            return self._attach_url_ids(cursor, triggers)
 
     def get_url_ids(self, trigger_id: int) -> list[int]:
         """Return the list of url_id integers associated with a trigger."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -105,7 +97,7 @@ class TriggerRepository:
 
         Returns the new trigger id, or ``None`` on duplicate name.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
@@ -113,14 +105,14 @@ class TriggerRepository:
                     f"INSERT INTO scheduled_triggers "
                     f"(name, schedule_type, schedule_value, strategy) "
                     f"VALUES ({ph}, {ph}, {ph}, {ph})"
-                    f"{self._cm._returning_id()}",
+                    f"{self._cm.returning_id()}",
                     (name, schedule_type, schedule_value, strategy),
                 )
-                trigger_id = self._cm._last_insert_id(cursor)
+                trigger_id = self._cm.last_insert_id(cursor)
                 self._sync_url_ids(cursor, trigger_id, url_ids)
                 return trigger_id
         except Exception as exc:
-            if self._cm._is_integrity_error(exc):
+            if self._cm.is_integrity_error(exc):
                 return None
             raise DatabaseError(f"Failed to create trigger: {exc}") from exc
 
@@ -137,7 +129,7 @@ class TriggerRepository:
 
         Returns ``True`` if the trigger was found and updated.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         now = datetime.utcnow().isoformat()
         try:
             with self._cm.get_connection() as conn:
@@ -154,7 +146,7 @@ class TriggerRepository:
                 self._sync_url_ids(cursor, trigger_id, url_ids)
                 return True
         except Exception as exc:
-            if self._cm._is_integrity_error(exc):
+            if self._cm.is_integrity_error(exc):
                 return False
             raise DatabaseError(f"Failed to update trigger {trigger_id}: {exc}") from exc
 
@@ -163,7 +155,7 @@ class TriggerRepository:
 
         Returns ``True`` if the trigger existed and was removed.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
@@ -184,7 +176,7 @@ class TriggerRepository:
 
         Returns ``True`` if the trigger was found and updated.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         now = datetime.utcnow().isoformat()
         try:
             with self._cm.get_connection() as conn:
@@ -207,7 +199,7 @@ class TriggerRepository:
         *status* should be ``'success'``, ``'partial'``, or ``'failed'``.
         Returns ``True`` if the trigger was found and updated.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         now = datetime.utcnow().isoformat()
         try:
             with self._cm.get_connection() as conn:
@@ -228,15 +220,47 @@ class TriggerRepository:
     # Private helpers
     # ------------------------------------------------------------------
 
+    def _attach_url_ids(self, cursor: Any, triggers: list[dict]) -> list[dict]:
+        """Attach URL id lists to already-fetched trigger rows in one query."""
+        if not triggers:
+            return triggers
+        trigger_ids = [trigger["id"] for trigger in triggers]
+        url_ids_by_trigger = self._fetch_url_ids_for_triggers(cursor, trigger_ids)
+        for trigger in triggers:
+            trigger["url_ids"] = url_ids_by_trigger.get(trigger["id"], [])
+        return triggers
+
     def _fetch_url_ids(self, cursor: Any, trigger_id: int) -> list[int]:
         """Return url_id list for a trigger using an existing cursor."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         cursor.execute(
             f"SELECT url_id FROM trigger_urls "
             f"WHERE trigger_id = {ph} ORDER BY url_id",
             (trigger_id,),
         )
         return [row[0] for row in cursor.fetchall()]
+
+    def _fetch_url_ids_for_triggers(
+        self, cursor: Any, trigger_ids: list[int],
+    ) -> dict[int, list[int]]:
+        """Return trigger_id -> url_ids for multiple triggers."""
+        if not trigger_ids:
+            return {}
+        ph = self._cm.placeholder()
+        placeholders = ", ".join([ph] * len(trigger_ids))
+        cursor.execute(
+            f"""
+            SELECT trigger_id, url_id
+            FROM trigger_urls
+            WHERE trigger_id IN ({placeholders})
+            ORDER BY trigger_id, url_id
+            """,
+            tuple(trigger_ids),
+        )
+        grouped: dict[int, list[int]] = {trigger_id: [] for trigger_id in trigger_ids}
+        for trigger_id, url_id in cursor.fetchall():
+            grouped.setdefault(trigger_id, []).append(url_id)
+        return grouped
 
     def _sync_url_ids(
         self, cursor: Any, trigger_id: int, url_ids: list[int],
@@ -246,7 +270,7 @@ class TriggerRepository:
         Uses a simple delete-all/insert-all strategy which is efficient
         for the small cardinality of trigger→URL relationships.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         cursor.execute(
             f"DELETE FROM trigger_urls WHERE trigger_id = {ph}",
             (trigger_id,),

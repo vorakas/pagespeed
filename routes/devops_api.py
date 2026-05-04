@@ -106,6 +106,19 @@ def create_devops_blueprint(
         builds = client.list_builds(definition_ids=definition_ids, top=top)
         return jsonify({"success": True, "builds": builds})
 
+    @bp.route("/api/devops/builds/recent-by-definition", methods=["POST"])
+    def recent_builds_by_definition():
+        data = request.get_json() or {}
+        _validate_body(data, extra=["definition_ids"])
+        client = _make_client(data)
+        definition_ids = data.get("definition_ids") or []
+        per_definition = data.get("per_definition", 5)
+        builds_by_definition = client.list_recent_builds_by_definition(
+            definition_ids=definition_ids,
+            per_definition=per_definition,
+        )
+        return jsonify({"success": True, "buildsByDefinition": builds_by_definition})
+
     @bp.route("/api/devops/builds/<int:build_id>", methods=["POST"])
     def get_build(build_id: int):
         data = request.get_json() or {}

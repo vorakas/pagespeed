@@ -12,6 +12,7 @@ from data_access.trigger_repository import TriggerRepository
 from data_access.preset_repository import PresetRepository
 from data_access.blazemeter_preset_repository import BlazemeterPresetRepository
 from data_access.blazemeter_run_repository import BlazemeterRunRepository
+from data_access.applitools_batch_repository import ApplitoolsBatchRepository
 from data_access.snapshot_repository import SnapshotRecord, SnapshotRepository
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "PresetRepository",
     "BlazemeterPresetRepository",
     "BlazemeterRunRepository",
+    "ApplitoolsBatchRepository",
     "SnapshotRecord",
     "SnapshotRepository",
 ]

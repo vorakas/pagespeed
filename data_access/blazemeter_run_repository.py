@@ -45,13 +45,13 @@ class BlazemeterRunRepository:
         ended_at: Optional[float],
     ) -> None:
         """Upsert a terminated run.  Idempotent by ``master_id``."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         started_iso = _epoch_to_iso(started_at)
         ended_iso = _epoch_to_iso(ended_at)
 
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
-            if self._cm._is_postgres:
+            if self._cm.is_postgres:
                 cursor.execute(
                     f"""
                     INSERT INTO blazemeter_runs (
@@ -96,7 +96,7 @@ class BlazemeterRunRepository:
 
     def list_recent(self, limit: int = 50, offset: int = 0) -> list[dict]:
         """Return runs ordered by ended_at DESC (newest first)."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -109,7 +109,7 @@ class BlazemeterRunRepository:
                 """,
                 (int(limit), int(offset)),
             )
-            rows = self._cm._rows_to_dicts(cursor)
+            rows = self._cm.rows_to_dicts(cursor)
             return [_row_to_dict(r) for r in rows]
 
     def count(self) -> int:

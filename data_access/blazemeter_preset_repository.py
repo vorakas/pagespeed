@@ -43,21 +43,21 @@ class BlazemeterPresetRepository:
             cursor.execute(
                 "SELECT * FROM blazemeter_presets ORDER BY name"
             )
-            presets = self._cm._rows_to_dicts(cursor)
+            presets = self._cm.rows_to_dicts(cursor)
             for preset in presets:
                 preset["tests"] = self._fetch_tests(cursor, preset["id"])
             return presets
 
     def get_by_id(self, preset_id: int) -> dict | None:
         """Return a single preset with its ``tests``, or ``None``."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT * FROM blazemeter_presets WHERE id = {ph}",
                 (preset_id,),
             )
-            preset = self._cm._row_to_dict(cursor)
+            preset = self._cm.row_to_dict(cursor)
             if preset is None:
                 return None
             preset["tests"] = self._fetch_tests(cursor, preset_id)
@@ -75,8 +75,8 @@ class BlazemeterPresetRepository:
         project_name: str | None = None,
     ) -> dict:
         """Insert a new preset plus its child tests in one transaction."""
-        ph = self._cm._placeholder()
-        returning = self._cm._returning_id()
+        ph = self._cm.placeholder()
+        returning = self._cm.returning_id()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
@@ -85,10 +85,10 @@ class BlazemeterPresetRepository:
                     f"VALUES ({ph}, {ph}, {ph}){returning}",
                     (name, project_id, project_name),
                 )
-                preset_id = self._cm._last_insert_id(cursor)
+                preset_id = self._cm.last_insert_id(cursor)
                 self._insert_tests(cursor, preset_id, tests)
         except Exception as exc:
-            if self._cm._is_integrity_error(exc):
+            if self._cm.is_integrity_error(exc):
                 raise ValidationError(f"A preset named '{name}' already exists") from exc
             raise DatabaseError(f"Failed to create preset: {exc}") from exc
         return self.get_by_id(preset_id)  # type: ignore[return-value]
@@ -102,7 +102,7 @@ class BlazemeterPresetRepository:
         project_name: str | None = None,
     ) -> dict | None:
         """Replace a preset's name + test list atomically."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
@@ -119,14 +119,14 @@ class BlazemeterPresetRepository:
                 )
                 self._insert_tests(cursor, preset_id, tests)
         except Exception as exc:
-            if self._cm._is_integrity_error(exc):
+            if self._cm.is_integrity_error(exc):
                 raise ValidationError(f"A preset named '{name}' already exists") from exc
             raise DatabaseError(f"Failed to update preset: {exc}") from exc
         return self.get_by_id(preset_id)
 
     def delete(self, preset_id: int) -> bool:
         """Delete a preset (cascade removes its test rows)."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             # SQLite doesn't enforce ON DELETE CASCADE by default; delete
@@ -146,14 +146,14 @@ class BlazemeterPresetRepository:
     # ------------------------------------------------------------------
 
     def _fetch_tests(self, cursor: Any, preset_id: int) -> list[dict]:
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         cursor.execute(
             f"SELECT test_id, test_name, project_id, project_name, position "
             f"FROM blazemeter_preset_tests "
             f"WHERE preset_id = {ph} ORDER BY position, id",
             (preset_id,),
         )
-        return self._cm._rows_to_dicts(cursor)
+        return self._cm.rows_to_dicts(cursor)
 
     def _insert_tests(
         self,
@@ -161,7 +161,7 @@ class BlazemeterPresetRepository:
         preset_id: int,
         tests: Iterable[dict],
     ) -> None:
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         for position, test in enumerate(tests):
             test_id = test.get("test_id") if isinstance(test, dict) else None
             test_name = test.get("test_name") if isinstance(test, dict) else None

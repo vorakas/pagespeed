@@ -42,7 +42,7 @@ def create_applitools_blueprint(
     """Factory that creates the Applitools API blueprint.
 
     Args:
-        store:        Process-wide in-memory cache for uploaded batches.
+        store:        Storage service for uploaded batches.
         helper_token: Shared secret the desktop helper must echo in the
                       ``X-Pharos-Helper-Token`` header. When ``None``,
                       the upload endpoint refuses every request — uploads

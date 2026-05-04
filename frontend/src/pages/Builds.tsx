@@ -188,9 +188,7 @@ export function Builds() {
     if (inFlightRef.current) return
     inFlightRef.current = true
     try {
-      // Bumped from 50 → 100 to make the "last 5 per definition" window
-      // robust when one pipeline is much more active than others.
-      const result = await api.getDevOpsBuilds(config, definitionIds, 100)
+      const result = await api.getDevOpsRecentBuildsByDefinition(config, definitionIds, 5)
       if (!result.success) return
 
       const recent: Record<string, DevOpsBuild[]> = {}
@@ -200,9 +198,7 @@ export function Builds() {
           recent[key] = []
           continue
         }
-        recent[key] = result.builds
-          .filter((b) => b.definitionId === defId)
-          .slice(0, 5)
+        recent[key] = result.buildsByDefinition[String(defId)] ?? []
       }
       setRecentBuilds(recent)
 

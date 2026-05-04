@@ -60,6 +60,7 @@ from config import (
     VAULT_REPO_URL,
 )
 from data_access import (
+    ApplitoolsBatchRepository,
     BlazemeterPresetRepository,
     BlazemeterRunRepository,
     ConnectionManager,
@@ -203,17 +204,16 @@ def create_app() -> Flask:
     preset_repo = PresetRepository(conn_mgr)
     blazemeter_preset_repo = BlazemeterPresetRepository(conn_mgr)
     blazemeter_run_repo = BlazemeterRunRepository(conn_mgr)
+    applitools_batch_repo = ApplitoolsBatchRepository(conn_mgr, ttl_seconds=24 * 60 * 60)
 
     pagespeed = PageSpeedClient(api_key=PAGESPEED_API_KEY)
 
     site_service = SiteService(site_repo, url_repo, test_result_repo)
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
 
-    # Process-wide cache for Applitools batches uploaded by the desktop
-    # helper. One instance per app so all workers share state — important
-    # because Gunicorn forks but the cache is per-process; if QA hits a
-    # different worker, they'll get a 404 and just rerun the helper.
-    applitools_store = ApplitoolsBatchStore()
+    # Persist Applitools batches uploaded by the desktop helper so QA
+    # uploads survive restarts, redeploys, and future worker scaling.
+    applitools_store = ApplitoolsBatchStore(repository=applitools_batch_repo)
 
     # ---- Scheduler ----
     # Explicit UTC timezone ensures cron expressions fire at the same time

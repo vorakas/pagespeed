@@ -507,6 +507,20 @@ class ApiClient {
     })
   }
 
+  async getDevOpsRecentBuildsByDefinition(
+    config: DevOpsConfig,
+    definitionIds: number[],
+    perDefinition: number = 5,
+  ): Promise<{ success: boolean; buildsByDefinition: Record<string, DevOpsBuild[]> }> {
+    return this.request("/api/devops/builds/recent-by-definition", {
+      method: "POST",
+      body: this.devOpsBody(config, {
+        definition_ids: definitionIds,
+        per_definition: perDefinition,
+      }),
+    })
+  }
+
   async getDevOpsBuild(config: DevOpsConfig, buildId: number): Promise<{ success: boolean; build: DevOpsBuild }> {
     return this.request(`/api/devops/builds/${buildId}`, {
       method: "POST",

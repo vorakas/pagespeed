@@ -40,8 +40,13 @@ class ConnectionManager:
     # ------------------------------------------------------------------
 
     @property
-    def _is_postgres(self) -> bool:
+    def is_postgres(self) -> bool:
         return self._db_url is not None
+
+    @property
+    def _is_postgres(self) -> bool:
+        """Backward-compatible alias for older repository code."""
+        return self.is_postgres
 
     def _get_pool(self) -> psycopg2.pool.ThreadedConnectionPool:
         """Return the process-local PostgreSQL connection pool."""
@@ -57,7 +62,7 @@ class ConnectionManager:
 
     def _create_connection(self) -> Any:
         """Borrow a connection from the pool or open a local SQLite connection."""
-        if self._is_postgres:
+        if self.is_postgres:
             return self._get_pool().getconn()
         conn = sqlite3.connect(_SQLITE_PATH)
         conn.row_factory = sqlite3.Row
@@ -65,7 +70,7 @@ class ConnectionManager:
 
     def _release_connection(self, conn: Any, discard: bool = False) -> None:
         """Return a PostgreSQL connection to the pool, or close SQLite."""
-        if self._is_postgres:
+        if self.is_postgres:
             pool = self._pool
             if pool is not None:
                 pool.putconn(conn, close=discard)
@@ -103,7 +108,7 @@ class ConnectionManager:
                 discard = True
             raise
         finally:
-            if self._is_postgres and getattr(conn, "closed", 0):
+            if self.is_postgres and getattr(conn, "closed", 0):
                 discard = True
             self._release_connection(conn, discard=discard)
 
@@ -111,41 +116,61 @@ class ConnectionManager:
     # Dialect helpers (package-internal — used by repositories)
     # ------------------------------------------------------------------
 
-    def _placeholder(self) -> str:
+    def placeholder(self) -> str:
         """Parameter placeholder for the active engine."""
-        return "%s" if self._is_postgres else "?"
+        return "%s" if self.is_postgres else "?"
 
-    def _returning_id(self) -> str:
+    def returning_id(self) -> str:
         """SQL clause appended to INSERT to retrieve the new row id."""
-        return " RETURNING id" if self._is_postgres else ""
+        return " RETURNING id" if self.is_postgres else ""
 
-    def _last_insert_id(self, cursor: Any) -> int:
+    def last_insert_id(self, cursor: Any) -> int:
         """Return the id produced by the most recent INSERT.
 
         For PostgreSQL the INSERT must include a ``RETURNING id`` clause
-        (use :meth:`_returning_id`).  For SQLite, ``cursor.lastrowid``
+        (use :meth:`returning_id`).  For SQLite, ``cursor.lastrowid``
         is used.
         """
-        if self._is_postgres:
+        if self.is_postgres:
             return cursor.fetchone()[0]
         return cursor.lastrowid
 
-    def _date_ago_expression(self) -> str:
+    def date_ago_expression(self) -> str:
         """SQL expression for *now minus N days* with one placeholder."""
-        ph = self._placeholder()
-        if self._is_postgres:
+        ph = self.placeholder()
+        if self.is_postgres:
             return f"NOW() - INTERVAL '{ph} days'"
         return f"datetime('now', '-' || {ph} || ' days')"
 
-    def _is_integrity_error(self, exc: Exception) -> bool:
+    def is_integrity_error(self, exc: Exception) -> bool:
         """Return ``True`` if *exc* is a unique-constraint violation."""
         return isinstance(exc, (sqlite3.IntegrityError, psycopg2.IntegrityError))
+
+    def _placeholder(self) -> str:
+        """Backward-compatible alias for older repository code."""
+        return self.placeholder()
+
+    def _returning_id(self) -> str:
+        """Backward-compatible alias for older repository code."""
+        return self.returning_id()
+
+    def _last_insert_id(self, cursor: Any) -> int:
+        """Backward-compatible alias for older repository code."""
+        return self.last_insert_id(cursor)
+
+    def _date_ago_expression(self) -> str:
+        """Backward-compatible alias for older repository code."""
+        return self.date_ago_expression()
+
+    def _is_integrity_error(self, exc: Exception) -> bool:
+        """Backward-compatible alias for older repository code."""
+        return self.is_integrity_error(exc)
 
     # ------------------------------------------------------------------
     # Result-set conversion
     # ------------------------------------------------------------------
 
-    def _rows_to_dicts(self, cursor: Any) -> list[dict]:
+    def rows_to_dicts(self, cursor: Any) -> list[dict]:
         """Convert all remaining rows to a list of dicts.
 
         Handles both psycopg2 (``cursor.description``) and sqlite3
@@ -154,20 +179,28 @@ class ConnectionManager:
         rows = cursor.fetchall()
         if not rows:
             return []
-        if self._is_postgres:
+        if self.is_postgres:
             columns = [desc[0] for desc in cursor.description]
             return [dict(zip(columns, row)) for row in rows]
         return [dict(row) for row in rows]
 
-    def _row_to_dict(self, cursor: Any) -> dict | None:
+    def row_to_dict(self, cursor: Any) -> dict | None:
         """Fetch a single row and return it as a dict, or ``None``."""
         row = cursor.fetchone()
         if row is None:
             return None
-        if self._is_postgres:
+        if self.is_postgres:
             columns = [desc[0] for desc in cursor.description]
             return dict(zip(columns, row))
         return dict(row)
+
+    def _rows_to_dicts(self, cursor: Any) -> list[dict]:
+        """Backward-compatible alias for older repository code."""
+        return self.rows_to_dicts(cursor)
+
+    def _row_to_dict(self, cursor: Any) -> dict | None:
+        """Backward-compatible alias for older repository code."""
+        return self.row_to_dict(cursor)
 
     # ------------------------------------------------------------------
     # Schema initialisation
@@ -182,7 +215,7 @@ class ConnectionManager:
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
-            if self._is_postgres:
+            if self.is_postgres:
                 self._init_postgres_schema(cursor)
             else:
                 self._init_sqlite_schema(cursor)
@@ -333,6 +366,16 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS applitools_batches (
+                batch_id TEXT PRIMARY KEY,
+                tests_json TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                platform TEXT,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         self._create_postgres_indexes(cursor)
 
     def _init_sqlite_schema(self, cursor: Any) -> None:
@@ -466,6 +509,16 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS applitools_batches (
+                batch_id TEXT PRIMARY KEY,
+                tests_json TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                platform TEXT,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # SQLite lacks IF NOT EXISTS for ALTER TABLE — tolerate failures.
         _SQLITE_MIGRATIONS = [
             "ALTER TABLE test_results ADD COLUMN inp REAL",
@@ -517,6 +570,10 @@ class ConnectionManager:
             CREATE INDEX IF NOT EXISTS idx_migration_snapshots_date_desc
             ON migration_snapshots (snapshot_date DESC)
             """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_applitools_batches_uploaded_at
+            ON applitools_batches (uploaded_at DESC)
+            """,
         ]
         for statement in index_statements:
             cursor.execute(statement)
@@ -551,6 +608,10 @@ class ConnectionManager:
             """
             CREATE INDEX IF NOT EXISTS idx_migration_snapshots_date_desc
             ON migration_snapshots (snapshot_date DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_applitools_batches_uploaded_at
+            ON applitools_batches (uploaded_at DESC)
             """,
         ]
         for statement in index_statements:

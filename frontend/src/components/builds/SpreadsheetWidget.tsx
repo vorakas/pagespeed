@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback } from "react"
 import { Download, Trash2, FileSpreadsheet } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { generateSpreadsheet, downloadSpreadsheet } from "@/services/spreadsheetExport"
 import type { SheetEntry } from "@/services/spreadsheetExport"
 
 interface SpreadsheetWidgetProps {
@@ -25,6 +24,7 @@ const DISPLAY_ORDER = [
 
 export function SpreadsheetWidget({ sheetData, onClear }: SpreadsheetWidgetProps) {
   const [releaseName, setReleaseName] = useState("")
+  const [downloading, setDownloading] = useState(false)
 
   const hasData = sheetData.size > 0
 
@@ -41,8 +41,14 @@ export function SpreadsheetWidget({ sheetData, onClear }: SpreadsheetWidgetProps
   }, [sheetData])
 
   const handleDownload = useCallback(async () => {
-    const blob = await generateSpreadsheet(releaseName, sheetData)
-    downloadSpreadsheet(blob, releaseName)
+    setDownloading(true)
+    try {
+      const { generateSpreadsheet, downloadSpreadsheet } = await import("@/services/spreadsheetExport")
+      const blob = await generateSpreadsheet(releaseName, sheetData)
+      downloadSpreadsheet(blob, releaseName)
+    } finally {
+      setDownloading(false)
+    }
   }, [releaseName, sheetData])
 
   return (
@@ -150,11 +156,15 @@ export function SpreadsheetWidget({ sheetData, onClear }: SpreadsheetWidgetProps
             variant="outline"
             size="sm"
             className="h-7 text-xs flex-1"
-            disabled={!hasData || !releaseName.trim()}
+            disabled={!hasData || !releaseName.trim() || downloading}
             onClick={handleDownload}
           >
             <Download className="h-3 w-3" />
-            {!releaseName.trim() && hasData ? "Enter release name" : "Download .xlsx"}
+            {downloading
+              ? "Preparing..."
+              : !releaseName.trim() && hasData
+                ? "Enter release name"
+                : "Download .xlsx"}
           </Button>
           {hasData && (
             <Button

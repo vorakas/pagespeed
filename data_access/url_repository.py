@@ -21,14 +21,14 @@ class UrlRepository:
 
     def get_by_site(self, site_id: int) -> list[dict]:
         """Return all URLs belonging to *site_id*, ordered by URL."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT * FROM urls WHERE site_id = {ph} ORDER BY url",
                 (site_id,),
             )
-            return self._cm._rows_to_dicts(cursor)
+            return self._cm.rows_to_dicts(cursor)
 
     def get_all_with_sites(self) -> list[dict]:
         """Return every URL joined with its parent site name."""
@@ -42,14 +42,14 @@ class UrlRepository:
                 JOIN sites s ON u.site_id = s.id
                 ORDER BY s.name, u.url
             """)
-            return self._cm._rows_to_dicts(cursor)
+            return self._cm.rows_to_dicts(cursor)
 
     def get_by_ids(self, url_ids: list[int]) -> list[dict]:
         """Return URL records for the given ids in a single query."""
         if not url_ids:
             return []
 
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         placeholders = ", ".join(ph for _ in url_ids)
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
@@ -57,22 +57,22 @@ class UrlRepository:
                 f"SELECT * FROM urls WHERE id IN ({placeholders})",
                 tuple(url_ids),
             )
-            return self._cm._rows_to_dicts(cursor)
+            return self._cm.rows_to_dicts(cursor)
 
     def create(self, site_id: int, url: str) -> int | None:
         """Insert a new URL.  Returns the new id, or ``None`` on duplicate."""
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     f"INSERT INTO urls (site_id, url) VALUES ({ph}, {ph})"
-                    f"{self._cm._returning_id()}",
+                    f"{self._cm.returning_id()}",
                     (site_id, url),
                 )
-                return self._cm._last_insert_id(cursor)
+                return self._cm.last_insert_id(cursor)
         except Exception as exc:
-            if self._cm._is_integrity_error(exc):
+            if self._cm.is_integrity_error(exc):
                 return None
             raise DatabaseError(f"Failed to create URL: {exc}") from exc
 
@@ -81,7 +81,7 @@ class UrlRepository:
 
         Returns ``True`` if the URL existed and was removed.
         """
-        ph = self._cm._placeholder()
+        ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()

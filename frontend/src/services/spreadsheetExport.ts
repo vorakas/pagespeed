@@ -12,7 +12,7 @@
  * the former's free edition does not write cell fills.
  */
 
-import ExcelJS from "exceljs"
+import type ExcelJS from "exceljs"
 import type { FailedTest, SkippedTest, UnresolvedTest } from "@/types"
 
 // ---------- Types ----------
@@ -108,7 +108,8 @@ export async function generateSpreadsheet(
   releaseName: string,
   entries: Map<string, SheetEntry>,
 ): Promise<Blob> {
-  const workbook = new ExcelJS.Workbook()
+  const { default: ExcelJSRuntime } = await import("exceljs")
+  const workbook = new ExcelJSRuntime.Workbook()
   const sheet = workbook.addWorksheet(releaseName || "Regression")
 
   sheet.columns = COLUMN_WIDTHS.map((width) => ({ width }))
