@@ -16,6 +16,7 @@ interface LeftRailProps {
   blockers: MigrationBlocker[] | null
   prodFailures: RawTaskRecord[] | null
   vaultLastSynced: string | null
+  activeProjectKey?: string | null
 }
 
 /**
@@ -34,6 +35,7 @@ export function LeftRail({
   blockers,
   prodFailures,
   vaultLastSynced,
+  activeProjectKey = null,
 }: LeftRailProps) {
   const navigate = useNavigate()
   const links = useDashboardLinks()
@@ -75,6 +77,7 @@ export function LeftRail({
               key={src.key}
               source={src}
               tone={projectStatus[src.key] ?? "green"}
+              active={src.key === activeProjectKey}
               onOpen={() => navigate(links.projectPath(src.key))}
             />
           ))
@@ -145,14 +148,15 @@ export function LeftRail({
 interface ProjectRowProps {
   source: MigrationSource
   tone: ProjectTone
+  active?: boolean
   onOpen: () => void
 }
 
-function ProjectRow({ source, tone, onOpen }: ProjectRowProps) {
+function ProjectRow({ source, tone, active = false, onOpen }: ProjectRowProps) {
   return (
     <button
       type="button"
-      className="lcc-lr-area"
+      className={`lcc-lr-area${active ? " active" : ""}`}
       onClick={onOpen}
       title={`${source.name} — ${source.total.toLocaleString()} tasks`}
     >

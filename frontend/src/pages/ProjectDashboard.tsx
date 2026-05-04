@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react"
 import { marked } from "marked"
 import { api } from "@/services/api"
 import { repairJiraMarkdownSource } from "@/lib/markdown-source"
@@ -8,8 +8,10 @@ import { normalizeJiraMergedHeaderTables } from "@/lib/markdown-tables"
 import { shortenLinksInHtml } from "@/lib/url-shortening"
 import { useDashboardLinks } from "@/lib/dashboard-links"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
+import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import type {
   MigrationBlocker,
+  MigrationHealthSnapshot,
   MigrationProjectTasks,
   MigrationSource,
   MigrationTaskDetail,
@@ -42,6 +44,7 @@ export function ProjectDashboard() {
   const { key: rawKey } = useParams<{ key: string }>()
   const projectKey = rawKey ? decodeURIComponent(rawKey) : ""
 
+  const [health, setHealth] = useState<MigrationHealthSnapshot | null>(null)
   const [sources, setSources] = useState<MigrationSource[] | null>(null)
   const [workstreams, setWorkstreams] = useState<MigrationWorkstream[] | null>(null)
   const [blockers, setBlockers] = useState<MigrationBlocker[] | null>(null)
@@ -61,6 +64,7 @@ export function ProjectDashboard() {
         api.getMigrationOverview(),
         api.getMigrationProjectTasks(projectKey),
       ])
+      setHealth(overview.health)
       setSources(overview.sources)
       setWorkstreams(overview.workstreams)
       setBlockers(overview.blockers)
@@ -169,42 +173,54 @@ export function ProjectDashboard() {
 
   return (
     <LaunchShell>
-      <PageFrame projectKey={projectKey}>
-        <ProjectHeader project={project} />
-        <StatsPanel project={project} blockerCount={projectBlockers.length} />
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.2fr 1fr",
-            gap: 14,
-          }}
-        >
-          <BlockersPanel blockers={projectBlockers} />
-          <RollupsPanel rollups={referencedFromRollups} />
-        </div>
-        <RecentTasksPanel
-          prodFailures={projectProdFailures}
-          newBugs={projectNewBugs}
+      <div className="lcc-project-shell">
+        <LeftRail
+          sources={sources}
+          workstreams={workstreams}
+          blockers={blockers}
+          prodFailures={prodFailures}
+          vaultLastSynced={health?.lastSynced ?? null}
+          activeProjectKey={projectKey}
         />
-        {projectTasks && (
-          <>
-            <StatusBreakdownPanel
-              rows={projectTasks.statusCounts}
-              total={projectTasks.total}
-              selected={statusFilter}
-              onSelect={(status) =>
-                setStatusFilter((prev) => (prev === status ? null : status))
-              }
+        <main className="lcc-main">
+          <PageFrame projectKey={projectKey}>
+            <ProjectHeader project={project} />
+            <StatsPanel project={project} blockerCount={projectBlockers.length} />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1.2fr 1fr",
+                gap: 14,
+              }}
+            >
+              <BlockersPanel blockers={projectBlockers} />
+              <RollupsPanel rollups={referencedFromRollups} />
+            </div>
+            <RecentTasksPanel
+              prodFailures={projectProdFailures}
+              newBugs={projectNewBugs}
             />
-            <TicketsPanel
-              tasks={filteredTasks}
-              total={projectTasks.total}
-              activeStatus={statusFilter}
-              onClearStatus={() => setStatusFilter(null)}
-            />
-          </>
-        )}
-      </PageFrame>
+            {projectTasks && (
+              <>
+                <StatusBreakdownPanel
+                  rows={projectTasks.statusCounts}
+                  total={projectTasks.total}
+                  selected={statusFilter}
+                  onSelect={(status) =>
+                    setStatusFilter((prev) => (prev === status ? null : status))
+                  }
+                />
+                <TicketsPanel
+                  tasks={filteredTasks}
+                  total={projectTasks.total}
+                  activeStatus={statusFilter}
+                  onClearStatus={() => setStatusFilter(null)}
+                />
+              </>
+            )}
+          </PageFrame>
+        </main>
+      </div>
     </LaunchShell>
   )
 }
@@ -219,23 +235,9 @@ function PageFrame({
   projectKey: string
   children: React.ReactNode
 }) {
-  const links = useDashboardLinks()
   return (
     <div style={{ padding: 18 }}>
-      <Link
-        to={links.launchDashboardPath()}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontSize: 12,
-          color: "var(--lcc-text-dim)",
-          textDecoration: "none",
-        }}
-      >
-        <ArrowLeft size={12} /> Back to dashboard
-      </Link>
-      <div style={{ marginTop: 4, fontSize: 11, color: "var(--lcc-text-faint)" }}>
+      <div style={{ fontSize: 11, color: "var(--lcc-text-faint)" }}>
         / dashboard / projects / {projectKey || "—"}
       </div>
       <div style={{ display: "grid", gap: 14, marginTop: 14 }}>{children}</div>

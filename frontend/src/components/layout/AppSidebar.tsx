@@ -2,7 +2,6 @@ import { Link } from "react-router-dom"
 import {
   Rocket,
   History,
-  ListTree,
   LayoutDashboard,
   Gauge,
   BarChart3,
@@ -36,7 +35,6 @@ const NAV: NavSection[] = [
     items: [
       { label: "Launch Dashboard", href: "/dashboard", icon: Rocket },
       { label: "Status History", href: "/dashboard/history", icon: History },
-      { label: "Workstreams", href: "/dashboard/workstreams/ws-data-platform", icon: ListTree },
     ],
   },
   {
