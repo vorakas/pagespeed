@@ -40,6 +40,14 @@ interface VitalBarProps {
   site2Name: string
 }
 
+interface RadarAxisTickProps {
+  x?: number
+  y?: number
+  payload?: {
+    value?: string | number
+  }
+}
+
 const SITE1_COLOR = "var(--lcc-violet)"
 const SITE2_COLOR = "var(--lcc-green)"
 
@@ -145,6 +153,28 @@ function VitalBarRow({
   )
 }
 
+function renderRadarAxisTick({ x = 0, y = 0, payload }: RadarAxisTickProps) {
+  const label = String(payload?.value ?? "")
+  const isRightLabel = label === "Accessibility"
+  const isLeftLabel = label === "SEO"
+  const isTopLabel = label === "Performance"
+  const isBottomLabel = label === "Best Practices"
+
+  return (
+    <text
+      x={isRightLabel ? x - 8 : isLeftLabel ? x + 8 : x}
+      y={isTopLabel ? y - 4 : isBottomLabel ? y + 8 : y}
+      textAnchor={isRightLabel ? "end" : isLeftLabel ? "start" : "middle"}
+      dominantBaseline="middle"
+      fill="var(--lcc-text-dim)"
+      fontFamily="var(--aurora-font-mono)"
+      fontSize={11}
+    >
+      {label}
+    </text>
+  )
+}
+
 function ComparisonResults({ data }: { data: ComparisonResult }) {
   const { url1, url2 } = data
 
@@ -201,7 +231,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <ResponsiveContainer width="100%" height={176}>
               <RadarChart data={radarData} margin={{ top: 12, right: 104, bottom: 18, left: 0 }}>
                 <PolarGrid stroke="var(--glass-border)" />
-                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: "var(--lcc-text-dim)", fontFamily: "var(--aurora-font-mono)" }} />
+                <PolarAngleAxis dataKey="metric" tick={renderRadarAxisTick} />
                 <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
                 <Radar name={url1.site_name} dataKey="site1" stroke={SITE1_COLOR} fill={SITE1_COLOR} fillOpacity={0.25} />
                 <Radar name={url2.site_name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.25} />

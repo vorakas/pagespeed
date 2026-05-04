@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import { ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react"
 import { marked } from "marked"
 import { api } from "@/services/api"
 import { repairJiraMarkdownSource } from "@/lib/markdown-source"
 import { normalizeJiraMergedHeaderTables } from "@/lib/markdown-tables"
 import { shortenLinksInHtml } from "@/lib/url-shortening"
-import { useDashboardLinks } from "@/lib/dashboard-links"
 import { formatPacificDateTime } from "@/lib/datetime"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
@@ -115,11 +114,6 @@ export function ProjectDashboard() {
     [newBugs, projectKey],
   )
 
-  const referencedFromRollups = useMemo(
-    () => filterWorkstreamsByProject(workstreams, projectKey),
-    [workstreams, projectKey],
-  )
-
   if (loading && !sources) {
     return (
       <LaunchShell>
@@ -190,17 +184,16 @@ export function ProjectDashboard() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.2fr 1fr",
+                gridTemplateColumns: "minmax(280px, 0.8fr) minmax(0, 1.4fr)",
                 gap: 14,
               }}
             >
               <BlockersPanel blockers={projectBlockers} />
-              <RollupsPanel rollups={referencedFromRollups} />
+              <RecentTasksPanel
+                prodFailures={projectProdFailures}
+                newBugs={projectNewBugs}
+              />
             </div>
-            <RecentTasksPanel
-              prodFailures={projectProdFailures}
-              newBugs={projectNewBugs}
-            />
             {projectTasks && (
               <>
                 <StatusBreakdownPanel
@@ -315,22 +308,46 @@ function StatsPanel({
   blockerCount: number
 }) {
   const pct = Math.max(0, Math.min(100, Math.round(project.pct ?? 0)))
+  const activePct = project.total > 0 ? Math.round((project.active / project.total) * 100) : 0
+  const blockerTone = blockerCount > 0 ? "blocked" : "near-complete"
   return (
-    <div className="panel" style={{ padding: "14px 18px" }}>
+    <div className="panel" style={{ padding: "16px 18px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+        }}
+      >
+        <div>
+          <h3 style={{ marginBottom: 4 }}>
+            Project health<span className="count">{project.key}</span>
+          </h3>
+          <div style={{ color: "var(--lcc-text-faint)", fontSize: 12 }}>
+            {project.resolved.toLocaleString()} resolved, {project.active.toLocaleString()} still active
+          </div>
+        </div>
+        <span className="lcc-chip" data-health={blockerTone}>
+          {blockerCount > 0 ? `${blockerCount} blockers` : "No blockers"}
+        </span>
+      </div>
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-          gap: 14,
+          gap: 10,
+          marginTop: 14,
         }}
       >
         <Stat label="Total tasks" value={project.total.toLocaleString()} />
-        <Stat label="Resolved" value={`${pct}%`} tone="green" />
-        <Stat label="Active" value={project.active.toLocaleString()} tone="amber" />
+        <Stat label="Resolved" value={`${pct}%`} tone="green" detail={`${project.resolved.toLocaleString()} tickets`} />
+        <Stat label="Active" value={project.active.toLocaleString()} tone="amber" detail={`${activePct}% of scope`} />
         <Stat
           label="Open blockers"
           value={blockerCount.toLocaleString()}
           tone={blockerCount > 0 ? "red" : "muted"}
+          detail={blockerCount > 0 ? "needs attention" : "clear"}
         />
       </div>
       <div className="lcc-src-bar" style={{ marginTop: 12, height: 6 }}>
@@ -344,17 +361,39 @@ function Stat({
   label,
   value,
   tone,
+  detail,
 }: {
   label: string
   value: string
   tone?: "green" | "amber" | "red" | "muted"
+  detail?: string
 }) {
+  const color = tone === "green"
+    ? "var(--lcc-green)"
+    : tone === "amber"
+      ? "var(--lcc-amber)"
+      : tone === "red"
+        ? "var(--lcc-red)"
+        : "var(--lcc-text)"
   return (
-    <div data-tone={tone}>
-      <div style={{ fontSize: 22, fontWeight: 600 }}>{value}</div>
-      <div style={{ fontSize: 11, color: "var(--lcc-text-faint)", marginTop: 2 }}>
+    <div
+      data-tone={tone}
+      style={{
+        padding: "10px 12px",
+        borderRadius: 8,
+        background: "var(--glass-bg-faint)",
+        border: "1px solid var(--glass-border)",
+      }}
+    >
+      <div style={{ fontSize: 21, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 10.5, color: "var(--lcc-text-faint)", marginTop: 2 }}>
         {label}
       </div>
+      {detail && (
+        <div style={{ fontSize: 10, color: "var(--lcc-text-dim)", marginTop: 3 }}>
+          {detail}
+        </div>
+      )}
     </div>
   )
 }
@@ -363,14 +402,24 @@ function Stat({
 
 function BlockersPanel({ blockers }: { blockers: MigrationBlocker[] }) {
   return (
-    <div className="panel" style={{ padding: "14px 18px" }}>
+    <div className="panel" style={{ padding: "14px 18px", minHeight: "100%" }}>
       <h3>
         Blockers<span className="count">{blockers.length}</span>
       </h3>
       {blockers.length === 0 ? (
-        <p style={{ color: "var(--lcc-text-faint)", fontSize: 12, margin: 0 }}>
-          No open blockers tagged to this project.
-        </p>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            minHeight: 78,
+            color: "var(--lcc-text-faint)",
+            fontSize: 12,
+          }}
+        >
+          <span className="lcc-dot" data-health="near-complete" />
+          <span>No open blockers tagged to this project.</span>
+        </div>
       ) : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {blockers.map((b) => (
@@ -413,68 +462,6 @@ function BlockersPanel({ blockers }: { blockers: MigrationBlocker[] }) {
   )
 }
 
-// ── Rollups (workstreams) ──────────────────────────────────────────────
-
-function RollupsPanel({ rollups }: { rollups: MigrationWorkstream[] }) {
-  const links = useDashboardLinks()
-  return (
-    <div className="panel" style={{ padding: "14px 18px" }}>
-      <h3>
-        Workstream rollups<span className="count">{rollups.length}</span>
-      </h3>
-      <p
-        style={{
-          color: "var(--lcc-text-faint)",
-          fontSize: 11,
-          margin: "0 0 8px",
-        }}
-      >
-        These workstream pages aggregate this project alongside others.
-      </p>
-      {rollups.length === 0 ? (
-        <p style={{ color: "var(--lcc-text-faint)", fontSize: 12, margin: 0 }}>
-          This project isn't referenced by any workstream rollup.
-        </p>
-      ) : (
-        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {rollups.map((ws) => (
-            <li
-              key={ws.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "5px 0",
-                borderBottom: "1px solid var(--lcc-border-faint)",
-              }}
-            >
-              <Link
-                to={links.workstreamPath(ws.id)}
-                style={{
-                  fontSize: 12,
-                  flex: 1,
-                  color: "var(--lcc-text)",
-                  textDecoration: "none",
-                }}
-              >
-                {ws.name}
-              </Link>
-              <span
-                style={{
-                  fontSize: 10,
-                  color: "var(--lcc-text-faint)",
-                }}
-              >
-                {ws.tasks.toLocaleString()} tasks
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
 // ── Recent activity ────────────────────────────────────────────────────
 
 function RecentTasksPanel({
@@ -488,8 +475,9 @@ function RecentTasksPanel({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "1fr 1fr",
+        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
         gap: 14,
+        height: "100%",
       }}
     >
       <TaskListPanel title="Production failures" tasks={prodFailures} tone="red" />
@@ -508,7 +496,7 @@ function TaskListPanel({
   tone: "red" | "amber"
 }) {
   return (
-    <div className="panel" style={{ padding: "14px 18px" }}>
+    <div className="panel" style={{ padding: "14px 18px", minHeight: "100%" }}>
       <h3>
         {title}
         <span className="count" data-tone={tone}>
@@ -516,9 +504,17 @@ function TaskListPanel({
         </span>
       </h3>
       {tasks.length === 0 ? (
-        <p style={{ color: "var(--lcc-text-faint)", fontSize: 12, margin: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            minHeight: 78,
+            color: "var(--lcc-text-faint)",
+            fontSize: 12,
+          }}
+        >
           None for this project.
-        </p>
+        </div>
       ) : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {tasks.slice(0, 8).map((t) => (
@@ -1205,24 +1201,4 @@ function filterTasksByProject(
     if (t.key?.toUpperCase().startsWith(`${upper}-`)) return true
     return false
   })
-}
-
-/**
- * A workstream "references" a project when one of its epic IDs uses this
- * project's prefix (e.g., WPM-4761 → WPM). For the `asana` feed there's
- * no key prefix, so we surface workstreams whose name contains "asana"
- * as a soft match.
- */
-function filterWorkstreamsByProject(
-  workstreams: MigrationWorkstream[] | null,
-  projectKey: string,
-): MigrationWorkstream[] {
-  if (!workstreams || !projectKey) return []
-  const upper = projectKey.toUpperCase()
-  if (upper === "ASANA") {
-    return workstreams.filter((ws) => ws.name.toLowerCase().includes("asana"))
-  }
-  return workstreams.filter((ws) =>
-    (ws.epics ?? []).some((epic) => epic?.toUpperCase().startsWith(`${upper}-`)),
-  )
 }

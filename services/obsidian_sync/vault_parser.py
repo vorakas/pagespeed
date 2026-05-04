@@ -231,7 +231,9 @@ def _extract_first_heading(body: str) -> Optional[str]:
     return None
 
 
-_HEADING_DATE_SUFFIX_RE = re.compile(r"\s*\(\d{4}-\d{2}-\d{2}\)\s*$")
+_HEADING_DATE_SUFFIX_RE = re.compile(
+    r"\s*(?:\(\d{4}-\d{2}-\d{2}\)|[–—-]\s*\d{4}-\d{2}-\d{2})\s*$"
+)
 
 
 def _strip_heading_date_suffix(heading: str) -> str:
