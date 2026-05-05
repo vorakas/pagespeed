@@ -5,6 +5,7 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { Play, Save, Trash2, Download, Search } from "lucide-react"
 import { api } from "@/services/api"
 import type { AzureConfig } from "@/types"
+import { formatQueryDuration } from "./queryTiming"
 
 const KQL_PRESETS: Record<string, { label: string; query: string }> = {
   errors5xx: {
@@ -88,6 +89,7 @@ export function KqlQueryPanel({ config }: KqlQueryPanelProps) {
   const [result, setResult] = useState<KqlResult | null>(null)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [queryDurationMs, setQueryDurationMs] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<"table" | "json">("table")
 
   const currentProfile = profilesData.profiles.find((p) => p.name === currentProfileName) || profilesData.profiles[0]
@@ -118,10 +120,13 @@ export function KqlQueryPanel({ config }: KqlQueryPanelProps) {
     setRunning(true)
     setError(null)
     setResult(null)
+    setQueryDurationMs(null)
+    const startedAt = performance.now()
     try {
       const data = await api.executeAzureQuery(config, query.trim()) as Record<string, unknown>
       if (data.success) {
         setResult(data as unknown as KqlResult)
+        setQueryDurationMs(performance.now() - startedAt)
       } else {
         setError((data.error as string) || "Query failed")
       }
@@ -306,7 +311,10 @@ export function KqlQueryPanel({ config }: KqlQueryPanelProps) {
             className="flex items-center justify-between px-4 py-2"
             style={{ borderBottom: "1px solid var(--glass-border)" }}
           >
-            <span className="aurora-text-faint text-xs">{result.count} rows</span>
+            <span className="aurora-text-faint text-xs">
+              {result.count} rows
+              {queryDurationMs !== null && ` in ${formatQueryDuration(queryDurationMs)}`}
+            </span>
             <div className="flex items-center gap-2">
               {result.rows.length > 0 && (
                 <Button variant="outline" size="xs" onClick={handleDownloadCsv}>
@@ -314,8 +322,24 @@ export function KqlQueryPanel({ config }: KqlQueryPanelProps) {
                 </Button>
               )}
               <div className="flex">
-                <Button variant={viewMode === "table" ? "default" : "outline"} size="xs" onClick={() => setViewMode("table")} className="rounded-r-none">Table</Button>
-                <Button variant={viewMode === "json" ? "default" : "outline"} size="xs" onClick={() => setViewMode("json")} className="rounded-l-none">JSON</Button>
+                <Button
+                  variant={viewMode === "table" ? "default" : "outline"}
+                  size="xs"
+                  onClick={() => setViewMode("table")}
+                  className="rounded-r-none"
+                  style={viewMode === "table" ? { color: "#000" } : undefined}
+                >
+                  Table
+                </Button>
+                <Button
+                  variant={viewMode === "json" ? "default" : "outline"}
+                  size="xs"
+                  onClick={() => setViewMode("json")}
+                  className="rounded-l-none"
+                  style={viewMode === "json" ? { color: "#000" } : undefined}
+                >
+                  JSON
+                </Button>
               </div>
             </div>
           </div>

@@ -1,13 +1,18 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Save, Wifi } from "lucide-react"
-import { api } from "@/services/api"
 import type { AzureConfig } from "@/types"
+
+export interface AzureConnectionStatus {
+  message: string
+  type: "success" | "error" | "testing" | "warning"
+}
 
 interface AzureConfigPanelProps {
   config: AzureConfig
   onConfigChange: (config: AzureConfig) => void
-  onConnected: () => void
+  onTestConnection: () => Promise<void>
+  connectionStatus: AzureConnectionStatus | null
 }
 
 function getExpirationWarning(dateStr: string): { message: string; type: "expired" | "warning" } | null {
@@ -33,11 +38,13 @@ const statusColor = (type: "success" | "error" | "testing" | "warning") => {
   }
 }
 
-export function AzureConfigPanel({ config, onConfigChange, onConnected }: AzureConfigPanelProps) {
-  const [connectionStatus, setConnectionStatus] = useState<{
-    message: string
-    type: "success" | "error" | "testing" | "warning"
-  } | null>(null)
+export function AzureConfigPanel({
+  config,
+  onConfigChange,
+  onTestConnection,
+  connectionStatus,
+}: AzureConfigPanelProps) {
+  const [saveStatus, setSaveStatus] = useState<AzureConnectionStatus | null>(null)
 
   const updateField = (field: keyof AzureConfig, value: string) => {
     onConfigChange({ ...config, [field]: value })
@@ -45,33 +52,8 @@ export function AzureConfigPanel({ config, onConfigChange, onConnected }: AzureC
 
   const handleSave = () => {
     onConfigChange(config)
-    setConnectionStatus({ message: "Configuration saved", type: "success" })
-    setTimeout(() => setConnectionStatus(null), 3000)
-  }
-
-  const handleTestConnection = async () => {
-    if (!config.tenantId || !config.clientId || !config.clientSecret || !config.workspaceId) {
-      setConnectionStatus({ message: "Please fill in all configuration fields.", type: "error" })
-      return
-    }
-    setConnectionStatus({ message: "Testing connection...", type: "testing" })
-    try {
-      const result = await api.testAzureConnection(config)
-      if (result.success) {
-        setConnectionStatus({
-          message: result.message,
-          type: result.warning ? "warning" : "success",
-        })
-        onConnected()
-      } else {
-        setConnectionStatus({ message: result.message, type: "error" })
-      }
-    } catch (err) {
-      setConnectionStatus({
-        message: err instanceof Error ? err.message : "Connection failed",
-        type: "error",
-      })
-    }
+    setSaveStatus({ message: "Configuration saved", type: "success" })
+    setTimeout(() => setSaveStatus(null), 3000)
   }
 
   const expirationWarning = getExpirationWarning(config.secretExpirationDate)
@@ -107,9 +89,20 @@ export function AzureConfigPanel({ config, onConfigChange, onConnected }: AzureC
             <label htmlFor="azExpiration" className="aurora-label block">Secret Expiration Date</label>
             <input id="azExpiration" type="date" className="aurora-input w-full" value={config.secretExpirationDate} onChange={(e) => updateField("secretExpirationDate", e.target.value)} />
           </div>
-          <Button variant="outline" onClick={handleTestConnection}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              void onTestConnection()
+            }}
+            disabled={connectionStatus?.type === "testing"}
+          >
             <Wifi className="h-4 w-4" /> Test Connection
           </Button>
+          {saveStatus && (
+            <p className="text-sm" style={{ color: statusColor(saveStatus.type) }}>
+              {saveStatus.message}
+            </p>
+          )}
           {connectionStatus && (
             <p className="text-sm" style={{ color: statusColor(connectionStatus.type) }}>
               {connectionStatus.message}

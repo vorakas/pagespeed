@@ -6,6 +6,7 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { Search } from "lucide-react"
 import { api } from "@/services/api"
 import type { AzureConfig } from "@/types"
+import { formatQueryDuration } from "./queryTiming"
 
 interface LogEntry {
   TimeGenerated?: string
@@ -54,12 +55,15 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
   const [loading, setLoading] = useState(false)
   const [logs, setLogs] = useState<LogEntry[] | null>(null)
   const [count, setCount] = useState(0)
+  const [queryDurationMs, setQueryDurationMs] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleSearch = async () => {
     if (!startDate || !endDate) return
     setLoading(true)
     setError(null)
+    setQueryDurationMs(null)
+    const startedAt = performance.now()
     try {
       const result = await api.searchAzureLogs(config, {
         startDate: new Date(startDate).toISOString(),
@@ -72,6 +76,7 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
       if (result.success) {
         setLogs((result.logs as LogEntry[]) || [])
         setCount((result.count as number) || 0)
+        setQueryDurationMs(performance.now() - startedAt)
       } else {
         setError((result.error as string) || "Search failed")
       }
@@ -134,7 +139,10 @@ export function LogSearchPanel({ config, selectedSite }: LogSearchPanelProps) {
       {logs !== null && !loading && (
         <div className="aurora-panel overflow-hidden">
           <div className="aurora-panel-header">
-            <span className="aurora-text-faint text-xs font-normal">Found {count} log entries</span>
+            <span className="aurora-text-faint text-xs font-normal">
+              Found {count} log entries
+              {queryDurationMs !== null && ` in ${formatQueryDuration(queryDurationMs)}`}
+            </span>
           </div>
           {logs.length === 0 ? (
             <EmptyState icon={<Search size={36} />} title="No Log Entries Found" description="Try adjusting your search criteria." />
