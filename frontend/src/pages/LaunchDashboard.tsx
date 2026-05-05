@@ -59,6 +59,7 @@ export function LaunchDashboard() {
   const [blockers, setBlockers] = useState<MigrationBlocker[] | null>(null)
   const [prodFailures, setProdFailures] = useState<RawTaskRecord[] | null>(null)
   const [newBugs, setNewBugs] = useState<RawTaskRecord[] | null>(null)
+  const [newBugs24h, setNewBugs24h] = useState<RawTaskRecord[] | null>(null)
   const [taskStatus, setTaskStatus] = useState<MigrationTaskStatusRow[] | null>(null)
   const [trend, setTrend] = useState<MigrationTrendPoint[] | null>(null)
   const [sources, setSources] = useState<MigrationSource[] | null>(null)
@@ -100,12 +101,14 @@ export function LaunchDashboard() {
       }
 
       const overview = await api.getMigrationOverview()
+      const bugs24h = await api.getMigrationNewBugs(1).catch(() => overview.newBugs)
       setHealth(overview.health)
       setKpis(overview.kpis)
       setWorkstreams(overview.workstreams)
       setBlockers(overview.blockers)
       setProdFailures(overview.productionFailures)
       setNewBugs(overview.newBugs)
+      setNewBugs24h(bugs24h)
       setTaskStatus(overview.taskStatus)
       setTrend(overview.trend)
       setSources(overview.sources)
@@ -131,6 +134,7 @@ export function LaunchDashboard() {
 
   const openIssueSummary = useCallback((kind: HeroIssueKpi) => {
     const copy = ISSUE_PANEL_COPY[kind]
+    const panelNewBugs = kind === "bug" ? newBugs24h : newBugs
     setStreamFilter(kind)
     setSidePanelTarget({
       kind: "issue-summary",
@@ -138,9 +142,9 @@ export function LaunchDashboard() {
       title: copy.title,
       description: copy.description,
       emptyLabel: copy.emptyLabel,
-      items: buildIncidentItems({ blockers, prodFailures, newBugs, filter: kind }),
+      items: buildIncidentItems({ blockers, prodFailures, newBugs: panelNewBugs, filter: kind }),
     })
-  }, [blockers, prodFailures, newBugs])
+  }, [blockers, prodFailures, newBugs, newBugs24h])
 
   if (error) {
     return (
