@@ -4,6 +4,7 @@ import { Link } from "react-router-dom"
 import { marked } from "marked"
 import { api } from "@/services/api"
 import { useDashboardLinks } from "@/lib/dashboard-links"
+import type { IncidentItem } from "@/components/launch-dashboard/incidentItems"
 import type {
   MigrationBlocker,
   MigrationWorkstream,
@@ -16,10 +17,19 @@ export type SidePanelTarget =
   | { kind: "workstream"; workstream: MigrationWorkstream }
   | { kind: "blocker"; blocker: MigrationBlocker }
   | { kind: "task"; task: RawTaskRecord }
+  | {
+      kind: "issue-summary"
+      issueKind: IncidentItem["kind"]
+      title: string
+      description: string
+      emptyLabel: string
+      items: IncidentItem[]
+    }
 
 interface SidePanelProps {
   target: SidePanelTarget | null
   onClose: () => void
+  onPickIssue?: (item: IncidentItem) => void
 }
 
 /**
@@ -28,7 +38,7 @@ interface SidePanelProps {
  * critical tasks. Blockers and task targets render without an extra
  * round-trip.
  */
-export function SidePanel({ target, onClose }: SidePanelProps) {
+export function SidePanel({ target, onClose, onPickIssue }: SidePanelProps) {
   const [detail, setDetail] = useState<MigrationWorkstreamDetail | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -74,7 +84,66 @@ export function SidePanel({ target, onClose }: SidePanelProps) {
           <BlockerDetail blocker={target.blocker} onClose={onClose} />
         )}
         {target.kind === "task" && <TaskDetail task={target.task} onClose={onClose} />}
+        {target.kind === "issue-summary" && (
+          <IssueSummary target={target} onClose={onClose} onPickIssue={onPickIssue} />
+        )}
       </aside>
+    </>
+  )
+}
+
+function IssueSummary({
+  target,
+  onClose,
+  onPickIssue,
+}: {
+  target: Extract<SidePanelTarget, { kind: "issue-summary" }>
+  onClose: () => void
+  onPickIssue?: (item: IncidentItem) => void
+}) {
+  return (
+    <>
+      <div className="sp-head">
+        <div>
+          <div className="sp-area">Quick triage</div>
+          <div className="sp-title">
+            {target.title} <span className="sp-title-count">{target.items.length}</span>
+          </div>
+        </div>
+        <button type="button" className="sp-close" aria-label="Close" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      <div className="sp-body">
+        <div className="sp-summary">{target.description}</div>
+        <div className="sp-issue-list" data-kind={target.issueKind}>
+          {target.items.length === 0 && <div className="sp-issue-empty">{target.emptyLabel}</div>}
+          {target.items.map((item, idx) => (
+            <button
+              type="button"
+              key={`${item.kind}-${item.id}-${idx}`}
+              className="sp-issue-row"
+              data-kind={item.kind}
+              onClick={() => onPickIssue?.(item)}
+            >
+              <div className="lcc-is-kind">
+                <span className="lcc-is-dot" data-severity={item.severity ?? undefined} />
+                <span className="lcc-is-kind-label">{item.kind}</span>
+                <span className="lcc-is-id">{item.id}</span>
+              </div>
+              <div className="lcc-is-title">{item.title}</div>
+              {item.note && <div className="lcc-is-note">{item.note}</div>}
+              <div className="lcc-is-foot">
+                <span className="lcc-chip" data-severity={item.severity ?? undefined}>
+                  {item.severity ?? "—"}
+                </span>
+                {item.meta && <span className="lcc-is-meta">{item.meta}</span>}
+                {item.time && <span className="lcc-is-time">{item.time}</span>}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
     </>
   )
 }

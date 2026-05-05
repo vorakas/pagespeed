@@ -5,14 +5,17 @@ import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { TopBar } from "@/components/launch-dashboard/TopBar"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
-import { HeroStrip } from "@/components/launch-dashboard/HeroStrip"
+import { HeroStrip, type HeroIssueKpi } from "@/components/launch-dashboard/HeroStrip"
 import { TrendChart } from "@/components/launch-dashboard/TrendChart"
 import { TaskStatusStrip } from "@/components/launch-dashboard/TaskStatusStrip"
 import {
   IncidentStream,
+} from "@/components/launch-dashboard/IncidentStream"
+import {
+  buildIncidentItems,
   type IncidentFilter,
   type IncidentItem,
-} from "@/components/launch-dashboard/IncidentStream"
+} from "@/components/launch-dashboard/incidentItems"
 import { SidePanel, type SidePanelTarget } from "@/components/launch-dashboard/SidePanel"
 import { WhatChangedToday } from "@/components/launch-dashboard/WhatChangedToday"
 import { DailyStatusSummary } from "@/components/launch-dashboard/DailyStatusSummary"
@@ -27,6 +30,27 @@ import type {
   MigrationWorkstream,
   RawTaskRecord,
 } from "@/types"
+
+const ISSUE_PANEL_COPY: Record<
+  HeroIssueKpi,
+  { title: string; description: string; emptyLabel: string }
+> = {
+  prod: {
+    title: "Production failures",
+    description: "Active production failures from the migration task feed, sorted by priority and recency.",
+    emptyLabel: "No production failures.",
+  },
+  blocker: {
+    title: "Open blockers",
+    description: "Blocking items that affect one or more migration workstreams.",
+    emptyLabel: "No open blockers.",
+  },
+  bug: {
+    title: "New bugs in 24h",
+    description: "Recently filed bugs from the last 24 hours, sorted by priority and recency.",
+    emptyLabel: "No new bugs in 24h.",
+  },
+}
 
 export function LaunchDashboard() {
   const [health, setHealth] = useState<MigrationHealthSnapshot | null>(null)
@@ -105,6 +129,19 @@ export function LaunchDashboard() {
     }
   }, [])
 
+  const openIssueSummary = useCallback((kind: HeroIssueKpi) => {
+    const copy = ISSUE_PANEL_COPY[kind]
+    setStreamFilter(kind)
+    setSidePanelTarget({
+      kind: "issue-summary",
+      issueKind: kind,
+      title: copy.title,
+      description: copy.description,
+      emptyLabel: copy.emptyLabel,
+      items: buildIncidentItems({ blockers, prodFailures, newBugs, filter: kind }),
+    })
+  }, [blockers, prodFailures, newBugs])
+
   if (error) {
     return (
       <LaunchShell>
@@ -158,7 +195,7 @@ export function LaunchDashboard() {
         />
 
         <main className="lcc-main">
-          <HeroStrip health={health} kpis={kpis} />
+          <HeroStrip health={health} kpis={kpis} onIssueKpiClick={openIssueSummary} />
 
           <WhatChangedToday />
 
@@ -188,7 +225,11 @@ export function LaunchDashboard() {
         />
       </div>
 
-      <SidePanel target={sidePanelTarget} onClose={() => setSidePanelTarget(null)} />
+      <SidePanel
+        target={sidePanelTarget}
+        onClose={() => setSidePanelTarget(null)}
+        onPickIssue={openIncident}
+      />
     </LaunchShell>
   )
 }

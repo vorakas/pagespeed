@@ -1135,6 +1135,22 @@
   background: var(--glass-bg-faint); border: 1px solid var(--glass-border);
   min-width: 96px;
 }
+.launch-dashboard button.lcc-hs-kpi {
+  font: inherit; color: inherit; text-align: left;
+}
+.launch-dashboard .lcc-hs-kpi[data-clickable="true"] {
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.12s;
+}
+.launch-dashboard .lcc-hs-kpi[data-clickable="true"]:hover {
+  background: var(--glass-hi);
+  border-color: var(--glass-border-strong);
+  transform: translateY(-1px);
+}
+.launch-dashboard .lcc-hs-kpi[data-clickable="true"]:focus-visible {
+  outline: 2px solid var(--lcc-blue);
+  outline-offset: 2px;
+}
 .launch-dashboard .lcc-hs-kpi-v {
   font-size: 22px; font-weight: 700; line-height: 1;
   font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
@@ -1686,6 +1702,13 @@
 .launch-dashboard-side-panel .sp-head .sp-title {
   font-size: 18px; font-weight: 600; letter-spacing: -0.01em;
 }
+.launch-dashboard-side-panel .sp-head .sp-title-count {
+  color: var(--lcc-text-faint);
+  font-family: var(--aurora-font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  margin-left: 6px;
+}
 .launch-dashboard-side-panel .sp-head .sp-area {
   font-size: 10px; text-transform: uppercase;
   letter-spacing: 0.12em; color: var(--lcc-text-faint);
@@ -1734,6 +1757,40 @@
 .launch-dashboard-side-panel .sp-stat[data-tone="red"]   .v { color: var(--lcc-red); }
 .launch-dashboard-side-panel .sp-stat[data-tone="amber"] .v { color: var(--lcc-amber); }
 .launch-dashboard-side-panel .sp-stat[data-tone="green"] .v { color: var(--lcc-green); }
+
+.launch-dashboard-side-panel .sp-issue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.launch-dashboard-side-panel .sp-issue-row {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--lcc-radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-faint);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background 0.12s, border-color 0.12s;
+}
+.launch-dashboard-side-panel .sp-issue-row:hover {
+  background: var(--glass-hi);
+  border-color: var(--glass-border-strong);
+}
+.launch-dashboard-side-panel .sp-issue-row:focus-visible {
+  outline: 2px solid var(--lcc-blue);
+  outline-offset: 2px;
+}
+.launch-dashboard-side-panel .sp-issue-empty {
+  padding: 28px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--lcc-radius-sm);
+  color: var(--lcc-text-faint);
+  font-size: 12px;
+  text-align: center;
+}
 
 .launch-dashboard-side-panel table.t {
   width: 100%; border-collapse: collapse; font-size: 12px;

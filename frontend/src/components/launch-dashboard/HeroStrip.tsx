@@ -1,9 +1,12 @@
 import type { MigrationHealthSnapshot, MigrationKpis } from "@/types"
 import { formatPacificDateLong } from "@/lib/datetime"
 
+export type HeroIssueKpi = "prod" | "blocker" | "bug"
+
 interface HeroStripProps {
   health: MigrationHealthSnapshot
   kpis: MigrationKpis | null
+  onIssueKpiClick?: (kind: HeroIssueKpi) => void
 }
 
 /**
@@ -15,7 +18,7 @@ interface HeroStripProps {
  * the primary bird's-eye number set, and lifting it out of the left
  * rail frees that rail to be a pure project navigator.
  */
-export function HeroStrip({ health, kpis }: HeroStripProps) {
+export function HeroStrip({ health, kpis, onIssueKpiClick }: HeroStripProps) {
   const days = computeDaysUntil(health.launchWindow?.start)
   const percent = days === null ? 0 : clamp01(((7 - days) / 7) * 100)
 
@@ -32,9 +35,24 @@ export function HeroStrip({ health, kpis }: HeroStripProps) {
           <div className="lcc-hs-kpis">
             <HeroKpi value={fmt(kpis.combinedUnique)} label="Combined unique tasks" tone="primary" />
             <HeroKpi value={`${kpis.resolvedPct ?? "—"}%`} label="Resolved" tone="green" />
-            <HeroKpi value={fmt(kpis.productionFailures)} label="Prod fail" tone="red" />
-            <HeroKpi value={fmt(kpis.openBlockers)} label="Blockers" tone="amber" />
-            <HeroKpi value={fmt(kpis.newBugs24h)} label="New / 24h" tone="red" />
+            <HeroKpi
+              value={fmt(kpis.productionFailures)}
+              label="Prod fail"
+              tone="red"
+              onClick={() => onIssueKpiClick?.("prod")}
+            />
+            <HeroKpi
+              value={fmt(kpis.openBlockers)}
+              label="Blockers"
+              tone="amber"
+              onClick={() => onIssueKpiClick?.("blocker")}
+            />
+            <HeroKpi
+              value={fmt(kpis.newBugs24h)}
+              label="New / 24h"
+              tone="red"
+              onClick={() => onIssueKpiClick?.("bug")}
+            />
           </div>
         )}
       </div>
@@ -59,13 +77,35 @@ interface HeroKpiProps {
   value: string
   label: string
   tone: "primary" | "green" | "amber" | "red"
+  onClick?: () => void
 }
 
-function HeroKpi({ value, label, tone }: HeroKpiProps) {
-  return (
-    <div className="lcc-hs-kpi" data-tone={tone}>
+function HeroKpi({ value, label, tone, onClick }: HeroKpiProps) {
+  const content = (
+    <>
       <div className="lcc-hs-kpi-v">{value}</div>
       <div className="lcc-hs-kpi-l">{label}</div>
+    </>
+  )
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className="lcc-hs-kpi"
+        data-tone={tone}
+        data-clickable="true"
+        onClick={onClick}
+        aria-label={`Open ${label} triage panel`}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div className="lcc-hs-kpi" data-tone={tone}>
+      {content}
     </div>
   )
 }
