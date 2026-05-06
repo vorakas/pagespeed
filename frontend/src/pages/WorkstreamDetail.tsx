@@ -597,6 +597,7 @@ function BurndownPanel({ md }: { md: WorkstreamMdPayload }) {
   const remaining = md.velocity.remaining ?? latest?.remaining ?? Math.max(total - (latest?.cum ?? 0), 0)
   const closed = latest?.cum ?? 0
   const closedPct = total > 0 ? Math.round((closed / total) * 100) : 0
+  const showIdealBurn = md.burndown.length >= 3
   return (
     <section className="panel">
       <h3 style={panelHeadStyle}>
@@ -612,7 +613,7 @@ function BurndownPanel({ md }: { md: WorkstreamMdPayload }) {
         <div style={burndownLegendStyle}>
           <LegendDot color="#f9737f" label="Remaining tasks" />
           <LegendDot color="#6ec7ff" label="Closed in month" />
-          <LegendDot color="rgba(255,255,255,0.45)" label="Ideal burn" dashed />
+          {showIdealBurn && <LegendDot color="rgba(255,255,255,0.45)" label="Ideal burn" dashed />}
         </div>
       </div>
       <BurndownChart data={md.burndown} total={total} />
@@ -684,7 +685,9 @@ function BurndownChart({ data, total }: { data: WorkstreamMdBurndown[]; total: n
   const yBar = (v: number) => pad.t + ih - (v / maxMonth) * (ih * 0.32)
   const xAt = (i: number) => plotLeft + i * xStep
   const linePath = data.map((d, i) => `${i ? "L" : "M"} ${xAt(i)} ${yRemaining(remainingAt(d))}`).join(" ")
+  const showIdealBurn = data.length >= 3
   const idealPath = `M ${plotLeft} ${yRemaining(total)} L ${xAt(data.length - 1)} ${yRemaining(0)}`
+  const barWidth = Math.min(54, Math.max(18, iw / Math.max(data.length * 2.6, 10)))
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
@@ -697,7 +700,7 @@ function BurndownChart({ data, total }: { data: WorkstreamMdBurndown[]; total: n
       {[0, 0.25, 0.5, 0.75, 1].map((f) => (
         <line
           key={f}
-          x1={pad.l}
+          x1={plotLeft}
           x2={W - pad.r}
           y1={pad.t + ih * f}
           y2={pad.t + ih * f}
@@ -728,7 +731,7 @@ function BurndownChart({ data, total }: { data: WorkstreamMdBurndown[]; total: n
         remaining tasks
       </text>
       <text
-        x={pad.l + iw / 2}
+        x={plotLeft + iw / 2}
         y={H - 4}
         fill="rgba(255,255,255,0.45)"
         fontSize="10"
@@ -737,21 +740,22 @@ function BurndownChart({ data, total }: { data: WorkstreamMdBurndown[]; total: n
         month
       </text>
       {data.map((d, i) => {
-        const bw = Math.max(4, xStep * 0.55)
         const bh = Math.max(1, (d.closed / maxMonth) * (ih * 0.32))
         return (
           <rect
             key={i}
-            x={xAt(i) - bw / 2}
+            x={xAt(i) - barWidth / 2}
             y={yBar(d.closed)}
-            width={bw}
+            width={barWidth}
             height={bh}
             fill={d.partial ? "rgba(110,199,255,0.35)" : "rgba(110,199,255,0.55)"}
             rx="1"
           />
         )
       })}
-      <path d={idealPath} fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1" strokeDasharray="5 5" />
+      {showIdealBurn && (
+        <path d={idealPath} fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1" strokeDasharray="5 5" />
+      )}
       <path d={linePath} fill="none" stroke="#f9737f" strokeWidth="2.5" />
       {data.map((d, i) => (
         <circle
@@ -766,7 +770,7 @@ function BurndownChart({ data, total }: { data: WorkstreamMdBurndown[]; total: n
       ))}
       {data.map(
         (d, i) =>
-          (i % 3 === 0 || i === data.length - 1) && (
+          (data.length <= 6 || i % 3 === 0 || i === data.length - 1) && (
             <text
               key={i}
               x={xAt(i)}
