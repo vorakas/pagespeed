@@ -560,6 +560,7 @@ class MigrationDashboardService:
         ))
 
         blockers = [b for b in list_blockers(self._vault) if workstream_id in b.affects]
+        live_blockers = _live_blockers([t for t in referenced_tasks if not t.is_resolved], workstream_id)
 
         markdown_payload: Optional[dict] = None
         raw_path = self._vault.root / rel
@@ -574,7 +575,7 @@ class MigrationDashboardService:
 
         return {
             "workstream": ws.to_dict(),
-            "blockers": [b.to_dict() for b in blockers],
+            "blockers": live_blockers or [b.to_dict() for b in blockers],
             "criticalTasks": [t.to_dict() for t in relevant[:12]],
             "referencedKeyCount": len(referenced_keys),
             "markdown": markdown_payload,
@@ -731,9 +732,14 @@ def _overlay_live_workstream_sections(markdown: dict, tasks: List[RawTask]) -> d
     sync even when orchestration leaves their prose unchanged.
     """
     active_tasks = [t for t in tasks if not t.is_resolved]
+    latest_update = _latest_task_update(tasks)
+    if latest_update:
+        markdown.setdefault("meta", {})["lastUpdate"] = latest_update
     markdown["progress"] = _live_progress(tasks)
     markdown["active"] = _live_active(active_tasks)
-    markdown["devs"] = _live_devs(active_tasks)
+    devs = _live_devs(active_tasks)
+    markdown["devs"] = devs
+    markdown["devObservations"] = _live_dev_observations(devs, active_tasks)
     markdown["burndown"] = _live_burndown(tasks)
     markdown["velocity"] = _live_velocity(tasks, active_tasks, markdown.get("velocity") or {})
     return markdown
@@ -810,6 +816,59 @@ def _live_devs(tasks: List[RawTask]) -> List[dict]:
         })
     rows.sort(key=lambda r: (-r["total"], r["name"].lower()))
     return rows
+
+
+def _live_dev_observations(devs: List[dict], active_tasks: List[RawTask]) -> List[str]:
+    if not devs:
+        return []
+
+    observations: List[str] = []
+    heaviest = devs[0]
+    parts = [f"{heaviest['name']} carries the heaviest active load ({heaviest['total']} tasks)"]
+    detail_parts = []
+    if heaviest["inProgress"]:
+        detail_parts.append(f"{heaviest['inProgress']} in progress")
+    if heaviest["codeReview"]:
+        detail_parts.append(f"{heaviest['codeReview']} in code review")
+    if heaviest["pipeline"]:
+        detail_parts.append(f"{heaviest['pipeline']} in QA/deployment")
+    if heaviest["backlog"]:
+        detail_parts.append(f"{heaviest['backlog']} in blocked/backlog states")
+    if detail_parts:
+        parts.append("including " + ", ".join(detail_parts))
+    observations.append("; ".join(parts) + ".")
+
+    unassigned = next((row for row in devs if row["unassigned"]), None)
+    if unassigned and unassigned["total"]:
+        observations.append(f"Unassigned work remains visible ({unassigned['total']} active tasks).")
+
+    blocked_count = sum(1 for task in active_tasks if _active_bucket(task) == "blocked")
+    if blocked_count:
+        label = "task is" if blocked_count == 1 else "tasks are"
+        observations.append(f"{blocked_count} active {label} currently blocked or failing.")
+
+    return observations
+
+
+def _live_blockers(tasks: List[RawTask], workstream_id: str) -> List[dict]:
+    blockers = [
+        task for task in tasks
+        if _active_bucket(task) == "blocked" or task.is_production_failure
+    ]
+    blockers.sort(key=lambda t: (
+        _severity_rank(_task_severity(t)),
+        -_date_sort_key(t.updated),
+        t.key,
+    ))
+    return [{
+        "id": task.key,
+        "name": task.summary or "(no title)",
+        "status": _status_label(task),
+        "severity": _task_severity(task),
+        "affects": [workstream_id],
+        "note": _active_note(task),
+        "relPath": task.rel_path,
+    } for task in blockers[:12]]
 
 
 def _live_burndown(tasks: List[RawTask]) -> List[dict]:
@@ -920,6 +979,27 @@ def _active_note(task: RawTask) -> Optional[str]:
     if task.updated:
         parts.append(f"updated {task.updated[:10]}")
     return " · ".join(parts) if parts else None
+
+
+def _task_severity(task: RawTask) -> str:
+    priority = (task.priority or "").strip().lower()
+    if priority in {"blocker", "critical", "high", "medium", "low"}:
+        return "critical" if priority == "blocker" else priority
+    if task.is_production_failure:
+        return "critical"
+    return "high" if _active_bucket(task) == "blocked" else "medium"
+
+
+def _severity_rank(severity: str) -> int:
+    return {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(severity, 9)
+
+
+def _latest_task_update(tasks: List[RawTask]) -> Optional[str]:
+    candidates = [task.updated for task in tasks if task.updated]
+    if not candidates:
+        return None
+    latest = max(candidates, key=_date_sort_key)
+    return latest[:10]
 
 
 def _is_recent(value: Optional[str], days: int) -> bool:
