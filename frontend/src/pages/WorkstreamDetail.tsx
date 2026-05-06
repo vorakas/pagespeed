@@ -758,11 +758,12 @@ function RecentRow({ row }: { row: WorkstreamMdRecent }) {
           : "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
       }}
     >
-      <div style={{ ...rowIdStyle, flex: "0 0 70px" }}>{row.updated.slice(5)}</div>
-      <div style={{ ...rowIdStyle, flex: "0 0 110px" }}>{row.id}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={rowIdStyle}>{row.updated.slice(5)}</div>
+      <div style={rowIdStyle}>{row.id}</div>
+      <div style={{ minWidth: 0 }}>
         <div style={rowTitleStyle}>{row.title}</div>
       </div>
+      <span style={rowAssigneeStyle}>{row.assignee}</span>
       <span
         style={{
           ...chipStyle,
@@ -771,9 +772,6 @@ function RecentRow({ row }: { row: WorkstreamMdRecent }) {
         }}
       >
         {row.status}
-      </span>
-      <span style={{ fontSize: 11, color: "var(--lcc-text-dim)", minWidth: 130, textAlign: "right" }}>
-        {row.assignee}
       </span>
     </li>
   )
@@ -1524,9 +1522,11 @@ const tabActiveStyle: React.CSSProperties = {
   boxShadow: "0 0 14px rgba(176,140,255,0.4)",
 }
 const rowStyle: React.CSSProperties = {
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "70px 110px minmax(0, 1fr) 130px",
   alignItems: "flex-start",
-  gap: 12,
+  columnGap: 12,
+  rowGap: 6,
   padding: "10px 12px",
   background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
   borderRadius: 6,
@@ -1535,15 +1535,25 @@ const rowIdStyle: React.CSSProperties = {
   fontFamily: "var(--font-mono, monospace)",
   fontSize: 10.5,
   color: "var(--lcc-text-faint)",
-  flex: "0 0 auto",
-  minWidth: 90,
-  maxWidth: 140,
   paddingTop: 2,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 }
 const rowTitleStyle: React.CSSProperties = {
   fontSize: 13,
   color: "var(--lcc-text)",
   lineHeight: 1.4,
+  overflowWrap: "anywhere",
+}
+const rowAssigneeStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: "var(--lcc-text-dim)",
+  textAlign: "right",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  paddingTop: 2,
 }
 const rowMetaStyle: React.CSSProperties = {
   fontSize: 11,
@@ -1560,6 +1570,12 @@ const chipStyle: React.CSSProperties = {
   borderRadius: 999,
   padding: "2px 8px",
   fontFamily: "var(--font-mono, monospace)",
+  gridColumn: "3 / 5",
+  justifySelf: "start",
+  maxWidth: "100%",
+  overflowWrap: "anywhere",
+  whiteSpace: "normal",
+  lineHeight: 1.35,
 }
 const riskRowStyle: React.CSSProperties = {
   padding: "10px 12px",
