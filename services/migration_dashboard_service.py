@@ -878,6 +878,7 @@ def _live_blockers(tasks: List[RawTask], workstream_id: str) -> List[dict]:
 
 def _live_burndown(tasks: List[RawTask]) -> List[dict]:
     monthly: Counter[Tuple[int, int]] = Counter()
+    total = len(tasks)
     for task in tasks:
         resolved_at = _parse_date(task.resolved)
         if resolved_at:
@@ -896,6 +897,7 @@ def _live_burndown(tasks: List[RawTask]) -> List[dict]:
             "month": month_date.strftime("%b %Y"),
             "closed": closed,
             "cum": cumulative,
+            "remaining": max(total - cumulative, 0),
             "partial": year == today.year and month == today.month,
         })
     return out
@@ -908,19 +910,26 @@ def _live_velocity(tasks: List[RawTask], active_tasks: List[RawTask], previous: 
         if resolved_at:
             monthly[(resolved_at.year, resolved_at.month)] += 1
 
-    q1_counts = [monthly.get((2026, month), 0) for month in (1, 2, 3)]
-    q1avg = round(sum(q1_counts) / 3, 1) if any(q1_counts) else previous.get("q1avg")
-    mar_rate = round(monthly[(2026, 3)] / 4.3, 1) if monthly.get((2026, 3)) else previous.get("marRate")
+    today = date.today()
+    complete_months = sorted(
+        ((year, month), count)
+        for (year, month), count in monthly.items()
+        if (year, month) < (today.year, today.month)
+    )
+    recent_complete = [count for _, count in complete_months[-3:]]
+    q1avg = round(sum(recent_complete) / len(recent_complete), 1) if recent_complete else previous.get("q1avg")
+    current_month_closed = monthly.get((today.year, today.month), 0)
+    mar_rate = round(current_month_closed / max(today.day / 7, 1), 1) if current_month_closed else 0
 
     projection = previous.get("projection")
     projection_note = previous.get("projectionNote")
-    recent_counts = [count for (year, month), count in monthly.items() if (year, month) >= (2026, 3)]
-    if active_tasks and recent_counts:
-        monthly_rate = sum(recent_counts) / len(recent_counts)
+    rate_basis = q1avg if isinstance(q1avg, (int, float)) and q1avg > 0 else None
+    if active_tasks and rate_basis:
+        monthly_rate = rate_basis
         if monthly_rate > 0:
             months_remaining = max(1, round(len(active_tasks) / monthly_rate))
             projection = f"~{months_remaining} mo"
-            projection_note = "at recent close rate"
+            projection_note = "at 3-month close rate"
 
     return {
         "q1avg": q1avg,

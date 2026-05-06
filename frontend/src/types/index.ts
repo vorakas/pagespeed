@@ -804,6 +804,7 @@ export interface WorkstreamMdBurndown {
   month: string
   closed: number
   cum: number
+  remaining?: number
   partial: boolean
 }
 

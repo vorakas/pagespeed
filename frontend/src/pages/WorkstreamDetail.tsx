@@ -516,23 +516,35 @@ function KeyRisksPanel({ md }: { md: WorkstreamMdPayload }) {
 // ── Burndown ──────────────────────────────────────────────────────────
 
 function BurndownPanel({ md }: { md: WorkstreamMdPayload }) {
+  const latest = md.burndown[md.burndown.length - 1]
+  const total = md.progress.total ?? ((latest?.remaining ?? 0) + (latest?.cum ?? 0))
+  const remaining = md.velocity.remaining ?? latest?.remaining ?? Math.max(total - (latest?.cum ?? 0), 0)
+  const closed = latest?.cum ?? 0
+  const closedPct = total > 0 ? Math.round((closed / total) * 100) : 0
   return (
     <section className="panel">
       <h3 style={panelHeadStyle}>
         Burndown & velocity
         <span style={panelCountStyle}>
-          {md.burndown.length} months · {md.burndown[md.burndown.length - 1]?.cum ?? 0} closed
+          {remaining} remaining · {closedPct}% closed
         </span>
       </h3>
-      <BurndownChart data={md.burndown} />
+      <div style={burndownSummaryStyle}>
+        <div style={burndownNarrativeStyle}>
+          <strong>Remaining scope</strong> should trend down over time. Monthly closures show whether the team is burning work fast enough to keep the line moving.
+        </div>
+        <div style={burndownLegendStyle}>
+          <LegendDot color="#f9737f" label="Remaining tasks" />
+          <LegendDot color="#6ec7ff" label="Closed in month" />
+          <LegendDot color="rgba(255,255,255,0.45)" label="Ideal burn" dashed />
+        </div>
+      </div>
+      <BurndownChart data={md.burndown} total={total} />
       <div style={velocityRowStyle}>
-        {md.velocity.q1avg != null && (
-          <Stat label="Q1 2026 avg / mo" value={md.velocity.q1avg} />
-        )}
-        {md.velocity.marRate != null && (
-          <Stat label="March 2026 rate" value={`${md.velocity.marRate}/wk`} />
-        )}
-        {md.velocity.remaining != null && <Stat label="Remaining" value={md.velocity.remaining} />}
+        <Stat label="Remaining scope" value={remaining} tone={remaining > 0 ? "amber" : "green"} />
+        <Stat label="Closed total" value={closed} tone="green" />
+        {md.velocity.q1avg != null && <Stat label="Avg closed / mo" value={md.velocity.q1avg} />}
+        {md.velocity.marRate != null && <Stat label="Current rate / wk" value={md.velocity.marRate} />}
         {md.velocity.projection && (
           <div
             style={{
@@ -554,31 +566,57 @@ function BurndownPanel({ md }: { md: WorkstreamMdPayload }) {
   )
 }
 
-function BurndownChart({ data }: { data: WorkstreamMdBurndown[] }) {
+function LegendDot({
+  color,
+  label,
+  dashed,
+}: {
+  color: string
+  label: string
+  dashed?: boolean
+}) {
+  return (
+    <span style={legendItemStyle}>
+      <span
+        style={{
+          width: 18,
+          height: 0,
+          borderTop: dashed ? `1px dashed ${color}` : `3px solid ${color}`,
+          borderRadius: 999,
+        }}
+      />
+      {label}
+    </span>
+  )
+}
+
+function BurndownChart({ data, total }: { data: WorkstreamMdBurndown[]; total: number }) {
+  if (data.length === 0 || total <= 0) {
+    return <div style={emptyStyle}>No completed work yet. Burndown starts once referenced tasks close.</div>
+  }
   const W = 720
-  const H = 220
-  const pad = { l: 42, r: 16, t: 18, b: 34 }
+  const H = 260
+  const pad = { l: 54, r: 24, t: 24, b: 46 }
   const iw = W - pad.l - pad.r
   const ih = H - pad.t - pad.b
-  const maxCum = useMemo(() => Math.max(...data.map((d) => d.cum)), [data])
-  const maxMonth = useMemo(() => Math.max(...data.map((d) => d.closed)), [data])
+  const maxRemaining = total
+  const maxMonth = useMemo(() => Math.max(1, ...data.map((d) => d.closed)), [data])
   const xStep = data.length > 1 ? iw / (data.length - 1) : 0
-  const yCum = (v: number) => pad.t + ih - (v / maxCum) * ih
+  const remainingAt = (d: WorkstreamMdBurndown) => d.remaining ?? Math.max(total - d.cum, 0)
+  const yRemaining = (v: number) => pad.t + ih - (v / maxRemaining) * ih
+  const yBar = (v: number) => pad.t + ih - (v / maxMonth) * (ih * 0.32)
   const xAt = (i: number) => pad.l + i * xStep
-  const areaPath = [
-    `M ${xAt(0)} ${pad.t + ih}`,
-    ...data.map((d, i) => `L ${xAt(i)} ${yCum(d.cum)}`),
-    `L ${xAt(data.length - 1)} ${pad.t + ih} Z`,
-  ].join(" ")
-  const linePath = data.map((d, i) => `${i ? "L" : "M"} ${xAt(i)} ${yCum(d.cum)}`).join(" ")
+  const linePath = data.map((d, i) => `${i ? "L" : "M"} ${xAt(i)} ${yRemaining(remainingAt(d))}`).join(" ")
+  const idealPath = `M ${pad.l} ${yRemaining(total)} L ${xAt(data.length - 1)} ${yRemaining(0)}`
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: "block" }}>
-      <defs>
-        <linearGradient id="ws-burn-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#6ee7a8" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="#6ee7a8" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      width="100%"
+      height={H}
+      role="img"
+      aria-label="Burndown chart showing remaining tasks by month and closed tasks per month"
+      style={{ display: "block" }}
+    >
       {[0, 0.25, 0.5, 0.75, 1].map((f) => (
         <line
           key={f}
@@ -594,22 +632,41 @@ function BurndownChart({ data }: { data: WorkstreamMdBurndown[] }) {
         <text
           key={f}
           x={pad.l - 6}
-          y={pad.t + ih * (1 - f) + 3}
+          y={yRemaining(maxRemaining * f) + 3}
           fill="rgba(255,255,255,0.4)"
           fontSize="10"
           textAnchor="end"
         >
-          {Math.round(maxCum * f)}
+          {Math.round(maxRemaining * f)}
         </text>
       ))}
+      <text
+        x={14}
+        y={pad.t + ih / 2}
+        fill="rgba(255,255,255,0.45)"
+        fontSize="10"
+        textAnchor="middle"
+        transform={`rotate(-90 14 ${pad.t + ih / 2})`}
+      >
+        remaining tasks
+      </text>
+      <text
+        x={pad.l + iw / 2}
+        y={H - 4}
+        fill="rgba(255,255,255,0.45)"
+        fontSize="10"
+        textAnchor="middle"
+      >
+        month
+      </text>
       {data.map((d, i) => {
         const bw = Math.max(4, xStep * 0.55)
-        const bh = (d.closed / maxMonth) * (ih * 0.4)
+        const bh = Math.max(1, (d.closed / maxMonth) * (ih * 0.32))
         return (
           <rect
             key={i}
             x={xAt(i) - bw / 2}
-            y={pad.t + ih - bh}
+            y={yBar(d.closed)}
             width={bw}
             height={bh}
             fill={d.partial ? "rgba(110,199,255,0.35)" : "rgba(110,199,255,0.55)"}
@@ -617,15 +674,15 @@ function BurndownChart({ data }: { data: WorkstreamMdBurndown[] }) {
           />
         )
       })}
-      <path d={areaPath} fill="url(#ws-burn-grad)" />
-      <path d={linePath} fill="none" stroke="#6ee7a8" strokeWidth="2" />
+      <path d={idealPath} fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1" strokeDasharray="5 5" />
+      <path d={linePath} fill="none" stroke="#f9737f" strokeWidth="2.5" />
       {data.map((d, i) => (
         <circle
           key={i}
           cx={xAt(i)}
-          cy={yCum(d.cum)}
+          cy={yRemaining(remainingAt(d))}
           r={i === data.length - 1 ? 4 : 2}
-          fill="#6ee7a8"
+          fill="#f9737f"
           stroke="#0b0d10"
           strokeWidth="1.5"
         />
@@ -1609,6 +1666,34 @@ const velocityRowStyle: React.CSSProperties = {
   gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
   gap: 10,
   marginTop: 12,
+}
+const burndownSummaryStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 16,
+  alignItems: "flex-start",
+  marginBottom: 8,
+}
+const burndownNarrativeStyle: React.CSSProperties = {
+  color: "var(--lcc-text-dim)",
+  fontSize: 12,
+  lineHeight: 1.45,
+  maxWidth: 520,
+}
+const burndownLegendStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 10,
+  justifyContent: "flex-end",
+}
+const legendItemStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  color: "var(--lcc-text-dim)",
+  fontSize: 11,
+  fontFamily: "var(--font-mono, monospace)",
+  whiteSpace: "nowrap",
 }
 const devRowStyle: React.CSSProperties = {
   display: "grid",
