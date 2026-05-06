@@ -879,9 +879,9 @@ def _live_blockers(tasks: List[RawTask], workstream_id: str) -> List[dict]:
 def _live_burndown(tasks: List[RawTask]) -> List[dict]:
     monthly: Counter[Tuple[int, int]] = Counter()
     for task in tasks:
-        resolved_at = _parse_date(task.resolved)
-        if resolved_at:
-            monthly[(resolved_at.year, resolved_at.month)] += 1
+        completed_at = _completion_date(task)
+        if completed_at:
+            monthly[(completed_at.year, completed_at.month)] += 1
     if not monthly:
         return []
 
@@ -909,9 +909,9 @@ def _live_burndown(tasks: List[RawTask]) -> List[dict]:
 def _live_velocity(tasks: List[RawTask], active_tasks: List[RawTask], previous: dict) -> dict:
     monthly: Counter[Tuple[int, int]] = Counter()
     for task in tasks:
-        resolved_at = _parse_date(task.resolved)
-        if resolved_at:
-            monthly[(resolved_at.year, resolved_at.month)] += 1
+        completed_at = _completion_date(task)
+        if completed_at:
+            monthly[(completed_at.year, completed_at.month)] += 1
 
     today = date.today()
     complete_months = sorted(
@@ -1021,6 +1021,15 @@ def _latest_task_update(tasks: List[RawTask]) -> Optional[str]:
         return None
     latest = max(candidates, key=_date_sort_key)
     return latest[:10]
+
+
+def _completion_date(task: RawTask) -> Optional[date]:
+    resolved_at = _parse_date(task.resolved)
+    if resolved_at:
+        return resolved_at
+    if task.is_resolved:
+        return _parse_date(task.updated)
+    return None
 
 
 def _is_recent(value: Optional[str], days: int) -> bool:
