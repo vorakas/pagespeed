@@ -203,8 +203,8 @@ function deriveSelectedWorkstream(detail: MigrationWorkstreamDetail): MigrationW
   }
 }
 
-function progressCount(md: WorkstreamMdPayload, kind: string): number | null {
-  return md.progress.buckets.find((bucket) => bucket.kind === kind)?.count ?? null
+function progressCount(md: WorkstreamMdPayload | null, kind: string): number | null {
+  return md?.progress.buckets.find((bucket) => bucket.kind === kind)?.count ?? null
 }
 
 // ── Hero ──────────────────────────────────────────────────────────────
@@ -212,8 +212,8 @@ function progressCount(md: WorkstreamMdPayload, kind: string): number | null {
 function Hero({ workstream, md }: { workstream: MigrationWorkstream; md: WorkstreamMdPayload | null }) {
   const status = md?.meta.status || workstream.status || ""
   const title = md?.meta.title || workstream.name
-  const taskCount = md?.meta.taskCount ?? workstream.tasks
-  const blocked = md?.meta.blockedCount ?? workstream.blockedCount
+  const taskCount = md?.progress.total ?? workstream.tasks
+  const blocked = progressCount(md, "blocked") ?? md?.active.blocked.length ?? workstream.blockedCount
   return (
     <section className="panel" style={{ padding: 22 }}>
       <div style={heroTopStyle}>
