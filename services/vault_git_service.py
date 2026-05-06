@@ -5,7 +5,7 @@ to a remote GitHub repository (``lpadobe-vault``) so that:
 
 1. Railway's sync output lands in version control automatically — every
    completed Jira/Asana sync commits and pushes.
-2. A separate orchestration agent (scheduled Claude Code run) can pull,
+2. A separate orchestration agent (scheduled OpenAI Codex run) can pull,
    rewrite wiki/status pages, and push results back.
 3. Local Obsidian on a workstation pulls from the same repo and sees
    both the raw sync output and the orchestrator's edits.
