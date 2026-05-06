@@ -310,13 +310,31 @@ function EpicsPanel({ md }: { md: WorkstreamMdPayload }) {
   return (
     <section className="panel">
       <h3 style={panelHeadStyle}>
-        Key epics <span style={panelCountStyle}>{md.epics.length} epics</span>
+        Key epics <span style={panelCountStyle}>{md.epics.length} epics · live where matched</span>
       </h3>
       <div style={epicGridStyle}>
         {md.epics.map((e) => (
           <div key={e.id} style={epicCardStyle}>
-            <div style={epicIdStyle}>{e.id}</div>
+            <div style={epicHeaderStyle}>
+              <span style={epicIdStyle}>{e.id}</span>
+              {e.live ? (
+                <span style={{ ...epicPillStyle, color: "var(--lcc-green)", borderColor: "var(--lcc-green)" }}>
+                  live
+                </span>
+              ) : (
+                <span style={{ ...epicPillStyle, color: "var(--lcc-text-faint)", borderColor: "var(--lcc-glass-border)" }}>
+                  curated
+                </span>
+              )}
+            </div>
             <div style={epicTitleStyle}>{e.title}</div>
+            {(e.status || e.assignee || e.updated) && (
+              <div style={epicMetaStyle}>
+                {e.status ? <span>{e.status}</span> : null}
+                {e.assignee ? <span>{e.assignee}</span> : null}
+                {e.updated ? <span>updated {e.updated}</span> : null}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -551,7 +569,7 @@ function KeyRisksPanel({ md }: { md: WorkstreamMdPayload }) {
   return (
     <section className="panel">
       <h3 style={panelHeadStyle}>
-        Key risks <span style={panelCountStyle}>{md.keyRisks.length}</span>
+        Key risks <span style={panelCountStyle}>{md.keyRisks.length} live signals</span>
       </h3>
       <ul style={listResetStyle}>
         {md.keyRisks.map((r, i) => (
@@ -563,6 +581,7 @@ function KeyRisksPanel({ md }: { md: WorkstreamMdPayload }) {
             }}
           >
             {r.text}
+            {r.source && <span style={riskSourceStyle}>{r.source}</span>}
           </li>
         ))}
       </ul>
@@ -1579,17 +1598,43 @@ const epicCardStyle: React.CSSProperties = {
   border: "1px solid var(--lcc-glass-border, rgba(255,255,255,0.1))",
   borderRadius: 8,
 }
+const epicHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  marginBottom: 3,
+}
 const epicIdStyle: React.CSSProperties = {
   fontSize: 10.5,
   fontFamily: "var(--font-mono, monospace)",
   color: "var(--lcc-blue)",
-  marginBottom: 3,
 }
 const epicTitleStyle: React.CSSProperties = {
   fontSize: 12.5,
   color: "var(--lcc-text)",
   fontWeight: 500,
   lineHeight: 1.35,
+}
+const epicMetaStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "4px 8px",
+  marginTop: 6,
+  fontSize: 10.5,
+  color: "var(--lcc-text-dim)",
+  fontFamily: "var(--font-mono, monospace)",
+}
+const epicPillStyle: React.CSSProperties = {
+  fontSize: 8.5,
+  fontWeight: 600,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  border: "1px solid",
+  borderRadius: 999,
+  padding: "1px 6px",
+  fontFamily: "var(--font-mono, monospace)",
+  flexShrink: 0,
 }
 const progressBarStyle: React.CSSProperties = {
   display: "flex",
@@ -1716,6 +1761,15 @@ const riskRowStyle: React.CSSProperties = {
   fontSize: 12.5,
   lineHeight: 1.5,
   color: "var(--lcc-text-dim)",
+}
+const riskSourceStyle: React.CSSProperties = {
+  display: "block",
+  marginTop: 6,
+  fontSize: 9,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--lcc-text-faint)",
+  fontFamily: "var(--font-mono, monospace)",
 }
 const emptyStyle: React.CSSProperties = {
   fontSize: 12,

@@ -760,6 +760,10 @@ export interface WorkstreamMdScopeItem {
 export interface WorkstreamMdEpic {
   id: string
   title: string
+  status?: string | null
+  assignee?: string | null
+  updated?: string | null
+  live?: boolean
 }
 
 export interface WorkstreamMdProgressBucket {
@@ -798,6 +802,7 @@ export interface WorkstreamMdActive {
 export interface WorkstreamMdRisk {
   tone: "red" | "amber" | string
   text: string
+  source?: "live" | "curated" | string
 }
 
 export interface WorkstreamMdBurndown {

@@ -740,6 +740,8 @@ def _overlay_live_workstream_sections(markdown: dict, tasks: List[RawTask]) -> d
     devs = _live_devs(active_tasks)
     markdown["devs"] = devs
     markdown["devObservations"] = _live_dev_observations(devs, active_tasks)
+    markdown["keyRisks"] = _live_key_risks(active_tasks)
+    markdown["epics"] = _live_epics(markdown.get("epics") or [], tasks)
     markdown["burndown"] = _live_burndown(tasks)
     markdown["velocity"] = _live_velocity(tasks, active_tasks, markdown.get("velocity") or {})
     return markdown
@@ -853,6 +855,114 @@ def _live_dev_observations(devs: List[dict], active_tasks: List[RawTask]) -> Lis
         observations.append(f"{blocked_count} active {label} currently blocked or failing.")
 
     return observations
+
+
+def _live_key_risks(active_tasks: List[RawTask]) -> List[dict]:
+    risks: List[dict] = []
+    blocked = [
+        task for task in active_tasks
+        if _active_bucket(task) == "blocked" or task.is_production_failure
+    ]
+    blocked.sort(key=lambda t: (_severity_rank(_task_severity(t)), -_date_sort_key(t.updated), t.key))
+    if blocked:
+        risks.append({
+            "tone": "red" if any(task.is_production_failure for task in blocked) else "amber",
+            "text": _risk_sentence(
+                f"{len(blocked)} active task{' is' if len(blocked) == 1 else 's are'} blocked or failing",
+                blocked,
+            ),
+            "source": "live",
+        })
+
+    high_priority = [
+        task for task in active_tasks
+        if (task.priority or "").strip().lower() in {"blocker", "critical", "high"}
+        and task not in blocked
+    ]
+    high_priority.sort(key=lambda t: (_severity_rank(_task_severity(t)), -_date_sort_key(t.updated), t.key))
+    if high_priority:
+        risks.append({
+            "tone": "amber",
+            "text": _risk_sentence(
+                f"{len(high_priority)} high-priority active task{' needs' if len(high_priority) == 1 else 's need'} attention",
+                high_priority,
+            ),
+            "source": "live",
+        })
+
+    unassigned = [task for task in active_tasks if not task.assignee]
+    if unassigned:
+        unassigned.sort(key=lambda t: -_date_sort_key(t.updated))
+        risks.append({
+            "tone": "amber",
+            "text": _risk_sentence(
+                f"{len(unassigned)} active task{' is' if len(unassigned) == 1 else 's are'} unassigned",
+                unassigned,
+            ),
+            "source": "live",
+        })
+
+    stale = [
+        task for task in active_tasks
+        if _days_since(task.updated) is not None and (_days_since(task.updated) or 0) >= 21
+    ]
+    if stale:
+        stale.sort(key=lambda t: _date_sort_key(t.updated))
+        risks.append({
+            "tone": "amber",
+            "text": _risk_sentence(
+                f"{len(stale)} active task{' has' if len(stale) == 1 else 's have'} not moved in 21+ days",
+                stale,
+            ),
+            "source": "live",
+        })
+
+    if not risks:
+        risks.append({
+            "tone": "green",
+            "text": "No live blocker, high-priority, unassigned, or stale-task risk detected from current raw task data.",
+            "source": "live",
+        })
+    return risks[:4]
+
+
+def _live_epics(epics: List[dict], tasks: List[RawTask]) -> List[dict]:
+    by_key = {task.key: task for task in tasks}
+    out = []
+    for epic in epics:
+        task = by_key.get(str(epic.get("id", "")))
+        if task is None:
+            out.append({**epic, "live": False})
+            continue
+        out.append({
+            **epic,
+            "title": task.summary or epic.get("title") or task.key,
+            "status": _status_label(task),
+            "assignee": task.assignee,
+            "updated": task.updated[:10] if task.updated else None,
+            "live": True,
+        })
+    return out
+
+
+def _risk_sentence(prefix: str, tasks: List[RawTask]) -> str:
+    examples = ", ".join(
+        f"{task.key} ({_status_label(task)})"
+        for task in tasks[:3]
+    )
+    suffix = f": {examples}" if examples else "."
+    if examples and len(tasks) > 3:
+        suffix += f", plus {len(tasks) - 3} more."
+    elif examples:
+        suffix += "."
+    return prefix + suffix
+
+
+def _days_since(value: Optional[str]) -> Optional[int]:
+    parsed = _parse_date(value)
+    if parsed is None:
+        return None
+    return (date.today() - parsed).days
 
 
 def _live_blockers(tasks: List[RawTask], workstream_id: str) -> List[dict]:
