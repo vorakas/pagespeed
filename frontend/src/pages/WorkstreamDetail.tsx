@@ -46,6 +46,7 @@ export function WorkstreamDetail() {
   const [detail, setDetail] = useState<MigrationWorkstreamDetail | null>(null)
   const [workstreams, setWorkstreams] = useState<MigrationWorkstream[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<keyof WorkstreamMdActive | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -67,6 +68,10 @@ export function WorkstreamDetail() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    setActiveTab(null)
+  }, [id])
 
   // Workstream list for the picker rail; loaded once and reused across
   // navigations between workstreams so the rail doesn't flicker on each
@@ -117,14 +122,18 @@ export function WorkstreamDetail() {
 
         {detail.blockers.length > 0 && <BlockersPanel blockers={detail.blockers} />}
 
-        {md?.progress?.buckets?.length ? <ProgressPanel md={md} /> : null}
+        {md?.progress?.buckets?.length ? (
+          <ProgressPanel md={md} selectedTab={activeTab} onSelectActiveTab={setActiveTab} />
+        ) : null}
 
         {/* Active Items + Key Risks side-by-side per mockup. Active Items
             needs more width than Key Risks (8-tab bar + row details),
             so this row uses a 3:2 split instead of the default 1:1. */}
         {md?.active || md?.keyRisks?.length ? (
           <div style={activeRiskRowStyle}>
-            {md?.active ? <ActiveItemsPanel active={md.active} /> : <div />}
+            {md?.active ? (
+              <ActiveItemsPanel active={md.active} selectedTab={activeTab} onTabChange={setActiveTab} />
+            ) : <div />}
             {md?.keyRisks?.length ? <KeyRisksPanel md={md} /> : <div />}
           </div>
         ) : null}
@@ -317,7 +326,15 @@ function EpicsPanel({ md }: { md: WorkstreamMdPayload }) {
 
 // ── Progress ──────────────────────────────────────────────────────────
 
-function ProgressPanel({ md }: { md: WorkstreamMdPayload }) {
+function ProgressPanel({
+  md,
+  selectedTab,
+  onSelectActiveTab,
+}: {
+  md: WorkstreamMdPayload
+  selectedTab: keyof WorkstreamMdActive | null
+  onSelectActiveTab: (tab: keyof WorkstreamMdActive) => void
+}) {
   const total = md.progress.total ?? md.progress.buckets.reduce((acc, b) => acc + b.count, 0)
   return (
     <section className="panel">
@@ -351,22 +368,48 @@ function ProgressPanel({ md }: { md: WorkstreamMdPayload }) {
       </div>
       <div style={progressCardsStyle}>
         {md.progress.buckets.map((b, i) => (
-          <ProgressBucketCard key={i} bucket={b} />
+          <ProgressBucketCard
+            key={i}
+            bucket={b}
+            selectedTab={selectedTab}
+            onSelectActiveTab={onSelectActiveTab}
+          />
         ))}
       </div>
     </section>
   )
 }
 
-function ProgressBucketCard({ bucket }: { bucket: WorkstreamMdProgressBucket }) {
+function ProgressBucketCard({
+  bucket,
+  selectedTab,
+  onSelectActiveTab,
+}: {
+  bucket: WorkstreamMdProgressBucket
+  selectedTab: keyof WorkstreamMdActive | null
+  onSelectActiveTab: (tab: keyof WorkstreamMdActive) => void
+}) {
+  const targetTab = activeTabForProgressBucket(bucket)
+  const isLinked = targetTab !== null
+  const isSelected = targetTab !== null && selectedTab === targetTab
   return (
-    <div
+    <button
+      type="button"
+      disabled={!isLinked}
+      onClick={() => {
+        if (targetTab) onSelectActiveTab(targetTab)
+      }}
       style={{
+        ...progressCardButtonStyle,
         padding: "10px 12px",
         borderRadius: 8,
         background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
-        border: `1px solid ${toneBorder(bucket.tone)}`,
+        border: `1px solid ${isSelected ? toneText(bucket.tone) : toneBorder(bucket.tone)}`,
+        cursor: isLinked ? "pointer" : "default",
+        opacity: isLinked ? 1 : 0.78,
+        boxShadow: isSelected ? `0 0 0 1px ${toneText(bucket.tone)} inset` : "none",
       }}
+      title={isLinked ? `Show ${bucket.label} active items` : bucket.label}
     >
       <div
         style={{
@@ -380,8 +423,14 @@ function ProgressBucketCard({ bucket }: { bucket: WorkstreamMdProgressBucket }) 
         {bucket.count}
       </div>
       <div style={statLabelStyle}>{bucket.label}</div>
-    </div>
+    </button>
   )
+}
+
+function activeTabForProgressBucket(bucket: WorkstreamMdProgressBucket): keyof WorkstreamMdActive | null {
+  return ACTIVE_TABS.some((tab) => tab.id === bucket.kind)
+    ? (bucket.kind as keyof WorkstreamMdActive)
+    : null
 }
 
 // ── Active items ──────────────────────────────────────────────────────
@@ -401,9 +450,17 @@ const ACTIVE_TABS: Array<{
   { id: "evaluated", label: "Evaluated", tone: "neutral" },
 ]
 
-function ActiveItemsPanel({ active }: { active: WorkstreamMdActive }) {
+function ActiveItemsPanel({
+  active,
+  selectedTab,
+  onTabChange,
+}: {
+  active: WorkstreamMdActive
+  selectedTab: keyof WorkstreamMdActive | null
+  onTabChange: (tab: keyof WorkstreamMdActive) => void
+}) {
   const firstNonEmpty = ACTIVE_TABS.find((t) => (active[t.id] || []).length > 0)?.id || "blocked"
-  const [tab, setTab] = useState<keyof WorkstreamMdActive>(firstNonEmpty)
+  const tab = selectedTab ?? firstNonEmpty
   const list = active[tab] || []
   return (
     <section className="panel">
@@ -417,7 +474,7 @@ function ActiveItemsPanel({ active }: { active: WorkstreamMdActive }) {
           return (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => onTabChange(t.id)}
               style={{ ...tabStyle, ...(isActive ? tabActiveStyle : {}) }}
             >
               {t.label}
@@ -427,8 +484,8 @@ function ActiveItemsPanel({ active }: { active: WorkstreamMdActive }) {
                   fontSize: 8.5,
                   padding: "1px 5px",
                   borderRadius: 999,
-                  background: isActive ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.06)",
-                  color: isActive ? "#fff" : "var(--lcc-text-faint)",
+                  background: isActive ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.06)",
+                  color: isActive ? "#05070d" : "var(--lcc-text-faint)",
                   fontFamily: "var(--font-mono, monospace)",
                 }}
               >
@@ -597,7 +654,8 @@ function BurndownChart({ data, total }: { data: WorkstreamMdBurndown[]; total: n
   const W = 720
   const H = 260
   const pad = { l: 54, r: 24, t: 24, b: 46 }
-  const iw = W - pad.l - pad.r
+  const plotLeft = pad.l + 26
+  const iw = W - plotLeft - pad.r
   const ih = H - pad.t - pad.b
   const maxRemaining = total
   const maxMonth = useMemo(() => Math.max(1, ...data.map((d) => d.closed)), [data])
@@ -605,9 +663,9 @@ function BurndownChart({ data, total }: { data: WorkstreamMdBurndown[]; total: n
   const remainingAt = (d: WorkstreamMdBurndown) => d.remaining ?? Math.max(total - d.cum, 0)
   const yRemaining = (v: number) => pad.t + ih - (v / maxRemaining) * ih
   const yBar = (v: number) => pad.t + ih - (v / maxMonth) * (ih * 0.32)
-  const xAt = (i: number) => pad.l + i * xStep
+  const xAt = (i: number) => plotLeft + i * xStep
   const linePath = data.map((d, i) => `${i ? "L" : "M"} ${xAt(i)} ${yRemaining(remainingAt(d))}`).join(" ")
-  const idealPath = `M ${pad.l} ${yRemaining(total)} L ${xAt(data.length - 1)} ${yRemaining(0)}`
+  const idealPath = `M ${plotLeft} ${yRemaining(total)} L ${xAt(data.length - 1)} ${yRemaining(0)}`
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
@@ -1547,6 +1605,13 @@ const progressCardsStyle: React.CSSProperties = {
   gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
   gap: 8,
 }
+const progressCardButtonStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  textAlign: "left",
+  font: "inherit",
+  color: "inherit",
+}
 const tabsRowStyle: React.CSSProperties = {
   display: "flex",
   gap: 3,
@@ -1577,7 +1642,7 @@ const tabStyle: React.CSSProperties = {
 }
 const tabActiveStyle: React.CSSProperties = {
   background: "linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue))",
-  color: "#fff",
+  color: "#05070d",
   boxShadow: "0 0 14px rgba(176,140,255,0.4)",
 }
 const rowStyle: React.CSSProperties = {
