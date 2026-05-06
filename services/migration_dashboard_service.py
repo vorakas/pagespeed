@@ -391,6 +391,8 @@ class MigrationDashboardService:
     def _compute_workstreams(self) -> List[dict]:
         streams = list_workstreams(self._vault)
         blockers = list_blockers(self._vault)
+        tasks = self._raw_tasks()
+        by_key = {t.key: t for t in tasks}
 
         # Reverse-lookup: blocker-id → list of workstreams it affects
         blockers_by_ws: Dict[str, List[str]] = {}
@@ -406,6 +408,17 @@ class MigrationDashboardService:
         out: List[dict] = []
         for ws in streams:
             ws.blockers = list(blockers_by_ws.get(ws.id, []))
+            try:
+                page = self._vault.read_page(f"wiki/{ws.id}.md")
+                referenced = [
+                    by_key[key]
+                    for key in _extract_task_keys(page["body"])
+                    if key in by_key
+                ]
+                if referenced:
+                    _apply_live_workstream_counts(ws, referenced)
+            except Exception:
+                logger.exception("Failed to overlay live workstream summary for %s", ws.id)
             if ws.area is None and ws.id in area_map:
                 ws.area = area_map[ws.id]
             # Prefer the status chip on the most recent status page when
@@ -561,6 +574,8 @@ class MigrationDashboardService:
 
         blockers = [b for b in list_blockers(self._vault) if workstream_id in b.affects]
         live_blockers = _live_blockers([t for t in referenced_tasks if not t.is_resolved], workstream_id)
+        if referenced_tasks:
+            _apply_live_workstream_counts(ws, referenced_tasks)
 
         markdown_payload: Optional[dict] = None
         raw_path = self._vault.root / rel
@@ -985,6 +1000,25 @@ def _live_blockers(tasks: List[RawTask], workstream_id: str) -> List[dict]:
         "note": _active_note(task),
         "relPath": task.rel_path,
     } for task in blockers[:12]]
+
+
+def _apply_live_workstream_counts(ws: Workstream, tasks: List[RawTask]) -> None:
+    """Overlay summary counts from the same referenced raw tasks as detail."""
+    active_tasks = [task for task in tasks if not task.is_resolved]
+    active_counts: Counter[str] = Counter(_active_bucket(task) for task in active_tasks)
+
+    ws.tasks = len(tasks)
+    ws.closed = len(tasks) - len(active_tasks)
+    ws.in_progress = active_counts["inProgress"]
+    ws.blocked_count = active_counts["blocked"]
+    ws.failed_qa = sum(1 for task in active_tasks if _is_failed_qa(task))
+
+
+def _is_failed_qa(task: RawTask) -> bool:
+    for candidate in (task.status, task.task_status, task.uat_status):
+        if candidate and "failed qa" in candidate.lower():
+            return True
+    return False
 
 
 def _live_burndown(tasks: List[RawTask]) -> List[dict]:
