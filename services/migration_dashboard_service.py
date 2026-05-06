@@ -948,13 +948,17 @@ def _active_bucket(task: RawTask) -> str:
         return "evaluating"
     if "evaluated" in status:
         return "evaluated"
+    if "clarification" in status:
+        return "openUnassigned"
+    if "groomed" in status or "open" in status or "new" in status:
+        return "openUnassigned"
     if "deployment" in status or "ppe" in status or "test" in status:
         return "inProgress"
     if "progress" in status:
         return "inProgress"
-    if not task.assignee or "open" in status or "new" in status:
+    if not task.assignee:
         return "openUnassigned"
-    return "inProgress"
+    return "openUnassigned"
 
 
 def _dev_bucket(task: RawTask) -> str:
