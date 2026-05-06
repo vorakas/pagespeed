@@ -4,6 +4,7 @@ import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { renderHeadlineSegments } from "@/components/launch-dashboard/headlineWikilinks"
 import { convertUtcTimesToPacific } from "@/lib/datetime"
+import { useObsidianSyncRefresh } from "@/hooks/use-obsidian-sync-refresh"
 import type { MigrationHistoryEntry, SnapshotKpiDelta } from "@/types"
 
 type FilterKey = "all" | "changes" | "regressions" | "resolutions"
@@ -56,6 +57,8 @@ export function StatusHistory() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useObsidianSyncRefresh(load, { reingestSnapshots: true })
 
   const filtered = useMemo(() => {
     if (!entries) return []

@@ -9,6 +9,7 @@ import { shortenLinksInHtml } from "@/lib/url-shortening"
 import { formatPacificDateTime } from "@/lib/datetime"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
+import { useObsidianSyncRefresh } from "@/hooks/use-obsidian-sync-refresh"
 import type {
   MigrationBlocker,
   MigrationHealthSnapshot,
@@ -81,6 +82,8 @@ export function ProjectDashboard() {
   useEffect(() => {
     void loadAll()
   }, [loadAll])
+
+  useObsidianSyncRefresh(loadAll)
 
   // Drop the status filter when the project key changes so a stale
   // filter from one project's status set doesn't carry over.

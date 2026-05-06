@@ -5,6 +5,7 @@ import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { WorkstreamRail } from "@/components/launch-dashboard/WorkstreamRail"
 import { useDashboardLinks } from "@/lib/dashboard-links"
+import { useObsidianSyncRefresh } from "@/hooks/use-obsidian-sync-refresh"
 import type {
   MigrationBlocker,
   MigrationWorkstream,
@@ -55,6 +56,14 @@ export function WorkstreamDetail() {
     }
   }, [id])
 
+  const loadWorkstreams = useCallback(async () => {
+    try {
+      setWorkstreams(await api.getMigrationWorkstreams())
+    } catch {
+      setWorkstreams([])
+    }
+  }, [])
+
   useEffect(() => {
     void load()
   }, [load])
@@ -63,19 +72,12 @@ export function WorkstreamDetail() {
   // navigations between workstreams so the rail doesn't flicker on each
   // route change. Silently ignores failure — the rail simply stays empty.
   useEffect(() => {
-    let cancelled = false
-    api
-      .getMigrationWorkstreams()
-      .then((list) => {
-        if (!cancelled) setWorkstreams(list)
-      })
-      .catch(() => {
-        if (!cancelled) setWorkstreams([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    void loadWorkstreams()
+  }, [loadWorkstreams])
+
+  useObsidianSyncRefresh(async () => {
+    await Promise.all([load(), loadWorkstreams()])
+  })
 
   if (error) {
     return (
@@ -749,7 +751,7 @@ function RecentRow({ row }: { row: WorkstreamMdRecent }) {
   return (
     <li
       style={{
-        ...rowStyle,
+        ...recentActivityRowStyle,
         borderLeft: row.highlight
           ? "2px solid var(--lcc-amber)"
           : `2px solid ${toneBorder(row.tone)}`,
@@ -1522,6 +1524,14 @@ const tabActiveStyle: React.CSSProperties = {
   boxShadow: "0 0 14px rgba(176,140,255,0.4)",
 }
 const rowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 12,
+  padding: "10px 12px",
+  background: "var(--lcc-glass-bg-faint, rgba(22,28,58,0.3))",
+  borderRadius: 6,
+}
+const recentActivityRowStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "70px 110px minmax(0, 1fr) 130px",
   alignItems: "flex-start",
