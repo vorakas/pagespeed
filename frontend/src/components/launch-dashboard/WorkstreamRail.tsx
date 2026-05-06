@@ -6,6 +6,7 @@ import { useDashboardLinks } from "@/lib/dashboard-links"
 interface WorkstreamRailProps {
   workstreams: MigrationWorkstream[] | null
   activeId: string
+  activeWorkstream?: MigrationWorkstream | null
 }
 
 /**
@@ -18,7 +19,7 @@ interface WorkstreamRailProps {
  *
  * Mirrors the handoff design's ``WsLeftRail`` (handoff/design/workstream.jsx).
  */
-export function WorkstreamRail({ workstreams, activeId }: WorkstreamRailProps) {
+export function WorkstreamRail({ workstreams, activeId, activeWorkstream = null }: WorkstreamRailProps) {
   const navigate = useNavigate()
   const links = useDashboardLinks()
 
@@ -57,7 +58,7 @@ export function WorkstreamRail({ workstreams, activeId }: WorkstreamRailProps) {
     return entries
   }, [workstreams])
 
-  const active = workstreams?.find((w) => w.id === activeId) ?? null
+  const active = activeWorkstream ?? workstreams?.find((w) => w.id === activeId) ?? null
 
   return (
     // This page has no Launch Dashboard topbar, so override the default

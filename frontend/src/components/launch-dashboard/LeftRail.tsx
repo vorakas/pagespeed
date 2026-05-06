@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { ChevronDown, ChevronRight } from "lucide-react"
 import { formatPacificDate } from "@/lib/datetime"
 import { useDashboardLinks } from "@/lib/dashboard-links"
 import type {
@@ -20,8 +19,7 @@ interface LeftRailProps {
 }
 
 /**
- * Sticky left rail: a Projects list (primary nav) + a collapsed
- * Rollups section (workstreams, demoted).
+ * Sticky left rail: a Projects list (primary nav) + top workstreams.
  *
  * The KPI summary that used to sit at the top now lives in the hero
  * strip, freeing this rail to act as a pure project navigator. Each
@@ -39,7 +37,6 @@ export function LeftRail({
 }: LeftRailProps) {
   const navigate = useNavigate()
   const links = useDashboardLinks()
-  const [rollupsOpen, setRollupsOpen] = useState(false)
 
   const sortedProjects = useMemo(() => {
     if (!sources) return []
@@ -51,12 +48,11 @@ export function LeftRail({
     [sortedProjects, blockers, prodFailures],
   )
 
-  const needsAttention = useMemo(() => {
+  const topWorkstreams = useMemo(() => {
     if (!workstreams) return []
     const scored = workstreams
       .map((ws) => ({ ws, score: attentionScore(ws) }))
-      .filter(({ score }) => score > 0)
-    scored.sort((a, b) => b.score - a.score)
+    scored.sort((a, b) => b.score - a.score || a.ws.name.localeCompare(b.ws.name))
     return scored.slice(0, 5)
   }, [workstreams])
 
@@ -85,51 +81,22 @@ export function LeftRail({
       </div>
 
       <div className="lcc-lr-section">
-        <button
-          type="button"
-          className="lcc-lr-label"
-          onClick={() => setRollupsOpen((v) => !v)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            background: "transparent",
-            border: 0,
-            padding: 0,
-            cursor: "pointer",
-            color: "inherit",
-            font: "inherit",
-            width: "100%",
-          }}
-          aria-expanded={rollupsOpen}
-        >
-          {rollupsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          Rollups
-          {needsAttention.length > 0 && (
-            <span className="lcc-lr-label-count">{needsAttention.length}</span>
+        <div className="lcc-lr-label">
+          WORKSTREAMS
+          {topWorkstreams.length > 0 && (
+            <span className="lcc-lr-label-count">{topWorkstreams.length}</span>
           )}
-        </button>
-        {rollupsOpen && (
-          <>
-            {needsAttention.length === 0 ? (
-              <div className="lcc-lr-empty">No at-risk rollups.</div>
-            ) : (
-              needsAttention.map(({ ws }) => (
-                <RollupRow
-                  key={ws.id}
-                  workstream={ws}
-                  onOpen={() => navigate(links.workstreamPath(ws.id))}
-                />
-              ))
-            )}
-            <div
-              className="lcc-lr-empty"
-              style={{ marginTop: 6, fontStyle: "italic" }}
-            >
-              Workstreams are an editorial cross-project view. Numbers here
-              aggregate the project feeds above.
-            </div>
-          </>
+        </div>
+        {topWorkstreams.length === 0 ? (
+          <div className="lcc-lr-empty">No workstreams found.</div>
+        ) : (
+          topWorkstreams.map(({ ws }) => (
+            <WorkstreamRow
+              key={ws.id}
+              workstream={ws}
+              onOpen={() => navigate(links.workstreamPath(ws.id))}
+            />
+          ))
         )}
       </div>
 
@@ -171,12 +138,12 @@ function ProjectRow({ source, tone, active = false, onOpen }: ProjectRowProps) {
   )
 }
 
-interface RollupRowProps {
+interface WorkstreamRowProps {
   workstream: MigrationWorkstream
   onOpen: () => void
 }
 
-function RollupRow({ workstream: ws, onOpen }: RollupRowProps) {
+function WorkstreamRow({ workstream: ws, onOpen }: WorkstreamRowProps) {
   return (
     <button
       type="button"

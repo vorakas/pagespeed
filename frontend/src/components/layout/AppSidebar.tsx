@@ -22,6 +22,7 @@ interface NavItem {
   label: string
   href: string
   icon: LucideIcon
+  activePrefix?: string
 }
 
 interface NavSection {
@@ -35,6 +36,12 @@ const NAV: NavSection[] = [
     items: [
       { label: "Launch Dashboard", href: "/dashboard", icon: Rocket },
       { label: "Status History", href: "/dashboard/history", icon: History },
+      {
+        label: "Workstreams",
+        href: "/dashboard/workstreams/ws-data-platform",
+        icon: Network,
+        activePrefix: "/dashboard/workstreams",
+      },
     ],
   },
   {
@@ -118,7 +125,10 @@ export function AppSidebar({ activePath }: AppSidebarProps) {
               {section.items.map((item) => {
                 const Icon = item.icon
                 const [linkPath, linkHash = ""] = item.href.split("#")
-                const isActive = linkPath === activePath.split("#")[0] &&
+                const activeRoute = activePath.split("#")[0]
+                const isActive = (item.activePrefix
+                  ? activeRoute.startsWith(item.activePrefix)
+                  : linkPath === activeRoute) &&
                   linkHash === (activePath.split("#")[1] ?? "")
                 return (
                   <Link

@@ -111,12 +111,13 @@ export function WorkstreamDetail() {
   }
 
   const md = detail.markdown
+  const selectedWorkstream = deriveSelectedWorkstream(detail)
   const hasCrossDeps = !!(md?.crossDeps?.length || md?.internalChains?.length || md?.criticalBlocker)
   const hasRightRail = !!(md?.decisions?.length || md?.crossRefs?.length || md?.team?.leads?.length)
   return (
     <LaunchShell>
       <div style={shellStyle}>
-        <WorkstreamRail workstreams={workstreams} activeId={id} />
+        <WorkstreamRail workstreams={workstreams} activeId={id} activeWorkstream={selectedWorkstream} />
         <div style={pageStyle}>
         <Hero workstream={detail.workstream} md={md} />
 
@@ -187,6 +188,23 @@ export function WorkstreamDetail() {
       </div>
     </LaunchShell>
   )
+}
+
+function deriveSelectedWorkstream(detail: MigrationWorkstreamDetail): MigrationWorkstream {
+  const md = detail.markdown
+  if (!md) return detail.workstream
+
+  return {
+    ...detail.workstream,
+    tasks: md.progress.total ?? detail.workstream.tasks,
+    closed: progressCount(md, "done") ?? detail.workstream.closed,
+    inProgress: progressCount(md, "inProgress") ?? detail.workstream.inProgress,
+    blockedCount: progressCount(md, "blocked") ?? md.active.blocked.length ?? detail.workstream.blockedCount,
+  }
+}
+
+function progressCount(md: WorkstreamMdPayload, kind: string): number | null {
+  return md.progress.buckets.find((bucket) => bucket.kind === kind)?.count ?? null
 }
 
 // ── Hero ──────────────────────────────────────────────────────────────
