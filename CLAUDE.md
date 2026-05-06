@@ -39,6 +39,22 @@ This file documents the full project state so a new session can pick up where we
 
 ---
 
+## Vault Workstream Orchestration Contract
+
+The dashboard now derives operational workstream panels from raw Jira/Asana task data at request time. The external vault orchestrator should treat `wiki/ws-*.md` as the relationship and narrative layer, not as the source of dashboard counts.
+
+**Orchestrator must update:**
+- Task wikilinks in each `wiki/ws-*.md` so every in-scope task is referenced and out-of-scope tasks are removed
+- `### Key Epics` entries with parseable epic IDs or wikilinks
+- Workstream pages when scope changes (`wiki/ws-*.md` create/rename/retire)
+- Curated narrative context such as overview, scope, dependencies, decisions, and cross-references
+
+**Orchestrator should not recalculate:** Progress counts, Active Items buckets, Developer Workload, Burndown & Velocity, Blockers, Key Risks, or Hero Last Update. Those are live overlays from raw task files.
+
+`GET /api/obsidian/pending-orchestration` includes an `orchestrationContract` object with the same machine-readable rules. Orchestrator commits must keep using a subject beginning `[orchestrate]` so the dashboard can detect the latest orchestration push.
+
+---
+
 ## Architecture
 
 The backend follows a **3-layer architecture** with dependency injection:

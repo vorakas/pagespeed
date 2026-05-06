@@ -28,6 +28,9 @@ from exceptions import VaultGitError
 logger = logging.getLogger(__name__)
 
 
+ORCHESTRATION_CONTRACT_VERSION = 1
+
+
 class VaultGitService:
     """Keeps the on-disk vault synchronized with a remote GitHub repo.
 
@@ -253,6 +256,7 @@ class VaultGitService:
                 "lastSync": _commit_meta(last_sync_hash, last_sync_ts, last_sync_subject),
                 "head": head,
                 "pendingSyncCommits": pending_sync_commits,
+                "orchestrationContract": _workstream_orchestration_contract(),
                 **_summarize_files(files),
             }
 
@@ -277,6 +281,7 @@ class VaultGitService:
             "lastSync": _commit_meta(last_sync_hash, last_sync_ts, last_sync_subject),
             "head": head,
             "pendingSyncCommits": _count_sync_commits(self._run, last_orch_hash),
+            "orchestrationContract": _workstream_orchestration_contract(),
             **_summarize_files(files),
         }
 
@@ -711,4 +716,43 @@ def _summarize_files(files: List[dict]) -> dict:
         "deleted": dels,
         "total": len(files),
         "bySource": sources,
+    }
+
+
+def _workstream_orchestration_contract() -> dict:
+    """Describe the work the external vault orchestrator must perform.
+
+    The dashboard now derives operational workstream panels from raw Jira/Asana
+    task files at request time. The orchestrator's durable responsibility is to
+    keep wiki workstream membership and curated context current.
+    """
+    return {
+        "version": ORCHESTRATION_CONTRACT_VERSION,
+        "commitSubjectPrefix": "[orchestrate]",
+        "responsibility": (
+            "Refresh wiki workstream membership and curated context. Raw sync "
+            "owns task facts; the dashboard derives operational metrics live."
+        ),
+        "mustUpdate": [
+            "Keep each wiki/ws-*.md page's in-scope Jira/Asana task wikilinks current.",
+            "Remove task wikilinks that no longer belong to the workstream.",
+            "Keep ### Key Epics populated with parseable epic IDs or wikilinks.",
+            "Create, rename, or retire wiki/ws-*.md pages when workstream scope changes.",
+            "Refresh curated narrative sections such as overview, scope, dependencies, decisions, and cross-references.",
+        ],
+        "doNotRecalculate": [
+            "Progress counts",
+            "Active Items buckets",
+            "Developer Workload",
+            "Burndown & Velocity",
+            "Blockers",
+            "Key Risks",
+            "Hero Last Update",
+        ],
+        "requiredOutput": {
+            "workstreamPages": "wiki/ws-*.md",
+            "taskReferences": "Obsidian wikilinks containing the task key, e.g. [[ACE2E-242 - Title|ACE2E-242]]",
+            "epicReferences": "Bullets under ### Key Epics containing an epic key or wikilink",
+            "push": "Commit and push wiki/ changes with a subject beginning [orchestrate]",
+        },
     }

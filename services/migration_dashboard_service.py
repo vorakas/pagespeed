@@ -727,9 +727,10 @@ def _extract_task_keys(body: str) -> List[str]:
 def _overlay_live_workstream_sections(markdown: dict, tasks: List[RawTask]) -> dict:
     """Refresh task-count panels from raw task frontmatter.
 
-    The workstream markdown still owns narrative sections (scope, risks,
-    decisions), but operational panels should track the latest Jira/Asana
-    sync even when orchestration leaves their prose unchanged.
+    The workstream markdown still owns membership and curated context (task
+    links, key epic links, scope, dependencies, decisions). Operational panels
+    track the latest Jira/Asana sync even when orchestration leaves their prose
+    unchanged.
     """
     active_tasks = [t for t in tasks if not t.is_resolved]
     latest_update = _latest_task_update(tasks)
