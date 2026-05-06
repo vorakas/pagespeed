@@ -16,6 +16,7 @@ import logging
 import re
 import threading
 import time
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -539,10 +540,14 @@ class MigrationDashboardService:
 
         tasks = self._raw_tasks()
         by_key = {t.key: t for t in tasks}
+        referenced_tasks: List[RawTask] = []
         relevant: List[RawTask] = []
         for key in referenced_keys:
             task = by_key.get(key)
-            if task is None or task.is_resolved:
+            if task is None:
+                continue
+            referenced_tasks.append(task)
+            if task.is_resolved:
                 continue
             relevant.append(task)
 
@@ -562,6 +567,8 @@ class MigrationDashboardService:
             raw_text = raw_path.read_text(encoding="utf-8", errors="replace") if raw_path.is_file() else ""
             if raw_text:
                 markdown_payload = parse_workstream_markdown(raw_text, workstream_id)
+                if referenced_tasks:
+                    markdown_payload = _overlay_live_workstream_sections(markdown_payload, referenced_tasks)
         except Exception:
             logger.exception("Workstream markdown parse failed for %s", workstream_id)
 
@@ -714,6 +721,224 @@ def _extract_task_keys(body: str) -> List[str]:
     for match in _TASK_KEY_RE.finditer(body):
         seen.setdefault(match.group(1), None)
     return list(seen.keys())
+
+
+def _overlay_live_workstream_sections(markdown: dict, tasks: List[RawTask]) -> dict:
+    """Refresh task-count panels from raw task frontmatter.
+
+    The workstream markdown still owns narrative sections (scope, risks,
+    decisions), but operational panels should track the latest Jira/Asana
+    sync even when orchestration leaves their prose unchanged.
+    """
+    active_tasks = [t for t in tasks if not t.is_resolved]
+    markdown["progress"] = _live_progress(tasks)
+    markdown["active"] = _live_active(active_tasks)
+    markdown["devs"] = _live_devs(active_tasks)
+    markdown["burndown"] = _live_burndown(tasks)
+    markdown["velocity"] = _live_velocity(tasks, active_tasks, markdown.get("velocity") or {})
+    return markdown
+
+
+def _live_progress(tasks: List[RawTask]) -> dict:
+    counts: Counter[str] = Counter(_status_label(t) for t in tasks)
+    buckets = []
+    for label, count in counts.items():
+        key = label.lower()
+        buckets.append({
+            "label": label,
+            "count": count,
+            "tone": _STATUS_COLOR_MAP.get(key, "neutral"),
+            "kind": _STATUS_GROUP_MAP.get(key, "backlog"),
+        })
+    order = {"done": 0, "inProgress": 1, "blocked": 2, "backlog": 3}
+    buckets.sort(key=lambda b: (order.get(b["kind"], 9), -b["count"], b["label"].lower()))
+    resolved = sum(1 for t in tasks if t.is_resolved)
+    total = len(tasks)
+    completion = f"{round((resolved / total) * 100)}% closed" if total else None
+    return {"total": total, "completion": completion, "buckets": buckets}
+
+
+def _live_active(tasks: List[RawTask]) -> dict:
+    buckets: Dict[str, List[dict]] = {
+        "blocked": [],
+        "inProgress": [],
+        "onHold": [],
+        "approvedReview": [],
+        "codeReview": [],
+        "openUnassigned": [],
+        "evaluating": [],
+        "evaluated": [],
+    }
+    for task in sorted(tasks, key=lambda t: -_date_sort_key(t.updated)):
+        bucket = _active_bucket(task)
+        buckets[bucket].append({
+            "id": task.key,
+            "title": task.summary or "(no title)",
+            "assignee": task.assignee,
+            "note": _active_note(task),
+            "overdue": task.is_production_failure,
+            "isNew": _is_recent(task.created, days=7),
+        })
+    return buckets
+
+
+def _live_devs(tasks: List[RawTask]) -> List[dict]:
+    counts: Dict[str, Dict[str, int]] = defaultdict(lambda: {
+        "inProgress": 0,
+        "codeReview": 0,
+        "pipeline": 0,
+        "backlog": 0,
+        "total": 0,
+    })
+    for task in tasks:
+        name = task.assignee or "Unassigned"
+        bucket = counts[name]
+        bucket["total"] += 1
+        dev_bucket = _dev_bucket(task)
+        bucket[dev_bucket] += 1
+
+    rows = []
+    for name, row in counts.items():
+        rows.append({
+            "name": name,
+            "inProgress": row["inProgress"],
+            "codeReview": row["codeReview"],
+            "pipeline": row["pipeline"],
+            "backlog": row["backlog"],
+            "total": row["total"],
+            "unassigned": name == "Unassigned",
+        })
+    rows.sort(key=lambda r: (-r["total"], r["name"].lower()))
+    return rows
+
+
+def _live_burndown(tasks: List[RawTask]) -> List[dict]:
+    monthly: Counter[Tuple[int, int]] = Counter()
+    for task in tasks:
+        resolved_at = _parse_date(task.resolved)
+        if resolved_at:
+            monthly[(resolved_at.year, resolved_at.month)] += 1
+    if not monthly:
+        return []
+
+    out = []
+    cumulative = 0
+    today = date.today()
+    for year, month in sorted(monthly):
+        closed = monthly[(year, month)]
+        cumulative += closed
+        month_date = date(year, month, 1)
+        out.append({
+            "month": month_date.strftime("%b %Y"),
+            "closed": closed,
+            "cum": cumulative,
+            "partial": year == today.year and month == today.month,
+        })
+    return out
+
+
+def _live_velocity(tasks: List[RawTask], active_tasks: List[RawTask], previous: dict) -> dict:
+    monthly: Counter[Tuple[int, int]] = Counter()
+    for task in tasks:
+        resolved_at = _parse_date(task.resolved)
+        if resolved_at:
+            monthly[(resolved_at.year, resolved_at.month)] += 1
+
+    q1_counts = [monthly.get((2026, month), 0) for month in (1, 2, 3)]
+    q1avg = round(sum(q1_counts) / 3, 1) if any(q1_counts) else previous.get("q1avg")
+    mar_rate = round(monthly[(2026, 3)] / 4.3, 1) if monthly.get((2026, 3)) else previous.get("marRate")
+
+    projection = previous.get("projection")
+    projection_note = previous.get("projectionNote")
+    recent_counts = [count for (year, month), count in monthly.items() if (year, month) >= (2026, 3)]
+    if active_tasks and recent_counts:
+        monthly_rate = sum(recent_counts) / len(recent_counts)
+        if monthly_rate > 0:
+            months_remaining = max(1, round(len(active_tasks) / monthly_rate))
+            projection = f"~{months_remaining} mo"
+            projection_note = "at recent close rate"
+
+    return {
+        "q1avg": q1avg,
+        "marRate": mar_rate,
+        "remaining": len(active_tasks),
+        "projection": projection,
+        "projectionNote": projection_note,
+    }
+
+
+def _status_label(task: RawTask) -> str:
+    return (task.effective_status or "Open").strip() or "Open"
+
+
+def _active_bucket(task: RawTask) -> str:
+    status = " ".join(
+        value.lower()
+        for value in (task.status, task.task_status, task.uat_status)
+        if value
+    )
+    if task.is_production_failure or "blocked" in status or "failed" in status:
+        return "blocked"
+    if "on hold" in status:
+        return "onHold"
+    if "approved code review" in status or "approved cr" in status:
+        return "approvedReview"
+    if "code review" in status:
+        return "codeReview"
+    if "evaluating" in status:
+        return "evaluating"
+    if "evaluated" in status:
+        return "evaluated"
+    if "deployment" in status or "ppe" in status or "test" in status:
+        return "inProgress"
+    if "progress" in status:
+        return "inProgress"
+    if not task.assignee or "open" in status or "new" in status:
+        return "openUnassigned"
+    return "inProgress"
+
+
+def _dev_bucket(task: RawTask) -> str:
+    active_bucket = _active_bucket(task)
+    if active_bucket == "codeReview" or active_bucket == "approvedReview":
+        return "codeReview"
+    if active_bucket == "inProgress":
+        status = " ".join(
+            value.lower()
+            for value in (task.status, task.task_status, task.uat_status)
+            if value
+        )
+        return "pipeline" if "deployment" in status or "ppe" in status or "test" in status else "inProgress"
+    return "backlog"
+
+
+def _active_note(task: RawTask) -> Optional[str]:
+    parts = []
+    status = _status_label(task)
+    if status:
+        parts.append(status)
+    if task.updated:
+        parts.append(f"updated {task.updated[:10]}")
+    return " · ".join(parts) if parts else None
+
+
+def _is_recent(value: Optional[str], days: int) -> bool:
+    parsed = _parse_date(value)
+    if parsed is None:
+        return False
+    return (date.today() - parsed).days <= days
+
+
+def _parse_date(value: Optional[str]) -> Optional[date]:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+    except ValueError:
+        try:
+            return datetime.strptime(value[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return None
 
 
 def _date_sort_key(value: Optional[str]) -> int:
