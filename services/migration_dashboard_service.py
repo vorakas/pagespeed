@@ -878,7 +878,6 @@ def _live_blockers(tasks: List[RawTask], workstream_id: str) -> List[dict]:
 
 def _live_burndown(tasks: List[RawTask]) -> List[dict]:
     monthly: Counter[Tuple[int, int]] = Counter()
-    total = len(tasks)
     for task in tasks:
         resolved_at = _parse_date(task.resolved)
         if resolved_at:
@@ -886,6 +885,10 @@ def _live_burndown(tasks: List[RawTask]) -> List[dict]:
     if not monthly:
         return []
 
+    # Only dated closures can be placed on the time axis. Undated closed
+    # tasks still count as complete elsewhere, but including them here would
+    # make the final remaining point disagree with the current active scope.
+    total = sum(1 for task in tasks if not task.is_resolved) + sum(monthly.values())
     out = []
     cumulative = 0
     today = date.today()
