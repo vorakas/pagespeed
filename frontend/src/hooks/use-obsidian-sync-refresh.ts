@@ -17,6 +17,20 @@ function jobKey(job: ObsidianSyncJobSummary): string {
   return `${job.jobId}:${job.status}:${job.endedAt ?? ""}`
 }
 
+async function refreshKey(): Promise<string | null> {
+  const [{ jobs }, vault] = await Promise.all([
+    api.getObsidianSyncHistory(1),
+    api.getVaultAutoRefreshStatus().catch(() => null),
+  ])
+  const latest = jobs.find(isTerminal)
+  const syncKey = latest ? jobKey(latest) : "no-sync"
+  const vaultKey = vault
+    ? `${vault.lastRefreshedHead ?? "no-head"}:${vault.lastOrchestrationPushAt ?? "no-orchestration"}`
+    : "no-vault"
+
+  return `${syncKey}|${vaultKey}`
+}
+
 async function refreshDashboardCaches(reingestSnapshots: boolean): Promise<void> {
   await fetch("/api/dashboard/cache/invalidate", { method: "POST" }).catch(() => null)
   if (reingestSnapshots) {
@@ -42,13 +56,9 @@ export function useObsidianSyncRefresh(
 
     async function checkLatestSync(): Promise<void> {
       try {
-        const { jobs } = await api.getObsidianSyncHistory(1)
+        const latestKey = await refreshKey()
         if (cancelled) return
-
-        const latest = jobs.find(isTerminal)
-        if (!latest) return
-
-        const latestKey = jobKey(latest)
+        if (!latestKey) return
         if (initialKeyRef.current === null) {
           initialKeyRef.current = latestKey
           return
