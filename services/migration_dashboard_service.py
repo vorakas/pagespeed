@@ -746,20 +746,25 @@ def _overlay_live_workstream_sections(markdown: dict, tasks: List[RawTask]) -> d
 
 
 def _live_progress(tasks: List[RawTask]) -> dict:
-    counts: Counter[str] = Counter(_status_label(t) for t in tasks)
-    buckets = []
-    for label, count in counts.items():
-        key = label.lower()
-        buckets.append({
-            "label": label,
-            "count": count,
-            "tone": _STATUS_COLOR_MAP.get(key, "neutral"),
-            "kind": _STATUS_GROUP_MAP.get(key, "backlog"),
-        })
-    order = {"done": 0, "inProgress": 1, "blocked": 2, "backlog": 3}
-    buckets.sort(key=lambda b: (order.get(b["kind"], 9), -b["count"], b["label"].lower()))
     resolved = sum(1 for t in tasks if t.is_resolved)
     total = len(tasks)
+    active_counts: Counter[str] = Counter(_active_bucket(t) for t in tasks if not t.is_resolved)
+    bucket_defs = [
+        ("done", "Closed", resolved, "green"),
+        ("blocked", "Blocked", active_counts["blocked"], "red"),
+        ("inProgress", "In Progress", active_counts["inProgress"], "blue"),
+        ("onHold", "On Hold", active_counts["onHold"], "amber"),
+        ("approvedReview", "Approved CR", active_counts["approvedReview"], "blue"),
+        ("codeReview", "Code Review", active_counts["codeReview"], "blue"),
+        ("openUnassigned", "Open / Unassigned", active_counts["openUnassigned"], "neutral"),
+        ("evaluating", "Evaluating", active_counts["evaluating"], "amber"),
+        ("evaluated", "Evaluated", active_counts["evaluated"], "amber"),
+    ]
+    buckets = [
+        {"kind": kind, "label": label, "count": count, "tone": tone}
+        for kind, label, count, tone in bucket_defs
+        if count > 0
+    ]
     completion = f"{round((resolved / total) * 100)}% closed" if total else None
     return {"total": total, "completion": completion, "buckets": buckets}
 
