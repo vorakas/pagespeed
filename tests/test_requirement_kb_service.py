@@ -124,6 +124,22 @@ class RequirementKbServiceTest(unittest.TestCase):
         self.assertEqual(source["sourceId"], "DBADMIN-6393")
         self.assertEqual(source["sourcePath"], "raw/WPM/Task/DBADMIN-6393 - Update Product Pricing Table.md")
 
+    def test_removes_source_and_chunks_from_knowledge_base(self):
+        kb = self.service.create_knowledge_base(
+            name="Calculator",
+            description="Minimum pricing and discounting requirements",
+        )
+        source = self.service.add_vault_source(kb["id"], "LAMPSPLUS-445")
+
+        removed = self.service.remove_source(kb["id"], source["id"])
+        sources = self.service.list_sources(kb["id"])
+        answer = self.service.ask_question(kb["id"], "vendor approval")
+
+        self.assertTrue(removed["removed"])
+        self.assertEqual(removed["sourceId"], source["id"])
+        self.assertEqual(sources, [])
+        self.assertEqual(answer["citations"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

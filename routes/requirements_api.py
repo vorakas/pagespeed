@@ -51,6 +51,10 @@ def create_requirements_blueprint(requirement_service: RequirementKbService) -> 
         data = request.get_json() or {}
         return jsonify(requirement_service.add_vault_source(kb_id, data.get("sourcePath", ""))), 201
 
+    @bp.delete("/knowledge-bases/<int:kb_id>/sources/<int:source_id>")
+    def remove_source(kb_id: int, source_id: int):
+        return jsonify(requirement_service.remove_source(kb_id, source_id))
+
     @bp.post("/knowledge-bases/<int:kb_id>/notes")
     def add_note(kb_id: int):
         data = request.get_json() or {}

@@ -348,6 +348,33 @@ class RequirementKbService:
             rows = self.conn_mgr.rows_to_dicts(cursor)
         return [self._source_api(row) for row in rows]
 
+    def remove_source(self, kb_id: int, source_id: int) -> dict[str, Any]:
+        self.get_knowledge_base(kb_id)
+        with self.conn_mgr.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT id, title
+                FROM requirement_sources
+                WHERE kb_id = {self.conn_mgr.placeholder()} AND id = {self.conn_mgr.placeholder()}
+                """,
+                (kb_id, source_id),
+            )
+            source = self.conn_mgr.row_to_dict(cursor)
+            if not source:
+                raise ValidationError("Source not found")
+
+            cursor.execute("DELETE FROM requirement_chunks WHERE source_id = " + self.conn_mgr.placeholder(), (source_id,))
+            cursor.execute("DELETE FROM requirement_notes WHERE source_id = " + self.conn_mgr.placeholder(), (source_id,))
+            cursor.execute(
+                f"""
+                DELETE FROM requirement_sources
+                WHERE kb_id = {self.conn_mgr.placeholder()} AND id = {self.conn_mgr.placeholder()}
+                """,
+                (kb_id, source_id),
+            )
+        return {"removed": True, "sourceId": source_id, "title": source.get("title")}
+
     def list_common_questions(self, kb_id: int) -> list[dict[str, Any]]:
         self.get_knowledge_base(kb_id)
         with self.conn_mgr.get_connection() as conn:

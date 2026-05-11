@@ -3,12 +3,14 @@ import {
   BookOpenCheck,
   CheckCircle2,
   FileUp,
+  FileText,
   Loader2,
   MessageSquareText,
   Plus,
   Search,
   Send,
   Sparkles,
+  Trash2,
 } from "lucide-react"
 
 import { api } from "@/services/api"
@@ -22,6 +24,14 @@ import type {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -60,6 +70,9 @@ export function RequirementQuestions() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [uploadMessage, setUploadMessage] = useState<string | null>(null)
+  const [sourceMessage, setSourceMessage] = useState<string | null>(null)
+  const [selectedSource, setSelectedSource] = useState<RequirementSource | null>(null)
+  const [sourceToRemove, setSourceToRemove] = useState<RequirementSource | null>(null)
 
   const activeKb = useMemo(
     () => knowledgeBases.find((kb) => kb.id === activeKbId) ?? null,
@@ -68,6 +81,14 @@ export function RequirementQuestions() {
   const uploadKnowledgeBase = useMemo(
     () => knowledgeBases.find((kb) => String(kb.id) === uploadKbId) ?? null,
     [knowledgeBases, uploadKbId],
+  )
+  const taskSources = useMemo(
+    () => sources.filter((source) => source.sourceType === "vault_task"),
+    [sources],
+  )
+  const documentSources = useMemo(
+    () => sources.filter((source) => source.sourceType !== "vault_task"),
+    [sources],
   )
 
   useEffect(() => {
@@ -195,12 +216,35 @@ export function RequirementQuestions() {
     if (!activeKbId || !taskPath.trim()) return
     setBusy("task")
     setError(null)
+    setSourceMessage(null)
     try {
       await api.addRequirementTaskSource(activeKbId, taskPath.trim())
       setTaskPath("")
+      setSourceMessage("Task added to the active knowledge base.")
       await loadSources(activeKbId)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Task import failed")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function removeSource() {
+    if (!activeKbId || !sourceToRemove) return
+    setBusy("remove-source")
+    setError(null)
+    setSourceMessage(null)
+    try {
+      await api.removeRequirementSource(activeKbId, sourceToRemove.id)
+      setSourceMessage(`${sourceToRemove.title} removed from the active knowledge base.`)
+      if (selectedSource?.id === sourceToRemove.id) {
+        setSelectedSource(null)
+      }
+      setSourceToRemove(null)
+      await loadSources(activeKbId)
+      await loadKnowledgeBases(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Source removal failed")
     } finally {
       setBusy(null)
     }
@@ -257,6 +301,24 @@ export function RequirementQuestions() {
       }
       return next
     })
+  }
+
+  function sourceContent(source: RequirementSource): string {
+    const text = source.extractedText?.trim()
+    if (text) return text
+    if (source.parseStatus === "visual_only") {
+      return "No readable text was extracted from this file. It remains attached to the knowledge base as a visual/reference source."
+    }
+    return "No source text is available for this item."
+  }
+
+  function sourceKindLabel(source: RequirementSource): string {
+    if (source.sourceType === "vault_task") return source.sourceSystem || "Task"
+    if (source.sourcePath?.toLowerCase().endsWith(".docx")) return "Word Doc"
+    if (source.sourcePath?.toLowerCase().endsWith(".pdf")) return "PDF"
+    if (source.sourcePath?.toLowerCase().endsWith(".svg")) return "Diagram"
+    if (source.sourcePath?.toLowerCase().endsWith(".vsdx")) return "Diagram"
+    return source.sourceSystem || "Document"
   }
 
   if (loading) {
@@ -411,22 +473,110 @@ export function RequirementQuestions() {
                 {activeKb ? `${activeKb.name} indexed evidence` : "Select a knowledge base to inspect sources"}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
+              {sourceMessage && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                  {sourceMessage}
+                </div>
+              )}
               {sources.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
                   No sources indexed for the active knowledge base yet.
                 </div>
               ) : (
-                sources.slice(0, 12).map((source) => (
-                  <div key={source.id} className="rounded-lg border p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={source.parseStatus === "indexed" ? "secondary" : "outline"}>{source.parseStatus}</Badge>
-                      <Badge variant="outline">{source.sourceSystem}</Badge>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{source.title}</span>
+                <>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tasks</p>
+                      <Badge variant="outline">{taskSources.length}</Badge>
                     </div>
-                    <p className="mt-2 truncate text-xs text-muted-foreground">{source.sourcePath}</p>
+                    <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                      {taskSources.length === 0 ? (
+                        <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                          No Jira or Asana task sources.
+                        </div>
+                      ) : (
+                        taskSources.map((source) => (
+                          <div key={source.id} className="group/source flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSource(source)}
+                              className="min-w-0 flex-1 rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                                <span className="size-1.5 rounded-full bg-primary" />
+                                <span>{source.sourceSystem}</span>
+                                <span className="ml-auto truncate">{source.sourceId}</span>
+                              </div>
+                              <div className="mt-1 line-clamp-2 text-sm font-medium text-foreground">{source.title}</div>
+                              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <Badge variant={source.parseStatus === "indexed" ? "secondary" : "outline"}>{source.parseStatus}</Badge>
+                                <span>{source.chunkCount ?? 0} chunks</span>
+                              </div>
+                            </button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="mt-2 shrink-0 text-muted-foreground hover:text-destructive"
+                              aria-label={`Remove ${source.title}`}
+                              onClick={() => setSourceToRemove(source)}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                ))
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Documents</p>
+                      <Badge variant="outline">{documentSources.length}</Badge>
+                    </div>
+                    <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                      {documentSources.length === 0 ? (
+                        <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                          No uploaded document sources.
+                        </div>
+                      ) : (
+                        documentSources.map((source) => (
+                          <div key={source.id} className="group/source flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSource(source)}
+                              className="min-w-0 flex-1 rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <div className="flex items-start gap-3">
+                                <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-medium text-foreground">{source.title}</div>
+                                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <Badge variant={source.parseStatus === "indexed" ? "secondary" : "outline"}>{source.parseStatus}</Badge>
+                                    <span>{sourceKindLabel(source)}</span>
+                                    <span>{source.chunkCount ?? 0} chunks</span>
+                                  </div>
+                                  <p className="mt-2 truncate text-xs text-muted-foreground">{source.sourcePath}</p>
+                                </div>
+                              </div>
+                            </button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="mt-2 shrink-0 text-muted-foreground hover:text-destructive"
+                              aria-label={`Remove ${source.title}`}
+                              onClick={() => setSourceToRemove(source)}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -599,6 +749,88 @@ export function RequirementQuestions() {
           </CardContent>
         </Card>
       </section>
+
+      <Dialog open={selectedSource != null} onOpenChange={(open) => !open && setSelectedSource(null)}>
+        <DialogContent className="max-h-[86vh] overflow-hidden sm:max-w-4xl">
+          {selectedSource && (
+            <>
+              <DialogHeader>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{sourceKindLabel(selectedSource)}</Badge>
+                  <Badge variant={selectedSource.parseStatus === "indexed" ? "secondary" : "outline"}>{selectedSource.parseStatus}</Badge>
+                  <Badge variant="outline">{selectedSource.chunkCount ?? 0} chunks</Badge>
+                </div>
+                <DialogTitle className="leading-snug">{selectedSource.title}</DialogTitle>
+                <DialogDescription>
+                  {[selectedSource.sourceId, selectedSource.sourceSystem, selectedSource.sourcePath].filter(Boolean).join(" | ")}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="min-h-0 overflow-y-auto rounded-lg border bg-muted/25 p-4">
+                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
+                  {sourceContent(selectedSource)}
+                </pre>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={OUTLINE_ACTION_BUTTON_CLASS}
+                  onClick={() => setSelectedSource(null)}
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setSourceToRemove(selectedSource)}
+                >
+                  <Trash2 className="size-4" />
+                  Remove
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={sourceToRemove != null} onOpenChange={(open) => !open && setSourceToRemove(null)}>
+        <DialogContent>
+          {sourceToRemove && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Remove Source</DialogTitle>
+                <DialogDescription>
+                  Remove this source from the active knowledge base? The original task or document will not be deleted.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="rounded-lg border bg-muted/25 p-3">
+                <div className="text-sm font-medium">{sourceToRemove.title}</div>
+                <div className="mt-1 truncate text-xs text-muted-foreground">{sourceToRemove.sourcePath}</div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={OUTLINE_ACTION_BUTTON_CLASS}
+                  onClick={() => setSourceToRemove(null)}
+                  disabled={busy === "remove-source"}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => void removeSource()}
+                  disabled={busy === "remove-source"}
+                >
+                  {busy === "remove-source" ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                  Remove
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

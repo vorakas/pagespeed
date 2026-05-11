@@ -945,6 +945,12 @@ class ApiClient {
     })
   }
 
+  async removeRequirementSource(kbId: number, sourceId: number): Promise<{ removed: boolean; sourceId: number; title?: string }> {
+    return this.request(`/api/requirements/knowledge-bases/${kbId}/sources/${sourceId}`, {
+      method: "DELETE",
+    })
+  }
+
   async addRequirementNote(
     kbId: number,
     input: { title: string; body: string; category: string; tags: string[]; sourceLink?: string },

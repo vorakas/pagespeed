@@ -1199,6 +1199,7 @@ export interface RequirementSource {
   sourcePath?: string | null
   parseStatus: string
   metadata?: Record<string, unknown>
+  extractedText?: string | null
   chunkCount?: number
   createdAt?: string
   ingestedAt?: string
