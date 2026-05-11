@@ -7,7 +7,7 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useSites } from "@/hooks/use-sites"
 import { api } from "@/services/api"
-import type { AiUsageSummary, Trigger } from "@/types"
+import type { AiUsageSummary, AiUsageTotal, Trigger } from "@/types"
 
 export function Setup() {
   const { sites, loading: sitesLoading, refreshSites } = useSites()
@@ -56,6 +56,28 @@ export function Setup() {
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
+  const providerUsageGroups = aiUsage
+    ? [
+        {
+          key: "openai",
+          label: "OpenAI",
+          rows: aiUsage.totals.filter((row) => row.provider.toLowerCase() === "openai"),
+        },
+        {
+          key: "anthropic",
+          label: "Anthropic",
+          rows: aiUsage.totals.filter((row) => ["anthropic", "claude"].includes(row.provider.toLowerCase())),
+        },
+      ]
+    : []
+
+  const sumUsageRows = (rows: AiUsageTotal[]) => ({
+    calls: rows.reduce((sum, row) => sum + row.callCount, 0),
+    inputTokens: rows.reduce((sum, row) => sum + row.inputTokens, 0),
+    outputTokens: rows.reduce((sum, row) => sum + row.outputTokens, 0),
+    estimatedCost: rows.reduce((sum, row) => sum + row.estimatedCost, 0),
+  })
+
   if (sitesLoading) {
     return (
       <>
@@ -77,7 +99,9 @@ export function Setup() {
         <Card className="rounded-lg">
           <CardHeader>
             <CardTitle>AI API Usage</CardTitle>
-            <CardDescription>Estimated spend from Pharos-tracked AI calls. Provider invoices remain the billing source of truth.</CardDescription>
+            <CardDescription>
+              Estimated spend from Pharos-tracked AI calls. Requirement Questions uses the API keys and models saved in AI Analysis.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {aiUsageError ? (
@@ -105,31 +129,51 @@ export function Setup() {
                 {aiUsage.totals.length === 0 ? (
                   <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No tracked AI API calls yet.</div>
                 ) : (
-                  <div className="overflow-hidden rounded-lg border">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Provider</th>
-                          <th className="px-3 py-2 text-left">Model</th>
-                          <th className="px-3 py-2 text-right">Calls</th>
-                          <th className="px-3 py-2 text-right">Input</th>
-                          <th className="px-3 py-2 text-right">Output</th>
-                          <th className="px-3 py-2 text-right">Cost</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {aiUsage.totals.map((row) => (
-                          <tr key={`${row.provider}-${row.model}-${row.feature}`} className="border-t">
-                            <td className="px-3 py-2 capitalize">{row.provider}</td>
-                            <td className="px-3 py-2">{row.model}</td>
-                            <td className="px-3 py-2 text-right">{row.callCount}</td>
-                            <td className="px-3 py-2 text-right">{row.inputTokens.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right">{row.outputTokens.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right">${row.estimatedCost.toFixed(6)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+                    {providerUsageGroups.map((group) => {
+                      const totals = sumUsageRows(group.rows)
+                      return (
+                        <div key={group.key} className="min-w-0 overflow-hidden rounded-lg border">
+                          <div className="border-b bg-muted/30 px-4 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <h3 className="font-semibold">{group.label}</h3>
+                              <span className="text-sm font-medium">${totals.estimatedCost.toFixed(6)}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {totals.calls} calls · {(totals.inputTokens + totals.outputTokens).toLocaleString()} tokens
+                            </p>
+                          </div>
+                          {group.rows.length === 0 ? (
+                            <div className="p-4 text-sm text-muted-foreground">No tracked {group.label} calls yet.</div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                            <table className="w-full min-w-[34rem] table-fixed text-sm">
+                              <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
+                                <tr>
+                                  <th className="w-[42%] px-3 py-2 text-left">Model</th>
+                                  <th className="w-[12%] px-3 py-2 text-right">Calls</th>
+                                  <th className="w-[16%] px-3 py-2 text-right">Input</th>
+                                  <th className="w-[16%] px-3 py-2 text-right">Output</th>
+                                  <th className="w-[14%] px-3 py-2 text-right">Cost</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.rows.map((row) => (
+                                  <tr key={`${row.provider}-${row.model}-${row.feature}`} className="border-t">
+                                    <td className="truncate px-3 py-2" title={row.model}>{row.model}</td>
+                                    <td className="px-3 py-2 text-right">{row.callCount}</td>
+                                    <td className="px-3 py-2 text-right">{row.inputTokens.toLocaleString()}</td>
+                                    <td className="px-3 py-2 text-right">{row.outputTokens.toLocaleString()}</td>
+                                    <td className="px-3 py-2 text-right">${row.estimatedCost.toFixed(6)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </>
