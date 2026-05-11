@@ -12,7 +12,6 @@ import {
   Plus,
   Search,
   Send,
-  Sparkles,
   Trash2,
 } from "lucide-react"
 
@@ -51,8 +50,8 @@ import { repairJiraMarkdownSource } from "@/lib/markdown-source"
 import { cn } from "@/lib/utils"
 
 const DISCOVERY_TERMS_EXAMPLE = "Example: minimum pricing, UMRP, MPR, vendor approval, discount rules"
-const ACTION_BUTTON_CLASS = "shadow-none"
-const OUTLINE_ACTION_BUTTON_CLASS = "shadow-none"
+const ACTION_BUTTON_CLASS = "shadow-none !text-black hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
+const OUTLINE_ACTION_BUTTON_CLASS = "shadow-none !text-black hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
 
 type SourcePreview =
   | { kind: "empty" }
@@ -819,15 +818,6 @@ export function RequirementQuestions() {
               Ask source-backed QA questions across curated requirements, synced Jira/Asana tasks, uploaded docs, and manual notes.
             </p>
           </div>
-          <Button
-            variant="outline"
-            className={OUTLINE_ACTION_BUTTON_CLASS}
-            onClick={() => void loadKnowledgeBases(true)}
-            disabled={busy != null}
-          >
-            <Sparkles className="size-4" />
-            Seed Calculator
-          </Button>
         </div>
 
         <div className="flex flex-wrap gap-2" aria-label="Requirement knowledge bases">
@@ -839,13 +829,13 @@ export function RequirementQuestions() {
               className={cn(
                 "inline-flex min-h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors",
                 activeKbId === kb.id
-                  ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/10 hover:bg-primary/90"
-                  : "border-border bg-background/70 text-foreground hover:border-primary/40 hover:bg-muted/60",
+                  ? "border-primary bg-primary !text-black shadow-sm shadow-primary/10 hover:bg-primary/90 hover:!text-black [&_svg]:!text-black"
+                  : "border-primary/45 bg-primary/65 !text-black hover:border-primary hover:bg-primary/75 hover:!text-black [&_svg]:!text-black",
               )}
             >
               <BookOpenCheck className="size-4" />
               {kb.name}
-              <span className={cn("text-xs", activeKbId === kb.id ? "text-primary-foreground/75" : "text-muted-foreground")}>
+              <span className="text-xs text-black/70">
                 {kb.sourceCount ?? 0}
               </span>
             </button>
