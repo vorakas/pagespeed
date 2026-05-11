@@ -54,6 +54,7 @@ const OUTLINE_ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 ho
 type SourcePreview =
   | { kind: "empty" }
   | { kind: "loading" }
+  | { kind: "docx" }
   | { kind: "error"; message: string }
   | { kind: "object"; url: string; mode: "pdf" | "image" | "download" }
   | { kind: "excel"; sheets: Array<{ name: string; rows: string[][] }> }
@@ -149,14 +150,19 @@ export function RequirementQuestions() {
         const mimeType = selectedSource.mimeType || blob.type
 
         if (lower.endsWith(".docx")) {
-          if (!docxPreviewRef.current) return
-          await renderAsync(blob, docxPreviewRef.current, undefined, {
-            className: "requirement-docx-preview",
-            inWrapper: false,
-            ignoreWidth: true,
-            ignoreHeight: true,
+          if (!cancelled) setSourcePreview({ kind: "docx" })
+          requestAnimationFrame(() => {
+            if (cancelled || !docxPreviewRef.current) return
+            docxPreviewRef.current.innerHTML = ""
+            void renderAsync(blob, docxPreviewRef.current, undefined, {
+              className: "requirement-docx-preview",
+              inWrapper: false,
+              ignoreWidth: true,
+              ignoreHeight: true,
+            }).catch((err: unknown) => {
+              if (!cancelled) setSourcePreview({ kind: "error", message: err instanceof Error ? err.message : "Word preview failed" })
+            })
           })
-          if (!cancelled) setSourcePreview({ kind: "empty" })
           return
         }
 
@@ -448,6 +454,9 @@ export function RequirementQuestions() {
     if (sourcePreview.kind === "error") {
       return <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{sourcePreview.message}</div>
     }
+    if (sourcePreview.kind === "docx") {
+      return <div ref={docxPreviewRef} className="requirement-docx-preview rounded-lg border bg-white p-4 text-black" />
+    }
     if (sourcePreview.kind === "object" && sourcePreview.mode === "pdf") {
       return <iframe title="Source PDF preview" src={sourcePreview.url} className="h-[68vh] w-full rounded-lg border bg-white" />
     }
@@ -491,7 +500,7 @@ export function RequirementQuestions() {
         </div>
       )
     }
-    return <div ref={docxPreviewRef} className="requirement-docx-preview rounded-lg border bg-white p-4 text-black" />
+    return null
   }
 
   if (loading) {
