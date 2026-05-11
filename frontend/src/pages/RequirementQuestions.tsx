@@ -864,6 +864,15 @@ export function RequirementQuestions() {
                       <SelectItem value="openai">OpenAI</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {aiProvider === "claude"
+                      ? savedAiConfig?.claude.hasApiKey
+                        ? `Global Anthropic key saved: ${savedAiConfig.claude.model}`
+                        : "No global Anthropic key saved; AI Summary will fall back to source-backed results."
+                      : savedAiConfig?.openai.hasApiKey
+                        ? `Global OpenAI key saved: ${savedAiConfig.openai.model}`
+                        : "No global OpenAI key saved; AI Summary will fall back to source-backed results."}
+                  </p>
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
                   <Label className="text-xs">Answer Mode</Label>
@@ -893,20 +902,11 @@ export function RequirementQuestions() {
                       AI Summary
                     </button>
                   </div>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Exact Requirements pulls raw source data from the knowledge base. AI Summary summarizes all retrieved data with the selected provider when an API call is needed.
+                  </p>
                 </div>
               </div>
-              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                Exact Requirements pulls raw source data from the knowledge base. AI Summary summarizes all retrieved data with the selected provider when an API call is needed.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {aiProvider === "claude"
-                  ? savedAiConfig?.claude.hasApiKey
-                    ? `Global Anthropic key saved: ${savedAiConfig.claude.model}`
-                    : "No global Anthropic key saved; AI Summary will fall back to source-backed results."
-                  : savedAiConfig?.openai.hasApiKey
-                    ? `Global OpenAI key saved: ${savedAiConfig.openai.model}`
-                    : "No global OpenAI key saved; AI Summary will fall back to source-backed results."}
-              </p>
             </div>
             <Textarea
               value={question}
