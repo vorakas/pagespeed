@@ -68,11 +68,25 @@ Supported source types:
 
 Upload flow:
 
-1. User selects KB.
+1. User selects a target KB from a required dropdown.
 2. User uploads one or more files.
 3. User optionally sets source title, category, and tags.
-4. Pharos stores the original file metadata and extracted text/structure.
-5. Pharos marks each upload as indexed, partially indexed, or needs review.
+4. Pharos stores the original file metadata with the selected KB id.
+5. Pharos extracts text/structure from each file.
+6. Pharos chunks and indexes the extracted content into the selected KB only.
+7. Pharos marks each upload as indexed, partially indexed, or needs review.
+
+The upload action is disabled until a KB is selected. Users cannot upload source files into an implicit or global bucket.
+
+After upload, each source must show:
+
+- Target KB.
+- Source type.
+- Parse/index status.
+- Chunk count when indexed.
+- Last ingested timestamp.
+
+If the user later changes a source's KB assignment, Pharos must remove that source's chunks from the old KB and re-index them into the new KB.
 
 Parser expectations:
 
