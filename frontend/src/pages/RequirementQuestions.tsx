@@ -120,6 +120,8 @@ export function RequirementQuestions() {
     )
     return marked.parse(transformed, { async: false }) as string
   }, [selectedSource])
+  const selectedSourceShowsOriginalPreview =
+    selectedSource != null && selectedSource.sourceType !== "vault_task" && selectedSource.sourceType !== "manual_note"
 
   useEffect(() => {
     void loadKnowledgeBases(true)
@@ -989,17 +991,21 @@ export function RequirementQuestions() {
                 </DialogDescription>
               </DialogHeader>
               <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                <section className="min-h-full space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Original Preview</h3>
-                    {selectedSource.originalFilename && (
-                      <span className="truncate font-mono text-[11px] text-muted-foreground">{selectedSource.originalFilename}</span>
-                    )}
-                  </div>
-                  <div className="min-h-[72vh]">{renderOriginalPreview()}</div>
-                </section>
-                <section className="mt-4 space-y-2">
-                  <h3 className="text-sm font-semibold">Indexed Text</h3>
+                {selectedSourceShowsOriginalPreview && (
+                  <section className="min-h-full space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">Original Preview</h3>
+                      {selectedSource.originalFilename && (
+                        <span className="truncate font-mono text-[11px] text-muted-foreground">{selectedSource.originalFilename}</span>
+                      )}
+                    </div>
+                    <div className="min-h-[72vh]">{renderOriginalPreview()}</div>
+                  </section>
+                )}
+                <section className={cn("space-y-2", selectedSourceShowsOriginalPreview && "mt-4")}>
+                  <h3 className="text-sm font-semibold">
+                    {selectedSource.sourceType === "vault_task" ? "Task Content" : "Indexed Text"}
+                  </h3>
                   <div
                     className="requirement-source-md rounded-lg border bg-muted/25 p-4"
                     dangerouslySetInnerHTML={{ __html: selectedSourceHtml }}
