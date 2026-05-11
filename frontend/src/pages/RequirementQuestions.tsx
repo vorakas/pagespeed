@@ -133,6 +133,17 @@ export function RequirementQuestions() {
     selectedSource != null && selectedSource.sourceType !== "vault_task" && selectedSource.sourceType !== "manual_note"
 
   useEffect(() => {
+    const previousHtmlOverflowX = document.documentElement.style.overflowX
+    const previousBodyOverflowX = document.body.style.overflowX
+    document.documentElement.style.overflowX = "hidden"
+    document.body.style.overflowX = "hidden"
+    return () => {
+      document.documentElement.style.overflowX = previousHtmlOverflowX
+      document.body.style.overflowX = previousBodyOverflowX
+    }
+  }, [])
+
+  useEffect(() => {
     void loadKnowledgeBases(true)
     api.getAiConfig()
       .then(setSavedAiConfig)

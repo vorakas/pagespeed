@@ -24,7 +24,7 @@ export function AppLayout() {
   return (
     <div className="beacon beacon-shell dark aurora min-h-screen">
       <AppSidebar activePath={activePath} />
-      <main className="beacon-main ml-[208px] min-h-screen min-w-0 max-w-[calc(100vw-208px)] overflow-x-hidden">
+      <main className="beacon-main ml-[208px] min-h-screen">
         <Outlet />
       </main>
       <Toaster position="bottom-right" richColors />
