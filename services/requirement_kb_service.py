@@ -239,7 +239,7 @@ class RequirementKbService:
     def add_vault_source(self, kb_id: int, source_path: str) -> dict[str, Any]:
         if not self.vault_root:
             raise ValidationError("Vault root is not configured")
-        safe_rel = source_path.replace("\\", "/").lstrip("/")
+        safe_rel = self._resolve_vault_reference(source_path)
         path = (self.vault_root / safe_rel).resolve()
         try:
             path.relative_to(self.vault_root.resolve())
@@ -756,7 +756,20 @@ class RequirementKbService:
         for path in self._iter_vault_task_files():
             if key.lower() in path.name.lower():
                 matches.append(self._rel_vault_path(path))
-        return matches
+        return sorted(matches)
+
+    def _resolve_vault_reference(self, source_reference: str) -> str:
+        clean = source_reference.strip().replace("\\", "/").lstrip("/")
+        if not clean:
+            raise ValidationError("Source path or task ID is required")
+        if "/" in clean or clean.lower().endswith(".md"):
+            return clean
+        if self._task_key(clean) == clean.upper():
+            matches = self._find_vault_paths_by_key(clean)
+            if not matches:
+                raise ValidationError(f"Task ID not found in vault: {clean}")
+            return matches[0]
+        return clean
 
     def _calculator_document_paths(self) -> list[Path]:
         roots = [

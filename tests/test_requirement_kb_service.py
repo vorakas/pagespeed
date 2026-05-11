@@ -111,6 +111,19 @@ class RequirementKbServiceTest(unittest.TestCase):
         self.assertIn("commonQuestionId", first_answer)
         self.assertEqual(first_answer["commonQuestionId"], second_answer["commonQuestionId"])
 
+    def test_adds_task_source_by_task_id(self):
+        kb = self.service.create_knowledge_base(
+            name="Calculator",
+            description="Minimum pricing and discounting requirements",
+        )
+
+        source = self.service.add_vault_source(kb["id"], "DBADMIN-6393")
+
+        self.assertEqual(source["sourceType"], "vault_task")
+        self.assertEqual(source["sourceSystem"], "Jira")
+        self.assertEqual(source["sourceId"], "DBADMIN-6393")
+        self.assertEqual(source["sourcePath"], "raw/WPM/Task/DBADMIN-6393 - Update Product Pricing Table.md")
+
 
 if __name__ == "__main__":
     unittest.main()

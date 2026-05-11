@@ -35,6 +35,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 const DEFAULT_DISCOVERY_TERMS = "minimum pricing, minimum price, UMRP, MPR, discount, vendor approval"
+const ACTION_BUTTON_CLASS = "text-black hover:text-black focus-visible:text-black [&_svg]:text-black"
+const OUTLINE_ACTION_BUTTON_CLASS = "bg-white text-black hover:bg-white/90 hover:text-black focus-visible:text-black [&_svg]:text-black"
 
 export function RequirementQuestions() {
   const [knowledgeBases, setKnowledgeBases] = useState<RequirementKnowledgeBase[]>([])
@@ -61,6 +63,10 @@ export function RequirementQuestions() {
   const activeKb = useMemo(
     () => knowledgeBases.find((kb) => kb.id === activeKbId) ?? null,
     [activeKbId, knowledgeBases],
+  )
+  const uploadKnowledgeBase = useMemo(
+    () => knowledgeBases.find((kb) => String(kb.id) === uploadKbId) ?? null,
+    [knowledgeBases, uploadKbId],
   )
 
   useEffect(() => {
@@ -178,7 +184,7 @@ export function RequirementQuestions() {
       setSelectedCandidates(new Set())
       await loadSources(kb.id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create KB failed")
+      setError(err instanceof Error ? err.message : "Create knowledge base failed")
     } finally {
       setBusy(null)
     }
@@ -270,7 +276,12 @@ export function RequirementQuestions() {
               Ask source-backed QA questions across curated requirements, synced Jira/Asana tasks, uploaded docs, and manual notes.
             </p>
           </div>
-          <Button variant="outline" onClick={() => void loadKnowledgeBases(true)} disabled={busy != null}>
+          <Button
+            variant="outline"
+            className={OUTLINE_ACTION_BUTTON_CLASS}
+            onClick={() => void loadKnowledgeBases(true)}
+            disabled={busy != null}
+          >
             <Sparkles className="size-4" />
             Seed Calculator
           </Button>
@@ -285,8 +296,8 @@ export function RequirementQuestions() {
               className={cn(
                 "inline-flex min-h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors",
                 activeKbId === kb.id
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:bg-muted",
+                  ? "border-primary bg-primary text-black hover:text-black"
+                  : "border-border bg-white text-black hover:bg-white/90 hover:text-black",
               )}
             >
               <BookOpenCheck className="size-4" />
@@ -313,7 +324,7 @@ export function RequirementQuestions() {
           <CardHeader>
             <CardTitle>Ask {activeKb ? activeKb.name : "a Knowledge Base"}</CardTitle>
             <CardDescription>
-              Active KB controls retrieval. Answers cite stored source chunks.
+              Active knowledge base controls retrieval. Answers cite stored source chunks.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -324,7 +335,11 @@ export function RequirementQuestions() {
               className="min-h-28"
             />
             <div className="flex justify-end">
-              <Button onClick={() => void askQuestion()} disabled={!activeKbId || !question.trim() || busy === "question"}>
+              <Button
+                className={ACTION_BUTTON_CLASS}
+                onClick={() => void askQuestion()}
+                disabled={!activeKbId || !question.trim() || busy === "question"}
+              >
                 {busy === "question" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                 Ask
               </Button>
@@ -354,13 +369,13 @@ export function RequirementQuestions() {
             <CardHeader>
               <CardTitle>Commonly Asked Questions</CardTitle>
               <CardDescription>
-                {activeKb ? `${activeKb.name} answers already generated` : "Select a KB to reuse answers"}
+                {activeKb ? `${activeKb.name} answers already generated` : "Select a knowledge base to reuse answers"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {commonQuestions.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                  No saved answers for this KB yet. Asked questions with citations will appear here.
+                  No saved answers for this knowledge base yet. Asked questions with citations will appear here.
                 </div>
               ) : (
                 commonQuestions.slice(0, 8).map((commonQuestion) => (
@@ -368,7 +383,7 @@ export function RequirementQuestions() {
                     key={commonQuestion.id}
                     type="button"
                     onClick={() => showCommonQuestion(commonQuestion)}
-                    className="w-full rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted"
+                    className="w-full rounded-lg border bg-white p-3 text-left text-black transition-colors hover:bg-white/90 hover:text-black"
                   >
                     <div className="flex items-start gap-2">
                       <MessageSquareText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
@@ -390,13 +405,13 @@ export function RequirementQuestions() {
             <CardHeader>
               <CardTitle>Sources</CardTitle>
               <CardDescription>
-                {activeKb ? `${activeKb.name} indexed evidence` : "Select a KB to inspect sources"}
+                {activeKb ? `${activeKb.name} indexed evidence` : "Select a knowledge base to inspect sources"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {sources.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                  No sources indexed for the active KB yet.
+                  No sources indexed for the active knowledge base yet.
                 </div>
               ) : (
                 sources.slice(0, 12).map((source) => (
@@ -418,19 +433,28 @@ export function RequirementQuestions() {
       <section className="grid gap-4 xl:grid-cols-3">
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle>Create KB</CardTitle>
+            <CardTitle>Create Knowledge Base</CardTitle>
             <CardDescription>Discover Jira/Asana candidates from the raw vault.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input value={kbName} onChange={(event) => setKbName(event.target.value)} placeholder="KB name, e.g. ATP" />
+            <Input value={kbName} onChange={(event) => setKbName(event.target.value)} placeholder="Knowledge base name, e.g. ATP" />
             <Input value={kbDescription} onChange={(event) => setKbDescription(event.target.value)} placeholder="Optional description" />
             <Textarea value={discoveryTerms} onChange={(event) => setDiscoveryTerms(event.target.value)} className="min-h-20" />
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => void discoverCandidates()} disabled={busy === "discover"}>
+              <Button
+                variant="outline"
+                className={OUTLINE_ACTION_BUTTON_CLASS}
+                onClick={() => void discoverCandidates()}
+                disabled={busy === "discover"}
+              >
                 {busy === "discover" ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
                 Discover
               </Button>
-              <Button onClick={() => void createKnowledgeBase()} disabled={!kbName.trim() || busy === "create"}>
+              <Button
+                className={ACTION_BUTTON_CLASS}
+                onClick={() => void createKnowledgeBase()}
+                disabled={!kbName.trim() || busy === "create"}
+              >
                 {busy === "create" ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
                 Create
               </Button>
@@ -466,13 +490,15 @@ export function RequirementQuestions() {
         <Card className="rounded-lg">
           <CardHeader>
             <CardTitle>Upload Docs</CardTitle>
-            <CardDescription>Choose a KB target before uploading.</CardDescription>
+            <CardDescription>Choose a knowledge base target before uploading.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Label>Target KB</Label>
+            <Label>Target Knowledge Base</Label>
             <Select value={uploadKbId} onValueChange={(value) => setUploadKbId(value ?? "")}>
               <SelectTrigger aria-label="Upload target knowledge base">
-                <SelectValue placeholder="Select KB" />
+                <span className={cn("flex flex-1 text-left", uploadKnowledgeBase ? "text-foreground" : "text-muted-foreground")}>
+                  {uploadKnowledgeBase?.name ?? "Select knowledge base"}
+                </span>
               </SelectTrigger>
               <SelectContent align="start">
                 {knowledgeBases.map((kb) => (
@@ -488,7 +514,11 @@ export function RequirementQuestions() {
               onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
               accept=".docx,.pdf,.xlsx,.xls,.csv,.json,.vsdx,.svg,.png,.jpg,.jpeg"
             />
-            <Button onClick={() => void uploadFiles()} disabled={!uploadKbId || files.length === 0 || busy === "upload"}>
+            <Button
+              className={ACTION_BUTTON_CLASS}
+              onClick={() => void uploadFiles()}
+              disabled={!uploadKbId || files.length === 0 || busy === "upload"}
+            >
               {busy === "upload" ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />}
               Upload {files.length ? files.length : ""}
             </Button>
@@ -498,17 +528,22 @@ export function RequirementQuestions() {
         <Card className="rounded-lg">
           <CardHeader>
             <CardTitle>Add Knowledge</CardTitle>
-            <CardDescription>Add a vault task or manual QA note to the active KB.</CardDescription>
+            <CardDescription>Add a Jira/Asana task or manual QA note to the active knowledge base.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Vault task path</Label>
+              <Label>Task ID</Label>
               <Input
                 value={taskPath}
                 onChange={(event) => setTaskPath(event.target.value)}
-                placeholder="raw/asana/LAMPSPLUS/Implementation/..."
+                placeholder="DBADMIN-256 or LAMPSPLUS-123"
               />
-              <Button variant="outline" onClick={() => void addTaskSource()} disabled={!activeKbId || !taskPath.trim() || busy === "task"}>
+              <Button
+                variant="outline"
+                className={OUTLINE_ACTION_BUTTON_CLASS}
+                onClick={() => void addTaskSource()}
+                disabled={!activeKbId || !taskPath.trim() || busy === "task"}
+              >
                 <Plus className="size-4" />
                 Add Task
               </Button>
@@ -529,7 +564,11 @@ export function RequirementQuestions() {
                 </SelectContent>
               </Select>
               <Textarea value={noteBody} onChange={(event) => setNoteBody(event.target.value)} className="min-h-24" />
-              <Button onClick={() => void addNote()} disabled={!activeKbId || !noteTitle.trim() || !noteBody.trim() || busy === "note"}>
+              <Button
+                className={ACTION_BUTTON_CLASS}
+                onClick={() => void addNote()}
+                disabled={!activeKbId || !noteTitle.trim() || !noteBody.trim() || busy === "note"}
+              >
                 {busy === "note" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 Save Note
               </Button>
