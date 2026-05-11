@@ -854,9 +854,9 @@ export function RequirementQuestions() {
             <div className="rounded-lg border border-border/70 bg-background/40 p-3">
               <div className="flex flex-wrap items-start gap-4">
                 <div className="min-w-52 space-y-1">
-                  <Label className="text-xs">AI Provider if Needed</Label>
+                  <Label className="flex h-4 items-center text-xs leading-none">AI Provider if Needed</Label>
                   <Select value={aiProvider} onValueChange={(value) => setAiProvider(value as "claude" | "openai")}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="h-8 w-full text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -864,7 +864,7 @@ export function RequirementQuestions() {
                       <SelectItem value="openai">OpenAI</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs leading-5 text-muted-foreground">
                     {aiProvider === "claude"
                       ? savedAiConfig?.claude.hasApiKey
                         ? `Global Anthropic key saved: ${savedAiConfig.claude.model}`
@@ -874,14 +874,14 @@ export function RequirementQuestions() {
                         : "No global OpenAI key saved; AI Summary will fall back to source-backed results."}
                   </p>
                 </div>
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Label className="text-xs">Answer Mode</Label>
-                  <div className="flex flex-wrap gap-2">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Label className="flex h-4 items-center text-xs leading-none">Answer Mode</Label>
+                  <div className="flex min-h-8 flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setAnswerMode("exact")}
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                        "inline-flex h-8 items-center rounded-full border px-3 text-xs font-semibold transition-colors",
                         answerMode === "exact"
                           ? "border-primary bg-primary/15 text-primary"
                           : "border-border/70 bg-background/60 text-muted-foreground hover:bg-muted/40 hover:text-foreground",
@@ -893,7 +893,7 @@ export function RequirementQuestions() {
                       type="button"
                       onClick={() => setAnswerMode("summary")}
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                        "inline-flex h-8 items-center rounded-full border px-3 text-xs font-semibold transition-colors",
                         answerMode === "summary"
                           ? "border-primary bg-primary/15 text-primary"
                           : "border-border/70 bg-background/60 text-muted-foreground hover:bg-muted/40 hover:text-foreground",
@@ -902,7 +902,7 @@ export function RequirementQuestions() {
                       AI Summary
                     </button>
                   </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
+                  <p className="text-xs leading-5 text-muted-foreground">
                     Exact Requirements pulls raw source data from the knowledge base. AI Summary summarizes all retrieved data with the selected provider when an API call is needed.
                   </p>
                 </div>
