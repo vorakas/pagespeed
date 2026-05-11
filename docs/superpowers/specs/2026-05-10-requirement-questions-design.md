@@ -27,11 +27,19 @@ Initial source set:
 
 The page has four main areas:
 
-- Ask: select KB, ask a question, receive answer with citations.
+- Ask: select KB from top pill buttons, ask a question, receive answer with citations.
 - Sources: view imported tasks, docs, diagrams, and notes.
 - Add Source: add task key/path or upload requirement files.
 - Add Note: capture QA knowledge manually.
 - Create KB: create a new knowledge base and discover candidate Jira/Asana tasks from the synced vault.
+
+Question-time KB selection:
+
+- Render available KBs as pill buttons across the top of the page.
+- The selected pill controls the active question context.
+- The first available KB can be selected by default.
+- The question panel must clearly show which KB is active.
+- Do not use a dropdown for the primary ask-question KB selector.
 
 Manual notes require:
 
