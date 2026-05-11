@@ -31,6 +31,7 @@ The page has four main areas:
 - Sources: view imported tasks, docs, diagrams, and notes.
 - Add Source: add task key/path or upload requirement files.
 - Add Note: capture QA knowledge manually.
+- Create KB: create a new knowledge base and discover candidate Jira/Asana tasks from the synced vault.
 
 Manual notes require:
 
@@ -39,6 +40,51 @@ Manual notes require:
 - Category: requirement, test scenario, exception, decision, or open question.
 - Optional source/task/doc link.
 - Optional tags.
+
+## Create KB From Vault Discovery
+
+Users must be able to create a new KB and ask Pharos to find likely related tasks in the synced Jira/Asana vault.
+
+Workflow:
+
+1. User clicks Create KB.
+2. User enters KB name and optional description.
+3. User enters search terms or accepts terms derived from the KB name.
+4. Pharos searches the configured vault task sources.
+5. Pharos presents candidate Jira/Asana tasks with relevance evidence.
+6. User can include, exclude, or manually add task keys/paths.
+7. User confirms selection.
+8. Pharos creates the KB, imports selected task files, chunks them, and indexes them into that KB.
+
+Vault search scope:
+
+- Use the configured `OBSIDIAN_VAULT_ROOT`.
+- Search raw Asana task files under `raw/asana/<project>/<section>/*.md`.
+- Search raw Jira task files under `raw/<jira-project>/<issue-type>/*.md`.
+- Do not use dashboard snapshot summaries as the primary task source.
+- Do not use `wiki/` workstream summaries as the primary task source for requirements extraction, except as supplemental navigation context.
+
+Candidate results should show:
+
+- Source system: Jira or Asana.
+- Project.
+- Task key or source id.
+- Title.
+- Status and QA/UAT fields when available.
+- Source path.
+- Matched terms.
+- Short snippets showing why it matched.
+- Relevance score.
+
+Candidate review actions:
+
+- Include.
+- Exclude.
+- Add task key/path manually.
+- Re-run discovery with different terms.
+- Create KB from selected sources.
+
+Discovery must be auditable. The KB should store the search terms used, discovery timestamp, selected candidates, excluded candidates, and any manually added sources.
 
 ## Processing
 
