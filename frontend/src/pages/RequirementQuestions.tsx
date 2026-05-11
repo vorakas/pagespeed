@@ -434,12 +434,24 @@ export function RequirementQuestions() {
         <Card className="rounded-lg">
           <CardHeader>
             <CardTitle>Create Knowledge Base</CardTitle>
-            <CardDescription>Discover Jira/Asana candidates from the raw vault.</CardDescription>
+            <CardDescription>Discover Jira/Asana candidates using terms that identify the requirement area.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Input value={kbName} onChange={(event) => setKbName(event.target.value)} placeholder="Knowledge base name, e.g. ATP" />
             <Input value={kbDescription} onChange={(event) => setKbDescription(event.target.value)} placeholder="Optional description" />
-            <Textarea value={discoveryTerms} onChange={(event) => setDiscoveryTerms(event.target.value)} className="min-h-20" />
+            <div className="space-y-2">
+              <Label>Search Terms</Label>
+              <Textarea
+                value={discoveryTerms}
+                onChange={(event) => setDiscoveryTerms(event.target.value)}
+                className="min-h-20"
+                placeholder="Example: ATP, available to promise, inventory allocation, stock availability"
+              />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Enter words, phrases, feature names, task labels, or field names that should identify related Jira/Asana tasks.
+                Separate terms with commas.
+              </p>
+            </div>
             <div className="flex gap-2">
               <Button
                 variant="outline"
