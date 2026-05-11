@@ -72,6 +72,7 @@ export function RequirementQuestions() {
   const [knowledgeBases, setKnowledgeBases] = useState<RequirementKnowledgeBase[]>([])
   const [activeKbId, setActiveKbId] = useState<number | null>(null)
   const [uploadKbId, setUploadKbId] = useState<string>("")
+  const [addKbId, setAddKbId] = useState<string>("")
   const [sources, setSources] = useState<RequirementSource[]>([])
   const [commonQuestions, setCommonQuestions] = useState<RequirementCommonQuestion[]>([])
   const [question, setQuestion] = useState("")
@@ -105,6 +106,10 @@ export function RequirementQuestions() {
   const uploadKnowledgeBase = useMemo(
     () => knowledgeBases.find((kb) => String(kb.id) === uploadKbId) ?? null,
     [knowledgeBases, uploadKbId],
+  )
+  const addKnowledgeBase = useMemo(
+    () => knowledgeBases.find((kb) => String(kb.id) === addKbId) ?? null,
+    [addKbId, knowledgeBases],
   )
   const taskSources = useMemo(
     () =>
@@ -158,6 +163,7 @@ export function RequirementQuestions() {
       return
     }
     setUploadKbId(String(activeKbId))
+    setAddKbId(String(activeKbId))
     void loadSources(activeKbId)
     void loadCommonQuestions(activeKbId)
   }, [activeKbId])
@@ -244,10 +250,12 @@ export function RequirementQuestions() {
         items = await api.getRequirementKnowledgeBases()
       }
       setKnowledgeBases(items)
-      const nextActive = activeKbId ?? items.find((kb) => kb.slug === "calculator")?.id ?? items[0]?.id ?? null
+      const nextActive =
+        items.find((kb) => kb.id === activeKbId)?.id ?? items.find((kb) => kb.slug === "calculator")?.id ?? items[0]?.id ?? null
       setActiveKbId(nextActive)
       if (nextActive != null) {
-        setUploadKbId(String(nextActive))
+        setUploadKbId((current) => (items.some((kb) => String(kb.id) === current) ? current : String(nextActive)))
+        setAddKbId((current) => (items.some((kb) => String(kb.id) === current) ? current : String(nextActive)))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load requirement knowledge bases")
@@ -341,6 +349,7 @@ export function RequirementQuestions() {
       setKnowledgeBases(items)
       setActiveKbId(kb.id)
       setUploadKbId(String(kb.id))
+      setAddKbId(String(kb.id))
       setKbName("")
       setKbDescription("")
       setCandidates([])
@@ -354,15 +363,20 @@ export function RequirementQuestions() {
   }
 
   async function addTaskSource() {
-    if (!activeKbId || !taskPath.trim()) return
+    const kbId = Number(addKbId)
+    if (!kbId || !taskPath.trim()) return
     setBusy("task")
     setError(null)
     setSourceMessage(null)
     try {
-      await api.addRequirementTaskSource(activeKbId, taskPath.trim())
+      await api.addRequirementTaskSource(kbId, taskPath.trim())
       setTaskPath("")
-      setSourceMessage("Task added to the active knowledge base.")
-      await loadSources(activeKbId)
+      setSourceMessage(`Task added to ${addKnowledgeBase?.name ?? "the selected knowledge base"}.`)
+      if (kbId === activeKbId) {
+        await loadSources(kbId)
+      }
+      await loadKnowledgeBases(false)
+      setAddKbId(String(kbId))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Task import failed")
     } finally {
@@ -392,11 +406,12 @@ export function RequirementQuestions() {
   }
 
   async function addNote() {
-    if (!activeKbId || !noteTitle.trim() || !noteBody.trim()) return
+    const kbId = Number(addKbId)
+    if (!kbId || !noteTitle.trim() || !noteBody.trim()) return
     setBusy("note")
     setError(null)
     try {
-      await api.addRequirementNote(activeKbId, {
+      await api.addRequirementNote(kbId, {
         title: noteTitle.trim(),
         body: noteBody.trim(),
         category: noteCategory,
@@ -404,7 +419,12 @@ export function RequirementQuestions() {
       })
       setNoteTitle("")
       setNoteBody("")
-      await loadSources(activeKbId)
+      setSourceMessage(`Note saved to ${addKnowledgeBase?.name ?? "the selected knowledge base"}.`)
+      if (kbId === activeKbId) {
+        await loadSources(kbId)
+      }
+      await loadKnowledgeBases(false)
+      setAddKbId(String(kbId))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Note save failed")
     } finally {
@@ -1249,9 +1269,26 @@ export function RequirementQuestions() {
         <Card className="rounded-lg">
           <CardHeader>
             <CardTitle>Add Knowledge</CardTitle>
-            <CardDescription>Add a Jira/Asana task or manual QA note to the active knowledge base.</CardDescription>
+            <CardDescription>Add a Jira/Asana task or manual QA note to a selected knowledge base.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Target Knowledge Base</Label>
+              <Select value={addKbId} onValueChange={(value) => setAddKbId(value ?? "")}>
+                <SelectTrigger aria-label="Add knowledge target knowledge base">
+                  <span className={cn("flex flex-1 text-left", addKnowledgeBase ? "text-foreground" : "text-muted-foreground")}>
+                    {addKnowledgeBase?.name ?? "Select knowledge base"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent align="start">
+                  {knowledgeBases.map((kb) => (
+                    <SelectItem key={kb.id} value={String(kb.id)}>
+                      {kb.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Task ID</Label>
               <Input
@@ -1263,7 +1300,7 @@ export function RequirementQuestions() {
                 variant="outline"
                 className={OUTLINE_ACTION_BUTTON_CLASS}
                 onClick={() => void addTaskSource()}
-                disabled={!activeKbId || !taskPath.trim() || busy === "task"}
+                disabled={!addKbId || !taskPath.trim() || busy === "task"}
               >
                 <Plus className="size-4" />
                 Add Task
@@ -1288,7 +1325,7 @@ export function RequirementQuestions() {
               <Button
                 className={ACTION_BUTTON_CLASS}
                 onClick={() => void addNote()}
-                disabled={!activeKbId || !noteTitle.trim() || !noteBody.trim() || busy === "note"}
+                disabled={!addKbId || !noteTitle.trim() || !noteBody.trim() || busy === "note"}
               >
                 {busy === "note" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 Save Note
