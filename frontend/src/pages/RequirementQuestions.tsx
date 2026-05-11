@@ -67,6 +67,7 @@ const VIDEO_ATTACHMENT_RE = /\.(webm|mp4|mov|m4v)$/i
 
 export function RequirementQuestions() {
   const [aiProvider, setAiProvider] = useLocalConfig<"claude" | "openai">("requirementAiProvider", "claude")
+  const [answerMode, setAnswerMode] = useLocalConfig<"exact" | "summary">("requirementAnswerMode", "exact")
   const [savedAiConfig, setSavedAiConfig] = useState<AiSavedConfig | null>(null)
   const [knowledgeBases, setKnowledgeBases] = useState<RequirementKnowledgeBase[]>([])
   const [activeKbId, setActiveKbId] = useState<number | null>(null)
@@ -850,34 +851,70 @@ export function RequirementQuestions() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-lg border border-border/70 bg-background/40 p-3">
+              <div className="flex flex-wrap items-start gap-4">
+                <div className="min-w-52 space-y-1">
+                  <Label className="text-xs">AI Provider if Needed</Label>
+                  <Select value={aiProvider} onValueChange={(value) => setAiProvider(value as "claude" | "openai")}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="claude">Claude</SelectItem>
+                      <SelectItem value="openai">OpenAI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Label className="text-xs">Answer Mode</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAnswerMode("exact")}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                        answerMode === "exact"
+                          ? "border-primary bg-primary/15 text-primary"
+                          : "border-border/70 bg-background/60 text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                      )}
+                    >
+                      Exact Requirements
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnswerMode("summary")}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                        answerMode === "summary"
+                          ? "border-primary bg-primary/15 text-primary"
+                          : "border-border/70 bg-background/60 text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                      )}
+                    >
+                      AI Summary
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                Exact Requirements pulls raw source data from the knowledge base. AI Summary summarizes all retrieved data with the selected provider when an API call is needed.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {aiProvider === "claude"
+                  ? savedAiConfig?.claude.hasApiKey
+                    ? `Global Anthropic key saved: ${savedAiConfig.claude.model}`
+                    : "No global Anthropic key saved; AI Summary will fall back to source-backed results."
+                  : savedAiConfig?.openai.hasApiKey
+                    ? `Global OpenAI key saved: ${savedAiConfig.openai.model}`
+                    : "No global OpenAI key saved; AI Summary will fall back to source-backed results."}
+              </p>
+            </div>
             <Textarea
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               placeholder="Example: When is vendor approval required for minimum pricing?"
               className="min-h-28"
             />
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="min-w-52 space-y-1">
-                <Label className="text-xs">AI Provider if Needed</Label>
-                <Select value={aiProvider} onValueChange={(value) => setAiProvider(value as "claude" | "openai")}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="claude">Claude</SelectItem>
-                    <SelectItem value="openai">OpenAI</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {aiProvider === "claude"
-                    ? savedAiConfig?.claude.hasApiKey
-                      ? `Global Anthropic key saved: ${savedAiConfig.claude.model}`
-                      : "No global Anthropic key saved; answers will stay knowledge-base only."
-                    : savedAiConfig?.openai.hasApiKey
-                      ? `Global OpenAI key saved: ${savedAiConfig.openai.model}`
-                      : "No global OpenAI key saved; answers will stay knowledge-base only."}
-                </p>
-              </div>
+            <div className="flex justify-end">
               <Button
                 className={ACTION_BUTTON_CLASS}
                 onClick={() => void askQuestion()}
