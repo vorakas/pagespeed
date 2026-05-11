@@ -946,7 +946,7 @@ export function RequirementQuestions() {
       </section>
 
       <Dialog open={selectedSource != null} onOpenChange={(open) => !open && setSelectedSource(null)}>
-        <DialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] grid-rows-none flex-col overflow-hidden sm:max-w-5xl">
+        <DialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] grid-rows-none flex-col overflow-hidden sm:max-w-6xl">
           {selectedSource && (
             <>
               <DialogHeader className="shrink-0">
@@ -960,17 +960,17 @@ export function RequirementQuestions() {
                   {[selectedSource.sourceId, selectedSource.sourceSystem, selectedSource.sourcePath].filter(Boolean).join(" | ")}
                 </DialogDescription>
               </DialogHeader>
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-                <section className="space-y-2">
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                <section className="min-h-full space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold">Original Preview</h3>
                     {selectedSource.originalFilename && (
                       <span className="truncate font-mono text-[11px] text-muted-foreground">{selectedSource.originalFilename}</span>
                     )}
                   </div>
-                  {renderOriginalPreview()}
+                  <div className="min-h-[72vh]">{renderOriginalPreview()}</div>
                 </section>
-                <section className="space-y-2">
+                <section className="mt-4 space-y-2">
                   <h3 className="text-sm font-semibold">Indexed Text</h3>
                   <div
                     className="requirement-source-md rounded-lg border bg-muted/25 p-4"
