@@ -140,6 +140,25 @@ class RequirementKbServiceTest(unittest.TestCase):
         self.assertEqual(sources, [])
         self.assertEqual(answer["citations"], [])
 
+    def test_uploaded_file_preserves_original_payload_for_preview(self):
+        kb = self.service.create_knowledge_base(
+            name="Calculator",
+            description="Minimum pricing and discounting requirements",
+        )
+        payload = b"sample uploaded file bytes"
+
+        source = self.service.ingest_uploaded_file(kb["id"], "Discounting Requirements.docx", payload)
+        stored = self.service.get_source_file(kb["id"], source["id"])
+        sources = self.service.list_sources(kb["id"])
+
+        self.assertTrue(source["hasOriginalFile"])
+        self.assertEqual(source["originalFilename"], "Discounting Requirements.docx")
+        self.assertEqual(source["mimeType"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        self.assertEqual(source["fileSize"], len(payload))
+        self.assertEqual(stored["payload"], payload)
+        self.assertEqual(stored["filename"], "Discounting Requirements.docx")
+        self.assertEqual(sources[0]["hasOriginalFile"], True)
+
 
 if __name__ == "__main__":
     unittest.main()

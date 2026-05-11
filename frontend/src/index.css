@@ -299,4 +299,25 @@
     background: var(--muted);
     padding: 0.75rem;
   }
+  .requirement-docx-preview {
+    max-height: 68vh;
+    overflow: auto;
+  }
+  .requirement-docx-preview .docx {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    padding: 1rem !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+  }
+  .requirement-docx-preview table {
+    max-width: 100%;
+    border-collapse: collapse;
+  }
+  .requirement-docx-preview td,
+  .requirement-docx-preview th {
+    border: 1px solid #d4d4d8;
+    padding: 0.35rem 0.5rem;
+  }
 }

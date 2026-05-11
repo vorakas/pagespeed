@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { marked } from "marked"
+import { renderAsync } from "docx-preview"
+import * as XLSX from "xlsx"
 import {
   BookOpenCheck,
   CheckCircle2,
@@ -49,6 +51,13 @@ const DEFAULT_DISCOVERY_TERMS = "minimum pricing, minimum price, UMRP, MPR, disc
 const ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
 const OUTLINE_ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
 
+type SourcePreview =
+  | { kind: "empty" }
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "object"; url: string; mode: "pdf" | "image" | "download" }
+  | { kind: "excel"; sheets: Array<{ name: string; rows: string[][] }> }
+
 export function RequirementQuestions() {
   const [knowledgeBases, setKnowledgeBases] = useState<RequirementKnowledgeBase[]>([])
   const [activeKbId, setActiveKbId] = useState<number | null>(null)
@@ -74,6 +83,8 @@ export function RequirementQuestions() {
   const [sourceMessage, setSourceMessage] = useState<string | null>(null)
   const [selectedSource, setSelectedSource] = useState<RequirementSource | null>(null)
   const [sourceToRemove, setSourceToRemove] = useState<RequirementSource | null>(null)
+  const [sourcePreview, setSourcePreview] = useState<SourcePreview>({ kind: "empty" })
+  const docxPreviewRef = useRef<HTMLDivElement | null>(null)
 
   const activeKb = useMemo(
     () => knowledgeBases.find((kb) => kb.id === activeKbId) ?? null,
@@ -116,6 +127,71 @@ export function RequirementQuestions() {
     void loadSources(activeKbId)
     void loadCommonQuestions(activeKbId)
   }, [activeKbId])
+
+  useEffect(() => {
+    if (!selectedSource || !activeKbId || !selectedSource.hasOriginalFile) {
+      setSourcePreview({ kind: "empty" })
+      if (docxPreviewRef.current) docxPreviewRef.current.innerHTML = ""
+      return
+    }
+
+    let cancelled = false
+    let objectUrl: string | null = null
+    setSourcePreview({ kind: "loading" })
+    if (docxPreviewRef.current) docxPreviewRef.current.innerHTML = ""
+
+    async function loadOriginalPreview() {
+      try {
+        const blob = await api.getRequirementSourceFile(activeKbId, selectedSource.id)
+        if (cancelled) return
+        const filename = selectedSource.originalFilename || selectedSource.sourcePath || selectedSource.title
+        const lower = filename.toLowerCase()
+        const mimeType = selectedSource.mimeType || blob.type
+
+        if (lower.endsWith(".docx")) {
+          if (!docxPreviewRef.current) return
+          await renderAsync(blob, docxPreviewRef.current, undefined, {
+            className: "requirement-docx-preview",
+            inWrapper: false,
+            ignoreWidth: true,
+            ignoreHeight: true,
+          })
+          if (!cancelled) setSourcePreview({ kind: "empty" })
+          return
+        }
+
+        if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
+          const workbook = XLSX.read(await blob.arrayBuffer(), { type: "array" })
+          const sheets = workbook.SheetNames.slice(0, 4).map((name) => ({
+            name,
+            rows: (XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, blankrows: false }) as unknown[][])
+              .slice(0, 80)
+              .map((row) => row.slice(0, 12).map((cell) => String(cell ?? ""))),
+          }))
+          if (!cancelled) setSourcePreview({ kind: "excel", sheets })
+          return
+        }
+
+        objectUrl = URL.createObjectURL(blob)
+        if (mimeType === "application/pdf" || lower.endsWith(".pdf")) {
+          setSourcePreview({ kind: "object", url: objectUrl, mode: "pdf" })
+        } else if (mimeType.startsWith("image/") || lower.endsWith(".svg")) {
+          setSourcePreview({ kind: "object", url: objectUrl, mode: "image" })
+        } else {
+          setSourcePreview({ kind: "object", url: objectUrl, mode: "download" })
+        }
+      } catch (err) {
+        if (!cancelled) setSourcePreview({ kind: "error", message: err instanceof Error ? err.message : "Preview failed" })
+      }
+    }
+
+    void loadOriginalPreview()
+
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [activeKbId, selectedSource])
 
   async function loadKnowledgeBases(seedCalculator = false) {
     setLoading(true)
@@ -351,6 +427,71 @@ export function RequirementQuestions() {
         '<a class="rq-mention" href="$2" target="_blank" rel="noreferrer">$1</a>',
       )
       .replace(/(^|[\s(])@([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,3})/g, '$1<span class="rq-mention">@$2</span>')
+  }
+
+  function renderOriginalPreview() {
+    if (!selectedSource?.hasOriginalFile) {
+      return (
+        <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+          Original file preview is not available for this source. Re-upload documents to enable original previews.
+        </div>
+      )
+    }
+    if (sourcePreview.kind === "loading") {
+      return (
+        <div className="flex min-h-40 items-center justify-center rounded-lg border bg-muted/25 text-sm text-muted-foreground">
+          <Loader2 className="mr-2 size-4 animate-spin" />
+          Loading original preview...
+        </div>
+      )
+    }
+    if (sourcePreview.kind === "error") {
+      return <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{sourcePreview.message}</div>
+    }
+    if (sourcePreview.kind === "object" && sourcePreview.mode === "pdf") {
+      return <iframe title="Source PDF preview" src={sourcePreview.url} className="h-[68vh] w-full rounded-lg border bg-white" />
+    }
+    if (sourcePreview.kind === "object" && sourcePreview.mode === "image") {
+      return (
+        <div className="rounded-lg border bg-white p-3">
+          <img src={sourcePreview.url} alt={selectedSource.title} className="max-h-[68vh] w-full object-contain" />
+        </div>
+      )
+    }
+    if (sourcePreview.kind === "object") {
+      return (
+        <a href={sourcePreview.url} target="_blank" rel="noreferrer" className="text-sm text-primary underline underline-offset-4">
+          Open original file
+        </a>
+      )
+    }
+    if (sourcePreview.kind === "excel") {
+      return (
+        <div className="space-y-4">
+          {sourcePreview.sheets.map((sheet) => (
+            <div key={sheet.name} className="overflow-hidden rounded-lg border">
+              <div className="border-b bg-muted/40 px-3 py-2 text-sm font-medium">{sheet.name}</div>
+              <div className="max-h-96 overflow-auto">
+                <table className="w-full border-collapse text-xs">
+                  <tbody>
+                    {sheet.rows.map((row, rowIndex) => (
+                      <tr key={`${sheet.name}-${rowIndex}`}>
+                        {row.map((cell, cellIndex) => (
+                          <td key={`${sheet.name}-${rowIndex}-${cellIndex}`} className="border-b border-r px-2 py-1 align-top">
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return <div ref={docxPreviewRef} className="requirement-docx-preview rounded-lg border bg-white p-4 text-black" />
   }
 
   if (loading) {
@@ -810,10 +951,24 @@ export function RequirementQuestions() {
                   {[selectedSource.sourceId, selectedSource.sourceSystem, selectedSource.sourcePath].filter(Boolean).join(" | ")}
                 </DialogDescription>
               </DialogHeader>
-              <div
-                className="requirement-source-md min-h-0 flex-1 overflow-y-auto rounded-lg border bg-muted/25 p-4"
-                dangerouslySetInnerHTML={{ __html: selectedSourceHtml }}
-              />
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+                <section className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Original Preview</h3>
+                    {selectedSource.originalFilename && (
+                      <span className="truncate font-mono text-[11px] text-muted-foreground">{selectedSource.originalFilename}</span>
+                    )}
+                  </div>
+                  {renderOriginalPreview()}
+                </section>
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold">Indexed Text</h3>
+                  <div
+                    className="requirement-source-md rounded-lg border bg-muted/25 p-4"
+                    dangerouslySetInnerHTML={{ __html: selectedSourceHtml }}
+                  />
+                </section>
+              </div>
               <DialogFooter className="shrink-0">
                 <Button
                   type="button"

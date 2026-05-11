@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+import io
+
+from flask import Blueprint, jsonify, request, send_file
 
 from services.requirement_kb_service import RequirementKbService
 
@@ -54,6 +56,16 @@ def create_requirements_blueprint(requirement_service: RequirementKbService) -> 
     @bp.delete("/knowledge-bases/<int:kb_id>/sources/<int:source_id>")
     def remove_source(kb_id: int, source_id: int):
         return jsonify(requirement_service.remove_source(kb_id, source_id))
+
+    @bp.get("/knowledge-bases/<int:kb_id>/sources/<int:source_id>/file")
+    def get_source_file(kb_id: int, source_id: int):
+        source_file = requirement_service.get_source_file(kb_id, source_id)
+        return send_file(
+            io.BytesIO(source_file["payload"]),
+            mimetype=source_file["mimeType"],
+            as_attachment=False,
+            download_name=source_file["filename"],
+        )
 
     @bp.post("/knowledge-bases/<int:kb_id>/notes")
     def add_note(kb_id: int):

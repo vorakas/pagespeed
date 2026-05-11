@@ -1200,6 +1200,10 @@ export interface RequirementSource {
   parseStatus: string
   metadata?: Record<string, unknown>
   extractedText?: string | null
+  hasOriginalFile?: boolean
+  originalFilename?: string | null
+  mimeType?: string | null
+  fileSize?: number | null
   chunkCount?: number
   createdAt?: string
   ingestedAt?: string

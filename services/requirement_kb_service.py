@@ -6,6 +6,7 @@ import csv
 import html
 import io
 import json
+import mimetypes
 import re
 import zipfile
 from dataclasses import dataclass
@@ -321,6 +322,9 @@ class RequirementKbService:
             title=title.strip() or Path(filename).stem,
             source_path=filename,
             source_text=source_text,
+            original_filename=filename,
+            mime_type=self._mime_type(filename),
+            file_payload=payload,
         )
 
     def list_sources(self, kb_id: int | None = None) -> list[dict[str, Any]]:
@@ -333,14 +337,31 @@ class RequirementKbService:
             cursor = conn.cursor()
             cursor.execute(
                 f"""
-                SELECT src.*,
+                SELECT src.id,
+                       src.kb_id,
+                       src.source_type,
+                       src.source_system,
+                       src.source_id,
+                       src.title,
+                       src.source_path,
+                       src.parse_status,
+                       src.metadata_json,
+                       src.extracted_text,
+                       src.original_filename,
+                       src.mime_type,
+                       src.file_size,
+                       CASE WHEN src.file_bytes IS NULL THEN NULL ELSE 1 END AS file_bytes,
+                       src.created_at,
+                       src.ingested_at,
                        kb.name AS kb_name,
-                       COUNT(ch.id) AS chunk_count
+                       (
+                         SELECT COUNT(*)
+                         FROM requirement_chunks ch
+                         WHERE ch.source_id = src.id
+                       ) AS chunk_count
                 FROM requirement_sources src
                 JOIN requirement_knowledge_bases kb ON kb.id = src.kb_id
-                LEFT JOIN requirement_chunks ch ON ch.source_id = src.id
                 {where}
-                GROUP BY src.id, kb.name
                 ORDER BY src.ingested_at DESC, src.id DESC
                 """,
                 params,
@@ -374,6 +395,31 @@ class RequirementKbService:
                 (kb_id, source_id),
             )
         return {"removed": True, "sourceId": source_id, "title": source.get("title")}
+
+    def get_source_file(self, kb_id: int, source_id: int) -> dict[str, Any]:
+        self.get_knowledge_base(kb_id)
+        with self.conn_mgr.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT original_filename, mime_type, file_size, file_bytes
+                FROM requirement_sources
+                WHERE kb_id = {self.conn_mgr.placeholder()} AND id = {self.conn_mgr.placeholder()}
+                """,
+                (kb_id, source_id),
+            )
+            row = self.conn_mgr.row_to_dict(cursor)
+        if not row or not row.get("file_bytes"):
+            raise ValidationError("Original file is not available for this source")
+        payload = row["file_bytes"]
+        if isinstance(payload, memoryview):
+            payload = payload.tobytes()
+        return {
+            "filename": row.get("original_filename") or f"requirement-source-{source_id}",
+            "mimeType": row.get("mime_type") or "application/octet-stream",
+            "fileSize": row.get("file_size") or len(payload),
+            "payload": bytes(payload),
+        }
 
     def list_common_questions(self, kb_id: int) -> list[dict[str, Any]]:
         self.get_knowledge_base(kb_id)
@@ -517,6 +563,9 @@ class RequirementKbService:
         title: str,
         source_path: str,
         source_text: SourceText,
+        original_filename: str | None = None,
+        mime_type: str | None = None,
+        file_payload: bytes | None = None,
     ) -> dict[str, Any]:
         self.get_knowledge_base(kb_id)
         metadata_json = json.dumps(source_text.metadata, ensure_ascii=True)
@@ -542,6 +591,10 @@ class RequirementKbService:
                         parse_status = {self.conn_mgr.placeholder()},
                         metadata_json = {self.conn_mgr.placeholder()},
                         extracted_text = {self.conn_mgr.placeholder()},
+                        original_filename = {self.conn_mgr.placeholder()},
+                        mime_type = {self.conn_mgr.placeholder()},
+                        file_size = {self.conn_mgr.placeholder()},
+                        file_bytes = {self.conn_mgr.placeholder()},
                         ingested_at = CURRENT_TIMESTAMP
                     WHERE id = {self.conn_mgr.placeholder()}
                     """,
@@ -553,6 +606,10 @@ class RequirementKbService:
                         source_text.parse_status,
                         metadata_json,
                         source_text.text,
+                        original_filename,
+                        mime_type,
+                        len(file_payload) if file_payload is not None else None,
+                        file_payload,
                         source_id_db,
                     ),
                 )
@@ -561,8 +618,9 @@ class RequirementKbService:
                 cursor.execute(
                     f"""
                     INSERT INTO requirement_sources
-                    (kb_id, source_type, source_system, source_id, title, source_path, parse_status, metadata_json, extracted_text)
-                    VALUES ({self._ph(9)})
+                    (kb_id, source_type, source_system, source_id, title, source_path, parse_status, metadata_json, extracted_text,
+                     original_filename, mime_type, file_size, file_bytes)
+                    VALUES ({self._ph(13)})
                     {self.conn_mgr.returning_id()}
                     """,
                     (
@@ -575,6 +633,10 @@ class RequirementKbService:
                         source_text.parse_status,
                         metadata_json,
                         source_text.text,
+                        original_filename,
+                        mime_type,
+                        len(file_payload) if file_payload is not None else None,
+                        file_payload,
                     ),
                 )
                 source_id_db = self.conn_mgr.last_insert_id(cursor)
@@ -899,6 +961,8 @@ class RequirementKbService:
         result = dict(row)
         result["metadata"] = parsed_metadata
         result["chunkCount"] = int(result.pop("chunk_count", 0) or 0)
+        file_bytes = result.pop("file_bytes", None)
+        result["hasOriginalFile"] = bool(file_bytes)
         if "kb_name" in result:
             result["kbName"] = result.pop("kb_name")
         for snake, camel in [
@@ -910,6 +974,9 @@ class RequirementKbService:
             ("parse_status", "parseStatus"),
             ("metadata_json", "metadataJson"),
             ("extracted_text", "extractedText"),
+            ("original_filename", "originalFilename"),
+            ("mime_type", "mimeType"),
+            ("file_size", "fileSize"),
             ("created_at", "createdAt"),
             ("ingested_at", "ingestedAt"),
         ]:
@@ -954,6 +1021,18 @@ class RequirementKbService:
     def _compact(self, value: str, limit: int) -> str:
         clean = self._clean(value)
         return clean if len(clean) <= limit else clean[: limit - 3].rstrip() + "..."
+
+    def _mime_type(self, filename: str) -> str:
+        suffix = Path(filename).suffix.lower()
+        known = {
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".xls": "application/vnd.ms-excel",
+            ".pdf": "application/pdf",
+            ".svg": "image/svg+xml",
+            ".vsdx": "application/vnd.visio",
+        }
+        return known.get(suffix) or mimetypes.guess_type(filename)[0] or "application/octet-stream"
 
     def _slugify(self, value: str) -> str:
         slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")

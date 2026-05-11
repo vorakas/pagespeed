@@ -951,6 +951,15 @@ class ApiClient {
     })
   }
 
+  async getRequirementSourceFile(kbId: number, sourceId: number): Promise<Blob> {
+    const response = await fetch(`${this.baseUrl}/api/requirements/knowledge-bases/${kbId}/sources/${sourceId}/file`)
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(errorData.error || `Request failed: ${response.status}`)
+    }
+    return response.blob()
+  }
+
   async addRequirementNote(
     kbId: number,
     input: { title: string; body: string; category: string; tags: string[]; sourceLink?: string },

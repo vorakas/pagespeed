@@ -377,6 +377,10 @@ class ConnectionManager:
         """)
 
         self._create_postgres_requirement_tables(cursor)
+        cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
+        cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS mime_type TEXT")
+        cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS file_size INTEGER")
+        cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS file_bytes BYTEA")
         self._create_postgres_indexes(cursor)
 
     def _init_sqlite_schema(self, cursor: Any) -> None:
@@ -532,6 +536,10 @@ class ConnectionManager:
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_status TEXT",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_id INTEGER",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_name TEXT",
+            "ALTER TABLE requirement_sources ADD COLUMN original_filename TEXT",
+            "ALTER TABLE requirement_sources ADD COLUMN mime_type TEXT",
+            "ALTER TABLE requirement_sources ADD COLUMN file_size INTEGER",
+            "ALTER TABLE requirement_sources ADD COLUMN file_bytes BLOB",
         ]
         for statement in _SQLITE_MIGRATIONS:
             try:
@@ -565,6 +573,10 @@ class ConnectionManager:
                 parse_status TEXT NOT NULL DEFAULT 'indexed',
                 metadata_json TEXT,
                 extracted_text TEXT,
+                original_filename TEXT,
+                mime_type TEXT,
+                file_size INTEGER,
+                file_bytes BYTEA,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(kb_id, source_path)
@@ -645,6 +657,10 @@ class ConnectionManager:
                 parse_status TEXT NOT NULL DEFAULT 'indexed',
                 metadata_json TEXT,
                 extracted_text TEXT,
+                original_filename TEXT,
+                mime_type TEXT,
+                file_size INTEGER,
+                file_bytes BLOB,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (kb_id) REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
