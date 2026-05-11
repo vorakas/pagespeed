@@ -29,7 +29,7 @@ The page has four main areas:
 
 - Ask: select KB, ask a question, receive answer with citations.
 - Sources: view imported tasks, docs, diagrams, and notes.
-- Add Source: add task key/path or upload requirement document.
+- Add Source: add task key/path or upload requirement files.
 - Add Note: capture QA knowledge manually.
 
 Manual notes require:
@@ -53,6 +53,43 @@ Processing steps:
 5. Re-index only the changed source.
 
 Future answers retrieve from the selected KB only. Answers cite the source chunks used. If sources conflict, the answer must say so instead of silently choosing one.
+
+## Uploaded Files
+
+The Requirement Questions page must support uploading files into a selected KB.
+
+Supported source types:
+
+- Word documents: `.docx`
+- PDFs: `.pdf`
+- Spreadsheets: `.xlsx`, `.xls`, `.csv`
+- Lucid/diagram exports: `.json`, `.vsdx`, `.svg`
+- Visual fallback images: `.png`, `.jpg`, `.jpeg`
+
+Upload flow:
+
+1. User selects KB.
+2. User uploads one or more files.
+3. User optionally sets source title, category, and tags.
+4. Pharos stores the original file metadata and extracted text/structure.
+5. Pharos marks each upload as indexed, partially indexed, or needs review.
+
+Parser expectations:
+
+- `.docx`: extract paragraphs/tables as requirement text.
+- `.xlsx`, `.xls`, `.csv`: extract sheets/rows into structured table chunks.
+- Lucid `.json`: extract diagram shapes, labels, connector edges, and decision paths.
+- `.vsdx`: extract diagram text and use as visual/layout validation.
+- `.svg`: extract text when available; mark flattened image-based exports as visual-only.
+- `.pdf`: extract selectable text when available; mark scanned/image-only exports as visual-only unless OCR is added later.
+- images: store as evidence only in the first version; OCR is later scope.
+
+The UI should make parse quality visible, especially for diagrams. Example states:
+
+- Full text extracted.
+- Structured diagram extracted.
+- Visual-only source.
+- Needs review.
 
 ## Backend Shape
 
@@ -107,4 +144,3 @@ The first implementation can seed Calculator from known local vault paths and up
 - Add Note stores and displays a source.
 - Known seed sources appear in Sources.
 - Question flow refuses unsupported answers and cites evidence for supported answers.
-
