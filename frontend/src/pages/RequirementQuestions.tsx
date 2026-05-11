@@ -59,6 +59,9 @@ type SourcePreview =
   | { kind: "object"; url: string; mode: "pdf" | "image" | "download" }
   | { kind: "excel"; sheets: Array<{ name: string; rows: string[][] }> }
 
+const IMAGE_ATTACHMENT_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i
+const VIDEO_ATTACHMENT_RE = /\.(webm|mp4|mov|m4v)$/i
+
 export function RequirementQuestions() {
   const [knowledgeBases, setKnowledgeBases] = useState<RequirementKnowledgeBase[]>([])
   const [activeKbId, setActiveKbId] = useState<number | null>(null)
@@ -111,7 +114,11 @@ export function RequirementQuestions() {
   )
   const selectedSourceHtml = useMemo(() => {
     if (!selectedSource) return ""
-    return marked.parse(formatRequirementSourceContent(sourceContent(selectedSource)), { async: false }) as string
+    const transformed = transformRequirementAttachments(
+      formatRequirementSourceContent(sourceContent(selectedSource)),
+      selectedSource.sourcePath || "",
+    )
+    return marked.parse(transformed, { async: false }) as string
   }, [selectedSource])
 
   useEffect(() => {
@@ -433,6 +440,27 @@ export function RequirementQuestions() {
         '<a class="rq-mention" href="$2" target="_blank" rel="noreferrer">$1</a>',
       )
       .replace(/(^|[\s(])@([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,3})/g, '$1<span class="rq-mention">@$2</span>')
+  }
+
+  function transformRequirementAttachments(content: string, basePath: string): string {
+    if (!basePath) return content
+    const renderAttachment = (target: string, label?: string) => {
+      const cleanTarget = target.trim()
+      const cleanLabel = (label || cleanTarget.split("/").pop() || cleanTarget).trim()
+      const src = `/api/obsidian/vault/asset?base=${encodeURIComponent(basePath)}&asset=${encodeURIComponent(cleanTarget)}`
+      const safeLabel = cleanLabel.replace(/"/g, "&quot;")
+      if (IMAGE_ATTACHMENT_RE.test(cleanTarget)) {
+        return `<img src="${src}" alt="${safeLabel}" class="requirement-attachment-image" loading="lazy" />`
+      }
+      if (VIDEO_ATTACHMENT_RE.test(cleanTarget)) {
+        return `<video src="${src}" class="requirement-attachment-video" controls preload="metadata"></video>`
+      }
+      return `<a href="${src}" target="_blank" rel="noreferrer" class="requirement-attachment-link">${safeLabel}</a>`
+    }
+
+    return content
+      .replace(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target, label) => renderAttachment(String(target), label ? String(label) : undefined))
+      .replace(/(?<!!)\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target, label) => renderAttachment(String(target), label ? String(label) : undefined))
   }
 
   function renderOriginalPreview() {
