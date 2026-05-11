@@ -459,6 +459,7 @@ class RequirementKbService:
         if saved:
             saved["answerSource"] = "common_question"
             saved["apiUsed"] = False
+            saved["commonQuestionId"] = saved.get("id")
             return saved
 
         with self.conn_mgr.get_connection() as conn:
@@ -499,7 +500,7 @@ class RequirementKbService:
 
         answer_lines = ["I found these relevant requirement notes:"]
         for score, matched, chunk in top:
-            snippet = self._compact(chunk["content"], 420)
+            snippet = self._clean(chunk["content"])
             answer_lines.append(f"- {snippet}")
         answer = {"answer": "\n".join(answer_lines), "citations": citations, "answerSource": "kb_search", "apiUsed": False}
         common_question = self._save_common_question(kb_id, question.strip(), answer["answer"], citations)
@@ -614,7 +615,7 @@ class RequirementKbService:
     def _citations_from_top(self, top: list[tuple[int, list[str], dict[str, Any]]]) -> list[dict[str, Any]]:
         citations = []
         for _score, matched, chunk in top:
-            snippet = self._compact(chunk["content"], 420)
+            snippet = self._clean(chunk["content"])
             citations.append(
                 {
                     "sourceId": chunk["source_id"],

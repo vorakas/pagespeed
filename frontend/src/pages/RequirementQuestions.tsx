@@ -128,6 +128,7 @@ export function RequirementQuestions() {
     )
     return formatRequirementHtml(marked.parse(transformed, { async: false }) as string)
   }, [selectedSource])
+  const sourceById = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources])
   const selectedSourceShowsOriginalPreview =
     selectedSource != null && selectedSource.sourceType !== "vault_task" && selectedSource.sourceType !== "manual_note"
 
@@ -291,6 +292,8 @@ export function RequirementQuestions() {
       answer: commonQuestion.answer,
       citations: commonQuestion.citations,
       commonQuestionId: commonQuestion.id,
+      answerSource: "common_question",
+      apiUsed: false,
     })
   }
 
@@ -453,6 +456,64 @@ export function RequirementQuestions() {
     return source.title
       .replace(new RegExp(`^\\[?${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]?\\s*[-:]*\\s*`, "i"), "")
       .trim() || source.title
+  }
+
+  function citationSource(citation: RequirementAnswer["citations"][number]): RequirementSource | null {
+    return sourceById.get(citation.sourceId) || null
+  }
+
+  function citationLabel(citation: RequirementAnswer["citations"][number]): string {
+    const source = citationSource(citation)
+    if (source?.sourceId) return source.sourceId
+    const titleMatch = citation.title.match(/\b[A-Z][A-Z0-9]+-\d+\b/)
+    return titleMatch?.[0] || citation.sourceSystem
+  }
+
+  function citationText(citation: RequirementAnswer["citations"][number]): string {
+    return citation.snippet?.trim() || citation.title
+  }
+
+  function openCitationSource(citation: RequirementAnswer["citations"][number]) {
+    const source = citationSource(citation)
+    if (source) {
+      setSelectedSource(source)
+    }
+  }
+
+  function renderCitationPill(citation: RequirementAnswer["citations"][number]) {
+    const source = citationSource(citation)
+    const label = citationLabel(citation)
+    return (
+      <button
+        type="button"
+        onClick={() => openCitationSource(citation)}
+        disabled={!source}
+        title={source ? `Open ${source.title}` : citation.title}
+        className="mx-1 inline-flex translate-y-[-1px] items-center rounded-[4px] border border-violet-300/70 bg-violet-700 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-white shadow-sm transition-colors hover:bg-violet-600 disabled:cursor-default disabled:opacity-70"
+      >
+        {label}
+      </button>
+    )
+  }
+
+  function renderAnswerBody(answer: RequirementAnswer) {
+    if (answer.citations.length === 0 || answer.answerSource === "ai") {
+      return <div className="whitespace-pre-wrap text-sm leading-relaxed">{answer.answer}</div>
+    }
+
+    return (
+      <div className="space-y-3 text-sm leading-relaxed">
+        <p>I found these relevant requirement notes:</p>
+        <ul className="space-y-2">
+          {answer.citations.map((citation, index) => (
+            <li key={`${citation.sourceId}-${citation.chunkIndex}-${index}`} className="leading-relaxed">
+              <span>{citationText(citation)}</span>
+              {renderCitationPill(citation)}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
   }
 
   function formatRequirementMarkdownSource(content: string): string {
@@ -832,19 +893,7 @@ export function RequirementQuestions() {
                     </span>
                   )}
                 </div>
-                <div className="whitespace-pre-wrap text-sm leading-relaxed">{answer.answer}</div>
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Citations</p>
-                  {answer.citations.map((citation, index) => (
-                    <div key={`${citation.sourceId}-${citation.chunkIndex}-${index}`} className="rounded-md border bg-background p-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline">{citation.sourceSystem}</Badge>
-                        <span className="text-sm font-medium">{citation.title}</span>
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground">{citation.sourcePath}</p>
-                    </div>
-                  ))}
-                </div>
+                {renderAnswerBody(answer)}
               </div>
             )}
           </CardContent>
