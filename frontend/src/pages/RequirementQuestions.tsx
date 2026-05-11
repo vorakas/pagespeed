@@ -119,10 +119,10 @@ export function RequirementQuestions() {
     if (!selectedSource) return ""
     const repaired = repairJiraMarkdownSource(sourceContent(selectedSource))
     const transformed = transformRequirementAttachments(
-      formatRequirementSourceContent(repaired),
+      formatRequirementMarkdownSource(repaired),
       selectedSource.sourcePath || "",
     )
-    return marked.parse(transformed, { async: false }) as string
+    return formatRequirementHtml(marked.parse(transformed, { async: false }) as string)
   }, [selectedSource])
   const selectedSourceShowsOriginalPreview =
     selectedSource != null && selectedSource.sourceType !== "vault_task" && selectedSource.sourceType !== "manual_note"
@@ -435,9 +435,8 @@ export function RequirementQuestions() {
       .trim() || source.title
   }
 
-  function formatRequirementSourceContent(content: string): string {
+  function formatRequirementMarkdownSource(content: string): string {
     return content
-      .replace(/\bAC\s*(\d+)\b(?!\.\w)/g, (_match, number) => `<span class="rq-ac-label">AC${number}</span>`)
       .replace(
         /^###\s+(.+?\s+[--]\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*$/gm,
         '<h3 class="rq-comment-header">$1</h3>',
@@ -447,6 +446,43 @@ export function RequirementQuestions() {
         '<a class="rq-mention" href="$2" target="_blank" rel="noreferrer">$1</a>',
       )
       .replace(/(^|[\s(])@([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,3})/g, '$1<span class="rq-mention">@$2</span>')
+  }
+
+  function formatRequirementHtml(html: string): string {
+    if (!html) return html
+    const template = document.createElement("template")
+    template.innerHTML = html
+    const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT)
+    const textNodes: Text[] = []
+
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text
+      const parent = node.parentElement
+      if (parent?.closest("a, code, pre, script, style, .requirement-attachment-video-button")) continue
+      textNodes.push(node)
+    }
+
+    for (const node of textNodes) {
+      const text = node.nodeValue || ""
+      if (!/\bAC\s*\d+\b/.test(text)) continue
+      const fragment = document.createDocumentFragment()
+      let lastIndex = 0
+      const re = /\bAC\s*(\d+)\b(?!\.\w)/g
+      let match: RegExpExecArray | null
+
+      while ((match = re.exec(text)) !== null) {
+        if (match.index > lastIndex) fragment.append(document.createTextNode(text.slice(lastIndex, match.index)))
+        const span = document.createElement("span")
+        span.className = "rq-ac-label"
+        span.textContent = `AC${match[1]}`
+        fragment.append(span)
+        lastIndex = match.index + match[0].length
+      }
+      if (lastIndex < text.length) fragment.append(document.createTextNode(text.slice(lastIndex)))
+      node.replaceWith(fragment)
+    }
+
+    return template.innerHTML
   }
 
   function attachmentDisplayNames(target: string, label?: string): string[] {
