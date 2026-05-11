@@ -64,7 +64,8 @@ type SourcePreview =
 const IMAGE_ATTACHMENT_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i
 const VIDEO_ATTACHMENT_RE = /\.(webm|mp4|mov|m4v)$/i
 const TASK_REFERENCE_RE = /\b(?:LAMPSPLUS|LPWE|LP|WPM|DBADMIN)-\d+\b/g
-const SOURCE_REFERENCE_RE = /\bSources?\s+\d+(?:\s*(?:,|&|and)\s*\d+)*/gi
+const DISPLAY_TASK_REFERENCE_RE = /["'“”]?\b(?:LAMPSPLUS|LPWE|LP|WPM|DBADMIN)-\d+\b["'“”]?/g
+const SOURCE_REFERENCE_RE = /["'“”]?\bSources?\s+\d+(?:\s*(?:,|&|and)\s*\d+)*\b["'“”]?/gi
 
 export function RequirementQuestions() {
   const [aiProvider, setAiProvider] = useLocalConfig<"claude" | "openai">("requirementAiProvider", "claude")
@@ -590,17 +591,17 @@ export function RequirementQuestions() {
 
     for (const node of textNodes) {
       const text = node.nodeValue || ""
-      if (!TASK_REFERENCE_RE.test(text) && !SOURCE_REFERENCE_RE.test(text)) {
-        TASK_REFERENCE_RE.lastIndex = 0
+      if (!DISPLAY_TASK_REFERENCE_RE.test(text) && !SOURCE_REFERENCE_RE.test(text)) {
+        DISPLAY_TASK_REFERENCE_RE.lastIndex = 0
         SOURCE_REFERENCE_RE.lastIndex = 0
         continue
       }
-      TASK_REFERENCE_RE.lastIndex = 0
+      DISPLAY_TASK_REFERENCE_RE.lastIndex = 0
       SOURCE_REFERENCE_RE.lastIndex = 0
       const fragment = document.createDocumentFragment()
       let lastIndex = 0
       const matches = [
-        ...Array.from(text.matchAll(TASK_REFERENCE_RE), (match) => ({ type: "task" as const, match })),
+        ...Array.from(text.matchAll(DISPLAY_TASK_REFERENCE_RE), (match) => ({ type: "task" as const, match })),
         ...Array.from(text.matchAll(SOURCE_REFERENCE_RE), (match) => ({ type: "source" as const, match })),
       ].sort((a, b) => a.match.index - b.match.index)
 
@@ -610,7 +611,7 @@ export function RequirementQuestions() {
         if (index > lastIndex) fragment.append(document.createTextNode(text.slice(lastIndex, index)))
 
         if (type === "task") {
-          const label = match[0].toUpperCase()
+          const label = match[0].replace(/^["'“”]|["'“”]$/g, "").toUpperCase()
           const source = sourceByTaskKey.get(label)
           fragment.append(createTaskReferencePill(label, source))
         } else {
