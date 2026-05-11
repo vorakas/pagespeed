@@ -20,6 +20,7 @@ from routes.metrics_api import create_metrics_blueprint
 from routes.newrelic_api import create_newrelic_blueprint
 from routes.obsidian_api import create_obsidian_blueprint
 from routes.pages import create_pages_blueprint
+from routes.requirements_api import create_requirements_blueprint
 from routes.sites_api import create_sites_blueprint
 from routes.testing_api import create_testing_blueprint
 from routes.triggers_api import create_triggers_blueprint
@@ -28,6 +29,7 @@ from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService
+from services.requirement_kb_service import RequirementKbService
 from services.site_service import SiteService
 from services.snapshot_service import SnapshotService
 from services.testing_service import TestingService
@@ -58,6 +60,7 @@ def register_blueprints(
     devops_pipeline_map: "dict | None" = None,
     applitools_store: "ApplitoolsBatchStore | None" = None,
     applitools_helper_token: "str | None" = None,
+    requirement_service: "RequirementKbService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -76,6 +79,8 @@ def register_blueprints(
     app.register_blueprint(create_newrelic_blueprint())
     app.register_blueprint(create_azure_blueprint())
     app.register_blueprint(create_ai_blueprint())
+    if requirement_service is not None:
+        app.register_blueprint(create_requirements_blueprint(requirement_service))
     app.register_blueprint(create_devops_blueprint(
         server_pat=devops_pat,
         server_organization=devops_organization,

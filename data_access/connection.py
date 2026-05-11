@@ -376,6 +376,7 @@ class ConnectionManager:
             )
         """)
 
+        self._create_postgres_requirement_tables(cursor)
         self._create_postgres_indexes(cursor)
 
     def _init_sqlite_schema(self, cursor: Any) -> None:
@@ -519,6 +520,8 @@ class ConnectionManager:
             )
         """)
 
+        self._create_sqlite_requirement_tables(cursor)
+
         # SQLite lacks IF NOT EXISTS for ALTER TABLE — tolerate failures.
         _SQLITE_MIGRATIONS = [
             "ALTER TABLE test_results ADD COLUMN inp REAL",
@@ -538,6 +541,173 @@ class ConnectionManager:
 
         cursor.execute("UPDATE test_results SET strategy = 'desktop' WHERE strategy IS NULL")
         self._create_sqlite_indexes(cursor)
+
+    def _create_postgres_requirement_tables(self, cursor: Any) -> None:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_knowledge_bases (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                slug TEXT NOT NULL UNIQUE,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_sources (
+                id SERIAL PRIMARY KEY,
+                kb_id INTEGER NOT NULL REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
+                source_type TEXT NOT NULL,
+                source_system TEXT NOT NULL,
+                source_id TEXT,
+                title TEXT NOT NULL,
+                source_path TEXT,
+                parse_status TEXT NOT NULL DEFAULT 'indexed',
+                metadata_json TEXT,
+                extracted_text TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(kb_id, source_path)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_chunks (
+                id SERIAL PRIMARY KEY,
+                kb_id INTEGER NOT NULL REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
+                source_id INTEGER NOT NULL REFERENCES requirement_sources (id) ON DELETE CASCADE,
+                chunk_index INTEGER NOT NULL,
+                heading TEXT,
+                content TEXT NOT NULL,
+                token_count INTEGER DEFAULT 0,
+                metadata_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_notes (
+                id SERIAL PRIMARY KEY,
+                kb_id INTEGER NOT NULL REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
+                source_id INTEGER REFERENCES requirement_sources (id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                category TEXT NOT NULL,
+                tags_json TEXT,
+                source_link TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_discovery_runs (
+                id SERIAL PRIMARY KEY,
+                kb_id INTEGER NOT NULL REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
+                search_terms_json TEXT NOT NULL,
+                selected_candidates_json TEXT NOT NULL,
+                excluded_candidates_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_common_questions (
+                id SERIAL PRIMARY KEY,
+                kb_id INTEGER NOT NULL REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
+                question TEXT NOT NULL,
+                normalized_question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                citations_json TEXT NOT NULL,
+                usage_count INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_asked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(kb_id, normalized_question)
+            )
+        """)
+
+    def _create_sqlite_requirement_tables(self, cursor: Any) -> None:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_knowledge_bases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                slug TEXT NOT NULL UNIQUE,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kb_id INTEGER NOT NULL,
+                source_type TEXT NOT NULL,
+                source_system TEXT NOT NULL,
+                source_id TEXT,
+                title TEXT NOT NULL,
+                source_path TEXT,
+                parse_status TEXT NOT NULL DEFAULT 'indexed',
+                metadata_json TEXT,
+                extracted_text TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (kb_id) REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
+                UNIQUE(kb_id, source_path)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kb_id INTEGER NOT NULL,
+                source_id INTEGER NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                heading TEXT,
+                content TEXT NOT NULL,
+                token_count INTEGER DEFAULT 0,
+                metadata_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (kb_id) REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
+                FOREIGN KEY (source_id) REFERENCES requirement_sources (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kb_id INTEGER NOT NULL,
+                source_id INTEGER,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                category TEXT NOT NULL,
+                tags_json TEXT,
+                source_link TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (kb_id) REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
+                FOREIGN KEY (source_id) REFERENCES requirement_sources (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_discovery_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kb_id INTEGER NOT NULL,
+                search_terms_json TEXT NOT NULL,
+                selected_candidates_json TEXT NOT NULL,
+                excluded_candidates_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (kb_id) REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_common_questions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kb_id INTEGER NOT NULL,
+                question TEXT NOT NULL,
+                normalized_question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                citations_json TEXT NOT NULL,
+                usage_count INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_asked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (kb_id) REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
+                UNIQUE(kb_id, normalized_question)
+            )
+        """)
 
     def _create_postgres_indexes(self, cursor: Any) -> None:
         """Create indexes for the repository query shapes used by the app."""
@@ -573,6 +743,22 @@ class ConnectionManager:
             """
             CREATE INDEX IF NOT EXISTS idx_applitools_batches_uploaded_at
             ON applitools_batches (uploaded_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb
+            ON requirement_sources (kb_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_requirement_chunks_kb
+            ON requirement_chunks (kb_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_requirement_chunks_source
+            ON requirement_chunks (source_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_requirement_common_questions_kb
+            ON requirement_common_questions (kb_id, usage_count DESC, last_asked_at DESC)
             """,
         ]
         for statement in index_statements:
@@ -612,6 +798,22 @@ class ConnectionManager:
             """
             CREATE INDEX IF NOT EXISTS idx_applitools_batches_uploaded_at
             ON applitools_batches (uploaded_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb
+            ON requirement_sources (kb_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_requirement_chunks_kb
+            ON requirement_chunks (kb_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_requirement_chunks_source
+            ON requirement_chunks (source_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_requirement_common_questions_kb
+            ON requirement_common_questions (kb_id, usage_count DESC, last_asked_at DESC)
             """,
         ]
         for statement in index_statements:

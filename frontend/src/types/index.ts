@@ -1175,6 +1175,81 @@ export interface MigrationHistoryEntry {
   diff: MigrationSnapshotDiff
 }
 
+// ---------- Requirement Questions ----------
+
+export interface RequirementKnowledgeBase {
+  id: number
+  name: string
+  slug: string
+  description?: string | null
+  sourceCount?: number
+  chunkCount?: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface RequirementSource {
+  id: number
+  kbId: number
+  kbName?: string
+  sourceType: string
+  sourceSystem: string
+  sourceId?: string | null
+  title: string
+  sourcePath?: string | null
+  parseStatus: string
+  metadata?: Record<string, unknown>
+  chunkCount?: number
+  createdAt?: string
+  ingestedAt?: string
+}
+
+export interface RequirementCandidate {
+  sourceSystem: string
+  project: string
+  section: string
+  taskKey: string
+  sourceId: string
+  title: string
+  sourcePath: string
+  status: string
+  uatStatus: string
+  e2eStatus: string
+  matchedTerms: string[]
+  snippets: string[]
+  relevanceScore: number
+}
+
+export interface RequirementCitation {
+  sourceId: number
+  sourceType: string
+  sourceSystem: string
+  title: string
+  sourcePath: string
+  chunkIndex: number
+  matchedTerms: string[]
+  snippet: string
+}
+
+export interface RequirementAnswer {
+  answer: string
+  citations: RequirementCitation[]
+  commonQuestionId?: number
+}
+
+export interface RequirementCommonQuestion {
+  id: number
+  kbId: number
+  question: string
+  normalizedQuestion: string
+  answer: string
+  citations: RequirementCitation[]
+  usageCount: number
+  createdAt?: string
+  updatedAt?: string
+  lastAskedAt?: string
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {

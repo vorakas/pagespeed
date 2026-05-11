@@ -60,6 +60,11 @@ import type {
   MigrationProjectTasks,
   MigrationTaskDetail,
   RawTaskRecord,
+  RequirementAnswer,
+  RequirementCandidate,
+  RequirementCommonQuestion,
+  RequirementKnowledgeBase,
+  RequirementSource,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -894,6 +899,81 @@ class ApiClient {
 
   async reingestMigrationSnapshots(): Promise<{ ingested: string[] }> {
     return this.request("/api/dashboard/snapshots/reingest", { method: "POST" })
+  }
+
+  // ---------- Requirement Questions ----------
+
+  async getRequirementKnowledgeBases(): Promise<RequirementKnowledgeBase[]> {
+    return this.request("/api/requirements/knowledge-bases")
+  }
+
+  async seedCalculatorKnowledgeBase(): Promise<RequirementKnowledgeBase> {
+    return this.request("/api/requirements/seed/calculator", { method: "POST" })
+  }
+
+  async discoverRequirementCandidates(terms: string[], limit = 50): Promise<RequirementCandidate[]> {
+    return this.request("/api/requirements/discover", {
+      method: "POST",
+      body: JSON.stringify({ terms, limit }),
+    })
+  }
+
+  async createRequirementKnowledgeBase(input: {
+    name: string
+    description?: string
+    searchTerms: string[]
+    candidates: RequirementCandidate[]
+  }): Promise<RequirementKnowledgeBase> {
+    return this.request("/api/requirements/knowledge-bases", {
+      method: "POST",
+      body: JSON.stringify(input),
+    })
+  }
+
+  async getRequirementSources(kbId: number): Promise<RequirementSource[]> {
+    return this.request(`/api/requirements/knowledge-bases/${kbId}/sources`)
+  }
+
+  async getRequirementCommonQuestions(kbId: number): Promise<RequirementCommonQuestion[]> {
+    return this.request(`/api/requirements/knowledge-bases/${kbId}/common-questions`)
+  }
+
+  async addRequirementTaskSource(kbId: number, sourcePath: string): Promise<RequirementSource> {
+    return this.request(`/api/requirements/knowledge-bases/${kbId}/sources/tasks`, {
+      method: "POST",
+      body: JSON.stringify({ sourcePath }),
+    })
+  }
+
+  async addRequirementNote(
+    kbId: number,
+    input: { title: string; body: string; category: string; tags: string[]; sourceLink?: string },
+  ): Promise<RequirementSource> {
+    return this.request(`/api/requirements/knowledge-bases/${kbId}/notes`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    })
+  }
+
+  async uploadRequirementFiles(kbId: number, files: File[]): Promise<RequirementSource[]> {
+    const formData = new FormData()
+    files.forEach((file) => formData.append("files", file))
+    const response = await fetch(`${this.baseUrl}/api/requirements/knowledge-bases/${kbId}/uploads`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(errorData.error || `Request failed: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async askRequirementQuestion(kbId: number, question: string): Promise<RequirementAnswer> {
+    return this.request(`/api/requirements/knowledge-bases/${kbId}/questions`, {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    })
   }
 }
 

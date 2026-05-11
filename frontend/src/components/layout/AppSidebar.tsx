@@ -11,6 +11,7 @@ import {
   Hammer,
   Waves,
   Network,
+  CircleHelp,
   Settings,
   Sun,
   Moon,
@@ -42,6 +43,7 @@ const NAV: NavSection[] = [
         icon: Network,
         activePrefix: "/dashboard/workstreams",
       },
+      { label: "Requirement Questions", href: "/dashboard/requirements", icon: CircleHelp },
     ],
   },
   {

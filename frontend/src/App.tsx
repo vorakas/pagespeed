@@ -26,6 +26,9 @@ const WorkstreamDetail = lazy(() =>
 const ProjectDashboard = lazy(() =>
   import("@/pages/ProjectDashboard").then((module) => ({ default: module.ProjectDashboard })),
 )
+const RequirementQuestions = lazy(() =>
+  import("@/pages/RequirementQuestions").then((module) => ({ default: module.RequirementQuestions })),
+)
 
 function RouteFallback() {
   return (
@@ -57,6 +60,7 @@ export default function App() {
                   <Route path="dashboard" element={<LaunchDashboard />} />
                   <Route path="dashboard/history" element={<StatusHistory />} />
                   <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
+                  <Route path="dashboard/requirements" element={<RequirementQuestions />} />
                   <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>

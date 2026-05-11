@@ -85,6 +85,7 @@ from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService, SyncAlreadyRunning
 from services.obsidian_sync.vault_reader import VaultReader
+from services.requirement_kb_service import RequirementKbService
 from services.scheduling_window import ActiveHoursWindow
 from services.snapshot_service import SnapshotService
 from services.pagespeed_client import PageSpeedClient
@@ -304,6 +305,7 @@ def create_app() -> Flask:
     migration_dashboard_service = MigrationDashboardService(
         vault_root=OBSIDIAN_VAULT_ROOT,
     )
+    requirement_service = RequirementKbService(conn_mgr, OBSIDIAN_VAULT_ROOT)
 
     # ---- Migration status snapshots (history + what-changed-today) ----
     snapshot_repo = SnapshotRepository(conn_mgr)
@@ -518,6 +520,7 @@ def create_app() -> Flask:
         devops_pipeline_map=DEVOPS_PIPELINE_MAP,
         applitools_store=applitools_store,
         applitools_helper_token=APPLITOOLS_HELPER_TOKEN,
+        requirement_service=requirement_service,
     )
 
     # ---- Centralized error handlers ----
