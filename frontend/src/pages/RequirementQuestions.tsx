@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { repairJiraMarkdownSource } from "@/lib/markdown-source"
 import { cn } from "@/lib/utils"
 
 const DEFAULT_DISCOVERY_TERMS = "minimum pricing, minimum price, UMRP, MPR, discount, vendor approval"
@@ -114,8 +115,9 @@ export function RequirementQuestions() {
   )
   const selectedSourceHtml = useMemo(() => {
     if (!selectedSource) return ""
+    const repaired = repairJiraMarkdownSource(sourceContent(selectedSource))
     const transformed = transformRequirementAttachments(
-      formatRequirementSourceContent(sourceContent(selectedSource)),
+      formatRequirementSourceContent(repaired),
       selectedSource.sourcePath || "",
     )
     return marked.parse(transformed, { async: false }) as string
