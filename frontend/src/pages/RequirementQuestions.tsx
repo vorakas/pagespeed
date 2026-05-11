@@ -321,6 +321,14 @@ export function RequirementQuestions() {
     return source.sourceSystem || "Document"
   }
 
+  function compactTaskTitle(source: RequirementSource): string {
+    const id = source.sourceId?.trim()
+    if (!id) return source.title
+    return source.title
+      .replace(new RegExp(`^\\[?${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]?\\s*[-:]*\\s*`, "i"), "")
+      .trim() || source.title
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[360px] items-center justify-center text-sm text-muted-foreground">
@@ -490,35 +498,36 @@ export function RequirementQuestions() {
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tasks</p>
                       <Badge variant="outline">{taskSources.length}</Badge>
                     </div>
-                    <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                    <div className="max-h-80 space-y-1 overflow-y-auto pr-1">
                       {taskSources.length === 0 ? (
                         <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
                           No Jira or Asana task sources.
                         </div>
                       ) : (
                         taskSources.map((source) => (
-                          <div key={source.id} className="group/source flex gap-2">
+                          <div key={source.id} className="group/source flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => setSelectedSource(source)}
-                              className="min-w-0 flex-1 rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
-                              <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                                <span className="size-1.5 rounded-full bg-primary" />
-                                <span>{source.sourceSystem}</span>
-                                <span className="ml-auto truncate">{source.sourceId}</span>
-                              </div>
-                              <div className="mt-1 line-clamp-2 text-sm font-medium text-foreground">{source.title}</div>
-                              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <Badge variant={source.parseStatus === "indexed" ? "secondary" : "outline"}>{source.parseStatus}</Badge>
-                                <span>{source.chunkCount ?? 0} chunks</span>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="shrink-0 rounded-[4px] border border-violet-300/70 bg-violet-700 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-white shadow-sm">
+                                  {source.sourceId || source.sourceSystem}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
+                                  {compactTaskTitle(source)}
+                                </span>
+                                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                                  {source.chunkCount ?? 0}
+                                </span>
                               </div>
                             </button>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon-sm"
-                              className="mt-2 shrink-0 text-muted-foreground hover:text-destructive"
+                              className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
                               aria-label={`Remove ${source.title}`}
                               onClick={() => setSourceToRemove(source)}
                             >
