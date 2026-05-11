@@ -63,6 +63,7 @@ type SourcePreview =
 
 const IMAGE_ATTACHMENT_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i
 const VIDEO_ATTACHMENT_RE = /\.(webm|mp4|mov|m4v)$/i
+const TASK_REFERENCE_RE = /\b(?:LAMPSPLUS|LPWE|LP|WPM|DBADMIN)-\d+\b/g
 
 export function RequirementQuestions() {
   const [aiProvider, setAiProvider] = useLocalConfig<"claude" | "openai">("requirementAiProvider", "claude")
@@ -134,6 +135,18 @@ export function RequirementQuestions() {
     return formatRequirementHtml(marked.parse(transformed, { async: false }) as string)
   }, [selectedSource])
   const sourceById = useMemo(() => new Map(sources.map((source) => [source.id, source])), [sources])
+  const sourceByTaskKey = useMemo(() => {
+    const next = new Map<string, RequirementSource>()
+    for (const source of sources) {
+      const keys = [source.sourceId, source.title, source.sourcePath]
+      for (const key of keys) {
+        for (const match of key?.match(TASK_REFERENCE_RE) ?? []) {
+          next.set(match.toUpperCase(), source)
+        }
+      }
+    }
+    return next
+  }, [sources])
   const selectedSourceShowsOriginalPreview =
     selectedSource != null && selectedSource.sourceType !== "vault_task" && selectedSource.sourceType !== "manual_note"
 
@@ -530,10 +543,12 @@ export function RequirementQuestions() {
 
   function renderAnswerBody(answer: RequirementAnswer) {
     if (answer.answerSource === "ai") {
-      const html = marked.parse(escapeHtml(answer.answer), { async: false }) as string
+      const html = formatRequirementAnswerHtml(marked.parse(escapeHtml(answer.answer), { async: false }) as string)
       return (
         <div
           className="requirement-answer-md min-w-0 break-words [overflow-wrap:anywhere]"
+          onClick={handleAnswerContentClick}
+          onKeyDown={handleAnswerContentKeyDown}
           dangerouslySetInnerHTML={{ __html: html }}
         />
       )
@@ -556,6 +571,53 @@ export function RequirementQuestions() {
         </ul>
       </div>
     )
+  }
+
+  function formatRequirementAnswerHtml(html: string): string {
+    if (!html) return html
+    const template = document.createElement("template")
+    template.innerHTML = html
+    const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT)
+    const textNodes: Text[] = []
+
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text
+      const parent = node.parentElement
+      if (parent?.closest("a, button, code, pre, script, style")) continue
+      textNodes.push(node)
+    }
+
+    for (const node of textNodes) {
+      const text = node.nodeValue || ""
+      if (!TASK_REFERENCE_RE.test(text)) {
+        TASK_REFERENCE_RE.lastIndex = 0
+        continue
+      }
+      TASK_REFERENCE_RE.lastIndex = 0
+      const fragment = document.createDocumentFragment()
+      let lastIndex = 0
+      let match: RegExpExecArray | null
+
+      while ((match = TASK_REFERENCE_RE.exec(text)) !== null) {
+        if (match.index > lastIndex) fragment.append(document.createTextNode(text.slice(lastIndex, match.index)))
+        const label = match[0].toUpperCase()
+        const source = sourceByTaskKey.get(label)
+        const pill = document.createElement(source ? "button" : "span")
+        pill.className = "rq-task-ref"
+        pill.textContent = label
+        if (source) {
+          pill.setAttribute("type", "button")
+          pill.setAttribute("data-requirement-source-id", String(source.id))
+          pill.setAttribute("title", `Open ${source.title}`)
+        }
+        fragment.append(pill)
+        lastIndex = match.index + match[0].length
+      }
+      if (lastIndex < text.length) fragment.append(document.createTextNode(text.slice(lastIndex)))
+      node.replaceWith(fragment)
+    }
+
+    return template.innerHTML
   }
 
   function formatRequirementMarkdownSource(content: string): string {
@@ -712,6 +774,27 @@ export function RequirementQuestions() {
       src: button.dataset.requirementVideoSrc || "",
       label: button.dataset.requirementVideoLabel || "Attachment video",
     })
+  }
+
+  function openRequirementSourceRef(button: HTMLElement) {
+    const sourceId = Number(button.dataset.requirementSourceId || 0)
+    const source = sourceById.get(sourceId)
+    if (source) setSelectedSource(source)
+  }
+
+  function handleAnswerContentClick(event: MouseEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement | null
+    const taskButton = target?.closest<HTMLElement>("button.rq-task-ref[data-requirement-source-id]")
+    if (taskButton) openRequirementSourceRef(taskButton)
+  }
+
+  function handleAnswerContentKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return
+    const target = event.target as HTMLElement | null
+    const taskButton = target?.closest<HTMLElement>("button.rq-task-ref[data-requirement-source-id]")
+    if (!taskButton) return
+    event.preventDefault()
+    openRequirementSourceRef(taskButton)
   }
 
   function handleSourceContentClick(event: MouseEvent<HTMLDivElement>) {
