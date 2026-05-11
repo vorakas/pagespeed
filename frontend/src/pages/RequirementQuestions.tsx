@@ -918,14 +918,16 @@ export function RequirementQuestions() {
                     key={commonQuestion.id}
                     type="button"
                     onClick={() => showCommonQuestion(commonQuestion)}
-                    className="w-full rounded-lg border bg-white p-3 text-left text-black transition-colors hover:bg-white/90 hover:text-black"
+                    className="w-full rounded-md border border-border/70 bg-background/70 p-3 text-left text-foreground transition-colors hover:border-primary/35 hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div className="flex items-start gap-2">
-                      <MessageSquareText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                      <MessageSquareText className="mt-0.5 size-4 shrink-0 text-primary/75" />
                       <div className="min-w-0 flex-1">
                         <p className="line-clamp-2 text-sm font-medium">{commonQuestion.question}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <Badge variant="outline">{commonQuestion.usageCount} asks</Badge>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/90">
+                          <Badge variant="outline" className="border-border/70 bg-muted/30 text-muted-foreground">
+                            {commonQuestion.usageCount} asks
+                          </Badge>
                           <span>{commonQuestion.citations.length} citations</span>
                         </div>
                       </div>
