@@ -48,6 +48,10 @@ def create_requirements_blueprint(requirement_service: RequirementKbService) -> 
     def list_common_questions(kb_id: int):
         return jsonify(requirement_service.list_common_questions(kb_id))
 
+    @bp.get("/ai-usage")
+    def ai_usage():
+        return jsonify(requirement_service.list_ai_usage_summary())
+
     @bp.post("/knowledge-bases/<int:kb_id>/sources/tasks")
     def add_task_source(kb_id: int):
         data = request.get_json() or {}
@@ -100,6 +104,12 @@ def create_requirements_blueprint(requirement_service: RequirementKbService) -> 
     @bp.post("/knowledge-bases/<int:kb_id>/questions")
     def ask_question(kb_id: int):
         data = request.get_json() or {}
-        return jsonify(requirement_service.ask_question(kb_id, data.get("question", "")))
+        return jsonify(
+            requirement_service.ask_question(
+                kb_id,
+                data.get("question", ""),
+                ai_options=data.get("ai") or {},
+            )
+        )
 
     return bp

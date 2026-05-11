@@ -17,6 +17,9 @@ from xml.etree import ElementTree as ET
 
 from data_access.connection import ConnectionManager
 from exceptions import ValidationError
+from services.ai_claude import ClaudeClient
+from services.ai_openai import OpenAIClient
+from services.ai_usage import estimate_ai_cost, normalize_provider, should_use_ai_for_requirement_question
 
 
 @dataclass(frozen=True)
@@ -441,10 +444,23 @@ class RequirementKbService:
     # Questions
     # ------------------------------------------------------------------
 
-    def ask_question(self, kb_id: int, question: str, limit: int = 5) -> dict[str, Any]:
+    def ask_question(
+        self,
+        kb_id: int,
+        question: str,
+        limit: int = 5,
+        ai_options: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         terms = self._question_terms(question)
         if not terms:
             raise ValidationError("Question is required")
+
+        saved = self._get_saved_common_question(kb_id, question)
+        if saved:
+            saved["answerSource"] = "common_question"
+            saved["apiUsed"] = False
+            return saved
+
         with self.conn_mgr.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -470,13 +486,135 @@ class RequirementKbService:
             return {
                 "answer": "This knowledge base does not contain enough information to answer that question.",
                 "citations": [],
+                "answerSource": "kb_search",
+                "apiUsed": False,
             }
 
+        citations = self._citations_from_top(top)
+        score_payload = [{"score": score, "matchedTerms": matched} for score, matched, _chunk in top]
+        if should_use_ai_for_requirement_question(question, score_payload):
+            ai_answer = self._try_ai_answer(kb_id, question, top, citations, ai_options or {})
+            if ai_answer:
+                return ai_answer
+
         answer_lines = ["I found these relevant requirement notes:"]
-        citations = []
         for score, matched, chunk in top:
             snippet = self._compact(chunk["content"], 420)
             answer_lines.append(f"- {snippet}")
+        answer = {"answer": "\n".join(answer_lines), "citations": citations, "answerSource": "kb_search", "apiUsed": False}
+        common_question = self._save_common_question(kb_id, question.strip(), answer["answer"], citations)
+        answer["commonQuestionId"] = common_question["id"]
+        return answer
+
+    def list_ai_usage_summary(self) -> dict[str, Any]:
+        with self.conn_mgr.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT provider, model, feature,
+                       COUNT(*) AS call_count,
+                       COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                       COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                       COALESCE(SUM(estimated_cost), 0) AS estimated_cost
+                FROM ai_api_usage
+                GROUP BY provider, model, feature
+                ORDER BY estimated_cost DESC
+                """
+            )
+            totals = self.conn_mgr.rows_to_dicts(cursor)
+            cursor.execute(
+                """
+                SELECT id, feature, provider, model, input_tokens, output_tokens,
+                       estimated_cost, metadata_json, created_at
+                FROM ai_api_usage
+                ORDER BY created_at DESC, id DESC
+                LIMIT 20
+                """
+            )
+            recent = self.conn_mgr.rows_to_dicts(cursor)
+
+        normalized_totals = []
+        for row in totals:
+            normalized_totals.append(
+                {
+                    "provider": row["provider"],
+                    "model": row["model"],
+                    "feature": row["feature"],
+                    "callCount": int(row["call_count"] or 0),
+                    "inputTokens": int(row["input_tokens"] or 0),
+                    "outputTokens": int(row["output_tokens"] or 0),
+                    "estimatedCost": float(row["estimated_cost"] or 0),
+                }
+            )
+
+        normalized_recent = []
+        for row in recent:
+            try:
+                metadata = json.loads(row.get("metadata_json") or "{}")
+            except json.JSONDecodeError:
+                metadata = {}
+            normalized_recent.append(
+                {
+                    "id": row["id"],
+                    "feature": row["feature"],
+                    "provider": row["provider"],
+                    "model": row["model"],
+                    "inputTokens": int(row["input_tokens"] or 0),
+                    "outputTokens": int(row["output_tokens"] or 0),
+                    "estimatedCost": float(row["estimated_cost"] or 0),
+                    "metadata": metadata,
+                    "createdAt": row["created_at"],
+                }
+            )
+
+        return {
+            "totals": normalized_totals,
+            "recent": normalized_recent,
+            "estimatedCost": float(sum(item["estimatedCost"] for item in normalized_totals)),
+        }
+
+    # ------------------------------------------------------------------
+    # Persistence internals
+    # ------------------------------------------------------------------
+
+    def _get_saved_common_question(self, kb_id: int, question: str) -> dict[str, Any] | None:
+        normalized = self._normalize_question(question)
+        if not normalized:
+            return None
+        with self.conn_mgr.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT *
+                FROM requirement_common_questions
+                WHERE kb_id = {self.conn_mgr.placeholder()}
+                  AND normalized_question = {self.conn_mgr.placeholder()}
+                """,
+                (kb_id, normalized),
+            )
+            existing = self.conn_mgr.row_to_dict(cursor)
+            if not existing:
+                return None
+            cursor.execute(
+                f"""
+                UPDATE requirement_common_questions
+                SET usage_count = usage_count + 1,
+                    last_asked_at = CURRENT_TIMESTAMP
+                WHERE id = {self.conn_mgr.placeholder()}
+                """,
+                (existing["id"],),
+            )
+            cursor.execute(
+                "SELECT * FROM requirement_common_questions WHERE id = " + self.conn_mgr.placeholder(),
+                (existing["id"],),
+            )
+            row = self.conn_mgr.row_to_dict(cursor)
+        return self._common_question_api(row or {})
+
+    def _citations_from_top(self, top: list[tuple[int, list[str], dict[str, Any]]]) -> list[dict[str, Any]]:
+        citations = []
+        for _score, matched, chunk in top:
+            snippet = self._compact(chunk["content"], 420)
             citations.append(
                 {
                     "sourceId": chunk["source_id"],
@@ -489,14 +627,99 @@ class RequirementKbService:
                     "snippet": snippet,
                 }
             )
-        answer = {"answer": "\n".join(answer_lines), "citations": citations}
+        return citations
+
+    def _try_ai_answer(
+        self,
+        kb_id: int,
+        question: str,
+        top: list[tuple[int, list[str], dict[str, Any]]],
+        citations: list[dict[str, Any]],
+        ai_options: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        provider = normalize_provider(str(ai_options.get("provider") or ""))
+        if provider not in {"claude", "openai"}:
+            return None
+
+        api_key = str(ai_options.get("apiKey") or "")
+        model = str(ai_options.get("model") or "")
+        if not api_key or not model:
+            return None
+
+        system_prompt = (
+            "You answer QA requirement questions using only the provided knowledge-base excerpts. "
+            "Synthesize across excerpts when useful, call out uncertainty, and do not invent requirements. "
+            "Keep the answer concise and cite source titles naturally."
+        )
+        context_blocks = []
+        for index, (_score, matched, chunk) in enumerate(top, start=1):
+            context_blocks.append(
+                "\n".join(
+                    [
+                        f"[Source {index}] {chunk['title']}",
+                        f"System: {chunk['source_system']}",
+                        f"Path: {chunk['source_path']}",
+                        f"Matched terms: {', '.join(matched)}",
+                        "Excerpt:",
+                        self._compact(chunk["content"], 1800),
+                    ]
+                )
+            )
+        user_message = f"Question: {question.strip()}\n\nKnowledge-base excerpts:\n\n" + "\n\n---\n\n".join(context_blocks)
+
+        if provider == "claude":
+            result = ClaudeClient(api_key=api_key, model=model).analyze(system_prompt, user_message)
+        else:
+            result = OpenAIClient(api_key=api_key, model=model).analyze(system_prompt, user_message)
+
+        usage = estimate_ai_cost(provider, result.get("model") or model, result.get("usage") or {})
+        self._log_ai_usage(
+            feature="requirement_questions",
+            provider=provider,
+            model=result.get("model") or model,
+            usage=usage,
+            metadata={"kbId": kb_id, "question": question.strip()},
+        )
+
+        answer = {
+            "answer": result.get("analysis") or "",
+            "citations": citations,
+            "answerSource": "ai",
+            "apiUsed": True,
+            "aiProvider": provider,
+            "aiModel": result.get("model") or model,
+            "usage": usage,
+        }
         common_question = self._save_common_question(kb_id, question.strip(), answer["answer"], citations)
         answer["commonQuestionId"] = common_question["id"]
         return answer
 
-    # ------------------------------------------------------------------
-    # Persistence internals
-    # ------------------------------------------------------------------
+    def _log_ai_usage(
+        self,
+        feature: str,
+        provider: str,
+        model: str,
+        usage: dict[str, Any],
+        metadata: dict[str, Any],
+    ) -> None:
+        with self.conn_mgr.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO ai_api_usage
+                (feature, provider, model, input_tokens, output_tokens, estimated_cost, metadata_json)
+                VALUES ({self._ph(7)})
+                """,
+                (
+                    feature,
+                    provider,
+                    model,
+                    int(usage.get("inputTokens") or 0),
+                    int(usage.get("outputTokens") or 0),
+                    float(usage.get("estimatedCost") or 0),
+                    json.dumps(metadata, ensure_ascii=True),
+                ),
+            )
 
     def _save_common_question(
         self,

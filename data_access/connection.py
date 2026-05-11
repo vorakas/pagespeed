@@ -633,6 +633,19 @@ class ConnectionManager:
                 UNIQUE(kb_id, normalized_question)
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ai_api_usage (
+                id SERIAL PRIMARY KEY,
+                feature TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                input_tokens INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                estimated_cost REAL NOT NULL DEFAULT 0,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
     def _create_sqlite_requirement_tables(self, cursor: Any) -> None:
         cursor.execute("""
@@ -722,6 +735,19 @@ class ConnectionManager:
                 last_asked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (kb_id) REFERENCES requirement_knowledge_bases (id) ON DELETE CASCADE,
                 UNIQUE(kb_id, normalized_question)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ai_api_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                feature TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                input_tokens INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                estimated_cost REAL NOT NULL DEFAULT 0,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 

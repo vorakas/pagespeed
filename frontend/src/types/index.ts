@@ -1240,6 +1240,11 @@ export interface RequirementAnswer {
   answer: string
   citations: RequirementCitation[]
   commonQuestionId?: number
+  answerSource?: "common_question" | "kb_search" | "ai"
+  apiUsed?: boolean
+  aiProvider?: string
+  aiModel?: string
+  usage?: AiUsageEstimate
 }
 
 export interface RequirementCommonQuestion {
@@ -1253,6 +1258,35 @@ export interface RequirementCommonQuestion {
   createdAt?: string
   updatedAt?: string
   lastAskedAt?: string
+}
+
+export interface AiUsageEstimate {
+  inputTokens: number
+  outputTokens: number
+  estimatedCost: number
+  pricingFound?: boolean
+}
+
+export interface AiUsageTotal extends AiUsageEstimate {
+  provider: string
+  model: string
+  feature: string
+  callCount: number
+}
+
+export interface AiUsageEvent extends AiUsageEstimate {
+  id: number
+  feature: string
+  provider: string
+  model: string
+  metadata?: Record<string, unknown>
+  createdAt?: string
+}
+
+export interface AiUsageSummary {
+  estimatedCost: number
+  totals: AiUsageTotal[]
+  recent: AiUsageEvent[]
 }
 
 // ---------- API Responses ----------

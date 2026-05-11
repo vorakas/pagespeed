@@ -18,6 +18,7 @@ import {
 
 import { api } from "@/services/api"
 import type {
+  AiConfig,
   RequirementAnswer,
   RequirementCandidate,
   RequirementCommonQuestion,
@@ -45,12 +46,19 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { useLocalConfig } from "@/hooks/use-local-config"
 import { repairJiraMarkdownSource } from "@/lib/markdown-source"
 import { cn } from "@/lib/utils"
 
 const DISCOVERY_TERMS_EXAMPLE = "Example: minimum pricing, UMRP, MPR, vendor approval, discount rules"
 const ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
 const OUTLINE_ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
+const DEFAULT_AI_CONFIG: AiConfig = {
+  claudeApiKey: "",
+  claudeModel: "claude-sonnet-4-20250514",
+  openaiApiKey: "",
+  openaiModel: "gpt-4o",
+}
 
 type SourcePreview =
   | { kind: "empty" }
@@ -64,6 +72,8 @@ const IMAGE_ATTACHMENT_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i
 const VIDEO_ATTACHMENT_RE = /\.(webm|mp4|mov|m4v)$/i
 
 export function RequirementQuestions() {
+  const [aiConfig] = useLocalConfig<AiConfig>("aiConfig", DEFAULT_AI_CONFIG)
+  const [aiProvider, setAiProvider] = useLocalConfig<"claude" | "openai">("requirementAiProvider", "claude")
   const [knowledgeBases, setKnowledgeBases] = useState<RequirementKnowledgeBase[]>([])
   const [activeKbId, setActiveKbId] = useState<number | null>(null)
   const [uploadKbId, setUploadKbId] = useState<string>("")
@@ -149,6 +159,8 @@ export function RequirementQuestions() {
       return
     }
 
+    const previewSource = selectedSource
+    const previewKbId = activeKbId
     let cancelled = false
     let objectUrl: string | null = null
     setSourcePreview({ kind: "loading" })
@@ -156,11 +168,11 @@ export function RequirementQuestions() {
 
     async function loadOriginalPreview() {
       try {
-        const blob = await api.getRequirementSourceFile(activeKbId, selectedSource.id)
+        const blob = await api.getRequirementSourceFile(previewKbId, previewSource.id)
         if (cancelled) return
-        const filename = selectedSource.originalFilename || selectedSource.sourcePath || selectedSource.title
+        const filename = previewSource.originalFilename || previewSource.sourcePath || previewSource.title
         const lower = filename.toLowerCase()
-        const mimeType = selectedSource.mimeType || blob.type
+        const mimeType = previewSource.mimeType || blob.type
 
         if (lower.endsWith(".docx")) {
           if (!cancelled) setSourcePreview({ kind: "docx" })
@@ -252,10 +264,18 @@ export function RequirementQuestions() {
 
   async function askQuestion() {
     if (!activeKbId || !question.trim()) return
+    const selectedAi =
+      aiProvider === "claude"
+        ? { provider: "claude" as const, apiKey: aiConfig.claudeApiKey, model: aiConfig.claudeModel }
+        : { provider: "openai" as const, apiKey: aiConfig.openaiApiKey, model: aiConfig.openaiModel }
     setBusy("question")
     setError(null)
     try {
-      const nextAnswer = await api.askRequirementQuestion(activeKbId, question.trim())
+      const nextAnswer = await api.askRequirementQuestion(
+        activeKbId,
+        question.trim(),
+        selectedAi.apiKey && selectedAi.model ? selectedAi : undefined,
+      )
       setAnswer(nextAnswer)
       await loadCommonQuestions(activeKbId)
     } catch (err) {
@@ -764,7 +784,28 @@ export function RequirementQuestions() {
               placeholder="Example: When is vendor approval required for minimum pricing?"
               className="min-h-28"
             />
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-52 space-y-1">
+                <Label className="text-xs">AI Provider if Needed</Label>
+                <Select value={aiProvider} onValueChange={(value) => setAiProvider(value as "claude" | "openai")}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude">Claude</SelectItem>
+                    <SelectItem value="openai">OpenAI</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {aiProvider === "claude"
+                    ? aiConfig.claudeApiKey
+                      ? `Configured: ${aiConfig.claudeModel}`
+                      : "Claude key not configured; answers will stay knowledge-base only."
+                    : aiConfig.openaiApiKey
+                      ? `Configured: ${aiConfig.openaiModel}`
+                      : "OpenAI key not configured; answers will stay knowledge-base only."}
+                </p>
+              </div>
               <Button
                 className={ACTION_BUTTON_CLASS}
                 onClick={() => void askQuestion()}
@@ -776,6 +817,21 @@ export function RequirementQuestions() {
             </div>
             {answer && (
               <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant={answer.apiUsed ? "secondary" : "outline"}>
+                    {answer.answerSource === "common_question"
+                      ? "Answered from saved FAQ"
+                      : answer.apiUsed
+                        ? `AI-generated with ${answer.aiProvider === "openai" ? "OpenAI" : "Claude"}`
+                        : "Answered from knowledge base search, no API"}
+                  </Badge>
+                  {answer.usage && (
+                    <span>
+                      Estimated API cost: ${answer.usage.estimatedCost.toFixed(6)}
+                      {answer.aiModel ? ` (${answer.aiModel})` : ""}
+                    </span>
+                  )}
+                </div>
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">{answer.answer}</div>
                 <div className="space-y-2">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Citations</p>

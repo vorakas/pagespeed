@@ -65,6 +65,7 @@ import type {
   RequirementCommonQuestion,
   RequirementKnowledgeBase,
   RequirementSource,
+  AiUsageSummary,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -984,11 +985,19 @@ class ApiClient {
     return response.json()
   }
 
-  async askRequirementQuestion(kbId: number, question: string): Promise<RequirementAnswer> {
+  async askRequirementQuestion(
+    kbId: number,
+    question: string,
+    ai?: { provider: "claude" | "openai"; apiKey: string; model: string },
+  ): Promise<RequirementAnswer> {
     return this.request(`/api/requirements/knowledge-bases/${kbId}/questions`, {
       method: "POST",
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, ai }),
     })
+  }
+
+  async getAiUsageSummary(): Promise<AiUsageSummary> {
+    return this.request("/api/requirements/ai-usage")
   }
 }
 
