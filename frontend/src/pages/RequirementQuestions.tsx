@@ -51,8 +51,8 @@ import { repairJiraMarkdownSource } from "@/lib/markdown-source"
 import { cn } from "@/lib/utils"
 
 const DISCOVERY_TERMS_EXAMPLE = "Example: minimum pricing, UMRP, MPR, vendor approval, discount rules"
-const ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
-const OUTLINE_ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
+const ACTION_BUTTON_CLASS = "shadow-none"
+const OUTLINE_ACTION_BUTTON_CLASS = "shadow-none"
 
 type SourcePreview =
   | { kind: "empty" }
@@ -839,13 +839,15 @@ export function RequirementQuestions() {
               className={cn(
                 "inline-flex min-h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors",
                 activeKbId === kb.id
-                  ? "border-primary !bg-white !text-black hover:!bg-white/90 hover:!text-black"
-                  : "border-border !bg-white !text-black hover:!bg-white/90 hover:!text-black",
+                  ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/10 hover:bg-primary/90"
+                  : "border-border bg-background/70 text-foreground hover:border-primary/40 hover:bg-muted/60",
               )}
             >
               <BookOpenCheck className="size-4" />
               {kb.name}
-              <span className="text-xs opacity-75">{kb.sourceCount ?? 0}</span>
+              <span className={cn("text-xs", activeKbId === kb.id ? "text-primary-foreground/75" : "text-muted-foreground")}>
+                {kb.sourceCount ?? 0}
+              </span>
             </button>
           ))}
           {knowledgeBases.length === 0 && (
@@ -1445,20 +1447,20 @@ export function RequirementQuestions() {
       </Dialog>
 
       <Dialog open={sourceToRemove != null} onOpenChange={(open) => !open && setSourceToRemove(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-xl">
           {sourceToRemove && (
             <>
               <DialogHeader>
                 <DialogTitle>Remove Source</DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="max-w-[62ch] pr-8 leading-relaxed">
                   Remove this source from the active knowledge base? The original task or document will not be deleted.
                 </DialogDescription>
               </DialogHeader>
-              <div className="rounded-lg border bg-muted/25 p-3">
-                <div className="text-sm font-medium">{sourceToRemove.title}</div>
-                <div className="mt-1 truncate text-xs text-muted-foreground">{sourceToRemove.sourcePath}</div>
+              <div className="min-w-0 rounded-lg border border-border/70 bg-muted/25 p-3">
+                <div className="break-words text-sm font-medium leading-snug">{sourceToRemove.title}</div>
+                <div className="mt-1 break-all text-xs leading-relaxed text-muted-foreground">{sourceToRemove.sourcePath}</div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="items-center">
                 <Button
                   type="button"
                   variant="outline"
