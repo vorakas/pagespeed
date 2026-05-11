@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react"
 import { marked } from "marked"
 import { renderAsync } from "docx-preview"
 import * as XLSX from "xlsx"
@@ -48,7 +48,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { repairJiraMarkdownSource } from "@/lib/markdown-source"
 import { cn } from "@/lib/utils"
 
-const DEFAULT_DISCOVERY_TERMS = "minimum pricing, minimum price, UMRP, MPR, discount, vendor approval"
+const DISCOVERY_TERMS_EXAMPLE = "Example: minimum pricing, UMRP, MPR, vendor approval, discount rules"
 const ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
 const OUTLINE_ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
 
@@ -73,7 +73,7 @@ export function RequirementQuestions() {
   const [answer, setAnswer] = useState<RequirementAnswer | null>(null)
   const [kbName, setKbName] = useState("")
   const [kbDescription, setKbDescription] = useState("")
-  const [discoveryTerms, setDiscoveryTerms] = useState(DEFAULT_DISCOVERY_TERMS)
+  const [discoveryTerms, setDiscoveryTerms] = useState("")
   const [candidates, setCandidates] = useState<RequirementCandidate[]>([])
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set())
   const [taskPath, setTaskPath] = useState("")
@@ -89,6 +89,8 @@ export function RequirementQuestions() {
   const [selectedSource, setSelectedSource] = useState<RequirementSource | null>(null)
   const [sourceToRemove, setSourceToRemove] = useState<RequirementSource | null>(null)
   const [sourcePreview, setSourcePreview] = useState<SourcePreview>({ kind: "empty" })
+  const [imagePreview, setImagePreview] = useState<{ src: string; alt: string } | null>(null)
+  const [videoPreview, setVideoPreview] = useState<{ src: string; label: string } | null>(null)
   const docxPreviewRef = useRef<HTMLDivElement | null>(null)
 
   const activeKb = useMemo(
@@ -435,8 +437,9 @@ export function RequirementQuestions() {
 
   function formatRequirementSourceContent(content: string): string {
     return content
+      .replace(/\bAC\s*(\d+)\b(?!\.\w)/g, (_match, number) => `<span class="rq-ac-label">AC${number}</span>`)
       .replace(
-        /^###\s+(.+?\s+[—-]\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*$/gm,
+        /^###\s+(.+?\s+[--]\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*$/gm,
         '<h3 class="rq-comment-header">$1</h3>',
       )
       .replace(
@@ -446,25 +449,137 @@ export function RequirementQuestions() {
       .replace(/(^|[\s(])@([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,3})/g, '$1<span class="rq-mention">@$2</span>')
   }
 
+  function attachmentDisplayNames(target: string, label?: string): string[] {
+    const cleanTarget = target.trim()
+    const filename = cleanTarget.split("/").pop() || cleanTarget
+    const underscoreFilename = filename.includes("_") ? filename.slice(filename.lastIndexOf("_") + 1) : ""
+    return [label, filename, underscoreFilename]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .map((value) => value.trim())
+  }
+
+  function normalizeAttachmentCaption(value: string): string {
+    return value
+      .trim()
+      .replace(/^[*_`]+|[*_`]+$/g, "")
+      .replace(/^["']+|["']+$/g, "")
+      .trim()
+      .toLowerCase()
+  }
+
+  function isDuplicateAttachmentCaption(value: string, names: string[]): boolean {
+    const normalized = normalizeAttachmentCaption(value)
+    if (!normalized) return false
+    return names.some((name) => normalizeAttachmentCaption(name) === normalized)
+  }
+
+  function removeDuplicateAttachmentCaptions(content: string): string {
+    const attachmentRe = /!?\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
+    const lines = content.split(/\r?\n/)
+    const cleaned: string[] = []
+    let previousAttachmentNames: string[] = []
+
+    for (const line of lines) {
+      attachmentRe.lastIndex = 0
+      const matches = [...line.matchAll(attachmentRe)]
+
+      if (matches.length > 0) {
+        const lastMatch = matches[matches.length - 1]
+        const target = String(lastMatch[1] || "")
+        const label = lastMatch[2] ? String(lastMatch[2]) : undefined
+        const names = attachmentDisplayNames(target, label)
+        const afterAttachment = line.slice((lastMatch.index ?? 0) + lastMatch[0].length)
+
+        if (isDuplicateAttachmentCaption(afterAttachment, names)) {
+          cleaned.push(line.slice(0, (lastMatch.index ?? 0) + lastMatch[0].length).trimEnd())
+        } else {
+          cleaned.push(line)
+        }
+        previousAttachmentNames = names
+        continue
+      }
+
+      if (previousAttachmentNames.length > 0 && isDuplicateAttachmentCaption(line, previousAttachmentNames)) {
+        previousAttachmentNames = []
+        continue
+      }
+
+      cleaned.push(line)
+      previousAttachmentNames = []
+    }
+
+    return cleaned.join("\n")
+  }
+
+  function escapeAttachmentAttribute(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+  }
+
   function transformRequirementAttachments(content: string, basePath: string): string {
     if (!basePath) return content
     const renderAttachment = (target: string, label?: string) => {
       const cleanTarget = target.trim()
       const cleanLabel = (label || cleanTarget.split("/").pop() || cleanTarget).trim()
       const src = `/api/obsidian/vault/asset?base=${encodeURIComponent(basePath)}&asset=${encodeURIComponent(cleanTarget)}`
-      const safeLabel = cleanLabel.replace(/"/g, "&quot;")
+      const safeLabel = escapeAttachmentAttribute(cleanLabel)
+      const safeSrc = escapeAttachmentAttribute(src)
       if (IMAGE_ATTACHMENT_RE.test(cleanTarget)) {
-        return `<img src="${src}" alt="${safeLabel}" class="requirement-attachment-image" loading="lazy" />`
+        return `<img src="${safeSrc}" alt="${safeLabel}" class="requirement-attachment-image" loading="lazy" role="button" tabindex="0" title="Open image preview" data-requirement-preview-src="${safeSrc}" />`
       }
       if (VIDEO_ATTACHMENT_RE.test(cleanTarget)) {
-        return `<video src="${src}" class="requirement-attachment-video" controls preload="metadata"></video>`
+        return `<button type="button" class="requirement-attachment-video-button" data-requirement-video-src="${safeSrc}" data-requirement-video-label="${safeLabel}" title="Open video playback"><span class="requirement-attachment-video-label">${safeLabel}</span><video src="${safeSrc}" class="requirement-attachment-video" muted preload="metadata"></video></button>`
       }
-      return `<a href="${src}" target="_blank" rel="noreferrer" class="requirement-attachment-link">${safeLabel}</a>`
+      return `<a href="${safeSrc}" target="_blank" rel="noreferrer" class="requirement-attachment-link">${safeLabel}</a>`
     }
 
-    return content
+    return removeDuplicateAttachmentCaptions(content)
       .replace(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target, label) => renderAttachment(String(target), label ? String(label) : undefined))
       .replace(/(?<!!)\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target, label) => renderAttachment(String(target), label ? String(label) : undefined))
+  }
+
+  function openRequirementImagePreview(img: HTMLImageElement) {
+    setImagePreview({
+      src: img.dataset.requirementPreviewSrc || img.currentSrc || img.src,
+      alt: img.alt || "Attachment image",
+    })
+  }
+
+  function openRequirementVideoPreview(button: HTMLElement) {
+    setVideoPreview({
+      src: button.dataset.requirementVideoSrc || "",
+      label: button.dataset.requirementVideoLabel || "Attachment video",
+    })
+  }
+
+  function handleSourceContentClick(event: MouseEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement | null
+    const img = target?.closest<HTMLImageElement>("img.requirement-attachment-image")
+    if (img) {
+      openRequirementImagePreview(img)
+      return
+    }
+    const videoButton = target?.closest<HTMLElement>(".requirement-attachment-video-button")
+    if (!videoButton) return
+    openRequirementVideoPreview(videoButton)
+  }
+
+  function handleSourceContentKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return
+    const target = event.target as HTMLElement | null
+    const img = target?.closest<HTMLImageElement>("img.requirement-attachment-image")
+    if (img) {
+      event.preventDefault()
+      openRequirementImagePreview(img)
+      return
+    }
+    const videoButton = target?.closest<HTMLElement>(".requirement-attachment-video-button")
+    if (!videoButton) return
+    event.preventDefault()
+    openRequirementVideoPreview(videoButton)
   }
 
   function renderOriginalPreview() {
@@ -825,7 +940,7 @@ export function RequirementQuestions() {
                 value={discoveryTerms}
                 onChange={(event) => setDiscoveryTerms(event.target.value)}
                 className="min-h-20"
-                placeholder="Example: ATP, available to promise, inventory allocation, stock availability"
+                placeholder={DISCOVERY_TERMS_EXAMPLE}
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Enter words, phrases, feature names, task labels, or field names that should identify related Jira/Asana tasks.
@@ -900,15 +1015,30 @@ export function RequirementQuestions() {
                 ))}
               </SelectContent>
             </Select>
-            <Input
-              type="file"
-              multiple
-              onChange={(event) => {
-                setFiles(Array.from(event.target.files ?? []))
-                setUploadMessage(null)
-              }}
-              accept=".docx,.pdf,.xlsx,.xls,.csv,.json,.vsdx,.svg,.png,.jpg,.jpeg"
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                id="requirement-doc-upload"
+                type="file"
+                multiple
+                className="sr-only"
+                onChange={(event) => {
+                  setFiles(Array.from(event.target.files ?? []))
+                  setUploadMessage(null)
+                }}
+                accept=".docx,.pdf,.xlsx,.xls,.csv,.json,.vsdx,.svg,.png,.jpg,.jpeg,.webm,.mp4,.mov,.m4v"
+              />
+              <Label
+                htmlFor="requirement-doc-upload"
+                className={cn(
+                  OUTLINE_ACTION_BUTTON_CLASS,
+                  "inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-input px-4 py-2 text-sm font-medium transition-colors",
+                )}
+              >
+                <FileUp className="size-4" />
+                Choose Files
+              </Label>
+              {files.length > 0 && <span className="text-sm text-muted-foreground">{files.length} selected</span>}
+            </div>
             <Button
               className={ACTION_BUTTON_CLASS}
               onClick={() => void uploadFiles()}
@@ -977,7 +1107,16 @@ export function RequirementQuestions() {
         </Card>
       </section>
 
-      <Dialog open={selectedSource != null} onOpenChange={(open) => !open && setSelectedSource(null)}>
+      <Dialog
+        open={selectedSource != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedSource(null)
+            setImagePreview(null)
+            setVideoPreview(null)
+          }
+        }}
+      >
         <DialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] grid-rows-none flex-col overflow-hidden sm:max-w-6xl">
           {selectedSource && (
             <>
@@ -1010,6 +1149,8 @@ export function RequirementQuestions() {
                   </h3>
                   <div
                     className="requirement-source-md rounded-lg border bg-muted/25 p-4"
+                    onClick={handleSourceContentClick}
+                    onKeyDown={handleSourceContentKeyDown}
                     dangerouslySetInnerHTML={{ __html: selectedSourceHtml }}
                   />
                 </section>
@@ -1034,6 +1175,44 @@ export function RequirementQuestions() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={imagePreview != null} onOpenChange={(open) => !open && setImagePreview(null)}>
+        <DialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] grid-rows-none flex-col overflow-hidden sm:max-w-7xl">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="leading-snug">{imagePreview?.alt || "Attachment image"}</DialogTitle>
+            <DialogDescription>Image attachment preview</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-auto rounded-lg border bg-black/90 p-3">
+            {imagePreview && (
+              <img
+                src={imagePreview.src}
+                alt={imagePreview.alt}
+                className="mx-auto block max-h-[calc(100vh-10rem)] max-w-full rounded-md bg-white object-contain"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={videoPreview != null} onOpenChange={(open) => !open && setVideoPreview(null)}>
+        <DialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] grid-rows-none flex-col overflow-hidden sm:max-w-7xl">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="leading-snug">{videoPreview?.label || "Attachment video"}</DialogTitle>
+            <DialogDescription>Video attachment playback</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-auto rounded-lg border bg-black p-3">
+            {videoPreview && (
+              <video
+                src={videoPreview.src}
+                className="mx-auto block max-h-[calc(100vh-10rem)] w-full rounded-md bg-black"
+                controls
+                preload="metadata"
+                autoPlay
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

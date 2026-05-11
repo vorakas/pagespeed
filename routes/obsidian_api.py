@@ -216,7 +216,7 @@ def create_obsidian_blueprint(
             return jsonify({"error": "vault not found"}), 404
         except VaultPathError as exc:
             return jsonify({"error": str(exc)}), 400
-        return send_file(path, mimetype=mimetype, max_age=3600)
+        return send_file(path, mimetype=mimetype, max_age=3600, conditional=True)
 
     @bp.route("/api/obsidian/vault/page", methods=["GET"])
     def vault_page():

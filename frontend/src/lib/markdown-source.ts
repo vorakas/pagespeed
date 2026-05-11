@@ -29,7 +29,8 @@
  *    preserve them anyway.)
  *
  * 3. **Spaced bold labels** — Jira comments sometimes emit label-style
- *    bold text as ``**AC7: **Next words``. CommonMark does not treat a
+ *    bold text as ``**AC7: **Next words`` or ``**AC7: ** Next words``.
+ *    CommonMark does not treat a
  *    delimiter preceded by whitespace as a closing delimiter, so the
  *    raw asterisks leak into the UI. Move the trailing space outside
  *    the bold marker: ``**AC7:** Next words``.
@@ -55,8 +56,8 @@ export function repairJiraMarkdownSource(md: string): string {
   // 2. Non-breaking spaces → regular spaces.
   out = out.replace(/\u00A0/g, " ")
 
-  // 3. Spaced bold labels: **AC7: **Text → **AC7:** Text.
-  out = out.replace(/\*\*([^*\n]{1,80}?:)\s+\*\*(?=\S)/g, "**$1** ")
+  // 3. Spaced bold labels: **AC7: ** Text → **AC7:** Text.
+  out = out.replace(/\*\*([^*\n]{1,80}?:)\s+\*\*\s*(?=\S)/g, "**$1** ")
 
   return out
 }

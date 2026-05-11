@@ -49,8 +49,7 @@ class VaultReader:
     """
 
     _ALLOWED_EXTS = frozenset({".md", ".markdown", ".txt"})
-    _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"})
-    _IMAGE_MIMES = {
+    _ASSET_MIMES = {
         ".png": "image/png",
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
@@ -58,6 +57,10 @@ class VaultReader:
         ".webp": "image/webp",
         ".svg": "image/svg+xml",
         ".bmp": "image/bmp",
+        ".webm": "video/webm",
+        ".mp4": "video/mp4",
+        ".mov": "video/quicktime",
+        ".m4v": "video/x-m4v",
     }
 
     def __init__(self, vault_root: str) -> None:
@@ -104,7 +107,7 @@ class VaultReader:
         }
 
     def resolve_asset(self, base_rel_path: str, asset_rel_path: str) -> tuple[Path, str]:
-        """Find an image attachment referenced from a markdown page.
+        """Find an attachment referenced from a markdown page.
 
         Obsidian wikilinks like ``![[_attachments/foo.png]]`` are path-ish but
         not rooted. The Asana sync writes attachments to ``<project>/_attachments/``
@@ -112,7 +115,7 @@ class VaultReader:
         task's parent directory and try ``<dir>/<asset_rel_path>`` at each level.
 
         Returns ``(absolute_path, mime_type)`` for the first match whose extension
-        is in the image allowlist. Raises :class:`VaultPathError` otherwise.
+        is in the asset allowlist. Raises :class:`VaultPathError` otherwise.
         """
         if not self.exists():
             raise VaultNotFoundError(str(self._root))
@@ -121,7 +124,7 @@ class VaultReader:
             raise VaultPathError(f"Asset path must not traverse: {asset_rel_path}")
 
         ext = Path(cleaned_asset).suffix.lower()
-        if ext not in self._IMAGE_EXTS:
+        if ext not in self._ASSET_MIMES:
             raise VaultPathError(f"Unsupported asset type: {ext or '(none)'}")
 
         base_resolved = self._resolve(base_rel_path)
@@ -136,7 +139,7 @@ class VaultReader:
             except ValueError:
                 break
             if candidate.is_file():
-                return candidate, self._IMAGE_MIMES[ext]
+                return candidate, self._ASSET_MIMES[ext]
             if current == root:
                 break
             if root not in current.parents:

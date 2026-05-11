@@ -258,6 +258,10 @@
     font-weight: 700;
     text-decoration: none;
   }
+  .requirement-source-md .rq-ac-label {
+    color: hsl(142 71% 45%);
+    font-weight: 750;
+  }
   .requirement-source-md a.rq-mention {
     border-bottom: 1px dotted hsl(270 95% 78% / 0.55);
   }
@@ -269,16 +273,42 @@
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     background: white;
+    cursor: zoom-in;
     margin: 0.5rem 0 0.85rem;
+  }
+  .requirement-source-md .requirement-attachment-image:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
+  }
+  .requirement-source-md .requirement-attachment-video-button {
+    display: block;
+    width: min(100%, 720px);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: hsl(222 25% 10%);
+    cursor: zoom-in;
+    margin: 0.5rem 0 0.85rem;
+    overflow: hidden;
+    padding: 0;
+    text-align: left;
+  }
+  .requirement-source-md .requirement-attachment-video-button:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
+  }
+  .requirement-source-md .requirement-attachment-video-label {
+    display: block;
+    border-bottom: 1px solid var(--border);
+    padding: 0.45rem 0.65rem;
+    color: var(--foreground);
+    font-size: 0.78rem;
+    font-weight: 650;
   }
   .requirement-source-md .requirement-attachment-video {
     display: block;
-    width: min(100%, 720px);
-    max-height: 420px;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    width: 100%;
+    max-height: 360px;
     background: black;
-    margin: 0.5rem 0 0.85rem;
   }
   .requirement-source-md .requirement-attachment-link {
     display: inline-flex;
