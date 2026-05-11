@@ -381,4 +381,77 @@
     border: 1px solid #d4d4d8;
     padding: 0.35rem 0.5rem;
   }
+
+  .requirement-answer-md {
+    color: var(--foreground);
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+  .requirement-answer-md > *:first-child {
+    margin-top: 0;
+  }
+  .requirement-answer-md > *:last-child {
+    margin-bottom: 0;
+  }
+  .requirement-answer-md h1,
+  .requirement-answer-md h2,
+  .requirement-answer-md h3,
+  .requirement-answer-md h4 {
+    margin: 1.35rem 0 0.55rem;
+    color: var(--foreground);
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.25;
+  }
+  .requirement-answer-md h1 {
+    font-size: 1.15rem;
+  }
+  .requirement-answer-md h2 {
+    font-size: 1.05rem;
+  }
+  .requirement-answer-md h3,
+  .requirement-answer-md h4 {
+    font-size: 0.95rem;
+  }
+  .requirement-answer-md p {
+    margin: 0.75rem 0;
+  }
+  .requirement-answer-md ul,
+  .requirement-answer-md ol {
+    margin: 0.65rem 0 1rem;
+    padding-left: 1.35rem;
+  }
+  .requirement-answer-md ul {
+    list-style: disc;
+  }
+  .requirement-answer-md ol {
+    list-style: decimal;
+  }
+  .requirement-answer-md li {
+    margin: 0.45rem 0;
+    padding-left: 0.2rem;
+  }
+  .requirement-answer-md li > p {
+    margin: 0.35rem 0;
+  }
+  .requirement-answer-md strong {
+    font-weight: 700;
+  }
+  .requirement-answer-md hr {
+    margin: 1.2rem 0;
+    border: 0;
+    border-top: 1px solid hsl(var(--border) / 0.75);
+  }
+  .requirement-answer-md code {
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: 0.35rem;
+    background: hsl(var(--muted) / 0.45);
+    padding: 0.1rem 0.32rem;
+    font-size: 0.84em;
+  }
+  .requirement-answer-md a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
 }

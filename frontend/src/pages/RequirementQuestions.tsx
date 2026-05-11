@@ -47,7 +47,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { useLocalConfig } from "@/hooks/use-local-config"
 import { repairJiraMarkdownSource } from "@/lib/markdown-source"
-import { cn } from "@/lib/utils"
+import { cn, escapeHtml } from "@/lib/utils"
 
 const DISCOVERY_TERMS_EXAMPLE = "Example: minimum pricing, UMRP, MPR, vendor approval, discount rules"
 const ACTION_BUTTON_CLASS = "shadow-none !text-black hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
@@ -529,7 +529,17 @@ export function RequirementQuestions() {
   }
 
   function renderAnswerBody(answer: RequirementAnswer) {
-    if (answer.citations.length === 0 || answer.answerSource === "ai") {
+    if (answer.answerSource === "ai") {
+      const html = marked.parse(escapeHtml(answer.answer), { async: false }) as string
+      return (
+        <div
+          className="requirement-answer-md min-w-0 break-words [overflow-wrap:anywhere]"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )
+    }
+
+    if (answer.citations.length === 0) {
       return <div className="min-w-0 whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]">{answer.answer}</div>
     }
 
