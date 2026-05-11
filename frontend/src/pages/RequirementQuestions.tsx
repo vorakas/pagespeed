@@ -64,6 +64,7 @@ type SourcePreview =
 const IMAGE_ATTACHMENT_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i
 const VIDEO_ATTACHMENT_RE = /\.(webm|mp4|mov|m4v)$/i
 const TASK_REFERENCE_RE = /\b(?:LAMPSPLUS|LPWE|LP|WPM|DBADMIN)-\d+\b/g
+const SOURCE_REFERENCE_RE = /\bSources?\s+\d+(?:\s*(?:,|&|and)\s*\d+)*/gi
 
 export function RequirementQuestions() {
   const [aiProvider, setAiProvider] = useLocalConfig<"claude" | "openai">("requirementAiProvider", "claude")
@@ -543,7 +544,7 @@ export function RequirementQuestions() {
 
   function renderAnswerBody(answer: RequirementAnswer) {
     if (answer.answerSource === "ai") {
-      const html = formatRequirementAnswerHtml(marked.parse(escapeHtml(answer.answer), { async: false }) as string)
+      const html = formatRequirementAnswerHtml(marked.parse(escapeHtml(answer.answer), { async: false }) as string, answer.citations)
       return (
         <div
           className="requirement-answer-md min-w-0 break-words [overflow-wrap:anywhere]"
@@ -573,7 +574,7 @@ export function RequirementQuestions() {
     )
   }
 
-  function formatRequirementAnswerHtml(html: string): string {
+  function formatRequirementAnswerHtml(html: string, citations: RequirementAnswer["citations"]): string {
     if (!html) return html
     const template = document.createElement("template")
     template.innerHTML = html
@@ -589,35 +590,58 @@ export function RequirementQuestions() {
 
     for (const node of textNodes) {
       const text = node.nodeValue || ""
-      if (!TASK_REFERENCE_RE.test(text)) {
+      if (!TASK_REFERENCE_RE.test(text) && !SOURCE_REFERENCE_RE.test(text)) {
         TASK_REFERENCE_RE.lastIndex = 0
+        SOURCE_REFERENCE_RE.lastIndex = 0
         continue
       }
       TASK_REFERENCE_RE.lastIndex = 0
+      SOURCE_REFERENCE_RE.lastIndex = 0
       const fragment = document.createDocumentFragment()
       let lastIndex = 0
-      let match: RegExpExecArray | null
+      const matches = [
+        ...Array.from(text.matchAll(TASK_REFERENCE_RE), (match) => ({ type: "task" as const, match })),
+        ...Array.from(text.matchAll(SOURCE_REFERENCE_RE), (match) => ({ type: "source" as const, match })),
+      ].sort((a, b) => a.match.index - b.match.index)
 
-      while ((match = TASK_REFERENCE_RE.exec(text)) !== null) {
-        if (match.index > lastIndex) fragment.append(document.createTextNode(text.slice(lastIndex, match.index)))
-        const label = match[0].toUpperCase()
-        const source = sourceByTaskKey.get(label)
-        const pill = document.createElement(source ? "button" : "span")
-        pill.className = "rq-task-ref"
-        pill.textContent = label
-        if (source) {
-          pill.setAttribute("type", "button")
-          pill.setAttribute("data-requirement-source-id", String(source.id))
-          pill.setAttribute("title", `Open ${source.title}`)
+      for (const { type, match } of matches) {
+        const index = match.index
+        if (index < lastIndex) continue
+        if (index > lastIndex) fragment.append(document.createTextNode(text.slice(lastIndex, index)))
+
+        if (type === "task") {
+          const label = match[0].toUpperCase()
+          const source = sourceByTaskKey.get(label)
+          fragment.append(createTaskReferencePill(label, source))
+        } else {
+          const citationNumbers = match[0].match(/\d+/g) ?? []
+          citationNumbers.forEach((numberText, citationIndex) => {
+            const citation = citations[Number(numberText) - 1]
+            const source = citation ? citationSource(citation) : null
+            const label = citation ? citationLabel(citation) : `Source ${numberText}`
+            if (citationIndex > 0) fragment.append(document.createTextNode(" & "))
+            fragment.append(createTaskReferencePill(label, source))
+          })
         }
-        fragment.append(pill)
-        lastIndex = match.index + match[0].length
+        lastIndex = index + match[0].length
       }
       if (lastIndex < text.length) fragment.append(document.createTextNode(text.slice(lastIndex)))
       node.replaceWith(fragment)
     }
 
     return template.innerHTML
+  }
+
+  function createTaskReferencePill(label: string, source: RequirementSource | null): HTMLElement {
+    const pill = document.createElement(source ? "button" : "span")
+    pill.className = "rq-task-ref"
+    pill.textContent = label
+    if (source) {
+      pill.setAttribute("type", "button")
+      pill.setAttribute("data-requirement-source-id", String(source.id))
+      pill.setAttribute("title", `Open ${source.title}`)
+    }
+    return pill
   }
 
   function formatRequirementMarkdownSource(content: string): string {
