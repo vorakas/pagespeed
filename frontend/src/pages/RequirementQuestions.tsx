@@ -35,8 +35,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 const DEFAULT_DISCOVERY_TERMS = "minimum pricing, minimum price, UMRP, MPR, discount, vendor approval"
-const ACTION_BUTTON_CLASS = "text-black hover:text-black focus-visible:text-black [&_svg]:text-black"
-const OUTLINE_ACTION_BUTTON_CLASS = "bg-white text-black hover:bg-white/90 hover:text-black focus-visible:text-black [&_svg]:text-black"
+const ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
+const OUTLINE_ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
 
 export function RequirementQuestions() {
   const [knowledgeBases, setKnowledgeBases] = useState<RequirementKnowledgeBase[]>([])
@@ -59,6 +59,7 @@ export function RequirementQuestions() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null)
 
   const activeKb = useMemo(
     () => knowledgeBases.find((kb) => kb.id === activeKbId) ?? null,
@@ -231,9 +232,11 @@ export function RequirementQuestions() {
     if (!kbId || files.length === 0) return
     setBusy("upload")
     setError(null)
+    setUploadMessage(null)
     try {
-      await api.uploadRequirementFiles(kbId, files)
+      const uploaded = await api.uploadRequirementFiles(kbId, files)
       setFiles([])
+      setUploadMessage(`Upload Complete: ${uploaded.length} file${uploaded.length === 1 ? "" : "s"} indexed.`)
       if (kbId === activeKbId) {
         await loadSources(kbId)
       }
@@ -296,8 +299,8 @@ export function RequirementQuestions() {
               className={cn(
                 "inline-flex min-h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors",
                 activeKbId === kb.id
-                  ? "border-primary bg-primary text-black hover:text-black"
-                  : "border-border bg-white text-black hover:bg-white/90 hover:text-black",
+                  ? "border-primary !bg-white !text-black hover:!bg-white/90 hover:!text-black"
+                  : "border-border !bg-white !text-black hover:!bg-white/90 hover:!text-black",
               )}
             >
               <BookOpenCheck className="size-4" />
@@ -523,7 +526,10 @@ export function RequirementQuestions() {
             <Input
               type="file"
               multiple
-              onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+              onChange={(event) => {
+                setFiles(Array.from(event.target.files ?? []))
+                setUploadMessage(null)
+              }}
               accept=".docx,.pdf,.xlsx,.xls,.csv,.json,.vsdx,.svg,.png,.jpg,.jpeg"
             />
             <Button
@@ -534,6 +540,11 @@ export function RequirementQuestions() {
               {busy === "upload" ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />}
               Upload {files.length ? files.length : ""}
             </Button>
+            {uploadMessage && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                {uploadMessage}
+              </div>
+            )}
           </CardContent>
         </Card>
 
