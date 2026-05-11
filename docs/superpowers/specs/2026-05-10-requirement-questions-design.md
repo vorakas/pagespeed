@@ -64,6 +64,15 @@ Workflow:
 7. User confirms selection.
 8. Pharos creates the KB, imports selected task files, chunks them, and indexes them into that KB.
 
+After a KB is created, Pharos must immediately refresh all KB selectors on the page. The new KB should appear in:
+
+- Top ask-question pill buttons.
+- Upload target dropdowns.
+- Add Task target controls.
+- Add Note target controls.
+
+The newly created KB should become the active KB by default so users can immediately upload associated docs or ask questions without reloading the page.
+
 Vault search scope:
 
 - Use the configured `OBSIDIAN_VAULT_ROOT`.
