@@ -1213,6 +1213,7 @@ class RequirementKbService:
             citations = json.loads(row.get("citations_json") or "[]")
         except json.JSONDecodeError:
             citations = []
+        citations = self._hydrate_citation_snippets(citations)
         result = dict(row)
         result["citations"] = citations
         for snake, camel in [
@@ -1227,6 +1228,39 @@ class RequirementKbService:
             if snake in result:
                 result[camel] = result.pop(snake)
         return result
+
+    def _hydrate_citation_snippets(self, citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Refresh cached citation snippets from current chunk content.
+
+        Older saved FAQ rows may contain compacted snippets ending in ellipses.
+        The citation identity is stable, so we can replace the display snippet
+        from ``requirement_chunks`` without changing the saved question row.
+        """
+        if not citations:
+            return citations
+        ph = self.conn_mgr.placeholder()
+        hydrated: list[dict[str, Any]] = []
+        with self.conn_mgr.get_connection() as conn:
+            cursor = conn.cursor()
+            for citation in citations:
+                next_citation = dict(citation)
+                source_id = citation.get("sourceId")
+                chunk_index = citation.get("chunkIndex")
+                if source_id is not None and chunk_index is not None:
+                    cursor.execute(
+                        f"""
+                        SELECT content
+                        FROM requirement_chunks
+                        WHERE source_id = {ph}
+                          AND chunk_index = {ph}
+                        """,
+                        (source_id, chunk_index),
+                    )
+                    row = self.conn_mgr.row_to_dict(cursor)
+                    if row and row.get("content"):
+                        next_citation["snippet"] = self._clean(row["content"])
+                hydrated.append(next_citation)
+        return hydrated
 
     def _text_areas(self, item: dict[str, Any]) -> str:
         values = []

@@ -498,15 +498,15 @@ export function RequirementQuestions() {
 
   function renderAnswerBody(answer: RequirementAnswer) {
     if (answer.citations.length === 0 || answer.answerSource === "ai") {
-      return <div className="whitespace-pre-wrap text-sm leading-relaxed">{answer.answer}</div>
+      return <div className="min-w-0 whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]">{answer.answer}</div>
     }
 
     return (
-      <div className="space-y-3 text-sm leading-relaxed">
+      <div className="min-w-0 space-y-3 text-sm leading-relaxed">
         <p>I found these relevant requirement notes:</p>
-        <ul className="space-y-2">
+        <ul className="min-w-0 space-y-2">
           {answer.citations.map((citation, index) => (
-            <li key={`${citation.sourceId}-${citation.chunkIndex}-${index}`} className="leading-relaxed">
+            <li key={`${citation.sourceId}-${citation.chunkIndex}-${index}`} className="min-w-0 break-words leading-relaxed [overflow-wrap:anywhere]">
               <span>{citationText(citation)}</span>
               {renderCitationPill(citation)}
             </li>
@@ -777,7 +777,7 @@ export function RequirementQuestions() {
   }
 
   return (
-    <div className="space-y-6 p-4 lg:p-6">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden p-4 lg:p-6">
       <section className="space-y-3">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -830,8 +830,8 @@ export function RequirementQuestions() {
         </div>
       )}
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-        <Card className="rounded-lg">
+      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+        <Card className="min-w-0 rounded-lg">
           <CardHeader>
             <CardTitle>Ask {activeKb ? activeKb.name : "a Knowledge Base"}</CardTitle>
             <CardDescription>
@@ -877,7 +877,7 @@ export function RequirementQuestions() {
               </Button>
             </div>
             {answer && (
-              <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+              <div className="min-w-0 space-y-4 overflow-hidden rounded-lg border bg-muted/30 p-4">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant={answer.apiUsed ? "secondary" : "outline"}>
                     {answer.answerSource === "common_question"
@@ -899,8 +899,8 @@ export function RequirementQuestions() {
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
-          <Card className="rounded-lg">
+        <div className="min-w-0 space-y-4">
+          <Card className="min-w-0 rounded-lg">
             <CardHeader>
               <CardTitle>Commonly Asked Questions</CardTitle>
               <CardDescription>
@@ -1066,8 +1066,8 @@ export function RequirementQuestions() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        <Card className="rounded-lg">
+      <section className="grid min-w-0 gap-4 xl:grid-cols-3">
+        <Card className="min-w-0 rounded-lg">
           <CardHeader>
             <CardTitle>Create Knowledge Base</CardTitle>
             <CardDescription>Discover Jira/Asana candidates using terms that identify the requirement area.</CardDescription>
