@@ -217,3 +217,71 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+@layer components {
+  .requirement-source-md {
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+  }
+  .requirement-source-md h1,
+  .requirement-source-md h2,
+  .requirement-source-md h3,
+  .requirement-source-md h4,
+  .requirement-source-md h5,
+  .requirement-source-md h6 {
+    margin: 1rem 0 0.45rem;
+    font-weight: 650;
+    line-height: 1.25;
+  }
+  .requirement-source-md h1:first-child,
+  .requirement-source-md h2:first-child,
+  .requirement-source-md h3:first-child {
+    margin-top: 0;
+  }
+  .requirement-source-md h1 { font-size: 1.05rem; }
+  .requirement-source-md h2 { font-size: 0.98rem; }
+  .requirement-source-md h3,
+  .requirement-source-md h4,
+  .requirement-source-md h5,
+  .requirement-source-md h6 { font-size: 0.9rem; }
+  .requirement-source-md p {
+    margin: 0 0 0.65rem;
+  }
+  .requirement-source-md ul,
+  .requirement-source-md ol {
+    margin: 0 0 0.65rem;
+    padding-left: 1.35rem;
+  }
+  .requirement-source-md ul { list-style: disc; }
+  .requirement-source-md ol { list-style: decimal; }
+  .requirement-source-md li {
+    margin-bottom: 0.2rem;
+  }
+  .requirement-source-md table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 0.75rem;
+    font-size: 0.78rem;
+  }
+  .requirement-source-md th,
+  .requirement-source-md td {
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    text-align: left;
+  }
+  .requirement-source-md code {
+    border-radius: 0.25rem;
+    background: var(--muted);
+    padding: 0.08rem 0.3rem;
+    font-size: 0.78rem;
+  }
+  .requirement-source-md pre {
+    overflow-x: auto;
+    border-radius: 0.5rem;
+    background: var(--muted);
+    padding: 0.75rem;
+  }
+}

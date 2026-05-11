@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { marked } from "marked"
 import {
   BookOpenCheck,
   CheckCircle2,
@@ -83,13 +84,23 @@ export function RequirementQuestions() {
     [knowledgeBases, uploadKbId],
   )
   const taskSources = useMemo(
-    () => sources.filter((source) => source.sourceType === "vault_task"),
+    () =>
+      sources
+        .filter((source) => source.sourceType === "vault_task")
+        .sort((a, b) => (b.chunkCount ?? 0) - (a.chunkCount ?? 0)),
     [sources],
   )
   const documentSources = useMemo(
-    () => sources.filter((source) => source.sourceType !== "vault_task"),
+    () =>
+      sources
+        .filter((source) => source.sourceType !== "vault_task")
+        .sort((a, b) => (b.chunkCount ?? 0) - (a.chunkCount ?? 0)),
     [sources],
   )
+  const selectedSourceHtml = useMemo(() => {
+    if (!selectedSource) return ""
+    return marked.parse(sourceContent(selectedSource), { async: false }) as string
+  }, [selectedSource])
 
   useEffect(() => {
     void loadKnowledgeBases(true)
@@ -305,7 +316,7 @@ export function RequirementQuestions() {
 
   function sourceContent(source: RequirementSource): string {
     const text = source.extractedText?.trim()
-    if (text) return text
+    if (text) return text.replace(/^---[\s\S]*?\n---\s*/, "").trim()
     if (source.parseStatus === "visual_only") {
       return "No readable text was extracted from this file. It remains attached to the knowledge base as a visual/reference source."
     }
@@ -495,7 +506,12 @@ export function RequirementQuestions() {
                 <>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tasks</p>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tasks</p>
+                        <p className="text-[11px] text-muted-foreground" title="The number at right is how many indexed chunks this source contributes to search and answers.">
+                          Right number = indexed chunks, sorted high to low.
+                        </p>
+                      </div>
                       <Badge variant="outline">{taskSources.length}</Badge>
                     </div>
                     <div className="max-h-80 space-y-1 overflow-y-auto pr-1">
@@ -518,7 +534,10 @@ export function RequirementQuestions() {
                                 <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
                                   {compactTaskTitle(source)}
                                 </span>
-                                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                                <span
+                                  className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                                  title="Indexed chunks used for retrieval"
+                                >
                                   {source.chunkCount ?? 0}
                                 </span>
                               </div>
@@ -541,40 +560,44 @@ export function RequirementQuestions() {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Documents</p>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Documents</p>
+                        <p className="text-[11px] text-muted-foreground">Click a document to preview indexed content.</p>
+                      </div>
                       <Badge variant="outline">{documentSources.length}</Badge>
                     </div>
-                    <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                    <div className="max-h-80 space-y-1 overflow-y-auto pr-1">
                       {documentSources.length === 0 ? (
                         <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
                           No uploaded document sources.
                         </div>
                       ) : (
                         documentSources.map((source) => (
-                          <div key={source.id} className="group/source flex gap-2">
+                          <div key={source.id} className="group/source flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => setSelectedSource(source)}
-                              className="min-w-0 flex-1 rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
-                              <div className="flex items-start gap-3">
-                                <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="truncate text-sm font-medium text-foreground">{source.title}</div>
-                                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                    <Badge variant={source.parseStatus === "indexed" ? "secondary" : "outline"}>{source.parseStatus}</Badge>
-                                    <span>{sourceKindLabel(source)}</span>
-                                    <span>{source.chunkCount ?? 0} chunks</span>
-                                  </div>
-                                  <p className="mt-2 truncate text-xs text-muted-foreground">{source.sourcePath}</p>
-                                </div>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+                                <span className="shrink-0 rounded-[4px] border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground">
+                                  {sourceKindLabel(source)}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{source.title}</span>
+                                <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground" title="Indexed chunks used for retrieval">
+                                  {source.chunkCount ?? 0}
+                                </span>
+                                <Badge variant={source.parseStatus === "indexed" ? "secondary" : "outline"} className="shrink-0 text-[10px]">
+                                  {source.parseStatus}
+                                </Badge>
                               </div>
                             </button>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon-sm"
-                              className="mt-2 shrink-0 text-muted-foreground hover:text-destructive"
+                              className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
                               aria-label={`Remove ${source.title}`}
                               onClick={() => setSourceToRemove(source)}
                             >
@@ -760,10 +783,10 @@ export function RequirementQuestions() {
       </section>
 
       <Dialog open={selectedSource != null} onOpenChange={(open) => !open && setSelectedSource(null)}>
-        <DialogContent className="max-h-[86vh] overflow-hidden sm:max-w-4xl">
+        <DialogContent className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] grid-rows-none flex-col overflow-hidden sm:max-w-5xl">
           {selectedSource && (
             <>
-              <DialogHeader>
+              <DialogHeader className="shrink-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{sourceKindLabel(selectedSource)}</Badge>
                   <Badge variant={selectedSource.parseStatus === "indexed" ? "secondary" : "outline"}>{selectedSource.parseStatus}</Badge>
@@ -774,12 +797,11 @@ export function RequirementQuestions() {
                   {[selectedSource.sourceId, selectedSource.sourceSystem, selectedSource.sourcePath].filter(Boolean).join(" | ")}
                 </DialogDescription>
               </DialogHeader>
-              <div className="min-h-0 overflow-y-auto rounded-lg border bg-muted/25 p-4">
-                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
-                  {sourceContent(selectedSource)}
-                </pre>
-              </div>
-              <DialogFooter>
+              <div
+                className="requirement-source-md min-h-0 flex-1 overflow-y-auto rounded-lg border bg-muted/25 p-4"
+                dangerouslySetInnerHTML={{ __html: selectedSourceHtml }}
+              />
+              <DialogFooter className="shrink-0">
                 <Button
                   type="button"
                   variant="outline"
