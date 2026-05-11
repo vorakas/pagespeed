@@ -99,7 +99,7 @@ export function RequirementQuestions() {
   )
   const selectedSourceHtml = useMemo(() => {
     if (!selectedSource) return ""
-    return marked.parse(sourceContent(selectedSource), { async: false }) as string
+    return marked.parse(formatRequirementSourceContent(sourceContent(selectedSource)), { async: false }) as string
   }, [selectedSource])
 
   useEffect(() => {
@@ -338,6 +338,19 @@ export function RequirementQuestions() {
     return source.title
       .replace(new RegExp(`^\\[?${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]?\\s*[-:]*\\s*`, "i"), "")
       .trim() || source.title
+  }
+
+  function formatRequirementSourceContent(content: string): string {
+    return content
+      .replace(
+        /^###\s+(.+?\s+[—-]\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*$/gm,
+        '<h3 class="rq-comment-header">$1</h3>',
+      )
+      .replace(
+        /\[(@[^\]]+)\]\(([^)]+)\)/g,
+        '<a class="rq-mention" href="$2" target="_blank" rel="noreferrer">$1</a>',
+      )
+      .replace(/(^|[\s(])@([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,3})/g, '$1<span class="rq-mention">@$2</span>')
   }
 
   if (loading) {
