@@ -450,12 +450,17 @@ class RequirementKbService:
         question: str,
         limit: int = 5,
         ai_options: dict[str, Any] | None = None,
+        answer_mode: str = "auto",
     ) -> dict[str, Any]:
         terms = self._question_terms(question)
         if not terms:
             raise ValidationError("Question is required")
 
-        saved = self._get_saved_common_question(kb_id, question)
+        mode = (answer_mode or "auto").strip().lower()
+        if mode not in {"auto", "exact", "summary"}:
+            mode = "auto"
+
+        saved = self._get_saved_common_question(kb_id, question) if mode != "summary" else None
         if saved:
             saved["answerSource"] = "common_question"
             saved["apiUsed"] = False
@@ -493,8 +498,18 @@ class RequirementKbService:
 
         citations = self._citations_from_top(top)
         score_payload = [{"score": score, "matchedTerms": matched} for score, matched, _chunk in top]
-        if should_use_ai_for_requirement_question(question, score_payload):
-            ai_answer = self._try_ai_answer(kb_id, question, top, citations, ai_options or {})
+        use_ai = mode == "summary" or (
+            mode == "auto" and should_use_ai_for_requirement_question(question, score_payload)
+        )
+        if use_ai:
+            ai_answer = self._try_ai_answer(
+                kb_id,
+                question,
+                top,
+                citations,
+                ai_options or {},
+                save_common=mode != "summary",
+            )
             if ai_answer:
                 return ai_answer
 
@@ -503,8 +518,9 @@ class RequirementKbService:
             snippet = self._clean(chunk["content"])
             answer_lines.append(f"- {snippet}")
         answer = {"answer": "\n".join(answer_lines), "citations": citations, "answerSource": "kb_search", "apiUsed": False}
-        common_question = self._save_common_question(kb_id, question.strip(), answer["answer"], citations)
-        answer["commonQuestionId"] = common_question["id"]
+        if mode != "summary":
+            common_question = self._save_common_question(kb_id, question.strip(), answer["answer"], citations)
+            answer["commonQuestionId"] = common_question["id"]
         return answer
 
     def list_ai_usage_summary(self) -> dict[str, Any]:
@@ -637,6 +653,7 @@ class RequirementKbService:
         top: list[tuple[int, list[str], dict[str, Any]]],
         citations: list[dict[str, Any]],
         ai_options: dict[str, Any],
+        save_common: bool = True,
     ) -> dict[str, Any] | None:
         provider = normalize_provider(str(ai_options.get("provider") or ""))
         if provider not in {"claude", "openai"}:
@@ -691,8 +708,9 @@ class RequirementKbService:
             "aiModel": result.get("model") or model,
             "usage": usage,
         }
-        common_question = self._save_common_question(kb_id, question.strip(), answer["answer"], citations)
-        answer["commonQuestionId"] = common_question["id"]
+        if save_common:
+            common_question = self._save_common_question(kb_id, question.strip(), answer["answer"], citations)
+            answer["commonQuestionId"] = common_question["id"]
         return answer
 
     def _log_ai_usage(

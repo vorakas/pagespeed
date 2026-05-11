@@ -1006,10 +1006,11 @@ class ApiClient {
     kbId: number,
     question: string,
     ai?: { provider: "claude" | "openai"; apiKey: string; model: string },
+    answerMode: "exact" | "summary" = "exact",
   ): Promise<RequirementAnswer> {
     return this.request(`/api/requirements/knowledge-bases/${kbId}/questions`, {
       method: "POST",
-      body: JSON.stringify({ question, ai }),
+      body: JSON.stringify({ question, ai, answerMode }),
     })
   }
 

@@ -125,6 +125,7 @@ def create_requirements_blueprint(
                 kb_id,
                 data.get("question", ""),
                 ai_options=ai_options,
+                answer_mode=data.get("answerMode") or data.get("answer_mode") or "auto",
             )
         )
 

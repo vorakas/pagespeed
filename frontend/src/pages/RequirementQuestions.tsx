@@ -295,6 +295,7 @@ export function RequirementQuestions() {
         activeKbId,
         question.trim(),
         selectedAi,
+        answerMode,
       )
       setAnswer(nextAnswer)
       await loadCommonQuestions(activeKbId)

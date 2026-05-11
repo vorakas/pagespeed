@@ -111,6 +111,41 @@ class RequirementKbServiceTest(unittest.TestCase):
         self.assertIn("commonQuestionId", first_answer)
         self.assertEqual(first_answer["commonQuestionId"], second_answer["commonQuestionId"])
 
+    def test_summary_mode_bypasses_saved_faq_and_uses_ai(self):
+        candidates = self.service.discover_candidates(["minimum pricing", "UMRP"], limit=10)
+        kb = self.service.create_knowledge_base_from_candidates(
+            name="Calculator",
+            description="Minimum pricing and discounting requirements",
+            search_terms=["minimum pricing", "UMRP"],
+            candidates=candidates,
+        )
+        self.service.ask_question(kb["id"], "When is vendor approval required?", answer_mode="exact")
+
+        calls = []
+
+        def fake_ai_answer(kb_id, question, top, citations, ai_options, save_common=True):
+            calls.append((kb_id, question, ai_options))
+            return {
+                "answer": "AI summary answer",
+                "citations": citations,
+                "answerSource": "ai",
+                "apiUsed": True,
+            }
+
+        self.service._try_ai_answer = fake_ai_answer
+
+        answer = self.service.ask_question(
+            kb["id"],
+            " when is vendor approval required? ",
+            answer_mode="summary",
+            ai_options={"provider": "openai", "apiKey": "test-key", "model": "gpt-5.5"},
+        )
+
+        self.assertEqual(answer["answerSource"], "ai")
+        self.assertTrue(answer["apiUsed"])
+        self.assertEqual(answer["answer"], "AI summary answer")
+        self.assertEqual(len(calls), 1)
+
     def test_adds_task_source_by_task_id(self):
         kb = self.service.create_knowledge_base(
             name="Calculator",
