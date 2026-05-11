@@ -438,7 +438,7 @@ export function RequirementQuestions() {
   function formatRequirementMarkdownSource(content: string): string {
     return content
       .replace(
-        /^###\s+(.+?\s+[--]\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*$/gm,
+        /^###\s+(.+?\s+(?:--|[-\u2013\u2014])\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*$/gm,
         '<h3 class="rq-comment-header">$1</h3>',
       )
       .replace(
