@@ -6,10 +6,14 @@ import io
 
 from flask import Blueprint, jsonify, request, send_file
 
+from services.ai_config_service import AiConfigService
 from services.requirement_kb_service import RequirementKbService
 
 
-def create_requirements_blueprint(requirement_service: RequirementKbService) -> Blueprint:
+def create_requirements_blueprint(
+    requirement_service: RequirementKbService,
+    ai_config_service: AiConfigService | None = None,
+) -> Blueprint:
     bp = Blueprint("requirements_api", __name__, url_prefix="/api/requirements")
 
     @bp.get("/knowledge-bases")
@@ -104,11 +108,23 @@ def create_requirements_blueprint(requirement_service: RequirementKbService) -> 
     @bp.post("/knowledge-bases/<int:kb_id>/questions")
     def ask_question(kb_id: int):
         data = request.get_json() or {}
+        ai_options = data.get("ai") or {}
+        if ai_config_service is not None and ai_options.get("provider"):
+            provider_config = ai_config_service.merge_request_provider(
+                ai_options.get("provider", ""),
+                ai_options.get("apiKey"),
+                ai_options.get("model"),
+            )
+            ai_options = {
+                "provider": provider_config["provider"],
+                "apiKey": provider_config["apiKey"],
+                "model": provider_config["model"],
+            }
         return jsonify(
             requirement_service.ask_question(
                 kb_id,
                 data.get("question", ""),
-                ai_options=data.get("ai") or {},
+                ai_options=ai_options,
             )
         )
 

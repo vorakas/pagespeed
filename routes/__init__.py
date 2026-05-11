@@ -25,6 +25,7 @@ from routes.sites_api import create_sites_blueprint
 from routes.testing_api import create_testing_blueprint
 from routes.triggers_api import create_triggers_blueprint
 from services.applitools_storage import ApplitoolsBatchStore
+from services.ai_config_service import AiConfigService
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
@@ -61,6 +62,7 @@ def register_blueprints(
     applitools_store: "ApplitoolsBatchStore | None" = None,
     applitools_helper_token: "str | None" = None,
     requirement_service: "RequirementKbService | None" = None,
+    ai_config_service: "AiConfigService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -78,9 +80,9 @@ def register_blueprints(
     app.register_blueprint(create_triggers_blueprint(trigger_service))
     app.register_blueprint(create_newrelic_blueprint())
     app.register_blueprint(create_azure_blueprint())
-    app.register_blueprint(create_ai_blueprint())
+    app.register_blueprint(create_ai_blueprint(ai_config_service))
     if requirement_service is not None:
-        app.register_blueprint(create_requirements_blueprint(requirement_service))
+        app.register_blueprint(create_requirements_blueprint(requirement_service, ai_config_service))
     app.register_blueprint(create_devops_blueprint(
         server_pat=devops_pat,
         server_organization=devops_organization,

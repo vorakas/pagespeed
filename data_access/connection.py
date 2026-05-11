@@ -646,6 +646,15 @@ class ConnectionManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ai_provider_config (
+                provider TEXT PRIMARY KEY,
+                api_key TEXT,
+                model TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
     def _create_sqlite_requirement_tables(self, cursor: Any) -> None:
         cursor.execute("""
@@ -748,6 +757,15 @@ class ConnectionManager:
                 estimated_cost REAL NOT NULL DEFAULT 0,
                 metadata_json TEXT NOT NULL DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ai_provider_config (
+                provider TEXT PRIMARY KEY,
+                api_key TEXT,
+                model TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 

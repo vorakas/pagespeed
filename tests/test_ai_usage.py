@@ -18,6 +18,13 @@ class AiUsageTests(unittest.TestCase):
         self.assertEqual(result["outputTokens"], 500)
         self.assertAlmostEqual(result["estimatedCost"], 0.0105)
 
+    def test_estimates_latest_provider_costs(self):
+        openai = estimate_ai_cost("openai", "gpt-5.5", {"prompt_tokens": 1000, "completion_tokens": 500})
+        claude = estimate_ai_cost("anthropic", "claude-opus-4-7", {"input_tokens": 1000, "output_tokens": 500})
+
+        self.assertAlmostEqual(openai["estimatedCost"], 0.02)
+        self.assertAlmostEqual(claude["estimatedCost"], 0.0175)
+
     def test_routes_synthesis_questions_to_ai_when_context_exists(self):
         self.assertTrue(
             should_use_ai_for_requirement_question(

@@ -8,6 +8,9 @@ from typing import Any
 
 MODEL_PRICING_USD_PER_1M: dict[str, dict[str, dict[str, Decimal]]] = {
     "openai": {
+        "gpt-5.5": {"input": Decimal("5.00"), "output": Decimal("30.00")},
+        "gpt-5.4": {"input": Decimal("2.50"), "output": Decimal("15.00")},
+        "gpt-5.4-mini": {"input": Decimal("0.75"), "output": Decimal("4.50")},
         "gpt-5.2": {"input": Decimal("1.75"), "output": Decimal("14.00")},
         "gpt-5.1": {"input": Decimal("1.25"), "output": Decimal("10.00")},
         "gpt-5": {"input": Decimal("1.25"), "output": Decimal("10.00")},
@@ -20,6 +23,7 @@ MODEL_PRICING_USD_PER_1M: dict[str, dict[str, dict[str, Decimal]]] = {
         "gpt-4o-mini": {"input": Decimal("0.15"), "output": Decimal("0.60")},
     },
     "claude": {
+        "claude-opus-4-7": {"input": Decimal("5.00"), "output": Decimal("25.00")},
         "claude-sonnet-4-6": {"input": Decimal("3.00"), "output": Decimal("15.00")},
         "claude-sonnet-4-5": {"input": Decimal("3.00"), "output": Decimal("15.00")},
         "claude-sonnet-4": {"input": Decimal("3.00"), "output": Decimal("15.00")},
@@ -47,13 +51,20 @@ AI_TRIGGER_TERMS = {
 
 
 def normalize_provider(provider: str) -> str:
-    return (provider or "").strip().lower()
+    provider_key = (provider or "").strip().lower()
+    return "claude" if provider_key == "anthropic" else provider_key
 
 
 def normalize_model(provider: str, model: str) -> str:
     provider_key = normalize_provider(provider)
     model_key = (model or "").strip().lower()
     if provider_key == "openai":
+        if model_key.startswith("gpt-5.5"):
+            return "gpt-5.5"
+        if model_key.startswith("gpt-5.4-mini"):
+            return "gpt-5.4-mini"
+        if model_key.startswith("gpt-5.4"):
+            return "gpt-5.4"
         if model_key.startswith("gpt-4.1-mini"):
             return "gpt-4.1-mini"
         if model_key.startswith("gpt-4.1-nano"):
@@ -74,7 +85,9 @@ def normalize_model(provider: str, model: str) -> str:
             return "gpt-5.1"
         if model_key.startswith("gpt-5"):
             return "gpt-5"
-    if provider_key == "claude":
+    if provider_key in {"claude", "anthropic"}:
+        if "opus-4-7" in model_key or "opus-4.7" in model_key:
+            return "claude-opus-4-7"
         if "sonnet-4-6" in model_key or "sonnet-4.6" in model_key:
             return "claude-sonnet-4-6"
         if "sonnet-4-5" in model_key or "sonnet-4.5" in model_key:

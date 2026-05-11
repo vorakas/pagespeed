@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request
 
 from exceptions import ValidationError
 from services.ai_claude import ClaudeClient
+from services.ai_config_service import AiConfigService
 from services.ai_openai import OpenAIClient
 from services.ai_orchestrator import AIOrchestrator
 from services.azure_client import AzureLogAnalyticsClient
@@ -16,13 +17,26 @@ from services.newrelic_client import NewRelicClient
 from services.validation import validate_required_fields
 
 
-def create_ai_blueprint() -> Blueprint:
+def create_ai_blueprint(ai_config_service: AiConfigService | None = None) -> Blueprint:
     """Factory that creates the AI analysis API blueprint.
 
     Returns:
         Configured Flask Blueprint.
     """
     bp = Blueprint("ai_api", __name__)
+
+    @bp.get("/api/ai/config")
+    def get_config():
+        if ai_config_service is None:
+            return jsonify({"claude": None, "openai": None})
+        return jsonify(ai_config_service.get_public_config())
+
+    @bp.put("/api/ai/config")
+    def save_config():
+        if ai_config_service is None:
+            raise ValidationError("AI config service is not available")
+        data = request.get_json() or {}
+        return jsonify(ai_config_service.save_config(data))
 
     @bp.route("/api/ai/analyze", methods=["POST"])
     def analyze():
@@ -86,15 +100,18 @@ def create_ai_blueprint() -> Blueprint:
         claude_svc = None
         openai_svc = None
 
-        if "claude" in providers and data.get("claude_api_key"):
+        claude_config = _provider_config(data, "claude", ai_config_service)
+        openai_config = _provider_config(data, "openai", ai_config_service)
+
+        if "claude" in providers and claude_config["apiKey"]:
             claude_svc = ClaudeClient(
-                api_key=data["claude_api_key"],
-                model=data.get("claude_model", "claude-sonnet-4-20250514"),
+                api_key=claude_config["apiKey"],
+                model=claude_config["model"],
             )
-        if "openai" in providers and data.get("openai_api_key"):
+        if "openai" in providers and openai_config["apiKey"]:
             openai_svc = OpenAIClient(
-                api_key=data["openai_api_key"],
-                model=data.get("openai_model", "gpt-4o"),
+                api_key=openai_config["apiKey"],
+                model=openai_config["model"],
             )
 
         ai_results = AIOrchestrator.run_analysis(
@@ -130,15 +147,18 @@ def create_ai_blueprint() -> Blueprint:
         claude_messages = data.get("claude_history")
         openai_messages = data.get("openai_history")
 
-        if "claude" in providers and data.get("claude_api_key") and claude_messages:
+        claude_config = _provider_config(data, "claude", ai_config_service)
+        openai_config = _provider_config(data, "openai", ai_config_service)
+
+        if "claude" in providers and claude_config["apiKey"] and claude_messages:
             claude_svc = ClaudeClient(
-                api_key=data["claude_api_key"],
-                model=data.get("claude_model", "claude-sonnet-4-20250514"),
+                api_key=claude_config["apiKey"],
+                model=claude_config["model"],
             )
-        if "openai" in providers and data.get("openai_api_key") and openai_messages:
+        if "openai" in providers and openai_config["apiKey"] and openai_messages:
             openai_svc = OpenAIClient(
-                api_key=data["openai_api_key"],
-                model=data.get("openai_model", "gpt-4o"),
+                api_key=openai_config["apiKey"],
+                model=openai_config["model"],
             )
 
         if not claude_svc and not openai_svc:
@@ -156,3 +176,23 @@ def create_ai_blueprint() -> Blueprint:
         })
 
     return bp
+
+
+def _provider_config(
+    data: dict,
+    provider: str,
+    ai_config_service: AiConfigService | None,
+) -> dict[str, str]:
+    api_key = data.get(f"{provider}_api_key")
+    model = data.get(f"{provider}_model")
+    if ai_config_service is not None:
+        return ai_config_service.merge_request_provider(provider, api_key, model)
+    defaults = {
+        "claude": "claude-sonnet-4-6",
+        "openai": "gpt-5.5",
+    }
+    return {
+        "provider": provider,
+        "apiKey": (api_key or "").strip(),
+        "model": (model or "").strip() or defaults[provider],
+    }

@@ -21,7 +21,7 @@ class ClaudeClient(AIServiceBase):
         model:   Model identifier (e.g. ``'claude-sonnet-4-20250514'``).
     """
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-20250514") -> None:
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-6") -> None:
         self._api_key: str = api_key
         self._model: str = model
 

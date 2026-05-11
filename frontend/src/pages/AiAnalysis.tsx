@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -7,7 +7,7 @@ import { AnalysisPanel, type ChatMessage } from "@/components/ai-analysis/Analys
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { useLocalConfig } from "@/hooks/use-local-config"
 import { api } from "@/services/api"
-import type { AiConfig, NewRelicConfig, AzureConfig } from "@/types"
+import type { AiConfig, AiSavedConfig, NewRelicConfig, AzureConfig } from "@/types"
 import { Loader2, Send, Sparkles } from "lucide-react"
 
 const TIME_RANGES = [
@@ -21,9 +21,9 @@ const TIME_RANGES = [
 
 const DEFAULT_AI_CONFIG: AiConfig = {
   claudeApiKey: "",
-  claudeModel: "claude-sonnet-4-20250514",
+  claudeModel: "claude-sonnet-4-6",
   openaiApiKey: "",
-  openaiModel: "gpt-4o",
+  openaiModel: "gpt-5.5",
 }
 
 interface ConversationState {
@@ -76,9 +76,49 @@ export function AiAnalysis() {
   const [followupText, setFollowupText] = useState("")
   const [sendingFollowup, setSendingFollowup] = useState(false)
   const [dataSources, setDataSources] = useState<{ newrelic: boolean; iis_logs: boolean } | null>(null)
+  const [savedAiConfig, setSavedAiConfig] = useState<AiSavedConfig | null>(null)
+  const [savingAiConfig, setSavingAiConfig] = useState(false)
+  const [aiConfigStatus, setAiConfigStatus] = useState<string | null>(null)
 
   const [conversation, setConversation] = useState<ConversationState>(INITIAL_CONVERSATION)
   const followupRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    api.getAiConfig()
+      .then((saved) => {
+        setSavedAiConfig(saved)
+        setAiConfig({
+          claudeApiKey: saved.claude.hasApiKey ? "" : aiConfig.claudeApiKey,
+          claudeModel: saved.claude.model || aiConfig.claudeModel,
+          openaiApiKey: saved.openai.hasApiKey ? "" : aiConfig.openaiApiKey,
+          openaiModel: saved.openai.model || aiConfig.openaiModel,
+        })
+      })
+      .catch((err) => {
+        setAiConfigStatus(err instanceof Error ? err.message : "Failed to load saved AI configuration")
+      })
+  }, [])
+
+  const handleSaveAiConfig = useCallback(async () => {
+    setSavingAiConfig(true)
+    setAiConfigStatus(null)
+    try {
+      const saved = await api.saveAiConfig(aiConfig)
+      setSavedAiConfig(saved)
+      setAiConfig({
+        ...aiConfig,
+        claudeApiKey: "",
+        claudeModel: saved.claude.model,
+        openaiApiKey: "",
+        openaiModel: saved.openai.model,
+      })
+      setAiConfigStatus("Saved globally. Other Pharos users can use these provider settings now.")
+    } catch (err) {
+      setAiConfigStatus(err instanceof Error ? err.message : "Failed to save AI configuration")
+    } finally {
+      setSavingAiConfig(false)
+    }
+  }, [aiConfig, setAiConfig])
 
   const handleAnalyze = useCallback(async () => {
     if (!urlPath.trim()) return
@@ -335,7 +375,14 @@ export function AiAnalysis() {
         </div>
 
         {/* AI Config */}
-        <AiConfigPanel config={aiConfig} onConfigChange={setAiConfig} />
+        <AiConfigPanel
+          config={aiConfig}
+          onConfigChange={setAiConfig}
+          savedConfig={savedAiConfig}
+          onSave={handleSaveAiConfig}
+          saving={savingAiConfig}
+          saveStatus={aiConfigStatus}
+        />
 
         {/* Data Source Status */}
         {dataSources && (

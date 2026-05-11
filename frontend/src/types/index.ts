@@ -211,6 +211,17 @@ export interface AiConfig {
   openaiModel: string
 }
 
+export interface AiProviderSavedConfig {
+  model: string
+  hasApiKey: boolean
+  apiKeyMasked: string | null
+}
+
+export interface AiSavedConfig {
+  claude: AiProviderSavedConfig
+  openai: AiProviderSavedConfig
+}
+
 export interface AiAnalysisResult {
   provider: string
   analysis: string

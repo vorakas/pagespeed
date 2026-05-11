@@ -305,6 +305,9 @@ def create_app() -> Flask:
     migration_dashboard_service = MigrationDashboardService(
         vault_root=OBSIDIAN_VAULT_ROOT,
     )
+    from services.ai_config_service import AiConfigService
+
+    ai_config_service = AiConfigService(conn_mgr)
     requirement_service = RequirementKbService(conn_mgr, OBSIDIAN_VAULT_ROOT)
 
     # ---- Migration status snapshots (history + what-changed-today) ----
@@ -521,6 +524,7 @@ def create_app() -> Flask:
         applitools_store=applitools_store,
         applitools_helper_token=APPLITOOLS_HELPER_TOKEN,
         requirement_service=requirement_service,
+        ai_config_service=ai_config_service,
     )
 
     # ---- Centralized error handlers ----

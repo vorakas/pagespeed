@@ -16,10 +16,10 @@ class OpenAIClient(AIServiceBase):
 
     Args:
         api_key: OpenAI API key.
-        model:   Model identifier (e.g. ``'gpt-4o'``).
+        model:   Model identifier (e.g. ``'gpt-5.5'``).
     """
 
-    def __init__(self, api_key: str, model: str = "gpt-4o") -> None:
+    def __init__(self, api_key: str, model: str = "gpt-5.5") -> None:
         self._api_key: str = api_key
         self._model: str = model
 
@@ -43,14 +43,13 @@ class OpenAIClient(AIServiceBase):
         client = OpenAI(api_key=self._api_key)
 
         try:
-            response = client.chat.completions.create(
+            response = self._create_chat_completion(
+                client,
                 model=self._model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
-                max_tokens=MAX_AI_TOKENS,
-                temperature=0.3,
             )
         except Exception as exc:
             self._handle_error(exc)
@@ -78,11 +77,10 @@ class OpenAIClient(AIServiceBase):
         full_messages = [{"role": "system", "content": system_prompt}] + messages
 
         try:
-            response = client.chat.completions.create(
+            response = self._create_chat_completion(
+                client,
                 model=self._model,
                 messages=full_messages,
-                max_tokens=MAX_AI_TOKENS,
-                temperature=0.3,
             )
         except Exception as exc:
             self._handle_error(exc)
@@ -97,6 +95,20 @@ class OpenAIClient(AIServiceBase):
         """Ensure an API key is configured."""
         if not self._api_key:
             raise AuthenticationError("OpenAI API key not configured", provider="OpenAI")
+
+    def _create_chat_completion(self, client: object, **kwargs: object) -> object:
+        """Create a chat completion with parameters compatible across model families."""
+        request = dict(kwargs)
+        if self._uses_completion_token_limit():
+            request["max_completion_tokens"] = MAX_AI_TOKENS
+        else:
+            request["max_tokens"] = MAX_AI_TOKENS
+            request["temperature"] = 0.3
+        return client.chat.completions.create(**request)
+
+    def _uses_completion_token_limit(self) -> bool:
+        model = self._model.lower()
+        return model.startswith("gpt-5") or model.startswith("o")
 
     @staticmethod
     def _parse_response(response: object) -> dict:

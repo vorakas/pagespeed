@@ -18,7 +18,7 @@ import {
 
 import { api } from "@/services/api"
 import type {
-  AiConfig,
+  AiSavedConfig,
   RequirementAnswer,
   RequirementCandidate,
   RequirementCommonQuestion,
@@ -53,12 +53,6 @@ import { cn } from "@/lib/utils"
 const DISCOVERY_TERMS_EXAMPLE = "Example: minimum pricing, UMRP, MPR, vendor approval, discount rules"
 const ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
 const OUTLINE_ACTION_BUTTON_CLASS = "!bg-white !text-black hover:!bg-white/90 hover:!text-black focus-visible:!text-black [&_svg]:!text-black"
-const DEFAULT_AI_CONFIG: AiConfig = {
-  claudeApiKey: "",
-  claudeModel: "claude-sonnet-4-20250514",
-  openaiApiKey: "",
-  openaiModel: "gpt-4o",
-}
 
 type SourcePreview =
   | { kind: "empty" }
@@ -72,8 +66,8 @@ const IMAGE_ATTACHMENT_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i
 const VIDEO_ATTACHMENT_RE = /\.(webm|mp4|mov|m4v)$/i
 
 export function RequirementQuestions() {
-  const [aiConfig] = useLocalConfig<AiConfig>("aiConfig", DEFAULT_AI_CONFIG)
   const [aiProvider, setAiProvider] = useLocalConfig<"claude" | "openai">("requirementAiProvider", "claude")
+  const [savedAiConfig, setSavedAiConfig] = useState<AiSavedConfig | null>(null)
   const [knowledgeBases, setKnowledgeBases] = useState<RequirementKnowledgeBase[]>([])
   const [activeKbId, setActiveKbId] = useState<number | null>(null)
   const [uploadKbId, setUploadKbId] = useState<string>("")
@@ -139,6 +133,9 @@ export function RequirementQuestions() {
 
   useEffect(() => {
     void loadKnowledgeBases(true)
+    api.getAiConfig()
+      .then(setSavedAiConfig)
+      .catch(() => setSavedAiConfig(null))
   }, [])
 
   useEffect(() => {
@@ -264,17 +261,20 @@ export function RequirementQuestions() {
 
   async function askQuestion() {
     if (!activeKbId || !question.trim()) return
-    const selectedAi =
-      aiProvider === "claude"
-        ? { provider: "claude" as const, apiKey: aiConfig.claudeApiKey, model: aiConfig.claudeModel }
-        : { provider: "openai" as const, apiKey: aiConfig.openaiApiKey, model: aiConfig.openaiModel }
+    const selectedAi = {
+      provider: aiProvider,
+      apiKey: "",
+      model: aiProvider === "claude"
+        ? savedAiConfig?.claude.model || "claude-sonnet-4-6"
+        : savedAiConfig?.openai.model || "gpt-5.5",
+    }
     setBusy("question")
     setError(null)
     try {
       const nextAnswer = await api.askRequirementQuestion(
         activeKbId,
         question.trim(),
-        selectedAi.apiKey && selectedAi.model ? selectedAi : undefined,
+        selectedAi,
       )
       setAnswer(nextAnswer)
       await loadCommonQuestions(activeKbId)
@@ -798,12 +798,12 @@ export function RequirementQuestions() {
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   {aiProvider === "claude"
-                    ? aiConfig.claudeApiKey
-                      ? `Configured: ${aiConfig.claudeModel}`
-                      : "Claude key not configured; answers will stay knowledge-base only."
-                    : aiConfig.openaiApiKey
-                      ? `Configured: ${aiConfig.openaiModel}`
-                      : "OpenAI key not configured; answers will stay knowledge-base only."}
+                    ? savedAiConfig?.claude.hasApiKey
+                      ? `Global Anthropic key saved: ${savedAiConfig.claude.model}`
+                      : "No global Anthropic key saved; answers will stay knowledge-base only."
+                    : savedAiConfig?.openai.hasApiKey
+                      ? `Global OpenAI key saved: ${savedAiConfig.openai.model}`
+                      : "No global OpenAI key saved; answers will stay knowledge-base only."}
                 </p>
               </div>
               <Button

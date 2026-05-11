@@ -18,6 +18,7 @@ import type {
   AzureLogEntry,
   AzureDashboardSummary,
   AiConfig,
+  AiSavedConfig,
   AiAnalysisResult,
   AiFollowUpResult,
   DevOpsConfig,
@@ -384,6 +385,22 @@ class ApiClient {
   }
 
   // ---------- AI Analysis ----------
+
+  async getAiConfig(): Promise<AiSavedConfig> {
+    return this.request("/api/ai/config")
+  }
+
+  async saveAiConfig(config: AiConfig): Promise<AiSavedConfig> {
+    return this.request("/api/ai/config", {
+      method: "PUT",
+      body: JSON.stringify({
+        claude_api_key: config.claudeApiKey,
+        claude_model: config.claudeModel,
+        openai_api_key: config.openaiApiKey,
+        openai_model: config.openaiModel,
+      }),
+    })
+  }
 
   async analyzeWithAi(
     config: AiConfig,
