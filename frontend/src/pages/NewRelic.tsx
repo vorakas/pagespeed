@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
-import { NewRelicConfigPanel } from "@/components/newrelic/NewRelicConfig"
+import { SiteConfigCard } from "@/components/newrelic/NewRelicConfig"
+import { UrlFavoritesInput } from "@/components/newrelic/UrlFavoritesInput"
 import { CwvMetrics } from "@/components/newrelic/CwvMetrics"
 import { PerformanceOverview } from "@/components/newrelic/PerformanceOverview"
 import { ApmMetrics } from "@/components/newrelic/ApmMetrics"
@@ -10,7 +11,19 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { useLocalConfig } from "@/hooks/use-local-config"
 import { api } from "@/services/api"
 import type { NewRelicConfig } from "@/types"
-import { Loader2 } from "lucide-react"
+import { Loader2, Settings } from "lucide-react"
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+type SiteKey = "lampsplus" | "adobe"
+type ViewMode = "comparison" | SiteKey
+
+const SITE_LABELS: Record<SiteKey, string> = {
+  lampsplus: "LampsPlus",
+  adobe: "Adobe Commerce",
+}
 
 const TIME_RANGES = [
   { value: "30 minutes ago", label: "Last 30 minutes" },
@@ -21,90 +34,291 @@ const TIME_RANGES = [
   { value: "24 hours ago", label: "Last 24 hours" },
 ]
 
-const DEFAULT_CONFIG: NewRelicConfig = {
-  apiKey: "",
-  accountId: "",
-  appName: "",
+const DEFAULT_CONFIG: NewRelicConfig = { apiKey: "", accountId: "", appName: "" }
+
+interface SiteData {
+  cwv: Record<string, unknown> | null
+  perf: Record<string, unknown> | null
+  apm: Record<string, unknown> | null
 }
 
-export function NewRelic() {
-  const [config, setConfig] = useLocalConfig<NewRelicConfig>("nrConfig", DEFAULT_CONFIG)
-  const [, setConnected] = useState(false)
-  const [pageUrl, setPageUrl] = useState("https://www.lampsplus.com/")
-  const [timeRange, setTimeRange] = useState("30 minutes ago")
+// ---------------------------------------------------------------------------
+// Migrate legacy single-site config (runs once at module load)
+// ---------------------------------------------------------------------------
 
-  // Data states
-  const [cwvData, setCwvData] = useState<Record<string, unknown> | null>(null)
-  const [perfData, setPerfData] = useState<Record<string, unknown> | null>(null)
-  const [apmData, setApmData] = useState<Record<string, unknown> | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+if (localStorage.getItem("nrConfig") && !localStorage.getItem("nrConfigLampsPlus")) {
+  localStorage.setItem("nrConfigLampsPlus", localStorage.getItem("nrConfig")!)
+  localStorage.removeItem("nrConfig")
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function extractCwv(data: SiteData | null) {
+  if (!data?.cwv) return { metrics: null, metadata: null, interactionsCount: null }
+  const metrics = data.cwv.metrics as Record<
+    string,
+    { p50: number | null; p75: number | null; p90: number | null }
+  > | undefined
+  const metadata = (data.cwv.metadata as Record<string, string>) ?? null
+  const interactionsCount = (metrics?.interactions as unknown as number) ?? null
+  return { metrics: metrics ?? null, metadata, interactionsCount }
+}
+
+function isConfigured(config: NewRelicConfig): boolean {
+  return Boolean(config.apiKey && config.accountId && config.appName)
+}
+
+// ---------------------------------------------------------------------------
+// View mode segmented control
+// ---------------------------------------------------------------------------
+
+const VIEW_OPTIONS: { key: ViewMode; label: string }[] = [
+  { key: "comparison", label: "Comparison" },
+  { key: "lampsplus", label: "LampsPlus" },
+  { key: "adobe", label: "Adobe Commerce" },
+]
+
+function ViewModeToggle({
+  value,
+  onChange,
+}: {
+  value: ViewMode
+  onChange: (v: ViewMode) => void
+}) {
+  return (
+    <div className="inline-flex gap-1.5">
+      {VIEW_OPTIONS.map(({ key, label }) => (
+        <button
+          key={key}
+          className="rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
+          style={{
+            border: `1px solid ${value === key ? "var(--lcc-amber)" : "var(--lcc-border)"}`,
+            backgroundColor: value === key ? "var(--lcc-amber)" : "transparent",
+            color: value === key ? "#000" : "var(--lcc-text-dim)",
+          }}
+          onClick={() => onChange(key)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Comparison column
+// ---------------------------------------------------------------------------
+
+function ComparisonColumn({
+  label,
+  data,
+  loading,
+  configured,
+}: {
+  label: string
+  data: SiteData | null
+  loading: boolean
+  configured: boolean
+}) {
+  const cwv = extractCwv(data)
+
+  return (
+    <div className="space-y-4 min-w-0">
+      <div className="flex items-center gap-2">
+        <h2 className="aurora-section-title whitespace-nowrap">{label}</h2>
+        <hr className="flex-1" style={{ borderColor: "var(--lcc-border)" }} />
+      </div>
+
+      {loading && (
+        <div className="aurora-panel flex items-center justify-center p-12">
+          <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--lcc-text-faint)" }} />
+        </div>
+      )}
+
+      {!loading && data?.cwv && (
+        <>
+          <CwvMetrics
+            metrics={cwv.metrics}
+            metadata={cwv.metadata}
+            interactionsCount={cwv.interactionsCount}
+          />
+          {data.perf && <PerformanceOverview data={data.perf} />}
+        </>
+      )}
+
+      {!loading && !data?.cwv && (
+        <div className="aurora-panel p-8 text-center">
+          <p className="aurora-text-faint text-sm">
+            {configured ? "No data loaded yet" : `Configure ${label} to enable comparison`}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
+
+export function NewRelic() {
+  // Persisted per-site configs
+  const [lpConfig, setLpConfig] = useLocalConfig<NewRelicConfig>(
+    "nrConfigLampsPlus",
+    DEFAULT_CONFIG,
+  )
+  const [adobeConfig, setAdobeConfig] = useLocalConfig<NewRelicConfig>(
+    "nrConfigAdobe",
+    DEFAULT_CONFIG,
+  )
+
+  // Persisted URLs
+  const [lpUrl, setLpUrl] = useLocalConfig<string>(
+    "nrUrlLampsPlus",
+    "https://www.lampsplus.com/",
+  )
+  const [adobeUrl, setAdobeUrl] = useLocalConfig<string>(
+    "nrUrlAdobe",
+    "https://mcprod.lampsplus.com/",
+  )
+
+  // Persisted favorites
+  const [lpFavorites, setLpFavorites] = useLocalConfig<string[]>("nrFavoritesLampsPlus", [])
+  const [adobeFavorites, setAdobeFavorites] = useLocalConfig<string[]>("nrFavoritesAdobe", [])
+
+  // View state
+  const [viewMode, setViewMode] = useLocalConfig<ViewMode>("nrViewMode", "comparison")
+  const [timeRange, setTimeRange] = useState("30 minutes ago")
+  const [configOpen, setConfigOpen] = useState(
+    () => !isConfigured(lpConfig) || !isConfigured(adobeConfig),
+  )
+
+  // Per-site metric data
+  const [lpData, setLpData] = useState<SiteData | null>(null)
+  const [adobeData, setAdobeData] = useState<SiteData | null>(null)
+  const [lpLoading, setLpLoading] = useState(false)
+  const [adobeLoading, setAdobeLoading] = useState(false)
+  const [lpError, setLpError] = useState<string | null>(null)
+  const [adobeError, setAdobeError] = useState<string | null>(null)
+
+  // Derived
+  const lpConfigured = isConfigured(lpConfig)
+  const adobeConfigured = isConfigured(adobeConfig)
+  const anyLoading = lpLoading || adobeLoading
+  const isSingleSite = viewMode !== "comparison"
+  const activeSite = isSingleSite ? (viewMode as SiteKey) : null
+
+  const configs: Record<SiteKey, NewRelicConfig> = {
+    lampsplus: lpConfig,
+    adobe: adobeConfig,
+  }
+
+  // -----------------------------------------------------------------------
+  // Data loading
+  // -----------------------------------------------------------------------
+
+  const loadSiteMetrics = useCallback(
+    async (siteKey: SiteKey, includeApm: boolean) => {
+      const config = siteKey === "lampsplus" ? lpConfig : adobeConfig
+      const url = siteKey === "lampsplus" ? lpUrl : adobeUrl
+      const setData = siteKey === "lampsplus" ? setLpData : setAdobeData
+      const setLoading = siteKey === "lampsplus" ? setLpLoading : setAdobeLoading
+      const setError = siteKey === "lampsplus" ? setLpError : setAdobeError
+
+      if (!isConfigured(config)) {
+        setError(`Configure ${SITE_LABELS[siteKey]} settings first`)
+        return
+      }
+      if (!url.trim()) {
+        setError("Enter a page URL to monitor")
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        const cwvResult = await api.getNewRelicCwv(config, url, timeRange)
+
+        const [perfResult, apmResult] = await Promise.all([
+          api.getNewRelicPerformance(config, timeRange).catch(() => null),
+          includeApm ? api.getNewRelicApm(config, timeRange).catch(() => null) : null,
+        ])
+
+        setData({ cwv: cwvResult, perf: perfResult, apm: apmResult })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load metrics")
+      } finally {
+        setLoading(false)
+      }
+    },
+    [lpConfig, adobeConfig, lpUrl, adobeUrl, timeRange],
+  )
 
   const loadAllMetrics = useCallback(async () => {
-    if (!config.apiKey || !config.accountId || !config.appName) {
-      setError("Please configure all API settings first")
-      return
+    if (viewMode === "comparison") {
+      const promises: Promise<void>[] = []
+      if (lpConfigured) promises.push(loadSiteMetrics("lampsplus", false))
+      if (adobeConfigured) promises.push(loadSiteMetrics("adobe", false))
+      if (promises.length === 0) {
+        setLpError("Configure at least one site to load metrics")
+        return
+      }
+      await Promise.all(promises)
+    } else {
+      await loadSiteMetrics(viewMode as SiteKey, true)
     }
-    if (!pageUrl.trim()) {
-      setError("Please enter a page URL to monitor")
-      return
-    }
+  }, [viewMode, loadSiteMetrics, lpConfigured, adobeConfigured])
 
-    setLoading(true)
-    setError(null)
-
-    try {
-      // Load CWV first
-      const cwvResult = await api.getNewRelicCwv(config, pageUrl, timeRange)
-      setCwvData(cwvResult)
-
-      // Load performance overview and APM in parallel
-      const [perfResult, apmResult] = await Promise.all([
-        api.getNewRelicPerformance(config, timeRange).catch(() => null),
-        api.getNewRelicApm(config, timeRange).catch(() => null),
-      ])
-      setPerfData(perfResult)
-      setApmData(apmResult)
-      setConnected(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load metrics")
-    } finally {
-      setLoading(false)
-    }
-  }, [config, pageUrl, timeRange])
-
-  const cwvMetrics = cwvData?.metrics as Record<string, unknown> | undefined
-  const cwvMetadata = cwvData?.metadata as Record<string, string> | undefined
-  const interactionsCount = (cwvMetrics?.interactions as number) ?? null
+  // -----------------------------------------------------------------------
+  // Render
+  // -----------------------------------------------------------------------
 
   return (
     <>
       <PageHeader title="New Relic" description="Core Web Vitals and APM metrics" />
       <div className="space-y-6 p-6">
-        {/* Configuration */}
-        <NewRelicConfigPanel
-          config={config}
-          onConfigChange={setConfig}
-          onConnected={() => setConnected(true)}
-        />
+        {/* ---- Configuration ---- */}
+        <details
+          open={configOpen}
+          onToggle={(e) => setConfigOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary
+            className="cursor-pointer select-none list-none"
+            style={{ color: "var(--lcc-text-dim)" }}
+          >
+            <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-widest">
+              <Settings className="h-3.5 w-3.5" />
+              API Configuration
+              <span className="aurora-text-faint text-[10px] normal-case tracking-normal">
+                {lpConfigured && adobeConfigured
+                  ? "Both sites configured"
+                  : lpConfigured || adobeConfigured
+                    ? "1 of 2 sites configured"
+                    : "Not configured"}
+              </span>
+            </span>
+          </summary>
+          <div className="mt-3 grid gap-4 lg:grid-cols-2">
+            <SiteConfigCard label="LampsPlus" config={lpConfig} onConfigChange={setLpConfig} />
+            <SiteConfigCard
+              label="Adobe Commerce"
+              config={adobeConfig}
+              onConfigChange={setAdobeConfig}
+            />
+          </div>
+        </details>
 
-        {/* Query Controls */}
-        <div className="aurora-panel p-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-              <label htmlFor="pageUrl" className="aurora-label block">Page URL to Monitor</label>
-              <input
-                id="pageUrl"
-                className="aurora-input w-full"
-                value={pageUrl}
-                onChange={(e) => setPageUrl(e.target.value)}
-                placeholder="https://www.lampsplus.com/"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5 w-48">
-              <label className="aurora-label block">Time Range</label>
+        {/* ---- Query Controls ---- */}
+        <div className="aurora-panel space-y-3 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+
+            <div className="flex items-center gap-3 ml-auto">
               <select
-                className="aurora-select w-full"
+                className="aurora-select"
                 value={timeRange}
                 onChange={(e) => setTimeRange(e.target.value)}
               >
@@ -114,53 +328,118 @@ export function NewRelic() {
                   </option>
                 ))}
               </select>
+              <Button onClick={loadAllMetrics} disabled={anyLoading} style={{ color: "#000" }}>
+                {anyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {anyLoading ? "Loading..." : "Load Metrics"}
+              </Button>
             </div>
-            <Button onClick={loadAllMetrics} disabled={loading} style={{ color: "#000" }}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {loading ? "Loading..." : "Load Metrics"}
-            </Button>
+          </div>
+
+          {/* URL inputs */}
+          <div className={viewMode === "comparison" ? "grid gap-4 lg:grid-cols-2" : ""}>
+            {(viewMode === "comparison" || viewMode === "lampsplus") && (
+              <UrlFavoritesInput
+                id="lpUrl"
+                label={viewMode === "comparison" ? "LampsPlus URL" : "Page URL to Monitor"}
+                url={lpUrl}
+                onUrlChange={setLpUrl}
+                favorites={lpFavorites}
+                onFavoritesChange={setLpFavorites}
+                placeholder="https://www.lampsplus.com/"
+              />
+            )}
+            {(viewMode === "comparison" || viewMode === "adobe") && (
+              <UrlFavoritesInput
+                id="adobeUrl"
+                label={viewMode === "comparison" ? "Adobe Commerce URL" : "Page URL to Monitor"}
+                url={adobeUrl}
+                onUrlChange={setAdobeUrl}
+                favorites={adobeFavorites}
+                onFavoritesChange={setAdobeFavorites}
+                placeholder="https://mcprod.lampsplus.com/"
+              />
+            )}
           </div>
         </div>
 
-        {error && (
-          <p className="text-sm" style={{ color: "var(--lcc-red)" }}>{error}</p>
+        {/* ---- Errors ---- */}
+        {lpError && (viewMode === "comparison" || viewMode === "lampsplus") && (
+          <p className="text-sm" style={{ color: "var(--lcc-red)" }}>
+            {viewMode === "comparison" ? `LampsPlus: ${lpError}` : lpError}
+          </p>
+        )}
+        {adobeError && (viewMode === "comparison" || viewMode === "adobe") && (
+          <p className="text-sm" style={{ color: "var(--lcc-red)" }}>
+            {viewMode === "comparison" ? `Adobe Commerce: ${adobeError}` : adobeError}
+          </p>
         )}
 
-        {loading && <LoadingSpinner message="Loading Core Web Vitals data from New Relic..." />}
-
-        {/* Core Web Vitals */}
-        {!loading && cwvData && (
-          <div>
-            <h2 className="aurora-section-title mb-3">Core Web Vitals</h2>
-            <CwvMetrics
-              metrics={cwvMetrics as Record<string, { p50: number | null; p75: number | null; p90: number | null }> | null ?? null}
-              metadata={cwvMetadata ?? null}
-              interactionsCount={interactionsCount}
+        {/* ---- Comparison Mode ---- */}
+        {viewMode === "comparison" && (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ComparisonColumn
+              label="LampsPlus"
+              data={lpData}
+              loading={lpLoading}
+              configured={lpConfigured}
+            />
+            <ComparisonColumn
+              label="Adobe Commerce"
+              data={adobeData}
+              loading={adobeLoading}
+              configured={adobeConfigured}
             />
           </div>
         )}
 
-        {/* Performance Overview */}
-        {!loading && perfData && (
-          <div>
-            <h2 className="aurora-section-title mb-3">Performance Overview</h2>
-            <PerformanceOverview data={perfData} />
-          </div>
-        )}
+        {/* ---- Single-Site Mode ---- */}
+        {isSingleSite && activeSite && (() => {
+          const data = activeSite === "lampsplus" ? lpData : adobeData
+          const loading = activeSite === "lampsplus" ? lpLoading : adobeLoading
+          const cwv = extractCwv(data)
 
-        {/* APM Metrics */}
-        {!loading && apmData && (
-          <div>
-            <h2 className="aurora-section-title mb-3">Application Performance Monitoring</h2>
-            <ApmMetrics data={apmData} />
-          </div>
-        )}
+          if (loading) {
+            return (
+              <LoadingSpinner message={`Loading ${SITE_LABELS[activeSite]} metrics...`} />
+            )
+          }
 
-        {/* Custom Query */}
-        <div>
-          <h2 className="aurora-section-title mb-3">Custom NerdGraph Query</h2>
-          <CustomQuery config={config} />
-        </div>
+          return (
+            <>
+              {data?.cwv && (
+                <div>
+                  <h2 className="aurora-section-title mb-3">Core Web Vitals</h2>
+                  <CwvMetrics
+                    metrics={cwv.metrics}
+                    metadata={cwv.metadata}
+                    interactionsCount={cwv.interactionsCount}
+                  />
+                </div>
+              )}
+
+              {data?.perf && (
+                <div>
+                  <h2 className="aurora-section-title mb-3">Performance Overview</h2>
+                  <PerformanceOverview data={data.perf} />
+                </div>
+              )}
+
+              {data?.apm && (
+                <div>
+                  <h2 className="aurora-section-title mb-3">
+                    Application Performance Monitoring
+                  </h2>
+                  <ApmMetrics data={data.apm} />
+                </div>
+              )}
+
+              <div>
+                <h2 className="aurora-section-title mb-3">Custom NerdGraph Query</h2>
+                <CustomQuery configs={configs} activeSite={activeSite} />
+              </div>
+            </>
+          )
+        })()}
       </div>
     </>
   )

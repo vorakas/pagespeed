@@ -1,43 +1,35 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Save, Wifi } from "lucide-react"
+import { Wifi } from "lucide-react"
 import { api } from "@/services/api"
 import type { NewRelicConfig as NrConfig } from "@/types"
 
-interface NewRelicConfigProps {
+interface SiteConfigCardProps {
+  label: string
   config: NrConfig
   onConfigChange: (config: NrConfig) => void
-  onConnected: () => void
 }
 
-export function NewRelicConfigPanel({ config, onConfigChange, onConnected }: NewRelicConfigProps) {
-  const [connectionStatus, setConnectionStatus] = useState<{
+export function SiteConfigCard({ label, config, onConfigChange }: SiteConfigCardProps) {
+  const [status, setStatus] = useState<{
     message: string
     type: "success" | "error" | "testing"
   } | null>(null)
 
-  const handleSave = () => {
-    onConfigChange(config)
-    setConnectionStatus({ message: "Configuration saved", type: "success" })
-    setTimeout(() => setConnectionStatus(null), 3000)
-  }
-
   const handleTestConnection = async () => {
     if (!config.apiKey) {
-      setConnectionStatus({ message: "Please enter an API key first", type: "error" })
+      setStatus({ message: "API key required", type: "error" })
       return
     }
-    setConnectionStatus({ message: "Testing connection...", type: "testing" })
+    setStatus({ message: "Testing...", type: "testing" })
     try {
       const result = await api.testNewRelicConnection(config)
-      if (result.success) {
-        setConnectionStatus({ message: result.message, type: "success" })
-        onConnected()
-      } else {
-        setConnectionStatus({ message: result.message, type: "error" })
-      }
+      setStatus({
+        message: result.message,
+        type: result.success ? "success" : "error",
+      })
     } catch (err) {
-      setConnectionStatus({
+      setStatus({
         message: err instanceof Error ? err.message : "Connection failed",
         type: "error",
       })
@@ -48,62 +40,66 @@ export function NewRelicConfigPanel({ config, onConfigChange, onConnected }: New
     onConfigChange({ ...config, [field]: value })
   }
 
+  const isConfigured = Boolean(config.apiKey && config.accountId && config.appName)
   const statusColor =
-    connectionStatus?.type === "success"
+    status?.type === "success"
       ? "var(--lcc-green)"
-      : connectionStatus?.type === "error"
+      : status?.type === "error"
         ? "var(--lcc-red)"
         : "var(--lcc-text-dim)"
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <div className="aurora-panel space-y-3 p-4">
-        <h3 className="aurora-text text-sm font-semibold">API Configuration</h3>
-        <div className="space-y-1.5">
-          <label htmlFor="nrApiKey" className="aurora-label block">API Key</label>
-          <input
-            id="nrApiKey"
-            type="password"
-            className="aurora-input w-full"
-            value={config.apiKey}
-            onChange={(e) => updateField("apiKey", e.target.value)}
-            placeholder="Enter your New Relic API key"
+    <div className="aurora-panel space-y-3 p-4">
+      <div className="flex items-center gap-2">
+        <h3 className="aurora-text text-sm font-semibold">{label}</h3>
+        {isConfigured && (
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{
+              backgroundColor:
+                status?.type === "success" ? "var(--lcc-green)" : "var(--lcc-text-faint)",
+            }}
           />
-        </div>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        <label className="aurora-label block">API Key</label>
+        <input
+          type="password"
+          className="aurora-input w-full"
+          value={config.apiKey}
+          onChange={(e) => updateField("apiKey", e.target.value)}
+          placeholder="New Relic API key"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <label htmlFor="nrAccountId" className="aurora-label block">Account ID</label>
+          <label className="aurora-label block">Account ID</label>
           <input
-            id="nrAccountId"
             className="aurora-input w-full"
             value={config.accountId}
             onChange={(e) => updateField("accountId", e.target.value)}
-            placeholder="Enter your Account ID"
+            placeholder="Account ID"
           />
         </div>
-        <Button onClick={handleSave} style={{ color: "#000" }}>
-          <Save className="h-4 w-4" />
-          Save Configuration
-        </Button>
-      </div>
-      <div className="aurora-panel space-y-3 p-4">
-        <h3 className="aurora-text text-sm font-semibold">Application Settings</h3>
         <div className="space-y-1.5">
-          <label htmlFor="nrAppName" className="aurora-label block">Application Name</label>
+          <label className="aurora-label block">App Name</label>
           <input
-            id="nrAppName"
             className="aurora-input w-full"
             value={config.appName}
             onChange={(e) => updateField("appName", e.target.value)}
-            placeholder="e.g., Production Web App"
+            placeholder="Application name"
           />
         </div>
-        <Button variant="outline" onClick={handleTestConnection}>
-          <Wifi className="h-4 w-4" />
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={handleTestConnection}>
+          <Wifi className="h-3.5 w-3.5" />
           Test Connection
         </Button>
-        {connectionStatus && (
-          <p className="text-sm" style={{ color: statusColor }}>
-            {connectionStatus.message}
+        {status && (
+          <p className="text-xs" style={{ color: statusColor }}>
+            {status.message}
           </p>
         )}
       </div>
