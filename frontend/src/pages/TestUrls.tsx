@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { TestResultsTable } from "@/components/test-urls/TestResultsTable"
 import { TestProgressPanel, type TestProgressEntry } from "@/components/test-urls/TestProgressPanel"
+import { BatchResultsLog } from "@/components/test-urls/BatchResultsLog"
 import { TestDetailDialog } from "@/components/test-urls/TestDetailDialog"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
@@ -33,6 +34,7 @@ export function TestUrls() {
     finished: false,
   })
   const [recentResults, setRecentResults] = useState<TestProgressEntry[]>([])
+  const [allResults, setAllResults] = useState<TestProgressEntry[]>([])
   const [retestingUrlId, setRetestingUrlId] = useState<number | null>(null)
   const abortRef = useRef(false)
 
@@ -97,6 +99,7 @@ export function TestUrls() {
     abortRef.current = false
     setTesting(true)
     setRecentResults([])
+    setAllResults([])
     setTestProgress({
       completed: 0,
       total: allUrls.length,
@@ -142,6 +145,7 @@ export function TestUrls() {
       }
 
       setRecentResults(entries.slice(0, 5))
+      setAllResults([...entries])
       setTestProgress((prev) => ({
         ...prev,
         completed: prev.completed + 1,
@@ -294,6 +298,12 @@ export function TestUrls() {
           strategyLabel={strategyLabel}
           finished={testProgress.finished}
           recentResults={recentResults}
+        />
+
+        {/* Batch Results Log */}
+        <BatchResultsLog
+          results={allResults}
+          onDismiss={() => setAllResults([])}
         />
 
         {/* Site Tabs + Results */}
