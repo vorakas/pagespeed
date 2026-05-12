@@ -94,7 +94,7 @@ const BASE_URL = import.meta.env.BASE_URL
 export function AppSidebar({ activePath }: AppSidebarProps) {
   const { theme, toggleTheme } = useTheme()
   return (
-    <aside className="beacon-sidebar fixed left-0 top-0 bottom-0 z-40 flex w-[208px] flex-col">
+    <aside className="beacon-sidebar fixed left-0 top-0 bottom-0 z-40 flex w-[224px] flex-col">
       {/* Brand — static Pharos logo. The image carries the "Pharos"
           wordmark, so we don't repeat it as text — only the small
           OPERATIONS HUB tagline rides alongside. */}
