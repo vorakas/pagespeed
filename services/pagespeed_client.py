@@ -8,6 +8,7 @@ failure — never returns ``None``.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Optional
 
 import requests
@@ -38,11 +39,16 @@ class PageSpeedClient:
         api_key: Optional API key.  ``None`` uses unauthenticated quota.
     """
 
+    _MAX_RETRIES: int = 1
+    _RETRY_BACKOFF_SECONDS: int = 5
+
     def __init__(self, api_key: Optional[str] = None) -> None:
         self._api_key: Optional[str] = api_key
 
     def test_url(self, url: str, strategy: str = DEFAULT_STRATEGY) -> dict:
         """Run a Lighthouse audit via the PageSpeed Insights API.
+
+        Retries once on timeout before giving up.
 
         Args:
             url:      The URL to test.
@@ -62,17 +68,54 @@ class PageSpeedClient:
         if self._api_key:
             params["key"] = self._api_key
 
-        try:
-            logger.info("Testing %s ...", url)
-            response = requests.get(
-                PAGESPEED_API_URL, params=params, timeout=PAGESPEED_TIMEOUT_SECONDS,
-            )
-            response.raise_for_status()
-            data = response.json()
-        except requests.exceptions.RequestException as exc:
-            raise PageSpeedError(f"HTTP request failed for {url}: {exc}") from exc
-
+        data = self._request_with_retry(url, params)
         return self._parse_results(data)
+
+    def _request_with_retry(self, url: str, params: dict[str, Any]) -> dict:
+        """Send the PSI request, retrying once on timeout."""
+        last_exception: requests.exceptions.RequestException | None = None
+
+        for attempt in range(1 + self._MAX_RETRIES):
+            try:
+                if attempt == 0:
+                    logger.info("Testing %s ...", url)
+                else:
+                    logger.info("Retrying %s (attempt %d) ...", url, attempt + 1)
+
+                response = requests.get(
+                    PAGESPEED_API_URL, params=params, timeout=PAGESPEED_TIMEOUT_SECONDS,
+                )
+                response.raise_for_status()
+                return response.json()
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+                last_exception = exc
+                if attempt < self._MAX_RETRIES:
+                    time.sleep(self._RETRY_BACKOFF_SECONDS)
+                    continue
+            except requests.exceptions.RequestException as exc:
+                raise PageSpeedError(
+                    self._friendly_error(url, exc),
+                ) from exc
+
+        raise PageSpeedError(
+            self._friendly_error(url, last_exception),
+        ) from last_exception
+
+    @staticmethod
+    def _friendly_error(url: str, exc: requests.exceptions.RequestException | None) -> str:
+        """Convert raw requests exceptions into concise, user-facing messages."""
+        if isinstance(exc, requests.exceptions.Timeout):
+            return (
+                f"Google PageSpeed timed out after {PAGESPEED_TIMEOUT_SECONDS}s for {url} "
+                f"— the page may be too heavy or the API is overloaded"
+            )
+        if isinstance(exc, requests.exceptions.ConnectionError):
+            return f"Could not connect to Google PageSpeed API while testing {url}"
+        if isinstance(exc, requests.exceptions.HTTPError) and exc.response is not None:
+            return (
+                f"Google PageSpeed returned HTTP {exc.response.status_code} for {url}"
+            )
+        return f"Google PageSpeed request failed for {url}"
 
     # ------------------------------------------------------------------
     # Parsing helpers — each stays under ~30 lines
