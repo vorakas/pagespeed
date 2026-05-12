@@ -572,17 +572,78 @@ export function RequirementQuestions() {
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
-    let displayNumber = 0
+    const numberedLines = lines
+      .map((line) => line.match(/^\d+\.\s+(.*)$/)?.[1]?.trim() || null)
+      .filter((line): line is string => Boolean(line))
 
-    return lines.map((line, index) => {
-      const numbered = line.match(/^\d+\.\s+(.*)$/)
-      const displayLine = numbered ? `${++displayNumber}. ${numbered[1]}` : line
+    if (numberedLines.length >= Math.max(3, lines.length - 1)) {
+      return [renderRequirementNumberedList(numberedLines, keyPrefix)]
+    }
+
+    return lines.map((line, index) => (
+      <p key={`${keyPrefix}-${index}`} className="requirement-exact-line">
+        {renderExactRequirementInline(line, `${keyPrefix}-${index}`)}
+      </p>
+    ))
+  }
+
+  function renderRequirementNumberedList(items: string[], keyPrefix: string): ReactNode {
+    const displayIndex = items.findIndex((item) => /^display text in the following format/i.test(item))
+    const backendIndex = items.findIndex((item, index) => index > displayIndex && /^back-?end\b/i.test(item))
+    const resumeIndex = items.findIndex(
+      (item, index) =>
+        index > backendIndex &&
+        /^(the zip code should|if user clicks|on mobile|on desktop|the form|update text|note:)/i.test(item),
+    )
+
+    if (displayIndex >= 0 && backendIndex > displayIndex) {
+      const nestedStart = displayIndex + 1
+      const nestedEnd = resumeIndex > backendIndex ? resumeIndex : items.length
+      const topItems = [...items.slice(0, displayIndex + 1), ...items.slice(nestedEnd)]
+      const nestedItems = items.slice(nestedStart, nestedEnd)
+      const backendNestedIndex = nestedItems.findIndex((item) => /^back-?end\b/i.test(item))
+
       return (
-        <p key={`${keyPrefix}-${index}`} className="requirement-exact-line">
-          {renderExactRequirementInline(displayLine, `${keyPrefix}-${index}`)}
-        </p>
+        <ol key={keyPrefix} className="requirement-exact-list">
+          {topItems.map((item, index) => (
+            <li key={`${keyPrefix}-top-${index}`}>
+              <span>{renderExactRequirementInline(item, `${keyPrefix}-top-${index}`)}</span>
+              {index === displayIndex && nestedItems.length > 0 && (
+                <ol className="requirement-exact-list requirement-exact-list-nested">
+                  {nestedItems.slice(0, backendNestedIndex >= 0 ? backendNestedIndex : nestedItems.length).map((nestedItem, nestedIndex) => (
+                    <li key={`${keyPrefix}-nested-before-${nestedIndex}`}>
+                      {renderExactRequirementInline(nestedItem, `${keyPrefix}-nested-before-${nestedIndex}`)}
+                    </li>
+                  ))}
+                  {backendNestedIndex >= 0 && (
+                    <li key={`${keyPrefix}-nested-backend`}>
+                      <span>{renderExactRequirementInline(nestedItems[backendNestedIndex], `${keyPrefix}-nested-backend`)}</span>
+                      {nestedItems.length > backendNestedIndex + 1 && (
+                        <ol className="requirement-exact-list requirement-exact-list-nested">
+                          {nestedItems.slice(backendNestedIndex + 1).map((nestedItem, nestedIndex) => (
+                            <li key={`${keyPrefix}-nested-backend-${nestedIndex}`}>
+                              {renderExactRequirementInline(nestedItem, `${keyPrefix}-nested-backend-${nestedIndex}`)}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </li>
+                  )}
+                </ol>
+              )}
+            </li>
+          ))}
+        </ol>
       )
-    })
+    }
+
+    return (
+      <ol key={keyPrefix} className="requirement-exact-list">
+        {items.map((item, index) => (
+          <li key={`${keyPrefix}-${index}`}>{renderExactRequirementInline(item, `${keyPrefix}-${index}`)}</li>
+        ))}
+      </ol>
+    )
   }
 
   function renderExactRequirementInline(text: string, keyPrefix: string): ReactNode[] {

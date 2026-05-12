@@ -525,6 +525,25 @@
   .requirement-exact-line:last-child {
     margin-bottom: 0;
   }
+  .requirement-exact-list {
+    margin: 0.35rem 0 0;
+    padding-left: 2rem;
+    list-style-position: outside;
+  }
+  .requirement-exact-list-nested {
+    margin-top: 0.35rem;
+    margin-bottom: 0.45rem;
+    padding-left: 2.15rem;
+  }
+  .requirement-exact-list li {
+    margin: 0.35rem 0;
+    padding-left: 0.18rem;
+  }
+  .requirement-exact-list li::marker {
+    color: hsl(var(--foreground));
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+  }
   .requirement-exact-mention {
     color: hsl(187 92% 66%);
     font-weight: 750;
