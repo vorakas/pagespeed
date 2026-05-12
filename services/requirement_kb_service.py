@@ -448,7 +448,7 @@ class RequirementKbService:
         self,
         kb_id: int,
         question: str,
-        limit: int = 5,
+        limit: int = 10,
         ai_options: dict[str, Any] | None = None,
         answer_mode: str = "auto",
     ) -> dict[str, Any]:
@@ -480,6 +480,10 @@ class RequirementKbService:
             )
             chunks = self.conn_mgr.rows_to_dicts(cursor)
 
+        chunk_index = {}
+        for chunk in chunks:
+            chunk_index[(chunk["source_id"], chunk["chunk_index"])] = chunk
+
         scored = []
         for chunk in chunks:
             score, matched = self._score_text(chunk["content"], terms)
@@ -487,6 +491,28 @@ class RequirementKbService:
                 scored.append((score, matched, chunk))
         scored.sort(key=lambda item: -item[0])
         top = scored[:limit]
+
+        seen = {(c["source_id"], c["chunk_index"]) for _, _, c in top}
+        expanded = []
+        for score, matched, chunk in top:
+            src_id = chunk["source_id"]
+            idx = chunk["chunk_index"]
+            prev_key = (src_id, idx - 1)
+            if prev_key not in seen:
+                prev = chunk_index.get(prev_key)
+                if prev:
+                    seen.add(prev_key)
+                    n_score, n_matched = self._score_text(prev["content"], terms)
+                    expanded.append((n_score, n_matched or matched, prev))
+            expanded.append((score, matched, chunk))
+            next_key = (src_id, idx + 1)
+            if next_key not in seen:
+                nxt = chunk_index.get(next_key)
+                if nxt:
+                    seen.add(next_key)
+                    n_score, n_matched = self._score_text(nxt["content"], terms)
+                    expanded.append((n_score, n_matched or matched, nxt))
+        top = expanded
 
         if not top:
             return {
@@ -522,6 +548,43 @@ class RequirementKbService:
             common_question = self._save_common_question(kb_id, question.strip(), answer["answer"], citations)
             answer["commonQuestionId"] = common_question["id"]
         return answer
+
+    def rechunk_knowledge_base(self, kb_id: int) -> dict[str, Any]:
+        self.get_knowledge_base(kb_id)
+        with self.conn_mgr.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT * FROM requirement_sources WHERE kb_id = {self.conn_mgr.placeholder()}",
+                (kb_id,),
+            )
+            sources = self.conn_mgr.rows_to_dicts(cursor)
+            total_chunks = 0
+            for source in sources:
+                source_id = source["id"]
+                text = source.get("extracted_text") or ""
+                cursor.execute(
+                    "DELETE FROM requirement_chunks WHERE source_id = " + self.conn_mgr.placeholder(),
+                    (source_id,),
+                )
+                for idx, chunk in enumerate(self._chunk_text(text)):
+                    cursor.execute(
+                        f"""
+                        INSERT INTO requirement_chunks (kb_id, source_id, chunk_index, heading, content, token_count, metadata_json)
+                        VALUES ({self._ph(7)})
+                        """,
+                        (
+                            kb_id,
+                            source_id,
+                            idx,
+                            chunk["heading"],
+                            chunk["content"],
+                            len(chunk["content"].split()),
+                            json.dumps(chunk.get("metadata", {})),
+                        ),
+                    )
+                    total_chunks += 1
+            conn.commit()
+        return {"rechunked": True, "sources": len(sources), "chunks": total_chunks}
 
     def list_ai_usage_summary(self) -> dict[str, Any]:
         with self.conn_mgr.get_connection() as conn:
@@ -1033,7 +1096,7 @@ class RequirementKbService:
     # Text helpers
     # ------------------------------------------------------------------
 
-    def _chunk_text(self, text: str, max_chars: int = 1300) -> list[dict[str, Any]]:
+    def _chunk_text(self, text: str, max_chars: int = 2500) -> list[dict[str, Any]]:
         clean = text.strip()
         if not clean:
             return [{"heading": "Visual source", "content": "Visual-only source. Review original file.", "metadata": {}}]
@@ -1062,8 +1125,17 @@ class RequirementKbService:
         parts = []
         text = content.strip()
         while text:
-            parts.append({"heading": heading, "content": text[:max_chars].strip(), "metadata": {}})
-            text = text[max_chars:].strip()
+            if len(text) <= max_chars:
+                parts.append({"heading": heading, "content": text, "metadata": {}})
+                break
+            cut = max_chars
+            for sep in (". ", ".\n", ";\n", ";\n", "\n"):
+                pos = text.rfind(sep, 0, max_chars)
+                if pos > max_chars // 3:
+                    cut = pos + len(sep)
+                    break
+            parts.append({"heading": heading, "content": text[:cut].strip(), "metadata": {}})
+            text = text[cut:].strip()
         return parts
 
     def _iter_vault_task_files(self) -> list[Path]:

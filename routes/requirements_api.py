@@ -129,4 +129,8 @@ def create_requirements_blueprint(
             )
         )
 
+    @bp.post("/knowledge-bases/<int:kb_id>/rechunk")
+    def rechunk_kb(kb_id: int):
+        return jsonify(requirement_service.rechunk_knowledge_base(kb_id))
+
     return bp

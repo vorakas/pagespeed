@@ -10,6 +10,7 @@ import {
   Loader2,
   MessageSquareText,
   Plus,
+  RefreshCw,
   Search,
   Send,
   Trash2,
@@ -1275,7 +1276,32 @@ export function RequirementQuestions() {
 
           <Card className="rounded-lg">
             <CardHeader>
-              <CardTitle>Sources</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Sources</CardTitle>
+                {activeKbId && sources.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={busy === "rechunk"}
+                    onClick={async () => {
+                      setBusy("rechunk")
+                      try {
+                        const result = await api.rechunkKnowledgeBase(activeKbId)
+                        setSourceMessage(`Rechunked ${result.sources} sources into ${result.chunks} chunks.`)
+                        await loadSources(activeKbId)
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Rechunk failed")
+                      } finally {
+                        setBusy(null)
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    title="Re-split all sources into larger, sentence-aware chunks for better search accuracy"
+                  >
+                    <RefreshCw className={cn("size-3.5", busy === "rechunk" && "animate-spin")} />
+                    Rechunk
+                  </button>
+                )}
+              </div>
               <CardDescription>
                 {activeKb ? `${activeKb.name} indexed evidence` : "Select a knowledge base to inspect sources"}
               </CardDescription>

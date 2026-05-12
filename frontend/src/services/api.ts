@@ -1014,6 +1014,10 @@ class ApiClient {
     })
   }
 
+  async rechunkKnowledgeBase(kbId: number): Promise<{ rechunked: boolean; sources: number; chunks: number }> {
+    return this.request(`/api/requirements/knowledge-bases/${kbId}/rechunk`, { method: "POST" })
+  }
+
   async getAiUsageSummary(): Promise<AiUsageSummary> {
     return this.request("/api/requirements/ai-usage")
   }
