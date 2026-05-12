@@ -2,6 +2,13 @@ import { createContext, useState, useRef, useCallback, type ReactNode } from "re
 import { api } from "@/services/api"
 import type { TestProgressEntry } from "@/components/test-urls/TestProgressPanel"
 import type { Strategy, SiteWithUrls } from "@/types"
+import {
+  loadBatchHistory,
+  saveBatchRun,
+  deleteBatchRun,
+  clearBatchHistory,
+  type BatchRun,
+} from "@/services/batchHistory"
 
 const CONCURRENCY = 3
 
@@ -20,8 +27,11 @@ interface BatchTestContextValue {
   progress: BatchTestProgress
   recentResults: TestProgressEntry[]
   allResults: TestProgressEntry[]
+  history: BatchRun[]
   startBatchTest: (sites: SiteWithUrls[], strategy: Strategy) => void
   dismissResults: () => void
+  deleteRun: (runId: string) => void
+  clearHistory: () => void
 }
 
 const initialProgress: BatchTestProgress = {
@@ -41,6 +51,7 @@ export function BatchTestProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<BatchTestProgress>(initialProgress)
   const [recentResults, setRecentResults] = useState<TestProgressEntry[]>([])
   const [allResults, setAllResults] = useState<TestProgressEntry[]>([])
+  const [history, setHistory] = useState<BatchRun[]>(() => loadBatchHistory())
   const abortRef = useRef(false)
 
   const startBatchTest = useCallback((sites: SiteWithUrls[], strategy: Strategy) => {
@@ -126,6 +137,8 @@ export function BatchTestProvider({ children }: { children: ReactNode }) {
     Promise.all(workers).then(() => {
       setProgress((prev) => ({ ...prev, activeUrls: [], finished: true }))
       setTesting(false)
+      const run = saveBatchRun(strategy, entries)
+      setHistory((prev) => [run, ...prev.slice(0, 19)])
     })
   }, [testing])
 
@@ -134,9 +147,22 @@ export function BatchTestProvider({ children }: { children: ReactNode }) {
     setRecentResults([])
   }, [])
 
+  const deleteRun = useCallback((runId: string) => {
+    deleteBatchRun(runId)
+    setHistory((prev) => prev.filter((r) => r.id !== runId))
+  }, [])
+
+  const handleClearHistory = useCallback(() => {
+    clearBatchHistory()
+    setHistory([])
+  }, [])
+
   return (
     <BatchTestContext.Provider
-      value={{ testing, progress, recentResults, allResults, startBatchTest, dismissResults }}
+      value={{
+        testing, progress, recentResults, allResults, history,
+        startBatchTest, dismissResults, deleteRun, clearHistory: handleClearHistory,
+      }}
     >
       {children}
     </BatchTestContext.Provider>

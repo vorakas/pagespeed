@@ -17,7 +17,10 @@ import type { Strategy, LatestResult, TestDetail } from "@/types"
 
 export function TestUrls() {
   const { sites, loading: sitesLoading, error: sitesError } = useSites()
-  const { testing, progress, recentResults, allResults, startBatchTest, dismissResults } = useBatchTest()
+  const {
+    testing, progress, recentResults, allResults, history,
+    startBatchTest, dismissResults, deleteRun, clearHistory,
+  } = useBatchTest()
   const [strategy, setStrategy] = useState<Strategy>("desktop")
   const [activeSiteId, setActiveSiteId] = useState<number | null>(null)
   const [results, setResults] = useState<LatestResult[]>([])
@@ -212,7 +215,10 @@ export function TestUrls() {
         {/* Batch Results Log */}
         <BatchResultsLog
           results={allResults}
+          history={history}
           onDismiss={dismissResults}
+          onDeleteRun={deleteRun}
+          onClearHistory={clearHistory}
         />
 
         {/* Site Tabs + Results */}
