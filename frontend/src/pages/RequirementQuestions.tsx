@@ -67,7 +67,7 @@ const TASK_REFERENCE_RE = /\b(?:LAMPSPLUS|LPWE|LP|WPM|DBADMIN)-\d+\b/g
 const DISPLAY_TASK_REFERENCE_RE = /["'“”]?\b(?:LAMPSPLUS|LPWE|LP|WPM|DBADMIN)-\d+\b["'“”]?/g
 const SOURCE_REFERENCE_RE = /["'“”]?\bSources?\s+\d+(?:\s*(?:,|&|and)\s*\d+)*\b["'“”]?/gi
 const REQUIREMENT_MENTION_RE = /\[(@[^\]]+)\]\((https?:\/\/[^)]+)\)/g
-const SQL_START_RE = /\b(?:SELECT|WITH|UPDATE|INSERT|DELETE)\b/i
+const SQL_START_RE = /\b(?:SELECT|UPDATE|INSERT|DELETE)\b/i
 const AC_REFERENCE_RE = /\bAC\s*\d+\b/gi
 
 export function RequirementQuestions() {
@@ -572,12 +572,17 @@ export function RequirementQuestions() {
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
+    let displayNumber = 0
 
-    return lines.map((line, index) => (
-      <p key={`${keyPrefix}-${index}`} className="requirement-exact-line">
-        {renderExactRequirementInline(line, `${keyPrefix}-${index}`)}
-      </p>
-    ))
+    return lines.map((line, index) => {
+      const numbered = line.match(/^\d+\.\s+(.*)$/)
+      const displayLine = numbered ? `${++displayNumber}. ${numbered[1]}` : line
+      return (
+        <p key={`${keyPrefix}-${index}`} className="requirement-exact-line">
+          {renderExactRequirementInline(displayLine, `${keyPrefix}-${index}`)}
+        </p>
+      )
+    })
   }
 
   function renderExactRequirementInline(text: string, keyPrefix: string): ReactNode[] {
