@@ -14,7 +14,7 @@ interface TestProgressPanelProps {
   total: number
   successful: number
   failed: number
-  currentUrl: string | null
+  activeUrls: string[]
   strategyLabel: string
   finished: boolean
   recentResults: TestProgressEntry[]
@@ -26,7 +26,7 @@ export function TestProgressPanel({
   total,
   successful,
   failed,
-  currentUrl,
+  activeUrls,
   strategyLabel,
   finished,
   recentResults,
@@ -48,10 +48,14 @@ export function TestProgressPanel({
 
       <Progress value={percentage} className="aurora-progress" />
 
-      {currentUrl && !finished && (
-        <div className="aurora-text-dim flex items-center gap-2 text-sm">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span className="truncate">{currentUrl}</span>
+      {activeUrls.length > 0 && !finished && (
+        <div className="space-y-1">
+          {activeUrls.map((url) => (
+            <div key={url} className="aurora-text-dim flex items-center gap-2 text-sm">
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+              <span className="truncate">{url}</span>
+            </div>
+          ))}
         </div>
       )}
 

@@ -22,13 +22,14 @@ export function TestUrls() {
   const [resultsError, setResultsError] = useState<string | null>(null)
 
   // Testing state
+  const CONCURRENCY = 3
   const [testing, setTesting] = useState(false)
   const [testProgress, setTestProgress] = useState({
     completed: 0,
     total: 0,
     successful: 0,
     failed: 0,
-    currentUrl: null as string | null,
+    activeUrls: [] as string[],
     finished: false,
   })
   const [recentResults, setRecentResults] = useState<TestProgressEntry[]>([])
@@ -82,7 +83,7 @@ export function TestUrls() {
     }
   }
 
-  // Batch test all URLs
+  // Batch test all URLs with parallel concurrency pool
   const handleTestAll = useCallback(async () => {
     const allUrls: Array<{ id: number; url: string; siteName: string }> = []
     for (const site of sites) {
@@ -101,21 +102,19 @@ export function TestUrls() {
       total: allUrls.length,
       successful: 0,
       failed: 0,
-      currentUrl: null,
+      activeUrls: [],
       finished: false,
     })
 
     let successful = 0
     let failed = 0
+    let nextIndex = 0
     const entries: TestProgressEntry[] = []
 
-    for (let i = 0; i < allUrls.length; i++) {
-      if (abortRef.current) break
-
-      const urlData = allUrls[i]
+    async function testOne(urlData: { id: number; url: string; siteName: string }) {
       setTestProgress((prev) => ({
         ...prev,
-        currentUrl: urlData.url,
+        activeUrls: [...prev.activeUrls, urlData.url],
       }))
 
       try {
@@ -142,24 +141,33 @@ export function TestUrls() {
         })
       }
 
-      // Keep only last 5 visible
       setRecentResults(entries.slice(0, 5))
       setTestProgress((prev) => ({
         ...prev,
-        completed: i + 1,
+        completed: prev.completed + 1,
         successful,
         failed,
+        activeUrls: prev.activeUrls.filter((u) => u !== urlData.url),
       }))
     }
 
-    setTestProgress((prev) => ({ ...prev, currentUrl: null, finished: true }))
+    async function worker() {
+      while (!abortRef.current) {
+        const index = nextIndex++
+        if (index >= allUrls.length) break
+        await testOne(allUrls[index])
+      }
+    }
 
-    // Refresh results for current site
+    const workers = Array.from({ length: Math.min(CONCURRENCY, allUrls.length) }, () => worker())
+    await Promise.all(workers)
+
+    setTestProgress((prev) => ({ ...prev, activeUrls: [], finished: true }))
+
     if (activeSiteId !== null) {
       loadResults(activeSiteId, strategy)
     }
 
-    // Auto-hide after 5 seconds
     setTimeout(() => {
       setTesting(false)
     }, 5000)
@@ -282,7 +290,7 @@ export function TestUrls() {
           total={testProgress.total}
           successful={testProgress.successful}
           failed={testProgress.failed}
-          currentUrl={testProgress.currentUrl}
+          activeUrls={testProgress.activeUrls}
           strategyLabel={strategyLabel}
           finished={testProgress.finished}
           recentResults={recentResults}
