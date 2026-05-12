@@ -5,38 +5,27 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { TestResultsTable } from "@/components/test-urls/TestResultsTable"
-import { TestProgressPanel, type TestProgressEntry } from "@/components/test-urls/TestProgressPanel"
+import { TestProgressPanel } from "@/components/test-urls/TestProgressPanel"
 import { BatchResultsLog } from "@/components/test-urls/BatchResultsLog"
 import { TestDetailDialog } from "@/components/test-urls/TestDetailDialog"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { useSites } from "@/hooks/use-sites"
+import { useBatchTest } from "@/hooks/use-batch-test"
 import { api } from "@/services/api"
-import type { Strategy, LatestResult, TestDetail, SiteWithUrls } from "@/types"
+import type { Strategy, LatestResult, TestDetail } from "@/types"
 
 export function TestUrls() {
   const { sites, loading: sitesLoading, error: sitesError } = useSites()
+  const { testing, progress, recentResults, allResults, startBatchTest, dismissResults } = useBatchTest()
   const [strategy, setStrategy] = useState<Strategy>("desktop")
   const [activeSiteId, setActiveSiteId] = useState<number | null>(null)
   const [results, setResults] = useState<LatestResult[]>([])
   const [resultsLoading, setResultsLoading] = useState(false)
   const [resultsError, setResultsError] = useState<string | null>(null)
 
-  // Testing state
-  const CONCURRENCY = 3
-  const [testing, setTesting] = useState(false)
-  const [testProgress, setTestProgress] = useState({
-    completed: 0,
-    total: 0,
-    successful: 0,
-    failed: 0,
-    activeUrls: [] as string[],
-    finished: false,
-  })
-  const [recentResults, setRecentResults] = useState<TestProgressEntry[]>([])
-  const [allResults, setAllResults] = useState<TestProgressEntry[]>([])
   const [retestingUrlId, setRetestingUrlId] = useState<number | null>(null)
-  const abortRef = useRef(false)
+  const prevFinishedRef = useRef(false)
 
   // Detail dialog state
   const [detailOpen, setDetailOpen] = useState(false)
@@ -85,97 +74,17 @@ export function TestUrls() {
     }
   }
 
-  // Batch test all URLs with parallel concurrency pool
-  const handleTestAll = useCallback(async () => {
-    const allUrls: Array<{ id: number; url: string; siteName: string }> = []
-    for (const site of sites) {
-      for (const url of site.urls) {
-        allUrls.push({ id: url.id, url: url.url, siteName: site.name })
-      }
-    }
+  const handleTestAll = useCallback(() => {
+    startBatchTest(sites, strategy)
+  }, [sites, strategy, startBatchTest])
 
-    if (allUrls.length === 0) return
-
-    abortRef.current = false
-    setTesting(true)
-    setRecentResults([])
-    setAllResults([])
-    setTestProgress({
-      completed: 0,
-      total: allUrls.length,
-      successful: 0,
-      failed: 0,
-      activeUrls: [],
-      finished: false,
-    })
-
-    let successful = 0
-    let failed = 0
-    let nextIndex = 0
-    const entries: TestProgressEntry[] = []
-
-    async function testOne(urlData: { id: number; url: string; siteName: string }) {
-      setTestProgress((prev) => ({
-        ...prev,
-        activeUrls: [...prev.activeUrls, urlData.url],
-      }))
-
-      try {
-        const response = await api.testUrl(urlData.id, urlData.url, strategy)
-        if (response.success) {
-          successful++
-          entries.unshift({ url: urlData.url, siteName: urlData.siteName, status: "success" })
-        } else {
-          failed++
-          entries.unshift({
-            url: urlData.url,
-            siteName: urlData.siteName,
-            status: "failed",
-            error: response.error || "Test failed",
-          })
-        }
-      } catch (err) {
-        failed++
-        entries.unshift({
-          url: urlData.url,
-          siteName: urlData.siteName,
-          status: "failed",
-          error: err instanceof Error ? err.message : "Network error",
-        })
-      }
-
-      setRecentResults(entries.slice(0, 5))
-      setAllResults([...entries])
-      setTestProgress((prev) => ({
-        ...prev,
-        completed: prev.completed + 1,
-        successful,
-        failed,
-        activeUrls: prev.activeUrls.filter((u) => u !== urlData.url),
-      }))
-    }
-
-    async function worker() {
-      while (!abortRef.current) {
-        const index = nextIndex++
-        if (index >= allUrls.length) break
-        await testOne(allUrls[index])
-      }
-    }
-
-    const workers = Array.from({ length: Math.min(CONCURRENCY, allUrls.length) }, () => worker())
-    await Promise.all(workers)
-
-    setTestProgress((prev) => ({ ...prev, activeUrls: [], finished: true }))
-
-    if (activeSiteId !== null) {
+  // Refresh results table when batch finishes
+  useEffect(() => {
+    if (progress.finished && !prevFinishedRef.current && activeSiteId !== null) {
       loadResults(activeSiteId, strategy)
     }
-
-    setTimeout(() => {
-      setTesting(false)
-    }, 5000)
-  }, [sites, strategy, activeSiteId, loadResults])
+    prevFinishedRef.current = progress.finished
+  }, [progress.finished, activeSiteId, strategy, loadResults])
 
   // Retest single URL
   const handleRetestUrl = useCallback(async (urlId: number, url: string) => {
@@ -230,7 +139,7 @@ export function TestUrls() {
     }
   }, [activeSiteId, strategy, loadResults])
 
-  const strategyLabel = strategy === "mobile" ? "Mobile" : "Desktop"
+  const strategyLabel = progress.strategy === "mobile" ? "Mobile" : "Desktop"
   const hasUrls = sites.some((site) => site.urls.length > 0)
 
   if (sitesLoading) {
@@ -290,20 +199,20 @@ export function TestUrls() {
         {/* Progress Panel */}
         <TestProgressPanel
           visible={testing}
-          completed={testProgress.completed}
-          total={testProgress.total}
-          successful={testProgress.successful}
-          failed={testProgress.failed}
-          activeUrls={testProgress.activeUrls}
+          completed={progress.completed}
+          total={progress.total}
+          successful={progress.successful}
+          failed={progress.failed}
+          activeUrls={progress.activeUrls}
           strategyLabel={strategyLabel}
-          finished={testProgress.finished}
+          finished={progress.finished}
           recentResults={recentResults}
         />
 
         {/* Batch Results Log */}
         <BatchResultsLog
           results={allResults}
-          onDismiss={() => setAllResults([])}
+          onDismiss={dismissResults}
         />
 
         {/* Site Tabs + Results */}

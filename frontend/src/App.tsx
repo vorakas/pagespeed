@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { ThemeProvider } from "@/context/ThemeContext"
 
 import { SitesProvider } from "@/context/SitesContext"
+import { BatchTestProvider } from "@/context/BatchTestContext"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AppLayout } from "@/components/layout/AppLayout"
 
@@ -44,6 +45,7 @@ export default function App() {
       <ThemeProvider>
         <TooltipProvider>
           <SitesProvider>
+          <BatchTestProvider>
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route element={<AppLayout />}>
@@ -66,6 +68,7 @@ export default function App() {
                 </Route>
               </Routes>
             </Suspense>
+          </BatchTestProvider>
           </SitesProvider>
         </TooltipProvider>
       </ThemeProvider>
