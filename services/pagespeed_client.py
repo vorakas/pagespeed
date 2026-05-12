@@ -92,6 +92,14 @@ class PageSpeedClient:
                 if attempt < self._MAX_RETRIES:
                     time.sleep(self._RETRY_BACKOFF_SECONDS)
                     continue
+            except requests.exceptions.HTTPError as exc:
+                if exc.response is not None and exc.response.status_code >= 500 and attempt < self._MAX_RETRIES:
+                    last_exception = exc
+                    time.sleep(self._RETRY_BACKOFF_SECONDS)
+                    continue
+                raise PageSpeedError(
+                    self._friendly_error(url, exc),
+                ) from exc
             except requests.exceptions.RequestException as exc:
                 raise PageSpeedError(
                     self._friendly_error(url, exc),
@@ -106,16 +114,22 @@ class PageSpeedClient:
         """Convert raw requests exceptions into concise, user-facing messages."""
         if isinstance(exc, requests.exceptions.Timeout):
             return (
-                f"Google PageSpeed timed out after {PAGESPEED_TIMEOUT_SECONDS}s for {url} "
-                f"— the page may be too heavy or the API is overloaded"
+                f"Google's API timed out after {PAGESPEED_TIMEOUT_SECONDS}s testing {url} "
+                f"— the page may be too heavy or Google is overloaded (not a server error on your site)"
             )
         if isinstance(exc, requests.exceptions.ConnectionError):
-            return f"Could not connect to Google PageSpeed API while testing {url}"
+            return f"Could not reach Google's PageSpeed API while testing {url} — not a server error on your site"
         if isinstance(exc, requests.exceptions.HTTPError) and exc.response is not None:
-            return (
-                f"Google PageSpeed returned HTTP {exc.response.status_code} for {url}"
-            )
-        return f"Google PageSpeed request failed for {url}"
+            status = exc.response.status_code
+            if status >= 500:
+                return (
+                    f"Google's API returned HTTP {status} while analyzing {url} "
+                    f"— this is a Google infrastructure error, not a failure on your site"
+                )
+            if status == 429:
+                return f"Google's API rate limit hit while testing {url} — try again in a few minutes"
+            return f"Google's API returned HTTP {status} while testing {url}"
+        return f"Google's PageSpeed API request failed for {url}"
 
     # ------------------------------------------------------------------
     # Parsing helpers — each stays under ~30 lines
