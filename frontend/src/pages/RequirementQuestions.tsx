@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react"
+import { type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { marked } from "marked"
 import { renderAsync } from "docx-preview"
 import * as XLSX from "xlsx"
@@ -66,6 +66,9 @@ const VIDEO_ATTACHMENT_RE = /\.(webm|mp4|mov|m4v)$/i
 const TASK_REFERENCE_RE = /\b(?:LAMPSPLUS|LPWE|LP|WPM|DBADMIN)-\d+\b/g
 const DISPLAY_TASK_REFERENCE_RE = /["'“”]?\b(?:LAMPSPLUS|LPWE|LP|WPM|DBADMIN)-\d+\b["'“”]?/g
 const SOURCE_REFERENCE_RE = /["'“”]?\bSources?\s+\d+(?:\s*(?:,|&|and)\s*\d+)*\b["'“”]?/gi
+const REQUIREMENT_MENTION_RE = /\[(@[^\]]+)\]\((https?:\/\/[^)]+)\)/g
+const SQL_START_RE = /\b(?:SELECT|WITH|UPDATE|INSERT|DELETE)\b/i
+const AC_REFERENCE_RE = /\bAC\s*\d+\b/gi
 
 export function RequirementQuestions() {
   const [aiProvider, setAiProvider] = useLocalConfig<"claude" | "openai">("requirementAiProvider", "claude")
@@ -543,6 +546,89 @@ export function RequirementQuestions() {
     )
   }
 
+  function renderExactRequirementContent(text: string): ReactNode[] {
+    const normalized = text.replace(/^\s*[-*]\s+/, "").trim()
+    const sqlMatch = normalized.match(SQL_START_RE)
+    if (sqlMatch?.index != null && sqlMatch.index >= 0) {
+      const beforeSql = normalized.slice(0, sqlMatch.index).trim()
+      const sql = normalized.slice(sqlMatch.index).replace(/`/g, "").trim()
+      return [
+        ...renderExactRequirementText(beforeSql, "before-sql"),
+        <pre key="sql" className="requirement-exact-code">
+          <code>{sql}</code>
+        </pre>,
+      ]
+    }
+    return renderExactRequirementText(normalized, "text")
+  }
+
+  function renderExactRequirementText(text: string, keyPrefix: string): ReactNode[] {
+    if (!text) return []
+    const lines = text
+      .replace(/\*\*/g, "")
+      .replace(/[ \t\r\n]+/g, " ")
+      .replace(/\s+(?=\d+\.\s+)/g, "\n")
+      .replace(/\s+(?=AC\s*\d+\b)/gi, "\n")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    return lines.map((line, index) => (
+      <p key={`${keyPrefix}-${index}`} className="requirement-exact-line">
+        {renderExactRequirementInline(line, `${keyPrefix}-${index}`)}
+      </p>
+    ))
+  }
+
+  function renderExactRequirementInline(text: string, keyPrefix: string): ReactNode[] {
+    const nodes: ReactNode[] = []
+    let lastIndex = 0
+    let match: RegExpExecArray | null
+    REQUIREMENT_MENTION_RE.lastIndex = 0
+
+    while ((match = REQUIREMENT_MENTION_RE.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        nodes.push(...renderPlainRequirementInline(text.slice(lastIndex, match.index), `${keyPrefix}-plain-${lastIndex}`))
+      }
+      nodes.push(
+        <a
+          key={`${keyPrefix}-mention-${match.index}`}
+          className="requirement-exact-mention"
+          href={match[2]}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {match[1]}
+        </a>,
+      )
+      lastIndex = match.index + match[0].length
+    }
+
+    if (lastIndex < text.length) {
+      nodes.push(...renderPlainRequirementInline(text.slice(lastIndex), `${keyPrefix}-plain-${lastIndex}`))
+    }
+    return nodes
+  }
+
+  function renderPlainRequirementInline(text: string, keyPrefix: string): ReactNode[] {
+    const nodes: ReactNode[] = []
+    let lastIndex = 0
+    let match: RegExpExecArray | null
+    AC_REFERENCE_RE.lastIndex = 0
+
+    while ((match = AC_REFERENCE_RE.exec(text)) !== null) {
+      if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index))
+      nodes.push(
+        <span key={`${keyPrefix}-ac-${match.index}`} className="requirement-exact-ac">
+          {match[0].replace(/\s+/g, " ")}
+        </span>,
+      )
+      lastIndex = match.index + match[0].length
+    }
+    if (lastIndex < text.length) nodes.push(text.slice(lastIndex))
+    return nodes
+  }
+
   function renderAnswerBody(answer: RequirementAnswer) {
     if (answer.answerSource === "ai") {
       const html = formatRequirementAnswerHtml(marked.parse(escapeHtml(answer.answer), { async: false }) as string, answer.citations)
@@ -561,16 +647,20 @@ export function RequirementQuestions() {
     }
 
     return (
-      <div className="min-w-0 space-y-3 text-sm leading-relaxed">
-        <p>I found these relevant requirement notes:</p>
-        <ul className="min-w-0 space-y-2">
+      <div className="requirement-exact-md min-w-0 space-y-3">
+        <p className="requirement-exact-intro">I found these relevant requirement notes:</p>
+        <div className="min-w-0 space-y-3">
           {answer.citations.map((citation, index) => (
-            <li key={`${citation.sourceId}-${citation.chunkIndex}-${index}`} className="min-w-0 break-words leading-relaxed [overflow-wrap:anywhere]">
-              <span>{citationText(citation)}</span>
-              {renderCitationPill(citation)}
-            </li>
+            <article key={`${citation.sourceId}-${citation.chunkIndex}-${index}`} className="requirement-exact-note">
+              <div className="requirement-exact-note-header">
+                <span>From</span>
+                {renderCitationPill(citation)}
+                <span>:</span>
+              </div>
+              <div className="requirement-exact-note-body">{renderExactRequirementContent(citationText(citation))}</div>
+            </article>
           ))}
-        </ul>
+        </div>
       </div>
     )
   }

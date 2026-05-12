@@ -485,4 +485,86 @@
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
   }
+
+  .requirement-exact-md {
+    font-size: 0.9rem;
+    line-height: 1.65;
+  }
+  .requirement-exact-intro {
+    margin: 0;
+    color: hsl(var(--foreground));
+    font-weight: 650;
+  }
+  .requirement-exact-note {
+    min-width: 0;
+    border-left: 3px solid hsl(258 78% 56% / 0.75);
+    border-radius: 0.45rem;
+    background: hsl(var(--background) / 0.18);
+    padding: 0.75rem 0.9rem 0.85rem;
+  }
+  .requirement-exact-note-header {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-bottom: 0.45rem;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+  .requirement-exact-note-body {
+    min-width: 0;
+    color: hsl(var(--foreground));
+    overflow-wrap: anywhere;
+  }
+  .requirement-exact-line {
+    margin: 0.42rem 0;
+  }
+  .requirement-exact-line:first-child {
+    margin-top: 0;
+  }
+  .requirement-exact-line:last-child {
+    margin-bottom: 0;
+  }
+  .requirement-exact-mention {
+    color: hsl(187 92% 66%);
+    font-weight: 750;
+    text-decoration: none;
+    text-shadow: 0 0 14px hsl(187 92% 66% / 0.24);
+  }
+  .requirement-exact-mention:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .requirement-exact-ac {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid hsl(142 74% 58% / 0.45);
+    border-radius: 0.35rem;
+    background: hsl(142 70% 28% / 0.22);
+    padding: 0.04rem 0.32rem;
+    color: hsl(142 77% 72%);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.82em;
+    font-weight: 750;
+  }
+  .requirement-exact-code {
+    max-width: 100%;
+    margin: 0.7rem 0 0;
+    overflow-x: auto;
+    border: 1px solid hsl(var(--border) / 0.75);
+    border-radius: 0.5rem;
+    background: hsl(222 47% 8% / 0.58);
+    padding: 0.75rem 0.85rem;
+    color: hsl(210 40% 94%);
+    font-size: 0.78rem;
+    line-height: 1.55;
+  }
+  .requirement-exact-code code {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    white-space: pre-wrap;
+  }
 }
