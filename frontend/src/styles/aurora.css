@@ -1605,13 +1605,32 @@
   border-color: var(--glass-border-strong);
 }
 .launch-dashboard .lcc-is-tab.active {
-  background: var(--lcc-violet-bg);
-  color: var(--lcc-violet);
-  border-color: rgba(176, 140, 255, 0.4);
+  background: oklch(52% 0.22 295);
+  color: oklch(98% 0.01 280);
+  border-color: oklch(52% 0.22 295);
+  font-weight: 600;
 }
 .launch-dashboard .lcc-is-tab.active span {
-  background: rgba(176, 140, 255, 0.18);
-  color: var(--lcc-violet);
+  background: oklch(36% 0.18 295);
+  color: oklch(98% 0.01 280);
+  font-weight: 600;
+}
+
+/* Incidents rail is narrow; tabs need tighter rhythm to fit 4 across without wrapping. */
+.launch-dashboard .lcc-incident-stream .lcc-is-tabs {
+  gap: 4px;
+  flex-wrap: nowrap;
+  margin-bottom: 10px;
+}
+.launch-dashboard .lcc-incident-stream .lcc-is-tab {
+  padding: 4px 9px;
+  font-size: 10.5px;
+  gap: 4px;
+  min-width: 0;
+}
+.launch-dashboard .lcc-incident-stream .lcc-is-tab span {
+  padding: 0 5px;
+  font-size: 9.5px;
 }
 
 .launch-dashboard .lcc-is-body { flex: 1; overflow-y: auto; padding: 8px 0; }
