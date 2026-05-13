@@ -160,6 +160,7 @@ class NewRelicClient:
               frontend: nrql(query: "FROM PageView SELECT percentile(domProcessingDuration + pageRenderingDuration, 50, 75, 90) AS Frontend_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               ttfbLike: nrql(query: "FROM PageView SELECT percentile(queueDuration + networkDuration, 50, 75, 90) AS TTFB_like_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               domProcessing: nrql(query: "FROM PageView SELECT percentile(domProcessingDuration, 50, 75, 90) AS DomProcessing_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
+              inp: nrql(query: "FROM PageViewTiming SELECT percentile(interactionToNextPaint, 50, 75, 90) AS INP WHERE appName = '{app_name}' AND pageUrl = '{page_url}' AND timingName = 'interactionToNextPaint' SINCE {time_range}") {{ results }}
               inpCollectionCheck: nrql(query: "FROM BrowserInteraction SELECT count(*) AS interactions WHERE appName = '{app_name}' AND targetUrl = '{page_url}' SINCE {time_range}") {{ results }}
               inpAnyInteractions: nrql(query: "FROM BrowserInteraction SELECT count(*) WHERE appName = '{app_name}' AND targetUrl = '{page_url}' SINCE {time_range}") {{ results }}
             }}
@@ -186,6 +187,7 @@ class NewRelicClient:
 
             metrics = {
                 "lcp": self._extract_percentiles(account_data.get("lcp", {}).get("results", [])),
+                "inp": self._extract_percentiles(account_data.get("inp", {}).get("results", [])),
                 "cls": self._extract_percentiles(account_data.get("cls", {}).get("results", [])),
                 "pageLoad": self._extract_percentiles(account_data.get("pageLoad", {}).get("results", [])),
                 "backend": self._extract_percentiles(account_data.get("backend", {}).get("results", [])),
