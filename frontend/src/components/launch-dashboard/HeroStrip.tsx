@@ -1,3 +1,7 @@
+import { useEffect, useState } from "react"
+import { Loader2, RotateCw } from "lucide-react"
+import { api } from "@/services/api"
+import { formatPacificDateTime, formatPacificTime } from "@/lib/datetime"
 import type { MigrationHealthSnapshot, MigrationKpis } from "@/types"
 
 export type HeroIssueKpi = "prod" | "blocker" | "bug"
@@ -6,14 +10,22 @@ interface HeroStripProps {
   health: MigrationHealthSnapshot
   kpis: MigrationKpis | null
   onIssueKpiClick?: (kind: HeroIssueKpi) => void
+  onRefresh?: () => void
+  refreshing?: boolean
 }
 
 /**
- * One-line operator brief: health badge · T−N · open blockers · prod failures.
- * Replaces the prior hero-metric template (5 KPI cards + 52px countdown +
- * gradient progress bar + "Project Status as of …" headline).
+ * One-line operator brief: health · T−N · open blockers · prod failures · sync.
+ * Replaces both the prior hero-metric template and the standalone TopBar — the
+ * sync indicator + manual refresh now ride at the end of the same row.
  */
-export function HeroStrip({ health, kpis, onIssueKpiClick }: HeroStripProps) {
+export function HeroStrip({
+  health,
+  kpis,
+  onIssueKpiClick,
+  onRefresh,
+  refreshing,
+}: HeroStripProps) {
   const days = computeDaysUntil(health.launchWindow?.start)
   const launchLabel = health.launchWindow?.start ?? "no launch window"
 
@@ -40,6 +52,12 @@ export function HeroStrip({ health, kpis, onIssueKpiClick }: HeroStripProps) {
         label="prod failures"
         tone="red"
         onClick={onIssueKpiClick ? () => onIssueKpiClick("prod") : undefined}
+      />
+      <span className="lcc-brief-flex" />
+      <SyncIndicator
+        lastSynced={health.lastSynced ?? null}
+        refreshing={refreshing ?? false}
+        onRefresh={onRefresh}
       />
     </div>
   )
@@ -74,6 +92,79 @@ function BriefStat({ value, label, tone, onClick }: BriefStatProps) {
   return <span className="lcc-brief-item">{body}</span>
 }
 
+interface SyncIndicatorProps {
+  lastSynced: string | null
+  refreshing: boolean
+  onRefresh?: () => void
+}
+
+function SyncIndicator({ lastSynced, refreshing, onRefresh }: SyncIndicatorProps) {
+  const [now, setNow] = useState(() => Date.now())
+  const [autoRefreshedAt, setAutoRefreshedAt] = useState<number | null>(null)
+  const [lastOrchestrationAt, setLastOrchestrationAt] = useState<number | null>(null)
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    // Poll backend auto-refresh status. Job runs every 10 min; 60s poll is plenty.
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const s = await api.getVaultAutoRefreshStatus()
+        if (cancelled || !s.enabled) return
+        if (typeof s.lastRefreshedAt === "number") {
+          setAutoRefreshedAt(s.lastRefreshedAt * 1000)
+        }
+        if (typeof s.lastOrchestrationPushAt === "number") {
+          setLastOrchestrationAt(s.lastOrchestrationPushAt * 1000)
+        }
+      } catch {
+        // Endpoint may be disabled in local dev — silent fallback.
+      }
+    }
+    void tick()
+    const id = window.setInterval(tick, 60_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [])
+
+  const syncedAgo = computeSyncedAgo(lastSynced, now)
+  const tooltipLines = [
+    `vault synced ${formatPacificDateTime(lastSynced) || "—"}`,
+    autoRefreshedAt ? `auto-refreshed ${formatPacificTime(autoRefreshedAt)}` : null,
+    lastOrchestrationAt ? `orchestrated ${formatPacificTime(lastOrchestrationAt)}` : null,
+  ].filter(Boolean)
+
+  return (
+    <span className="lcc-brief-sync" title={tooltipLines.join("\n")}>
+      <span className="lcc-status-dot" />
+      <span className="lcc-brief-label">
+        {refreshing ? "syncing vault…" : `synced ${syncedAgo ?? "—"}`}
+      </span>
+      {onRefresh && (
+        <button
+          type="button"
+          className="lcc-brief-refresh"
+          onClick={onRefresh}
+          disabled={refreshing}
+          aria-label="Sync vault and refresh dashboard"
+        >
+          {refreshing ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <RotateCw size={13} />
+          )}
+        </button>
+      )}
+    </span>
+  )
+}
+
 function fmt(n: number | null | undefined): string {
   if (n == null) return "—"
   return Number(n).toLocaleString()
@@ -84,4 +175,15 @@ function computeDaysUntil(iso: string | null | undefined): number | null {
   const target = new Date(iso).getTime()
   if (Number.isNaN(target)) return null
   return Math.ceil((target - Date.now()) / 86_400_000)
+}
+
+function computeSyncedAgo(iso: string | null | undefined, now: number): string | null {
+  if (!iso) return null
+  const parsed = new Date(iso).getTime()
+  if (Number.isNaN(parsed)) return null
+  const minutes = Math.max(0, Math.floor((now - parsed) / 60_000))
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
 }

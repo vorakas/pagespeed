@@ -3,7 +3,6 @@ import { useLocation } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
-import { TopBar } from "@/components/launch-dashboard/TopBar"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import { HeroStrip, type HeroIssueKpi } from "@/components/launch-dashboard/HeroStrip"
 import { P1Burndown } from "@/components/launch-dashboard/P1Burndown"
@@ -184,11 +183,6 @@ export function LaunchDashboard() {
 
   return (
     <LaunchShell>
-      <TopBar
-        health={health}
-        onRefresh={() => void loadAll(true)}
-        refreshing={refreshing}
-      />
       <div className="lcc-shell">
         <LeftRail
           sources={sources}
@@ -199,7 +193,13 @@ export function LaunchDashboard() {
         />
 
         <main className="lcc-main">
-          <HeroStrip health={health} kpis={kpis} onIssueKpiClick={openIssueSummary} />
+          <HeroStrip
+            health={health}
+            kpis={kpis}
+            onIssueKpiClick={openIssueSummary}
+            onRefresh={() => void loadAll(true)}
+            refreshing={refreshing}
+          />
 
           <WhatChangedToday />
 
