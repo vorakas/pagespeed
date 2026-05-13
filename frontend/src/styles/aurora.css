@@ -1570,31 +1570,48 @@
   font-family: var(--aurora-font-mono); letter-spacing: 0;
   text-transform: none; font-size: 11px;
 }
-.launch-dashboard .lcc-is-tabs { display: flex; gap: 4px; }
+.launch-dashboard .lcc-is-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
 .launch-dashboard .lcc-is-tab {
-  flex: 1;
-  background: transparent; border: 1px solid var(--glass-border);
-  color: var(--lcc-text-dim); font: inherit; font-size: 10.5px;
-  padding: 5px 8px; border-radius: 999px; cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--lcc-text-dim);
+  font: inherit;
+  font-size: 11px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
   letter-spacing: 0.04em;
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  transition: all 0.12s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 .launch-dashboard .lcc-is-tab span {
-  font-size: 9.5px; color: var(--lcc-text-faint);
+  font-size: 10px;
+  color: var(--lcc-text-faint);
   background: var(--glass-hi);
-  padding: 0 5px; border-radius: 999px;
+  padding: 0 6px;
+  border-radius: 999px;
   font-family: var(--aurora-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 .launch-dashboard .lcc-is-tab:hover {
-  color: var(--lcc-text); border-color: var(--glass-border-strong);
+  color: var(--lcc-text);
+  border-color: var(--glass-border-strong);
 }
 .launch-dashboard .lcc-is-tab.active {
-  background: linear-gradient(135deg, var(--lcc-violet), var(--lcc-blue));
-  color: #000; border-color: transparent;
+  background: var(--lcc-violet-bg);
+  color: var(--lcc-violet);
+  border-color: rgba(176, 140, 255, 0.4);
 }
 .launch-dashboard .lcc-is-tab.active span {
-  background: rgba(0, 0, 0, 0.18); color: #000;
+  background: rgba(176, 140, 255, 0.18);
+  color: var(--lcc-violet);
 }
 
 .launch-dashboard .lcc-is-body { flex: 1; overflow-y: auto; padding: 8px 0; }
