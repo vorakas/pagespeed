@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { SiteConfigCard } from "@/components/newrelic/NewRelicConfig"
@@ -271,6 +271,28 @@ export function NewRelic() {
       await loadSiteMetrics(viewMode as SiteKey, true)
     }
   }, [viewMode, loadSiteMetrics, lpConfigured, adobeConfigured])
+
+  // -----------------------------------------------------------------------
+  // Auto-reload when switching to single-site (need APM data)
+  // -----------------------------------------------------------------------
+
+  const previousViewMode = useRef(viewMode)
+  useEffect(() => {
+    const prev = previousViewMode.current
+    previousViewMode.current = viewMode
+
+    // Only trigger when switching TO a single-site view
+    if (viewMode === "comparison" || viewMode === prev) return
+
+    const siteKey = viewMode as SiteKey
+    const config = siteKey === "lampsplus" ? lpConfig : adobeConfig
+    const data = siteKey === "lampsplus" ? lpData : adobeData
+
+    // Only auto-load if the site is configured and either has no data or is missing APM
+    if (isConfigured(config) && (!data || !data.apm)) {
+      loadSiteMetrics(siteKey, true)
+    }
+  }, [viewMode, lpConfig, adobeConfig, lpData, adobeData, loadSiteMetrics])
 
   // -----------------------------------------------------------------------
   // Render
