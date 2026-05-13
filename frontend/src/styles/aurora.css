@@ -1160,10 +1160,23 @@
 .launch-dashboard .lcc-brief-sync {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-family: var(--aurora-font-mono);
   font-size: 11px;
   color: var(--lcc-text-dim);
+}
+.launch-dashboard .lcc-brief-sync-stack {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+.launch-dashboard .lcc-brief-sync-primary {
+  color: var(--lcc-text-dim);
+  font-size: 11px;
+}
+.launch-dashboard .lcc-brief-sync-sub {
+  font-size: 9.5px;
+  color: var(--lcc-text-faint);
 }
 .launch-dashboard .lcc-brief-refresh {
   width: 26px;

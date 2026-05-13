@@ -134,17 +134,35 @@ function SyncIndicator({ lastSynced, refreshing, onRefresh }: SyncIndicatorProps
   }, [])
 
   const syncedAgo = computeSyncedAgo(lastSynced, now)
-  const tooltipLines = [
-    `vault synced ${formatPacificDateTime(lastSynced) || "—"}`,
-    autoRefreshedAt ? `auto-refreshed ${formatPacificTime(autoRefreshedAt)}` : null,
-    lastOrchestrationAt ? `orchestrated ${formatPacificTime(lastOrchestrationAt)}` : null,
-  ].filter(Boolean)
 
   return (
-    <span className="lcc-brief-sync" title={tooltipLines.join("\n")}>
+    <span className="lcc-brief-sync">
       <span className="lcc-status-dot" />
-      <span className="lcc-brief-label">
-        {refreshing ? "syncing vault…" : `synced ${syncedAgo ?? "—"}`}
+      <span className="lcc-brief-sync-stack">
+        <span className="lcc-brief-sync-primary">
+          {refreshing ? "syncing vault…" : `synced ${syncedAgo ?? "—"}`}
+        </span>
+        <span className="lcc-brief-sync-sub">
+          {refreshing
+            ? "pulling Jira + Asana"
+            : formatPacificDateTime(lastSynced) || "—"}
+        </span>
+        {autoRefreshedAt && (
+          <span
+            className="lcc-brief-sync-sub"
+            title="Last automatic vault pull from origin"
+          >
+            auto-refreshed {formatPacificTime(autoRefreshedAt)}
+          </span>
+        )}
+        {lastOrchestrationAt && (
+          <span
+            className="lcc-brief-sync-sub"
+            title="When the orchestrator last pushed an [orchestrate] commit to GitHub"
+          >
+            orchestrated {formatPacificTime(lastOrchestrationAt)}
+          </span>
+        )}
       </span>
       {onRefresh && (
         <button
@@ -153,6 +171,7 @@ function SyncIndicator({ lastSynced, refreshing, onRefresh }: SyncIndicatorProps
           onClick={onRefresh}
           disabled={refreshing}
           aria-label="Sync vault and refresh dashboard"
+          title="Sync — pull Jira+Asana into the vault and re-parse every panel"
         >
           {refreshing ? (
             <Loader2 size={14} className="animate-spin" />
