@@ -120,6 +120,7 @@ export function CwvMetrics({ metrics, metadata, interactionsCount }: CwvMetricsP
   if (!metrics) return null
 
   const lcp = metrics.lcp as PercentileMetric | undefined
+  const inp = metrics.inp as PercentileMetric | undefined
   const cls = metrics.cls as PercentileMetric | undefined
   const pageLoad = metrics.pageLoad as PercentileMetric | undefined
   const backend = metrics.backend as PercentileMetric | undefined
@@ -127,27 +128,45 @@ export function CwvMetrics({ metrics, metadata, interactionsCount }: CwvMetricsP
   const ttfbLike = metrics.ttfbLike as PercentileMetric | undefined
   const domProcessing = metrics.domProcessing as PercentileMetric | undefined
 
-  // Page load values from NR come in seconds — convert to ms
-  const pageLoadMs: PercentileMetric | undefined = pageLoad
-    ? {
-        p50: pageLoad.p50 !== null ? pageLoad.p50 * 1000 : null,
-        p75: pageLoad.p75 !== null ? pageLoad.p75 * 1000 : null,
-        p90: pageLoad.p90 !== null ? pageLoad.p90 * 1000 : null,
-      }
-    : undefined
+  // NR returns durations in seconds — convert to ms for display
+  const toMs = (m: PercentileMetric | undefined): PercentileMetric | undefined =>
+    m
+      ? {
+          p50: m.p50 !== null ? m.p50 * 1000 : null,
+          p75: m.p75 !== null ? m.p75 * 1000 : null,
+          p90: m.p90 !== null ? m.p90 * 1000 : null,
+        }
+      : undefined
+
+  const lcpMs = toMs(lcp)
+  const inpMs = toMs(inp)
+  const pageLoadMs = toMs(pageLoad)
+  const backendMs = toMs(backend)
+  const frontendMs = toMs(frontend)
+  const ttfbLikeMs = toMs(ttfbLike)
+  const domProcessingMs = toMs(domProcessing)
 
   return (
     <div className="space-y-4">
-      {/* Primary CWV Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* Primary CWV Cards — canonical order: LCP → INP → CLS → Page Load */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <PercentileCard
           title="LCP"
           subtitle="Largest Contentful Paint"
           idealText="Ideal P75: ≤ 2500ms"
-          metric={lcp}
+          metric={lcpMs}
           unit="ms"
           goodThreshold={2500}
           poorThreshold={4000}
+        />
+        <PercentileCard
+          title="INP"
+          subtitle="Interaction to Next Paint"
+          idealText="Ideal P75: ≤ 200ms"
+          metric={inpMs}
+          unit="ms"
+          goodThreshold={200}
+          poorThreshold={500}
         />
         <PercentileCard
           title="CLS"
@@ -174,10 +193,10 @@ export function CwvMetrics({ metrics, metadata, interactionsCount }: CwvMetricsP
       <div>
         <h3 className="aurora-text mb-3 text-sm font-semibold">Performance Breakdown</h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <BreakdownCard title="Backend Duration" idealText="Ideal P75: ≤ 500ms" metric={backend} />
-          <BreakdownCard title="Frontend Duration" idealText="Ideal P75: ≤ 1500ms" metric={frontend} />
-          <BreakdownCard title="TTFB-like (Queue + Network)" idealText="Ideal P75: ≤ 800ms" metric={ttfbLike} />
-          <BreakdownCard title="DOM Processing" idealText="Ideal P75: ≤ 500ms" metric={domProcessing} />
+          <BreakdownCard title="Backend Duration" idealText="Ideal P75: ≤ 500ms" metric={backendMs} />
+          <BreakdownCard title="Frontend Duration" idealText="Ideal P75: ≤ 1500ms" metric={frontendMs} />
+          <BreakdownCard title="TTFB-like (Queue + Network)" idealText="Ideal P75: ≤ 800ms" metric={ttfbLikeMs} />
+          <BreakdownCard title="DOM Processing" idealText="Ideal P75: ≤ 500ms" metric={domProcessingMs} />
         </div>
       </div>
 
