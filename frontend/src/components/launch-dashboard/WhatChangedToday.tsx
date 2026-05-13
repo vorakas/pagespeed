@@ -101,7 +101,7 @@ function Column({ tone, label, tickets }: ColumnProps) {
   return (
     <div>
       <div style={sectionHeadStyle}>
-        <span style={{ color: `var(--lcc-${tone})`, fontWeight: 700 }}>{label}</span>
+        <span style={{ color: `var(--lcc-${tone})`, fontWeight: 600 }}>{label}</span>
         <span style={sectionSepStyle} />
         <span style={sectionCountStyle}>{tickets.length}</span>
       </div>
@@ -110,13 +110,7 @@ function Column({ tone, label, tickets }: ColumnProps) {
       ) : (
         <ul style={listStyle}>
           {tickets.slice(0, 8).map((t) => (
-            <li
-              key={t.key}
-              style={{
-                ...itemStyle,
-                borderLeft: `2px solid var(--lcc-${tone})`,
-              }}
-            >
+            <li key={t.key} style={itemStyle}>
               <div style={itemIdStyle}>{t.key}</div>
               <div style={itemTitleStyle}>{t.summary || "(no summary)"}</div>
               <div style={itemMetaStyle}>

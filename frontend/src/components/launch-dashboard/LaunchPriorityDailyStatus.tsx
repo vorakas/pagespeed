@@ -9,15 +9,6 @@ import type {
   RawTaskRecord,
 } from "@/types"
 
-type Tone = "red" | "amber" | "green" | "blue" | "violet" | "neutral"
-
-const TONES: Record<string, Tone> = {
-  P1: "red",
-  P2: "amber",
-  P3: "blue",
-  "Post-Launch": "violet",
-}
-
 interface Props {
   launchPriorities: MigrationLaunchPriorities | null
   snapshot: MigrationSnapshot | null
@@ -87,16 +78,9 @@ export function LaunchPriorityDailyStatus({ launchPriorities, snapshot }: Props)
 }
 
 function PriorityBucket({ bucket }: { bucket: MigrationLaunchPriorityBucket }) {
-  const tone = TONES[bucket.priority] ?? "neutral"
   const [selectedTask, setSelectedTask] = useState<RawTaskRecord | null>(null)
   return (
     <div>
-      <div style={summaryGridStyle}>
-        <SummaryStat label="Active" value={bucket.active} tone={tone} />
-        <SummaryStat label="Resolved" value={bucket.resolved} tone="green" />
-        <SummaryStat label="Total" value={bucket.total} tone="neutral" />
-      </div>
-
       {bucket.items.length === 0 ? (
         <div style={emptyStyle}>No active {bucket.label} tasks.</div>
       ) : (
@@ -105,7 +89,6 @@ function PriorityBucket({ bucket }: { bucket: MigrationLaunchPriorityBucket }) {
             <TaskRow
               key={task.key}
               task={task}
-              tone={tone}
               onSelect={() => setSelectedTask(task)}
             />
           ))}
@@ -118,25 +101,13 @@ function PriorityBucket({ bucket }: { bucket: MigrationLaunchPriorityBucket }) {
   )
 }
 
-function SummaryStat({ label, value, tone }: { label: string; value: number; tone: Tone }) {
-  return (
-    <div style={{ ...summaryStatStyle, borderColor: `var(--lcc-${tone})` }}>
-      <span style={summaryLabelStyle}>{label}</span>
-      <strong style={{ color: `var(--lcc-${tone})` }}>{value.toLocaleString()}</strong>
-    </div>
-  )
-}
-
 function TaskRow({
   task,
-  tone,
   onSelect,
 }: {
   task: RawTaskRecord
-  tone: Tone
   onSelect: () => void
 }) {
-  const accent = `var(--lcc-${tone})`
   const meta = [
     task.assignee ? `@${task.assignee}` : "UNASSIGNED",
     task.uatStatus || task.taskStatus || task.status || "Open",
@@ -144,7 +115,7 @@ function TaskRow({
   ].filter(Boolean)
 
   return (
-    <div style={{ ...rowStyle, borderLeft: `2px solid ${accent}` }}>
+    <div style={rowStyle}>
       <button type="button" style={rowIdPillStyle} onClick={onSelect}>
         {task.key}
       </button>
@@ -206,13 +177,13 @@ const eyebrowStyle: React.CSSProperties = {
   color: "var(--lcc-text-faint)",
   fontSize: 12,
   textTransform: "uppercase",
-  letterSpacing: 0,
-  fontWeight: 800,
+  letterSpacing: "0.12em",
+  fontWeight: 600,
   marginBottom: 10,
 }
 
 const eyebrowSep: React.CSSProperties = { color: "var(--lcc-glass-border)" }
-const eyebrowFile: React.CSSProperties = { textTransform: "none", fontWeight: 650 }
+const eyebrowFile: React.CSSProperties = { textTransform: "none", fontWeight: 500 }
 
 const headlineSingleStyle: React.CSSProperties = {
   margin: "0 0 14px",
@@ -249,30 +220,6 @@ const headlineBulletDotStyle: React.CSSProperties = {
 
 const tabBodyStyle: React.CSSProperties = { minHeight: 160 }
 
-const summaryGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: 10,
-  marginBottom: 14,
-}
-
-const summaryStatStyle: React.CSSProperties = {
-  border: "1px solid var(--lcc-glass-border)",
-  background: "var(--lcc-glass-bg-faint)",
-  borderRadius: 6,
-  padding: "10px 12px",
-}
-
-const summaryLabelStyle: React.CSSProperties = {
-  display: "block",
-  color: "var(--lcc-text-faint)",
-  fontSize: 11,
-  textTransform: "uppercase",
-  letterSpacing: 0,
-  fontWeight: 800,
-  marginBottom: 4,
-}
-
 const rowsStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
@@ -282,7 +229,7 @@ const rowStyle: React.CSSProperties = {
   display: "flex",
   gap: 10,
   alignItems: "center",
-  border: "1px solid rgba(255, 255, 255, 0.55)",
+  border: "1px solid var(--glass-border)",
   background: "var(--lcc-violet-bg)",
   borderRadius: 6,
   padding: "9px 10px",
@@ -291,28 +238,28 @@ const rowStyle: React.CSSProperties = {
 const rowIdPillStyle: React.CSSProperties = {
   width: 88,
   flex: "0 0 auto",
-  color: "#fff",
-  border: "1px solid rgba(255, 255, 255, 0.68)",
-  background: "rgba(255, 255, 255, 0.08)",
+  color: "var(--lcc-text)",
+  border: "1px solid var(--glass-border-strong)",
+  background: "var(--glass-hi)",
   borderRadius: 999,
   padding: "5px 8px",
   fontFamily: "var(--font-mono)",
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 700,
   cursor: "pointer",
 }
 
 const rowTitleStyle: React.CSSProperties = {
-  color: "#fff",
+  color: "var(--lcc-text)",
   fontSize: 13,
-  fontWeight: 700,
+  fontWeight: 600,
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
 }
 
 const rowMetaStyle: React.CSSProperties = {
-  color: "rgba(255, 255, 255, 0.72)",
+  color: "var(--lcc-text-dim)",
   fontSize: 11,
   marginTop: 3,
   overflow: "hidden",
@@ -321,13 +268,13 @@ const rowMetaStyle: React.CSSProperties = {
 }
 
 const chipStyle: React.CSSProperties = {
-  border: "1px solid rgba(255, 255, 255, 0.65)",
+  border: "1px solid var(--glass-border-strong)",
   borderRadius: 6,
   padding: "3px 7px",
   fontSize: 11,
-  fontWeight: 850,
+  fontWeight: 700,
   whiteSpace: "nowrap",
-  color: "#fff",
+  color: "var(--lcc-text)",
 }
 
 const emptyStyle: React.CSSProperties = {

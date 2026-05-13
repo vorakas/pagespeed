@@ -291,7 +291,7 @@ function ProjectTopBar({
       <div className="lcc-spacer" />
 
       <div className="lcc-sync">
-        <span className="lcc-pulse" />
+        <span className="lcc-status-dot" />
         <div>
           <div>vault synced</div>
           <div className="lcc-sync-sub">{formatPacificDateTime(health?.lastSynced)}</div>

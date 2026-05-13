@@ -7,7 +7,6 @@ interface P1BurndownProps {
 export function P1Burndown({ launchPriorities }: P1BurndownProps) {
   const points = launchPriorities?.p1Burndown ?? []
   const current = points[points.length - 1] ?? null
-  const active = current?.active ?? 0
   const resolved = current?.resolved ?? 0
   const total = current?.total ?? 0
   const resolvedPct = total > 0 ? Math.round((resolved / total) * 100) : 0
@@ -16,14 +15,10 @@ export function P1Burndown({ launchPriorities }: P1BurndownProps) {
     <div className="panel lcc-trend-panel" aria-label="P1 burndown">
       <h3>
         P1 Burndown
-        <span className="count">{current?.date ?? "Current"}</span>
+        <span className="count">
+          {resolvedPct}% resolved · {current?.date ?? "Current"}
+        </span>
       </h3>
-
-      <div style={statsStyle}>
-        <Stat label="Active" value={active} tone="red" />
-        <Stat label="Resolved" value={resolved} tone="green" />
-        <Stat label="Total" value={total} tone="neutral" />
-      </div>
 
       <div style={barTrackStyle} aria-label={`${resolvedPct}% resolved`}>
         <div style={{ ...barFillStyle, width: `${resolvedPct}%` }} />
@@ -34,24 +29,6 @@ export function P1Burndown({ launchPriorities }: P1BurndownProps) {
       ) : (
         <div style={emptyStyle}>Need dated P1 task history to draw a burndown.</div>
       )}
-    </div>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: number
-  tone: "red" | "green" | "neutral"
-}) {
-  const color = tone === "neutral" ? "var(--lcc-text)" : `var(--lcc-${tone})`
-  return (
-    <div style={statStyle}>
-      <span>{label}:</span>
-      <strong style={{ color }}>{value.toLocaleString()}</strong>
     </div>
   )
 }
@@ -95,31 +72,13 @@ function MiniChart({ points }: { points: MigrationP1BurndownPoint[] }) {
   )
 }
 
-const statsStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: 8,
-  marginTop: 12,
-}
-
-const statStyle: React.CSSProperties = {
-  border: "1px solid var(--lcc-glass-border)",
-  background: "var(--lcc-glass-bg-faint)",
-  borderRadius: 6,
-  padding: "9px 10px",
-  display: "flex",
-  alignItems: "baseline",
-  justifyContent: "space-between",
-  gap: 8,
-}
-
 const barTrackStyle: React.CSSProperties = {
   height: 10,
   borderRadius: 6,
   background: "var(--lcc-glass-bg-faint)",
   border: "1px solid var(--lcc-glass-border)",
   overflow: "hidden",
-  marginTop: 14,
+  marginTop: 4,
 }
 
 const barFillStyle: React.CSSProperties = {

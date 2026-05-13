@@ -817,16 +817,16 @@
   color: var(--lcc-text-faint);
 }
 
-.launch-dashboard .lcc-pulse {
+.launch-dashboard .lcc-status-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--lcc-green);
-  /* Originally a 2.2s infinite expanding-ring animation. The ring was
-   * decorative — the dot's solid green is sufficient sync-OK signal,
-   * and infinite animations are eye-catching slop in a status indicator
-   * that should fade into the chrome once read. */
+  /* Static status indicator. The class name used to be `.lcc-pulse` —
+   * a holdover from when it carried an infinite expanding-ring keyframe.
+   * The animation was eye-catching slop in a status pill that should
+   * fade into the chrome once read; renamed to reflect what it is now. */
 }
 
 .launch-dashboard .lcc-chip {
@@ -1103,114 +1103,56 @@
   font-family: var(--aurora-font-mono); padding: 2px 0;
 }
 
-/* ── Hero strip ─────────────────────────────────────────────────── */
-.launch-dashboard .lcc-hero-strip {
-  padding: 18px 22px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 28px;
+/* ── Operator brief ──────────────────────────────────────────────
+ * One-line replacement for the prior hero-metric template. Carries
+ * health · T−N · open blockers · prod failures. No radial-gradient
+ * backdrop, no gradient progress bar, no oversized countdown. */
+.launch-dashboard .lcc-brief {
+  padding: 14px 22px;
+  display: flex;
   align-items: center;
-  position: relative; overflow: hidden;
+  flex-wrap: wrap;
+  gap: 18px;
+  row-gap: 10px;
 }
-.launch-dashboard .lcc-hero-strip::before {
-  content: ""; position: absolute; inset: 0;
-  background:
-    radial-gradient(40% 120% at 0% 50%,   rgba(176, 140, 255, 0.18), transparent 60%),
-    radial-gradient(40% 120% at 100% 50%, rgba(110, 199, 255, 0.18), transparent 60%);
-  pointer-events: none;
+.launch-dashboard .lcc-brief-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--glass-border);
 }
-.launch-dashboard .lcc-hs-main,
-.launch-dashboard .lcc-hs-countdown { position: relative; z-index: 1; }
-.launch-dashboard .lcc-hs-status { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
-.launch-dashboard .lcc-hs-headline {
-  font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1;
-  color: var(--lcc-text);
+.launch-dashboard .lcc-brief-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font: inherit;
+  color: inherit;
 }
-.launch-dashboard .lcc-hs-kpis {
-  display: flex; flex-wrap: wrap; gap: 10px;
-  margin-top: 14px;
-}
-.launch-dashboard .lcc-hs-kpi {
-  padding: 8px 14px; border-radius: var(--lcc-radius-sm);
-  background: var(--glass-bg-faint); border: 1px solid var(--glass-border);
-  min-width: 96px;
-}
-.launch-dashboard button.lcc-hs-kpi {
-  font: inherit; color: inherit; text-align: left;
-}
-.launch-dashboard .lcc-hs-kpi[data-clickable="true"] {
+.launch-dashboard .lcc-brief-item-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, transform 0.12s;
+  border-radius: var(--lcc-radius-sm);
+  transition: color 0.12s;
 }
-.launch-dashboard .lcc-hs-kpi[data-clickable="true"]:hover {
-  background: var(--glass-hi);
-  border-color: var(--glass-border-strong);
-  transform: translateY(-1px);
-}
-.launch-dashboard .lcc-hs-kpi[data-clickable="true"]:focus-visible {
+.launch-dashboard .lcc-brief-item-btn:hover .lcc-brief-num { color: var(--lcc-text); }
+.launch-dashboard .lcc-brief-item-btn:hover .lcc-brief-label { color: var(--lcc-text-dim); }
+.launch-dashboard .lcc-brief-item-btn:focus-visible {
   outline: 2px solid var(--lcc-blue);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
-.launch-dashboard .lcc-hs-kpi-v {
-  font-size: 22px; font-weight: 700; line-height: 1;
-  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
-}
-.launch-dashboard .lcc-hs-kpi-l {
-  font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--lcc-text-faint); margin-top: 4px;
-  font-family: var(--aurora-font-mono);
-}
-.launch-dashboard .lcc-hs-kpi[data-tone="primary"] .lcc-hs-kpi-v {
+.launch-dashboard .lcc-brief-num {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
   color: var(--lcc-text);
 }
-.launch-dashboard .lcc-hs-kpi[data-tone="green"] .lcc-hs-kpi-v { color: var(--lcc-green); }
-.launch-dashboard .lcc-hs-kpi[data-tone="amber"] .lcc-hs-kpi-v { color: var(--lcc-amber); }
-.launch-dashboard .lcc-hs-kpi[data-tone="red"]   .lcc-hs-kpi-v { color: var(--lcc-red); }
-
-.launch-dashboard .lcc-hs-reasons {
-  display: flex; flex-wrap: wrap; gap: 14px 28px;
-  margin: 0; padding: 0; list-style: none;
-}
-.launch-dashboard .lcc-hs-reasons li {
-  padding-left: 14px; position: relative;
-  color: var(--lcc-text-dim); font-size: 12px;
-}
-.launch-dashboard .lcc-hs-reasons li::before {
-  content: ""; position: absolute; left: 0; top: 7px;
-  width: 5px; height: 5px; background: var(--lcc-red); border-radius: 50%;
-}
-
-.launch-dashboard .lcc-hs-countdown {
-  border-left: 1px solid var(--glass-border);
-  padding-left: 28px; text-align: right; min-width: 220px;
-}
-.launch-dashboard .lcc-hs-cd-label {
-  font-size: 10px; text-transform: uppercase;
-  letter-spacing: 0.12em; color: var(--lcc-text-faint); font-weight: 600;
-}
-.launch-dashboard .lcc-hs-cd-num {
-  font-size: 52px; font-weight: 700; letter-spacing: -0.04em; line-height: 1;
-  font-variant-numeric: tabular-nums; margin: 4px 0;
-  color: var(--lcc-text);
-}
-.launch-dashboard .lcc-hs-cd-num span {
-  font-size: 18px; margin-left: 4px;
-  color: var(--lcc-text-dim); font-weight: 500;
-  -webkit-text-fill-color: var(--lcc-text-dim);
-}
-.launch-dashboard .lcc-hs-cd-bar {
-  height: 6px; border-radius: 999px; overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--glass-border);
-  margin-bottom: 6px;
-}
-.launch-dashboard .lcc-hs-cd-bar > span {
-  display: block; height: 100%;
-  background: linear-gradient(90deg, var(--lcc-amber), var(--lcc-red) 60%, var(--lcc-violet));
-}
-.launch-dashboard .lcc-hs-cd-sub {
-  font-size: 11px; color: var(--lcc-text-faint);
-  font-family: var(--aurora-font-mono);
+.launch-dashboard .lcc-brief-num[data-tone="amber"] { color: var(--lcc-amber); }
+.launch-dashboard .lcc-brief-num[data-tone="red"]   { color: var(--lcc-red); }
+.launch-dashboard .lcc-brief-label {
+  font-size: 13px;
+  color: var(--lcc-text-faint);
 }
 
 /* ── Health badge ─────────────────────────────────────────────── */

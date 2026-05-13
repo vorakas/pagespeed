@@ -11,15 +11,12 @@ interface TopBarProps {
 }
 
 /**
- * Sticky top bar: brand / countdown / sync status.
+ * Sticky top bar: sync status + manual refresh.
  *
- * The days-to-launch number is derived from real `Date.now()` — no
- * hardcoded anchor. "synced Nm ago" ticks every 30s.
- *
- * The previous overall-health pill and health-filter pills were removed:
- * the filter pills never wired to any view, and the overall-health pill
- * just rolled up workstream status (which we're demoting in favor of the
- * per-project view).
+ * Brand block and T−N countdown lived here previously but they
+ * triple-branded the page (sidebar + top bar + hero) and duplicated the
+ * countdown carried by the operator brief. Branding moves to the
+ * sidebar; the countdown lives in the hero brief.
  */
 export function TopBar({ health, onRefresh, refreshing }: TopBarProps) {
   const [now, setNow] = useState(() => Date.now())
@@ -58,34 +55,14 @@ export function TopBar({ health, onRefresh, refreshing }: TopBarProps) {
     }
   }, [])
 
-  const daysToLaunch = computeDaysUntil(health?.launchWindow?.start, now)
   const syncedAgo = computeSyncedAgo(health?.lastSynced, now)
 
   return (
     <div className="lcc-topbar">
-      <div className="lcc-brand">
-        <div className="lcc-brand-dot" />
-        <div>
-          <div className="lcc-brand-name">LP / Adobe Migration</div>
-          <div className="lcc-brand-sub">Dashboard</div>
-        </div>
-      </div>
-
-      <div className="lcc-tb-divider" />
-
-      <div className="lcc-tb-countdown">
-        <div className="lcc-tb-countdown-num">
-          {daysToLaunch === null ? "—" : `T−${daysToLaunch}`}
-        </div>
-        <div className="lcc-tb-countdown-sub">
-          {health?.launchWindow?.start ?? "no launch date"}
-        </div>
-      </div>
-
       <div className="lcc-spacer" />
 
       <div className="lcc-sync">
-        <span className="lcc-pulse" />
+        <span className="lcc-status-dot" />
         <div>
           <div>{refreshing ? "syncing vault…" : `synced ${syncedAgo ?? "—"}`}</div>
           <div className="lcc-sync-sub">
@@ -129,13 +106,6 @@ export function TopBar({ health, onRefresh, refreshing }: TopBarProps) {
       )}
     </div>
   )
-}
-
-function computeDaysUntil(iso: string | null | undefined, now: number): number | null {
-  if (!iso) return null
-  const target = new Date(iso).getTime()
-  if (Number.isNaN(target)) return null
-  return Math.ceil((target - now) / 86_400_000)
 }
 
 function computeSyncedAgo(iso: string | null | undefined, now: number): string | null {
