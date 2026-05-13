@@ -324,7 +324,7 @@ function BlockerDetail({ blocker, onClose }: { blocker: MigrationBlocker; onClos
   )
 }
 
-function TaskDetail({ task, onClose }: { task: RawTaskRecord; onClose: () => void }) {
+export function TaskDetail({ task, onClose }: { task: RawTaskRecord; onClose: () => void }) {
   const title = task.summary ?? task.key
   return (
     <>

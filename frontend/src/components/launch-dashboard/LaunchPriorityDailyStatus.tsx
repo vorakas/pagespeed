@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { convertUtcTimesToPacific } from "@/lib/datetime"
 import { renderHeadlineSegments } from "./headlineWikilinks"
+import { TaskDetail } from "./SidePanel"
 import type {
   MigrationLaunchPriorityBucket,
   MigrationLaunchPriorities,
@@ -55,7 +56,7 @@ export function LaunchPriorityDailyStatus({ launchPriorities, snapshot }: Props)
         <HeadlineBullets text={convertUtcTimesToPacific(snapshot.headline, snapshot.date)} />
       )}
 
-      <div style={tabBarStyle} role="tablist">
+      <div className="lcc-is-tabs" role="tablist">
         {buckets.map((bucket) => {
           const active = activeBucket?.priority === bucket.priority
           return (
@@ -65,10 +66,10 @@ export function LaunchPriorityDailyStatus({ launchPriorities, snapshot }: Props)
               aria-selected={active}
               type="button"
               onClick={() => setTab(bucket.priority)}
-              style={active ? tabStyleActive : tabStyle}
+              className={`lcc-is-tab${active ? " active" : ""}`}
             >
-              <span>{bucket.label}</span>
-              <span style={tabCountStyle}>{bucket.active}</span>
+              {bucket.label}
+              <span>{bucket.active}</span>
             </button>
           )
         })}
@@ -151,7 +152,7 @@ function TaskRow({
         <div style={rowTitleStyle}>{task.summary || "(no summary)"}</div>
         <div style={rowMetaStyle}>{meta.join(" · ")}</div>
       </div>
-      <span style={{ ...chipStyle, color: accent, borderColor: accent }}>
+      <span style={chipStyle}>
         {task.launchPriority || task.priority || "Priority"}
       </span>
     </div>
@@ -159,50 +160,16 @@ function TaskRow({
 }
 
 function TaskModal({ task, onClose }: { task: RawTaskRecord; onClose: () => void }) {
-  const fields = [
-    ["Launch Priority", task.launchPriority],
-    ["Status", task.uatStatus || task.taskStatus || task.status],
-    ["Assignee", task.assignee],
-    ["Project", task.project],
-    ["Type", task.type],
-    ["Created", task.created],
-    ["Updated", task.updated],
-    ["Resolved", task.resolved],
-  ].filter(([, value]) => value)
-
   return (
     <div style={modalBackdropStyle} role="presentation" onClick={onClose}>
       <div
         style={modalStyle}
+        className="launch-dashboard-side-panel open"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="launch-task-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div style={modalHeadStyle}>
-          <button type="button" style={modalIdPillStyle} onClick={onClose}>
-            {task.key}
-          </button>
-          <button type="button" style={closeButtonStyle} onClick={onClose} aria-label="Close">
-            x
-          </button>
-        </div>
-        <h3 id="launch-task-title" style={modalTitleStyle}>
-          {task.summary || "(no summary)"}
-        </h3>
-        <dl style={fieldGridStyle}>
-          {fields.map(([label, value]) => (
-            <div key={label} style={fieldStyle}>
-              <dt>{label}</dt>
-              <dd>{value}</dd>
-            </div>
-          ))}
-        </dl>
-        {task.url && (
-          <a href={task.url} target="_blank" rel="noreferrer" style={taskLinkStyle}>
-            Open source task
-          </a>
-        )}
+        <TaskDetail task={task} onClose={onClose} />
       </div>
     </div>
   )
@@ -280,50 +247,6 @@ const headlineBulletDotStyle: React.CSSProperties = {
   flex: "0 0 auto",
 }
 
-const tabBarStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-  marginBottom: 14,
-}
-
-const tabStyle: React.CSSProperties = {
-  border: "1px solid var(--lcc-glass-border)",
-  background: "var(--lcc-glass-bg-faint)",
-  color: "var(--lcc-text-dim)",
-  borderRadius: 999,
-  padding: "6px 7px 6px 12px",
-  fontSize: 12,
-  fontWeight: 850,
-  display: "inline-flex",
-  gap: 8,
-  alignItems: "center",
-  cursor: "pointer",
-  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
-}
-
-const tabStyleActive: React.CSSProperties = {
-  ...tabStyle,
-  color: "var(--lcc-text)",
-  borderColor: "var(--lcc-accent)",
-  background: "var(--lcc-glass-bg-strong)",
-  boxShadow: "0 0 0 1px rgba(6, 182, 212, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
-}
-
-const tabCountStyle: React.CSSProperties = {
-  minWidth: 20,
-  height: 20,
-  padding: "0 6px",
-  borderRadius: 999,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "rgba(255, 255, 255, 0.06)",
-  color: "var(--lcc-text)",
-  fontSize: 11,
-  fontFamily: "var(--font-mono)",
-}
-
 const tabBodyStyle: React.CSSProperties = { minHeight: 160 }
 
 const summaryGridStyle: React.CSSProperties = {
@@ -359,8 +282,8 @@ const rowStyle: React.CSSProperties = {
   display: "flex",
   gap: 10,
   alignItems: "center",
-  border: "1px solid var(--lcc-glass-border)",
-  background: "var(--lcc-glass-bg-faint)",
+  border: "1px solid rgba(255, 255, 255, 0.55)",
+  background: "var(--lcc-violet-bg)",
   borderRadius: 6,
   padding: "9px 10px",
 }
@@ -368,9 +291,9 @@ const rowStyle: React.CSSProperties = {
 const rowIdPillStyle: React.CSSProperties = {
   width: 88,
   flex: "0 0 auto",
-  color: "var(--lcc-accent)",
-  border: "1px solid var(--lcc-glass-border)",
-  background: "var(--lcc-glass-bg)",
+  color: "#fff",
+  border: "1px solid rgba(255, 255, 255, 0.68)",
+  background: "rgba(255, 255, 255, 0.08)",
   borderRadius: 999,
   padding: "5px 8px",
   fontFamily: "var(--font-mono)",
@@ -380,7 +303,7 @@ const rowIdPillStyle: React.CSSProperties = {
 }
 
 const rowTitleStyle: React.CSSProperties = {
-  color: "var(--lcc-text)",
+  color: "#fff",
   fontSize: 13,
   fontWeight: 700,
   overflow: "hidden",
@@ -389,7 +312,7 @@ const rowTitleStyle: React.CSSProperties = {
 }
 
 const rowMetaStyle: React.CSSProperties = {
-  color: "var(--lcc-text-faint)",
+  color: "rgba(255, 255, 255, 0.72)",
   fontSize: 11,
   marginTop: 3,
   overflow: "hidden",
@@ -398,12 +321,13 @@ const rowMetaStyle: React.CSSProperties = {
 }
 
 const chipStyle: React.CSSProperties = {
-  border: "1px solid var(--lcc-glass-border)",
+  border: "1px solid rgba(255, 255, 255, 0.65)",
   borderRadius: 6,
   padding: "3px 7px",
   fontSize: 11,
   fontWeight: 850,
   whiteSpace: "nowrap",
+  color: "#fff",
 }
 
 const emptyStyle: React.CSSProperties = {
@@ -425,71 +349,12 @@ const modalBackdropStyle: React.CSSProperties = {
 }
 
 const modalStyle: React.CSSProperties = {
-  width: "min(620px, 100%)",
+  position: "relative",
+  top: "auto",
+  right: "auto",
+  bottom: "auto",
+  transform: "none",
+  width: "min(870px, 100%)",
   maxHeight: "min(720px, calc(100vh - 36px))",
-  overflow: "auto",
-  border: "1px solid var(--lcc-glass-border)",
-  background: "var(--lcc-panel-bg)",
-  borderRadius: 8,
-  padding: 18,
-  boxShadow: "0 24px 60px rgba(0, 0, 0, 0.34)",
-}
-
-const modalHeadStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 12,
-  marginBottom: 12,
-}
-
-const modalIdPillStyle: React.CSSProperties = {
-  border: "1px solid var(--lcc-accent)",
-  background: "var(--lcc-glass-bg-strong)",
-  color: "var(--lcc-accent)",
-  borderRadius: 999,
-  padding: "6px 10px",
-  fontFamily: "var(--font-mono)",
-  fontSize: 12,
-  fontWeight: 850,
-  cursor: "pointer",
-}
-
-const closeButtonStyle: React.CSSProperties = {
-  width: 30,
-  height: 30,
-  borderRadius: 999,
-  border: "1px solid var(--lcc-glass-border)",
-  background: "var(--lcc-glass-bg)",
-  color: "var(--lcc-text-dim)",
-  cursor: "pointer",
-}
-
-const modalTitleStyle: React.CSSProperties = {
-  margin: "0 0 14px",
-  color: "var(--lcc-text)",
-  fontSize: 18,
-  lineHeight: 1.35,
-}
-
-const fieldGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 10,
-  margin: 0,
-}
-
-const fieldStyle: React.CSSProperties = {
-  border: "1px solid var(--lcc-glass-border)",
-  background: "var(--lcc-glass-bg-faint)",
-  borderRadius: 6,
-  padding: "9px 10px",
-}
-
-const taskLinkStyle: React.CSSProperties = {
-  display: "inline-flex",
-  marginTop: 14,
-  color: "var(--lcc-accent)",
-  fontSize: 12,
-  fontWeight: 800,
+  minHeight: 0,
 }
