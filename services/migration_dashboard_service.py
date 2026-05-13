@@ -164,6 +164,9 @@ class MigrationDashboardService:
     def get_new_bugs(self, window_days: int = 7) -> List[dict]:
         return self._cached(f"newBugs:{window_days}", lambda: self._compute_new_bugs(window_days))
 
+    def get_launch_priorities(self) -> dict:
+        return self._cached("launchPriorities", self._compute_launch_priorities)
+
     def get_daily_activity(self, on_date: date) -> dict:
         """Return tickets created and resolved on ``on_date``.
 
@@ -439,6 +442,9 @@ class MigrationDashboardService:
 
     def _compute_new_bugs(self, window_days: int) -> List[dict]:
         return [t.to_dict() for t in new_bugs(self._raw_tasks(), window_days=window_days)]
+
+    def _compute_launch_priorities(self) -> dict:
+        return _launch_priority_summary(self._raw_tasks())
 
     def _compute_daily_activity(self, on_date: date) -> dict:
         activity = daily_activity(self._raw_tasks(), on_date=on_date)
@@ -940,6 +946,69 @@ def _live_key_risks(active_tasks: List[RawTask]) -> List[dict]:
             "source": "live",
         })
     return risks[:4]
+
+
+_LAUNCH_PRIORITY_ORDER = ("P1", "P2", "P3", "Post-Launch")
+
+
+def _launch_priority_summary(tasks: List[RawTask]) -> dict:
+    buckets: Dict[str, List[RawTask]] = {label: [] for label in _LAUNCH_PRIORITY_ORDER}
+    for task in tasks:
+        label = _launch_priority_label(task)
+        if label is None:
+            continue
+        buckets[label].append(task)
+
+    out = []
+    for label in _LAUNCH_PRIORITY_ORDER:
+        all_items = buckets[label]
+        active = [task for task in all_items if not task.is_resolved]
+        resolved = len(all_items) - len(active)
+        active.sort(key=_launch_priority_sort_key)
+        out.append({
+            "priority": label,
+            "label": label,
+            "total": len(all_items),
+            "active": len(active),
+            "resolved": resolved,
+            "items": [task.to_dict() for task in active[:24]],
+        })
+
+    p1 = out[0]
+    today = date.today().isoformat()
+    return {
+        "date": today,
+        "buckets": out,
+        "p1Burndown": [{
+            "date": today,
+            "active": p1["active"],
+            "resolved": p1["resolved"],
+            "total": p1["total"],
+        }],
+    }
+
+
+def _launch_priority_label(task: RawTask) -> Optional[str]:
+    raw = (task.launch_priority or "").strip().lower()
+    normalized = raw.replace("_", "-").replace(" ", "-")
+    if normalized in {"p1", "1"}:
+        return "P1"
+    if normalized in {"p2", "2"}:
+        return "P2"
+    if normalized in {"p3", "3"}:
+        return "P3"
+    if normalized in {"post-launch", "postlaunch", "post"}:
+        return "Post-Launch"
+    return None
+
+
+def _launch_priority_sort_key(task: RawTask) -> Tuple[int, int, int, str]:
+    return (
+        0 if task.is_production_failure else 1,
+        0 if _active_bucket(task) == "blocked" else 1,
+        -_date_sort_key(task.updated or task.created),
+        task.key,
+    )
 
 
 def _live_epics(epics: List[dict], tasks: List[RawTask]) -> List[dict]:

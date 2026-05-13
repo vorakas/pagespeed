@@ -53,6 +53,7 @@ class RawTask:
     task_type: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[str] = None
+    launch_priority: Optional[str] = None
     assignee: Optional[str] = None
     created: Optional[str] = None
     updated: Optional[str] = None
@@ -73,6 +74,7 @@ class RawTask:
             "type": self.task_type,
             "status": self.status,
             "priority": self.priority,
+            "launchPriority": self.launch_priority,
             "assignee": self.assignee,
             "created": self.created,
             "updated": self.updated,
@@ -108,7 +110,12 @@ class RawTask:
     @property
     def is_new_bug(self) -> bool:
         """True if this ticket was filed as a Bug (Jira or Asana type)."""
-        return (self.task_type or "").lower() == "bug"
+        task_type = (self.task_type or "").lower()
+        if task_type == "bug":
+            return True
+        if self.source == "asana" and not task_type:
+            return "/Implementation/" in f"/{self.rel_path}"
+        return False
 
     @property
     def created_date(self) -> Optional[date]:
@@ -187,6 +194,7 @@ class RawTaskScanner:
             task_type=_str(fm.get("type")),
             status=_str(fm.get("status")),
             priority=_str(fm.get("priority") or fm.get("task_priority")),
+            launch_priority=_str(fm.get("launch_priority") or fm.get("Launch Priority")),
             assignee=_str(fm.get("assignee")),
             created=_str(fm.get("created")),
             updated=_str(fm.get("updated") or fm.get("modified")),

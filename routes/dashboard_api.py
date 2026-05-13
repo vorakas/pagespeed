@@ -55,6 +55,7 @@ def create_dashboard_blueprint(
             "blockers": service.get_blockers(),
             "productionFailures": service.get_production_failures(),
             "newBugs": service.get_new_bugs(window_days=7),
+            "launchPriorities": service.get_launch_priorities(),
             "taskStatus": service.get_task_status(),
             "trend": service.get_trend(),
             "sources": service.get_sources(),

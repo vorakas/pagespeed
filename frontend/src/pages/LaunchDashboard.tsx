@@ -6,7 +6,7 @@ import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { TopBar } from "@/components/launch-dashboard/TopBar"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import { HeroStrip, type HeroIssueKpi } from "@/components/launch-dashboard/HeroStrip"
-import { TrendChart } from "@/components/launch-dashboard/TrendChart"
+import { P1Burndown } from "@/components/launch-dashboard/P1Burndown"
 import { TaskStatusStrip } from "@/components/launch-dashboard/TaskStatusStrip"
 import {
   IncidentStream,
@@ -18,15 +18,15 @@ import {
 } from "@/components/launch-dashboard/incidentItems"
 import { SidePanel, type SidePanelTarget } from "@/components/launch-dashboard/SidePanel"
 import { WhatChangedToday } from "@/components/launch-dashboard/WhatChangedToday"
-import { DailyStatusSummary } from "@/components/launch-dashboard/DailyStatusSummary"
+import { LaunchPriorityDailyStatus } from "@/components/launch-dashboard/LaunchPriorityDailyStatus"
 import type {
+  MigrationLaunchPriorities,
   MigrationBlocker,
   MigrationHealthSnapshot,
   MigrationKpis,
   MigrationSnapshotDiffResponse,
   MigrationSource,
   MigrationTaskStatusRow,
-  MigrationTrendPoint,
   MigrationWorkstream,
   RawTaskRecord,
 } from "@/types"
@@ -61,7 +61,7 @@ export function LaunchDashboard() {
   const [newBugs, setNewBugs] = useState<RawTaskRecord[] | null>(null)
   const [newBugs24h, setNewBugs24h] = useState<RawTaskRecord[] | null>(null)
   const [taskStatus, setTaskStatus] = useState<MigrationTaskStatusRow[] | null>(null)
-  const [trend, setTrend] = useState<MigrationTrendPoint[] | null>(null)
+  const [launchPriorities, setLaunchPriorities] = useState<MigrationLaunchPriorities | null>(null)
   const [sources, setSources] = useState<MigrationSource[] | null>(null)
   const [snapshotDiff, setSnapshotDiff] = useState<MigrationSnapshotDiffResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -109,8 +109,8 @@ export function LaunchDashboard() {
       setProdFailures(overview.productionFailures)
       setNewBugs(overview.newBugs)
       setNewBugs24h(bugs24h)
+      setLaunchPriorities(overview.launchPriorities)
       setTaskStatus(overview.taskStatus)
-      setTrend(overview.trend)
       setSources(overview.sources)
       setSnapshotDiff(overview.snapshotDiff)
     } catch (err) {
@@ -203,9 +203,10 @@ export function LaunchDashboard() {
 
           <WhatChangedToday />
 
-          {snapshotDiff?.latest && (
-            <DailyStatusSummary snapshot={snapshotDiff.latest} sources={sources} />
-          )}
+          <LaunchPriorityDailyStatus
+            snapshot={snapshotDiff?.latest ?? null}
+            launchPriorities={launchPriorities}
+          />
 
           <div
             style={{
@@ -214,7 +215,7 @@ export function LaunchDashboard() {
               gap: 14,
             }}
           >
-            {trend && <TrendChart rows={trend} />}
+            <P1Burndown launchPriorities={launchPriorities} />
             {taskStatus && <TaskStatusStrip rows={taskStatus} />}
           </div>
         </main>

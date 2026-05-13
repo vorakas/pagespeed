@@ -49,7 +49,7 @@ export function buildIncidentItems({
       id: p.key,
       title: p.summary ?? "(no summary)",
       note: p.uatStatus ?? p.status,
-      severity: (p.priority ?? "").toLowerCase() || "medium",
+      severity: incidentSeverity(p),
       meta: p.assignee,
       time: "active",
       sortTime: parseTimestamp(p.updated) || parseTimestamp(p.created),
@@ -75,7 +75,7 @@ export function buildIncidentItems({
       id: n.key,
       title: n.summary ?? "(no summary)",
       note: n.assignee ? `@${n.assignee}` : "UNASSIGNED",
-      severity: (n.priority ?? "").toLowerCase() || "medium",
+      severity: incidentSeverity(n),
       meta: n.project,
       time: n.created ? `filed ${formatPacificDate(n.created)}` : null,
       sortTime: parseTimestamp(n.updated) || parseTimestamp(n.created),
@@ -91,4 +91,13 @@ export function buildIncidentItems({
       if (sevDiff !== 0) return sevDiff
       return b.sortTime - a.sortTime
     })
+}
+
+function incidentSeverity(task: RawTaskRecord): string {
+  const launchPriority = (task.launchPriority ?? "").toLowerCase()
+  if (launchPriority === "p1") return "critical"
+  if (launchPriority === "p2") return "high"
+  if (launchPriority === "p3") return "medium"
+  if (launchPriority === "post-launch") return "low"
+  return (task.priority ?? "").toLowerCase() || "medium"
 }

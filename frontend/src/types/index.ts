@@ -707,6 +707,7 @@ export interface RawTaskRecord {
   type: string | null
   status: string | null
   priority: string | null
+  launchPriority: string | null
   assignee: string | null
   created: string | null
   updated: string | null
@@ -730,6 +731,28 @@ export interface MigrationTrendPoint {
   resolved: number | null
   active: number | null
   total: number | null
+}
+
+export interface MigrationLaunchPriorityBucket {
+  priority: "P1" | "P2" | "P3" | "Post-Launch" | string
+  label: string
+  total: number
+  active: number
+  resolved: number
+  items: RawTaskRecord[]
+}
+
+export interface MigrationP1BurndownPoint {
+  date: string
+  active: number
+  resolved: number
+  total: number
+}
+
+export interface MigrationLaunchPriorities {
+  date: string
+  buckets: MigrationLaunchPriorityBucket[]
+  p1Burndown: MigrationP1BurndownPoint[]
 }
 
 export interface MigrationTeam {
@@ -1130,6 +1153,7 @@ export interface MigrationDashboardOverview {
   blockers: MigrationBlocker[]
   productionFailures: RawTaskRecord[]
   newBugs: RawTaskRecord[]
+  launchPriorities: MigrationLaunchPriorities
   taskStatus: MigrationTaskStatusRow[]
   trend: MigrationTrendPoint[]
   sources: MigrationSource[]
