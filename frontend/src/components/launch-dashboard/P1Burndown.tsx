@@ -32,7 +32,7 @@ export function P1Burndown({ launchPriorities }: P1BurndownProps) {
       {points.length > 1 ? (
         <MiniChart points={points} />
       ) : (
-        <div style={emptyStyle}>Tracking from current launch-priority snapshot.</div>
+        <div style={emptyStyle}>Need dated P1 task history to draw a burndown.</div>
       )}
     </div>
   )
@@ -50,7 +50,7 @@ function Stat({
   const color = tone === "neutral" ? "var(--lcc-text)" : `var(--lcc-${tone})`
   return (
     <div style={statStyle}>
-      <span>{label}</span>
+      <span>{label}:</span>
       <strong style={{ color }}>{value.toLocaleString()}</strong>
     </div>
   )
@@ -60,19 +60,38 @@ function MiniChart({ points }: { points: MigrationP1BurndownPoint[] }) {
   const max = Math.max(...points.map((point) => point.active), 1)
   const width = 320
   const height = 88
+  const topPad = 8
+  const bottomPad = 12
+  const plotHeight = height - topPad - bottomPad
   const step = points.length > 1 ? width / (points.length - 1) : width
   const line = points
     .map((point, index) => {
       const x = index * step
-      const y = height - (point.active / max) * height
+      const y = topPad + (1 - point.active / max) * plotHeight
       return `${x},${y}`
     })
     .join(" ")
+  const latest = points[points.length - 1]
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={chartStyle}>
-      <polyline points={line} fill="none" stroke="var(--lcc-red)" strokeWidth="3" />
-    </svg>
+    <div style={chartWrapStyle}>
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={chartStyle}>
+        <line x1="0" y1={topPad} x2={width} y2={topPad} stroke="var(--lcc-glass-border)" />
+        <line
+          x1="0"
+          y1={height - bottomPad}
+          x2={width}
+          y2={height - bottomPad}
+          stroke="var(--lcc-glass-border)"
+        />
+        <polyline points={line} fill="none" stroke="var(--lcc-red)" strokeWidth="3" />
+      </svg>
+      <div style={chartCaptionStyle}>
+        <span>{points[0]?.date}</span>
+        <span>{latest?.active.toLocaleString()} active</span>
+        <span>{latest?.date}</span>
+      </div>
+    </div>
   )
 }
 
@@ -88,6 +107,10 @@ const statStyle: React.CSSProperties = {
   background: "var(--lcc-glass-bg-faint)",
   borderRadius: 6,
   padding: "9px 10px",
+  display: "flex",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  gap: 8,
 }
 
 const barTrackStyle: React.CSSProperties = {
@@ -105,11 +128,23 @@ const barFillStyle: React.CSSProperties = {
   background: "var(--lcc-green)",
 }
 
+const chartWrapStyle: React.CSSProperties = {
+  marginTop: 14,
+}
+
 const chartStyle: React.CSSProperties = {
   width: "100%",
   height: 90,
-  marginTop: 14,
   display: "block",
+}
+
+const chartCaptionStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 8,
+  color: "var(--lcc-text-faint)",
+  fontSize: 11,
+  fontFamily: "var(--font-mono)",
 }
 
 const emptyStyle: React.CSSProperties = {

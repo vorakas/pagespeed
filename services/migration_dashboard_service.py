@@ -18,7 +18,7 @@ import threading
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
@@ -951,7 +951,13 @@ def _live_key_risks(active_tasks: List[RawTask]) -> List[dict]:
 _LAUNCH_PRIORITY_ORDER = ("P1", "P2", "P3", "Post-Launch")
 
 
-def _launch_priority_summary(tasks: List[RawTask]) -> dict:
+def _launch_priority_summary(
+    tasks: List[RawTask],
+    *,
+    today: Optional[date] = None,
+    history_days: int = 30,
+) -> dict:
+    today = today or date.today()
     buckets: Dict[str, List[RawTask]] = {label: [] for label in _LAUNCH_PRIORITY_ORDER}
     for task in tasks:
         label = _launch_priority_label(task)
@@ -975,16 +981,11 @@ def _launch_priority_summary(tasks: List[RawTask]) -> dict:
         })
 
     p1 = out[0]
-    today = date.today().isoformat()
+    today_iso = today.isoformat()
     return {
-        "date": today,
+        "date": today_iso,
         "buckets": out,
-        "p1Burndown": [{
-            "date": today,
-            "active": p1["active"],
-            "resolved": p1["resolved"],
-            "total": p1["total"],
-        }],
+        "p1Burndown": _p1_burndown_points(buckets["P1"], today=today, history_days=history_days),
     }
 
 
@@ -1009,6 +1010,35 @@ def _launch_priority_sort_key(task: RawTask) -> Tuple[int, int, int, str]:
         -_date_sort_key(task.updated or task.created),
         task.key,
     )
+
+
+def _p1_burndown_points(tasks: List[RawTask], *, today: date, history_days: int) -> List[dict]:
+    if history_days < 1:
+        history_days = 1
+    start = today - timedelta(days=history_days - 1)
+    points = []
+    for offset in range(history_days):
+        day = start + timedelta(days=offset)
+        total = 0
+        resolved = 0
+        active = 0
+        for task in tasks:
+            created = _parse_date(task.created)
+            if created is None or created > day:
+                continue
+            total += 1
+            resolved_at = _completion_date(task)
+            if resolved_at is not None and resolved_at <= day:
+                resolved += 1
+            else:
+                active += 1
+        points.append({
+            "date": day.isoformat(),
+            "active": active,
+            "resolved": resolved,
+            "total": total,
+        })
+    return points
 
 
 def _live_epics(epics: List[dict], tasks: List[RawTask]) -> List[dict]:

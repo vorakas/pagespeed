@@ -87,6 +87,7 @@ export function LaunchPriorityDailyStatus({ launchPriorities, snapshot }: Props)
 
 function PriorityBucket({ bucket }: { bucket: MigrationLaunchPriorityBucket }) {
   const tone = TONES[bucket.priority] ?? "neutral"
+  const [selectedTask, setSelectedTask] = useState<RawTaskRecord | null>(null)
   return (
     <div>
       <div style={summaryGridStyle}>
@@ -100,9 +101,17 @@ function PriorityBucket({ bucket }: { bucket: MigrationLaunchPriorityBucket }) {
       ) : (
         <div style={rowsStyle}>
           {bucket.items.map((task) => (
-            <TaskRow key={task.key} task={task} tone={tone} />
+            <TaskRow
+              key={task.key}
+              task={task}
+              tone={tone}
+              onSelect={() => setSelectedTask(task)}
+            />
           ))}
         </div>
+      )}
+      {selectedTask && (
+        <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />
       )}
     </div>
   )
@@ -117,7 +126,15 @@ function SummaryStat({ label, value, tone }: { label: string; value: number; ton
   )
 }
 
-function TaskRow({ task, tone }: { task: RawTaskRecord; tone: Tone }) {
+function TaskRow({
+  task,
+  tone,
+  onSelect,
+}: {
+  task: RawTaskRecord
+  tone: Tone
+  onSelect: () => void
+}) {
   const accent = `var(--lcc-${tone})`
   const meta = [
     task.assignee ? `@${task.assignee}` : "UNASSIGNED",
@@ -127,7 +144,9 @@ function TaskRow({ task, tone }: { task: RawTaskRecord; tone: Tone }) {
 
   return (
     <div style={{ ...rowStyle, borderLeft: `2px solid ${accent}` }}>
-      <div style={rowIdStyle}>{task.key}</div>
+      <button type="button" style={rowIdPillStyle} onClick={onSelect}>
+        {task.key}
+      </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={rowTitleStyle}>{task.summary || "(no summary)"}</div>
         <div style={rowMetaStyle}>{meta.join(" · ")}</div>
@@ -135,6 +154,56 @@ function TaskRow({ task, tone }: { task: RawTaskRecord; tone: Tone }) {
       <span style={{ ...chipStyle, color: accent, borderColor: accent }}>
         {task.launchPriority || task.priority || "Priority"}
       </span>
+    </div>
+  )
+}
+
+function TaskModal({ task, onClose }: { task: RawTaskRecord; onClose: () => void }) {
+  const fields = [
+    ["Launch Priority", task.launchPriority],
+    ["Status", task.uatStatus || task.taskStatus || task.status],
+    ["Assignee", task.assignee],
+    ["Project", task.project],
+    ["Type", task.type],
+    ["Created", task.created],
+    ["Updated", task.updated],
+    ["Resolved", task.resolved],
+  ].filter(([, value]) => value)
+
+  return (
+    <div style={modalBackdropStyle} role="presentation" onClick={onClose}>
+      <div
+        style={modalStyle}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="launch-task-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div style={modalHeadStyle}>
+          <button type="button" style={modalIdPillStyle} onClick={onClose}>
+            {task.key}
+          </button>
+          <button type="button" style={closeButtonStyle} onClick={onClose} aria-label="Close">
+            x
+          </button>
+        </div>
+        <h3 id="launch-task-title" style={modalTitleStyle}>
+          {task.summary || "(no summary)"}
+        </h3>
+        <dl style={fieldGridStyle}>
+          {fields.map(([label, value]) => (
+            <div key={label} style={fieldStyle}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+        {task.url && (
+          <a href={task.url} target="_blank" rel="noreferrer" style={taskLinkStyle}>
+            Open source task
+          </a>
+        )}
+      </div>
     </div>
   )
 }
@@ -220,16 +289,17 @@ const tabBarStyle: React.CSSProperties = {
 
 const tabStyle: React.CSSProperties = {
   border: "1px solid var(--lcc-glass-border)",
-  background: "var(--lcc-glass-bg)",
+  background: "var(--lcc-glass-bg-faint)",
   color: "var(--lcc-text-dim)",
-  borderRadius: 6,
-  padding: "7px 10px",
+  borderRadius: 999,
+  padding: "6px 7px 6px 12px",
   fontSize: 12,
-  fontWeight: 750,
+  fontWeight: 850,
   display: "inline-flex",
-  gap: 7,
+  gap: 8,
   alignItems: "center",
   cursor: "pointer",
+  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
 }
 
 const tabStyleActive: React.CSSProperties = {
@@ -237,17 +307,18 @@ const tabStyleActive: React.CSSProperties = {
   color: "var(--lcc-text)",
   borderColor: "var(--lcc-accent)",
   background: "var(--lcc-glass-bg-strong)",
+  boxShadow: "0 0 0 1px rgba(6, 182, 212, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
 }
 
 const tabCountStyle: React.CSSProperties = {
   minWidth: 20,
   height: 20,
   padding: "0 6px",
-  borderRadius: 6,
+  borderRadius: 999,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "var(--lcc-glass-bg-faint)",
+  background: "rgba(255, 255, 255, 0.06)",
   color: "var(--lcc-text)",
   fontSize: 11,
   fontFamily: "var(--font-mono)",
@@ -294,13 +365,18 @@ const rowStyle: React.CSSProperties = {
   padding: "9px 10px",
 }
 
-const rowIdStyle: React.CSSProperties = {
-  width: 82,
+const rowIdPillStyle: React.CSSProperties = {
+  width: 88,
   flex: "0 0 auto",
-  color: "var(--lcc-text)",
+  color: "var(--lcc-accent)",
+  border: "1px solid var(--lcc-glass-border)",
+  background: "var(--lcc-glass-bg)",
+  borderRadius: 999,
+  padding: "5px 8px",
   fontFamily: "var(--font-mono)",
   fontSize: 12,
   fontWeight: 800,
+  cursor: "pointer",
 }
 
 const rowTitleStyle: React.CSSProperties = {
@@ -336,4 +412,84 @@ const emptyStyle: React.CSSProperties = {
   padding: 14,
   color: "var(--lcc-text-faint)",
   fontSize: 12,
+}
+
+const modalBackdropStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 80,
+  display: "grid",
+  placeItems: "center",
+  padding: 18,
+  background: "rgba(2, 6, 23, 0.62)",
+}
+
+const modalStyle: React.CSSProperties = {
+  width: "min(620px, 100%)",
+  maxHeight: "min(720px, calc(100vh - 36px))",
+  overflow: "auto",
+  border: "1px solid var(--lcc-glass-border)",
+  background: "var(--lcc-panel-bg)",
+  borderRadius: 8,
+  padding: 18,
+  boxShadow: "0 24px 60px rgba(0, 0, 0, 0.34)",
+}
+
+const modalHeadStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12,
+  marginBottom: 12,
+}
+
+const modalIdPillStyle: React.CSSProperties = {
+  border: "1px solid var(--lcc-accent)",
+  background: "var(--lcc-glass-bg-strong)",
+  color: "var(--lcc-accent)",
+  borderRadius: 999,
+  padding: "6px 10px",
+  fontFamily: "var(--font-mono)",
+  fontSize: 12,
+  fontWeight: 850,
+  cursor: "pointer",
+}
+
+const closeButtonStyle: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  borderRadius: 999,
+  border: "1px solid var(--lcc-glass-border)",
+  background: "var(--lcc-glass-bg)",
+  color: "var(--lcc-text-dim)",
+  cursor: "pointer",
+}
+
+const modalTitleStyle: React.CSSProperties = {
+  margin: "0 0 14px",
+  color: "var(--lcc-text)",
+  fontSize: 18,
+  lineHeight: 1.35,
+}
+
+const fieldGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10,
+  margin: 0,
+}
+
+const fieldStyle: React.CSSProperties = {
+  border: "1px solid var(--lcc-glass-border)",
+  background: "var(--lcc-glass-bg-faint)",
+  borderRadius: 6,
+  padding: "9px 10px",
+}
+
+const taskLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  marginTop: 14,
+  color: "var(--lcc-accent)",
+  fontSize: 12,
+  fontWeight: 800,
 }

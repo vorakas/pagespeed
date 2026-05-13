@@ -1,5 +1,5 @@
+from datetime import date
 import unittest
-from unittest.mock import patch
 
 from services.migration_dashboard_service import _launch_priority_summary
 from services.obsidian_sync.raw_scanner import RawTask
@@ -15,6 +15,7 @@ class LaunchPrioritySummaryTest(unittest.TestCase):
             summary="Zoom buttons not functioning",
             launch_priority="P1",
             status="Open",
+            created="2026-05-13",
             updated="2026-05-13",
         )
         p2 = RawTask(
@@ -37,9 +38,7 @@ class LaunchPrioritySummaryTest(unittest.TestCase):
             updated="2026-05-12",
         )
 
-        with patch("services.migration_dashboard_service.date") as fake_date:
-            fake_date.today.return_value.isoformat.return_value = "2026-05-13"
-            summary = _launch_priority_summary([p1, p2, done])
+        summary = _launch_priority_summary([p1, p2, done], today=date(2026, 5, 13))
 
         buckets = {bucket["priority"]: bucket for bucket in summary["buckets"]}
         self.assertEqual(buckets["P1"]["total"], 2)
@@ -47,7 +46,7 @@ class LaunchPrioritySummaryTest(unittest.TestCase):
         self.assertEqual(buckets["P1"]["resolved"], 1)
         self.assertEqual(buckets["P1"]["items"][0]["key"], "813621")
         self.assertEqual(buckets["P2"]["active"], 1)
-        self.assertEqual(summary["p1Burndown"][0]["active"], 1)
+        self.assertEqual(summary["p1Burndown"][-1]["active"], 1)
 
     def test_ignores_legacy_priority_without_launch_priority(self):
         task = RawTask(
@@ -64,6 +63,35 @@ class LaunchPrioritySummaryTest(unittest.TestCase):
 
         p1 = next(bucket for bucket in summary["buckets"] if bucket["priority"] == "P1")
         self.assertEqual(p1["active"], 0)
+
+    def test_p1_burndown_uses_created_and_resolved_dates(self):
+        older = RawTask(
+            key="100001",
+            source="asana",
+            project="LAMPSPLUS",
+            rel_path="raw/asana/LAMPSPLUS/Implementation/100001 - Older.md",
+            launch_priority="P1",
+            status="Completed",
+            created="2026-05-10",
+            resolved="2026-05-12",
+        )
+        newer = RawTask(
+            key="100002",
+            source="asana",
+            project="LAMPSPLUS",
+            rel_path="raw/asana/LAMPSPLUS/Implementation/100002 - Newer.md",
+            launch_priority="P1",
+            status="Open",
+            created="2026-05-11",
+        )
+
+        summary = _launch_priority_summary([older, newer], today=date(2026, 5, 13), history_days=4)
+
+        points = {point["date"]: point["active"] for point in summary["p1Burndown"]}
+        self.assertEqual(points["2026-05-10"], 1)
+        self.assertEqual(points["2026-05-11"], 2)
+        self.assertEqual(points["2026-05-12"], 1)
+        self.assertEqual(points["2026-05-13"], 1)
 
 
 if __name__ == "__main__":
