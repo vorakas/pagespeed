@@ -87,6 +87,33 @@ def create_obsidian_blueprint(
             return jsonify({"error": str(exc)}), 400
         return jsonify({"success": True, "job": job.to_dict()}), 202
 
+    @bp.route("/api/obsidian/sync/purge-source", methods=["POST"])
+    def purge_source():
+        """Delete all files under ``raw/<source>/`` so the next full sync
+        starts clean.  Useful when the JQL scope changed or a debug run
+        wrote files outside the normal feed scope.
+
+        Body: ``{ "source": "WPM" }``
+        """
+        import shutil
+        from pathlib import Path
+
+        data = request.get_json(silent=True) or {}
+        source = str(data.get("source", "")).strip()
+        if not source or "/" in source or "\\" in source or source.startswith("."):
+            return jsonify({"error": "invalid source name"}), 400
+
+        raw_dir = Path(sync_service.vault_root) / "raw" / source
+        if not raw_dir.exists():
+            return jsonify({"error": f"raw/{source} does not exist"}), 404
+
+        # Count files before purge.
+        md_count = sum(1 for _ in raw_dir.rglob("*.md"))
+        shutil.rmtree(raw_dir)
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Purged raw/%s: removed %d markdown files", source, md_count)
+        return jsonify({"success": True, "source": source, "filesRemoved": md_count})
+
     @bp.route("/api/obsidian/sync/active", methods=["GET"])
     def active_sync():
         job = sync_service.active_job()
