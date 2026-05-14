@@ -570,7 +570,12 @@ class MigrationDashboardService:
 
         def _resolve_epic(task: "RawTask", depth: int = 0) -> Optional[str]:
             """Return the effective epic key for *task*, walking up the
-            parent chain (max 2 hops) when the task itself has no epic_link."""
+            parent chain (max 2 hops) when the task itself has no epic_link.
+
+            Special case: if the parent IS an Epic (task_type == "Epic"),
+            use the parent's key directly — Epics don't carry their own
+            Epic Link field in Jira.
+            """
             if task.epic_link:
                 return task.epic_link
             if depth >= 2 or not task.parent_key:
@@ -578,6 +583,9 @@ class MigrationDashboardService:
             parent = by_key.get(task.parent_key)
             if parent is None:
                 return None
+            # Parent is itself an Epic → use its key as the epic.
+            if parent.task_type and parent.task_type.lower() == "epic":
+                return parent.key
             return _resolve_epic(parent, depth + 1)
 
         # Bucket tasks by effective epic (own or inherited from parent).
