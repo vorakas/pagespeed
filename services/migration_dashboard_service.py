@@ -565,8 +565,13 @@ class MigrationDashboardService:
         don't carry their own Epic Link but logically belong to their
         parent's epic.
         """
-        tasks = self._raw_tasks()
-        by_key = {t.key: t for t in tasks}
+        all_tasks = self._raw_tasks()
+        by_key = {t.key: t for t in all_tasks}
+
+        # Exclude Epic-type issues from member counting — they are the
+        # group headers, not work items. They remain in by_key so the
+        # parent-walk and summary lookup still find them.
+        tasks = [t for t in all_tasks if not (t.task_type and t.task_type.lower() == "epic")]
 
         def _resolve_epic(task: "RawTask", depth: int = 0) -> Optional[str]:
             """Return the effective epic key for *task*, walking up the
