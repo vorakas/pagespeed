@@ -558,16 +558,35 @@ class MigrationDashboardService:
         Tasks without an ``epic_link`` are collected into an "Ungrouped"
         bucket so nothing is invisible. Epics are sorted by active task
         count descending so the busiest appear first.
+
+        **Parent inheritance:** Sub-tasks and children that lack an explicit
+        ``epic_link`` inherit the epic from their ``parent_key`` (walking up
+        to two levels). This matches standard Jira behaviour where sub-tasks
+        don't carry their own Epic Link but logically belong to their
+        parent's epic.
         """
         tasks = self._raw_tasks()
         by_key = {t.key: t for t in tasks}
 
-        # Bucket tasks by epic_link value.
+        def _resolve_epic(task: "RawTask", depth: int = 0) -> Optional[str]:
+            """Return the effective epic key for *task*, walking up the
+            parent chain (max 2 hops) when the task itself has no epic_link."""
+            if task.epic_link:
+                return task.epic_link
+            if depth >= 2 or not task.parent_key:
+                return None
+            parent = by_key.get(task.parent_key)
+            if parent is None:
+                return None
+            return _resolve_epic(parent, depth + 1)
+
+        # Bucket tasks by effective epic (own or inherited from parent).
         epic_buckets: Dict[str, List[RawTask]] = defaultdict(list)
         ungrouped: List[RawTask] = []
         for task in tasks:
-            if task.epic_link:
-                epic_buckets[task.epic_link].append(task)
+            effective_epic = _resolve_epic(task)
+            if effective_epic:
+                epic_buckets[effective_epic].append(task)
             else:
                 ungrouped.append(task)
 
