@@ -237,6 +237,9 @@ class MigrationDashboardService:
     def get_trend(self) -> List[dict]:
         return self._cached("trend", self._compute_trend)
 
+    def get_epic_progress(self) -> dict:
+        return self._cached("epicProgress", self._compute_epic_progress)
+
     def get_teams(self) -> List[dict]:
         return self._cached("teams", self._compute_teams)
 
@@ -543,6 +546,112 @@ class MigrationDashboardService:
                 })
             out.append(payload)
         return out
+
+    def _compute_epic_progress(self) -> dict:
+        """Group tasks by epic and compute task-count + hours progress.
+
+        Each epic row carries dual progress metrics:
+        - Task completion: resolved / total (always available)
+        - Hours progress: time_spent / original_estimate (sparse — many
+          tasks have no time tracking data)
+
+        Tasks without an ``epic_link`` are collected into an "Ungrouped"
+        bucket so nothing is invisible. Epics are sorted by active task
+        count descending so the busiest appear first.
+        """
+        tasks = self._raw_tasks()
+        by_key = {t.key: t for t in tasks}
+
+        # Bucket tasks by epic_link value.
+        epic_buckets: Dict[str, List[RawTask]] = defaultdict(list)
+        ungrouped: List[RawTask] = []
+        for task in tasks:
+            if task.epic_link:
+                epic_buckets[task.epic_link].append(task)
+            else:
+                ungrouped.append(task)
+
+        rows: List[dict] = []
+        for epic_key, members in epic_buckets.items():
+            epic_task = by_key.get(epic_key)
+            epic_summary = epic_task.summary if epic_task else None
+            epic_status = epic_task.effective_status if epic_task else None
+
+            total = len(members)
+            resolved = sum(1 for t in members if t.is_resolved)
+            active = total - resolved
+
+            original_seconds = sum(t.original_estimate_seconds or 0 for t in members)
+            spent_seconds = sum(t.time_spent_seconds or 0 for t in members)
+            remaining_seconds = sum(t.remaining_estimate_seconds or 0 for t in members)
+            tasks_with_estimates = sum(1 for t in members if t.original_estimate_seconds)
+
+            # Derive a resource_group from the majority of member tasks.
+            team_counts: Counter[str] = Counter()
+            for t in members:
+                if t.resource_group:
+                    team_counts[t.resource_group] += 1
+            primary_team = team_counts.most_common(1)[0][0] if team_counts else None
+
+            rows.append({
+                "epicKey": epic_key,
+                "summary": epic_summary or epic_key,
+                "status": epic_status,
+                "totalTasks": total,
+                "resolvedTasks": resolved,
+                "activeTasks": active,
+                "taskPct": round((resolved / total) * 100) if total else 0,
+                "originalEstimateHours": round(original_seconds / 3600, 1) if original_seconds else 0,
+                "timeSpentHours": round(spent_seconds / 3600, 1) if spent_seconds else 0,
+                "remainingEstimateHours": round(remaining_seconds / 3600, 1) if remaining_seconds else 0,
+                "hoursPct": round((spent_seconds / original_seconds) * 100) if original_seconds else None,
+                "tasksWithEstimates": tasks_with_estimates,
+                "team": primary_team,
+            })
+
+        # Sort: active tasks descending, then by epic key for stability.
+        rows.sort(key=lambda r: (-r["activeTasks"], r["epicKey"]))
+
+        # Ungrouped bucket.
+        ug_total = len(ungrouped)
+        ug_resolved = sum(1 for t in ungrouped if t.is_resolved)
+        ug_original = sum(t.original_estimate_seconds or 0 for t in ungrouped)
+        ug_spent = sum(t.time_spent_seconds or 0 for t in ungrouped)
+        ug_remaining = sum(t.remaining_estimate_seconds or 0 for t in ungrouped)
+
+        # Summary totals across all tasks.
+        all_total = len(tasks)
+        all_resolved = sum(1 for t in tasks if t.is_resolved)
+        all_original = sum(t.original_estimate_seconds or 0 for t in tasks)
+        all_spent = sum(t.time_spent_seconds or 0 for t in tasks)
+        all_remaining = sum(t.remaining_estimate_seconds or 0 for t in tasks)
+        all_with_estimates = sum(1 for t in tasks if t.original_estimate_seconds)
+
+        return {
+            "epics": rows,
+            "ungrouped": {
+                "totalTasks": ug_total,
+                "resolvedTasks": ug_resolved,
+                "activeTasks": ug_total - ug_resolved,
+                "taskPct": round((ug_resolved / ug_total) * 100) if ug_total else 0,
+                "originalEstimateHours": round(ug_original / 3600, 1) if ug_original else 0,
+                "timeSpentHours": round(ug_spent / 3600, 1) if ug_spent else 0,
+                "remainingEstimateHours": round(ug_remaining / 3600, 1) if ug_remaining else 0,
+                "hoursPct": round((ug_spent / ug_original) * 100) if ug_original else None,
+            },
+            "totals": {
+                "totalTasks": all_total,
+                "resolvedTasks": all_resolved,
+                "activeTasks": all_total - all_resolved,
+                "taskPct": round((all_resolved / all_total) * 100) if all_total else 0,
+                "originalEstimateHours": round(all_original / 3600, 1) if all_original else 0,
+                "timeSpentHours": round(all_spent / 3600, 1) if all_spent else 0,
+                "remainingEstimateHours": round(all_remaining / 3600, 1) if all_remaining else 0,
+                "hoursPct": round((all_spent / all_original) * 100) if all_original else None,
+                "tasksWithEstimates": all_with_estimates,
+                "epicCount": len(rows),
+            },
+        }
 
     def _compute_workstream_detail(self, workstream_id: str) -> Optional[dict]:
         rel = f"wiki/{workstream_id}.md"

@@ -53,6 +53,7 @@ import type {
   MigrationTeam,
   MigrationWorkstreamDetail,
   MigrationDashboardOverview,
+  EpicProgressResponse,
   MigrationSnapshot,
   MigrationSnapshotDiff,
   MigrationSnapshotDiffResponse,
@@ -838,6 +839,10 @@ class ApiClient {
 
   async getMigrationKpis(): Promise<MigrationKpis> {
     return this.request("/api/dashboard/kpis")
+  }
+
+  async getEpicProgress(): Promise<EpicProgressResponse> {
+    return this.request("/api/dashboard/epic-progress")
   }
 
   async getMigrationSources(): Promise<MigrationSource[]> {

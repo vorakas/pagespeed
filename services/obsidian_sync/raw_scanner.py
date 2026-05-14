@@ -63,6 +63,16 @@ class RawTask:
     completion: Optional[str] = None
     jira_url: Optional[str] = None
     asana_url: Optional[str] = None
+    # Reporting fields (from Jira custom fields)
+    epic_link: Optional[str] = None
+    resource_group: Optional[str] = None
+    product_owner: Optional[str] = None
+    resource_queue: Optional[str] = None
+    parent_key: Optional[str] = None
+    # Time tracking in seconds (for dashboard calculations)
+    original_estimate_seconds: Optional[int] = None
+    time_spent_seconds: Optional[int] = None
+    remaining_estimate_seconds: Optional[int] = None
 
     def to_dict(self) -> dict:
         return {
@@ -83,6 +93,14 @@ class RawTask:
             "uatStatus": self.uat_status,
             "completion": self.completion,
             "url": self.jira_url or self.asana_url,
+            "epicLink": self.epic_link,
+            "resourceGroup": self.resource_group,
+            "productOwner": self.product_owner,
+            "resourceQueue": self.resource_queue,
+            "parentKey": self.parent_key,
+            "originalEstimateSeconds": self.original_estimate_seconds,
+            "timeSpentSeconds": self.time_spent_seconds,
+            "remainingEstimateSeconds": self.remaining_estimate_seconds,
         }
 
     @property
@@ -204,6 +222,14 @@ class RawTaskScanner:
             completion=_str(fm.get("completion")),
             jira_url=_str(fm.get("jira_url")),
             asana_url=_str(fm.get("asana_url")),
+            epic_link=_str(fm.get("epic_link")),
+            resource_group=_str(fm.get("resource_group")),
+            product_owner=_str(fm.get("product_owner")),
+            resource_queue=_str(fm.get("resource_queue")),
+            parent_key=_str(fm.get("parent_key")),
+            original_estimate_seconds=_int(fm.get("original_estimate_seconds")),
+            time_spent_seconds=_int(fm.get("time_spent_seconds")),
+            remaining_estimate_seconds=_int(fm.get("remaining_estimate_seconds")),
         )
 
 
@@ -358,3 +384,13 @@ def _str(value: Any) -> Optional[str]:
         text = value.strip()
         return text or None
     return str(value)
+
+
+def _int(value: Any) -> Optional[int]:
+    """Coerce a frontmatter value to int, returning None on failure."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None

@@ -59,6 +59,7 @@ def create_dashboard_blueprint(
             "taskStatus": service.get_task_status(),
             "trend": service.get_trend(),
             "sources": service.get_sources(),
+            "epicProgress": service.get_epic_progress(),
             "snapshotDiff": snapshot_diff_payload,
         })
 
@@ -91,6 +92,12 @@ def create_dashboard_blueprint(
         if not service.is_available():
             return jsonify({"error": "vault not found"}), 404
         return jsonify(service.get_production_failures())
+
+    @bp.route("/api/dashboard/epic-progress", methods=["GET"])
+    def epic_progress():
+        if not service.is_available():
+            return jsonify({"error": "vault not found"}), 404
+        return jsonify(service.get_epic_progress())
 
     @bp.route("/api/dashboard/new-bugs", methods=["GET"])
     def new_bugs():

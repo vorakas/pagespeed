@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Jira → Obsidian Second Brain Exporter
+Jira ? Obsidian Second Brain Exporter
 ======================================
 Pulls all issues from one or more Jira Data Center/Server projects and
 generates Obsidian-compatible markdown files with rich frontmatter,
@@ -53,13 +53,23 @@ except ImportError:
     os.system(f"{sys.executable} -m pip install requests --break-system-packages -q")
     import requests
 
-# ──────────────────────────────────────────────
-# CONFIGURATION — edit these or use env vars
-# ──────────────────────────────────────────────
+# Load .env from the project root (so JIRA_PAT etc. are picked up
+# without needing to export them in the shell first).
+try:
+    from dotenv import load_dotenv
+    # Walk up from this file to find the project root .env
+    _project_root = Path(__file__).resolve().parent.parent.parent
+    load_dotenv(_project_root / ".env")
+except ImportError:
+    pass  # python-dotenv not installed ? rely on shell env vars
+
+# ??????????????????????????????????????????????
+# CONFIGURATION ? edit these or use env vars
+# ??????????????????????????????????????????????
 JIRA_BASE_URL = os.environ.get("JIRA_BASE_URL", "https://lampstrack.lampsplus.com")
 JIRA_PAT = os.environ.get("JIRA_PAT", "")
 
-# ⬇️  Your Obsidian vault root. Each project gets its own subfolder:2. P
+# ??  Your Obsidian vault root. Each project gets its own subfolder:2. P
 #       raw/WPM/Epic/...    raw/WPM/Story/...
 #       raw/ACEDS/Epic/...  raw/ACEDS/Story/...
 VAULT_ROOT = os.environ.get("VAULT_ROOT", r"C:\Users\AdamB\Desktop\LPAdobe\raw")
@@ -72,10 +82,16 @@ DEFAULT_PROJECTS = ["ACE2E", "ACEDS", "ACAB", "ACAQA", "ACCMS", "ACM"]
 MAX_RESULTS_PER_PAGE = 50  # Jira pagination limit
 SYNC_STATE_FILE = ".jira_sync_state.json"  # Per-project, stored in each subfolder
 
+# Custom field IDs ? discovered via scripts/discover_custom_fields.py
+EPIC_LINK_FIELD = "customfield_10380"
+RESOURCE_GROUP_FIELD = "customfield_10040"
+PRODUCT_OWNER_FIELD = "customfield_11480"
+RESOURCE_QUEUE_FIELD = "customfield_10050"
 
-# ──────────────────────────────────────────────
+
+# ??????????????????????????????????????????????
 # HELPERS
-# ──────────────────────────────────────────────
+# ??????????????????????????????????????????????
 
 def jira_session():
     """Create an authenticated requests session."""
@@ -107,9 +123,13 @@ def fetch_all_issues(session, project_key, since=None):
         "resolution", "description", "comment", "issuelinks",
         "subtasks", "parent", "labels", "components", "fixVersions",
         "attachment", "worklog", "timetracking",
-        # Sprint & story points live in custom fields — we grab all
+        # Sprint & story points live in custom fields ? we grab all
         "customfield_10004",  # story points (common default)
         "customfield_10007",  # sprint (common default)
+        EPIC_LINK_FIELD,      # epic link
+        RESOURCE_GROUP_FIELD, # resource group (team)
+        PRODUCT_OWNER_FIELD,  # product owner
+        RESOURCE_QUEUE_FIELD, # resource queue (QA/Back End/Front End/etc.)
     ])
 
     all_issues = []
@@ -123,7 +143,7 @@ def fetch_all_issues(session, project_key, since=None):
             "fields": fields,
             "expand": "names",
         }
-        print(f"  Fetching issues {start_at}–{start_at + MAX_RESULTS_PER_PAGE}...")
+        print(f"  Fetching issues {start_at}?{start_at + MAX_RESULTS_PER_PAGE}...")
         resp = session.get(url, params=params)
         resp.raise_for_status()
         data = resp.json()
@@ -136,7 +156,7 @@ def fetch_all_issues(session, project_key, since=None):
             break
         start_at += MAX_RESULTS_PER_PAGE
 
-    print(f"  ✓ Retrieved {len(all_issues)} issues total.\n")
+    print(f"  ? Retrieved {len(all_issues)} issues total.\n")
     return all_issues, names_map
 
 
@@ -158,6 +178,10 @@ def fetch_all_issues_jql(session, jql):
         "attachment", "worklog", "timetracking",
         "customfield_10004",  # story points
         "customfield_10007",  # sprint
+        EPIC_LINK_FIELD,      # epic link
+        RESOURCE_GROUP_FIELD, # resource group (team)
+        PRODUCT_OWNER_FIELD,  # product owner
+        RESOURCE_QUEUE_FIELD, # resource queue (QA/Back End/Front End/etc.)
     ])
 
     all_issues = []
@@ -171,7 +195,7 @@ def fetch_all_issues_jql(session, jql):
             "fields": fields,
             "expand": "names",
         }
-        print(f"  Fetching issues {start_at}–{start_at + MAX_RESULTS_PER_PAGE}...")
+        print(f"  Fetching issues {start_at}?{start_at + MAX_RESULTS_PER_PAGE}...")
         resp = session.get(url, params=params)
         resp.raise_for_status()
         data = resp.json()
@@ -184,7 +208,7 @@ def fetch_all_issues_jql(session, jql):
             break
         start_at += MAX_RESULTS_PER_PAGE
 
-    print(f"  ✓ Retrieved {len(all_issues)} issues total.\n")
+    print(f"  ? Retrieved {len(all_issues)} issues total.\n")
     return all_issues, names_map
 
 
@@ -202,7 +226,7 @@ def sanitize_filename(text):
 
 
 def format_date(iso_str):
-    """Convert Jira ISO timestamp → YYYY-MM-DD."""
+    """Convert Jira ISO timestamp ? YYYY-MM-DD."""
     if not iso_str:
         return ""
     try:
@@ -213,7 +237,7 @@ def format_date(iso_str):
 
 
 def format_datetime(iso_str):
-    """Convert Jira ISO timestamp → YYYY-MM-DD HH:MM."""
+    """Convert Jira ISO timestamp ? YYYY-MM-DD HH:MM."""
     if not iso_str:
         return ""
     try:
@@ -231,7 +255,7 @@ def person_name(field):
 
 
 def extract_sprint_names(sprint_field):
-    """Parse sprint info — can be a list of sprint objects or strings."""
+    """Parse sprint info ? can be a list of sprint objects or strings."""
     if not sprint_field:
         return []
     if isinstance(sprint_field, list):
@@ -252,7 +276,7 @@ def extract_sprint_names(sprint_field):
 
 def jira_markup_to_md(text, issue_key=None):
     """
-    Best-effort conversion of Jira wiki markup → Markdown.
+    Best-effort conversion of Jira wiki markup ? Markdown.
     Covers the most common patterns.
 
     Args:
@@ -272,25 +296,25 @@ def jira_markup_to_md(text, issue_key=None):
 
     t = text
 
-    # ── Phase 1: Code blocks — protect their contents from later transforms ──
+    # ?? Phase 1: Code blocks ? protect their contents from later transforms ??
 
-    # Code blocks: {code}...{code} → ```...```
+    # Code blocks: {code}...{code} ? ```...```
     t = re.sub(r"\{code(?::([^}]*))?\}(.*?)\{code\}", r"```\1\n\2\n```", t, flags=re.DOTALL)
 
-    # No-format blocks: {noformat}...{noformat} → ```...```
+    # No-format blocks: {noformat}...{noformat} ? ```...```
     t = re.sub(r"\{noformat\}(.*?)\{noformat\}", r"```\n\1\n```", t, flags=re.DOTALL)
 
-    # ── Phase 2: Strip HTML tags and Jira macros ──
+    # ?? Phase 2: Strip HTML tags and Jira macros ??
 
     # Convert <br> and <br/> to newlines FIRST (before stripping)
     t = re.sub(r"<br\s*/?>", "\n", t)
     # Strip common HTML tags (preserve content inside them)
     t = re.sub(r"</?(?:p|div|span|font|b|i|u|em|strong|ul|ol|li|td|tr|th|table|thead|tbody|h[1-6]|a|img|hr|sup|sub|pre|code|blockquote)(?:\s[^>]*)?>", "", t)
 
-    # Color macros — just strip them
+    # Color macros ? just strip them
     t = re.sub(r"\{color:[^}]*\}(.*?)\{color\}", r"\1", t, flags=re.DOTALL)
 
-    # Panels — convert to blockquote with optional title
+    # Panels ? convert to blockquote with optional title
     def panel_to_blockquote(m):
         params = m.group(1) or ""
         content = m.group(2).strip()
@@ -309,7 +333,7 @@ def jira_markup_to_md(text, issue_key=None):
     t = re.sub(r"\{quote\}(.*?)\{quote\}", lambda m: "\n".join("> " + l for l in m.group(1).strip().split("\n")), t,
                flags=re.DOTALL)
 
-    # Info/warning/tip/note macros → blockquotes with label
+    # Info/warning/tip/note macros ? blockquotes with label
     for macro in ["info", "warning", "tip", "note"]:
         def macro_to_blockquote(m, label=macro):
             content = m.group(1).strip()
@@ -319,7 +343,7 @@ def jira_markup_to_md(text, issue_key=None):
             return "\n".join(lines)
         t = re.sub(r"\{" + macro + r"(?::[^}]*)?\}(.*?)\{" + macro + r"\}", macro_to_blockquote, t, flags=re.DOTALL)
 
-    # Expand macros — convert to details/summary or just show content
+    # Expand macros ? convert to details/summary or just show content
     def expand_to_md(m):
         title = m.group(1) or "Details"
         content = m.group(2).strip()
@@ -332,23 +356,23 @@ def jira_markup_to_md(text, issue_key=None):
     t = re.sub(r"\{anchor:[^}]*\}", "", t)
     t = re.sub(r"\{status:([^}]*)\}", lambda m: f"`{re.search(r'title=([^|}]+)', m.group(1)).group(1) if re.search(r'title=([^|}]+)', m.group(1)) else 'status'}`", t)
 
-    # User mentions: [~username] → @username
+    # User mentions: [~username] ? @username
     t = re.sub(r"\[~([^\]]+)\]", r"@\1", t)
 
-    # Jira emoticons → Unicode or text equivalents
+    # Jira emoticons ? Unicode or text equivalents
     emoticon_map = {
-        "(/)": "✅", "(x)": "❌", "(!)": "⚠️",
-        "(?)": "❓", "(+)": "👍", "(-)": "👎",
-        "(on)": "💡", "(off)": "🔌", "(*)": "⭐",
-        "(i)": "ℹ️", "(flag)": "🚩",
+        "(/)": "[OK]", "(x)": "[X]", "(!)": "??",
+        "(?)": "?", "(+)": "?", "(-)": "?",
+        "(on)": "[LIGHT]", "(off)": "[PLUG]", "(*)": "?",
+        "(i)": "??", "(flag)": "?",
     }
     for jira_icon, unicode_icon in emoticon_map.items():
         t = t.replace(jira_icon, unicode_icon)
 
-    # ── Phase 3: Tables ──
+    # ?? Phase 3: Tables ??
 
-    # Jira tables: ||header1||header2|| → | header1 | header2 |
-    #              |cell1|cell2|        → | cell1   | cell2   |
+    # Jira tables: ||header1||header2|| ? | header1 | header2 |
+    #              |cell1|cell2|        ? | cell1   | cell2   |
     def convert_table_block(text):
         """Convert a block of Jira table lines to markdown table."""
         lines = text.split("\n")
@@ -375,7 +399,7 @@ def jira_markup_to_md(text, issue_key=None):
                 cells = [c.strip() for c in stripped[1:-1].split("|")]
                 md_row = "| " + " | ".join(cells) + " |"
                 if not in_table:
-                    # Data row without a preceding header — add a generic header
+                    # Data row without a preceding header ? add a generic header
                     header = "| " + " | ".join(f"Col {i+1}" for i in range(len(cells))) + " |"
                     separator = "| " + " | ".join("---" for _ in cells) + " |"
                     result.append(header)
@@ -384,7 +408,7 @@ def jira_markup_to_md(text, issue_key=None):
                 result.append(md_row)
 
             elif stripped == "" and in_table:
-                # Skip blank lines inside a table block — Jira often
+                # Skip blank lines inside a table block ? Jira often
                 # inserts them between rows
                 continue
 
@@ -396,56 +420,56 @@ def jira_markup_to_md(text, issue_key=None):
 
     t = convert_table_block(t)
 
-    # ── Phase 4: Structural elements (must run before inline formatting) ──
+    # ?? Phase 4: Structural elements (must run before inline formatting) ??
 
-    # Bullet lists: * → -, ** → indented -, *** → double-indented -
+    # Bullet lists: * ? -, ** ? indented -, *** ? double-indented -
     # MUST run before bold conversion, because ** at line start is a bullet, not bold
-    # Allow optional leading whitespace — Jira often indents sub-bullets
+    # Allow optional leading whitespace ? Jira often indents sub-bullets
     t = re.sub(r"^\s*(\*+)\s", lambda m: "  " * (len(m.group(1)) - 1) + "- ", t, flags=re.MULTILINE)
 
-    # Numbered lists: # → 1., ## → indented 1.
-    # MUST run BEFORE headings — Jira headings use "h1." not "#", so no conflict.
+    # Numbered lists: # ? 1., ## ? indented 1.
+    # MUST run BEFORE headings ? Jira headings use "h1." not "#", so no conflict.
     # Allow optional leading whitespace.
     t = re.sub(r"^\s*(#+)\s", lambda m: "  " * (len(m.group(1)) - 1) + "1. ", t, flags=re.MULTILINE)
 
-    # Headings: h1. → #, h2. → ##, etc.
+    # Headings: h1. ? #, h2. ? ##, etc.
     # Runs AFTER numbered lists so "## " (from Jira ##) is already converted to "  1. "
     t = re.sub(r"^h([1-6])\.\s*", lambda m: "#" * int(m.group(1)) + " ", t, flags=re.MULTILINE)
 
-    # Block quotes: bq. text → > text
+    # Block quotes: bq. text ? > text
     t = re.sub(r"^bq\.\s*", "> ", t, flags=re.MULTILINE)
 
-    # ── Phase 5: Inline formatting ──
+    # ?? Phase 5: Inline formatting ??
 
-    # Monospace: {{text}} → `text`
+    # Monospace: {{text}} ? `text`
     t = re.sub(r"\{\{(.+?)\}\}", r"`\1`", t)
 
-    # Bold: *text* → **text**  (only when not at line start — bullets already handled)
+    # Bold: *text* ? **text**  (only when not at line start ? bullets already handled)
     t = re.sub(r"(?<!\w)\*([^\*\n]+?)\*(?!\w)", r"**\1**", t)
 
-    # Italic: _text_ → *text*
+    # Italic: _text_ ? *text*
     t = re.sub(r"(?<!\w)_([^_\n]+?)_(?!\w)", r"*\1*", t)
 
-    # Strikethrough: -text- → ~~text~~
+    # Strikethrough: -text- ? ~~text~~
     # More restrictive: require whitespace or line boundary on both sides to avoid
     # matching hyphenated words like "real-time" or "line-level"
     t = re.sub(r"(?:^|(?<=\s))-([^\-\n]+?)-(?=\s|$)", r"~~\1~~", t, flags=re.MULTILINE)
 
-    # Superscript: ^text^ → <sup>text</sup>  (markdown doesn't have native superscript)
+    # Superscript: ^text^ ? <sup>text</sup>  (markdown doesn't have native superscript)
     t = re.sub(r"\^([^\^\n]+?)\^", r"<sup>\1</sup>", t)
 
-    # Subscript: ~text~ → <sub>text</sub>
+    # Subscript: ~text~ ? <sub>text</sub>
     # Avoid matching inside ~~ (strikethrough) or @user patterns
     t = re.sub(r"(?<!~)~([^\~\n@]+?)~(?!~)", r"<sub>\1</sub>", t)
 
-    # Citation: ??text?? → *text*  (render as italic)
+    # Citation: ??text?? ? *text*  (render as italic)
     t = re.sub(r"\?\?([^\?\n]+?)\?\?", r"*\1*", t)
 
     # Links: [title|url] or [url]
     t = re.sub(r"\[([^|\]]+)\|([^\]]+)\]", r"[\1](\2)", t)
     t = re.sub(r"\[([^\]]+)\]", r"[\1](\1)", t)
 
-    # Images: !image.png! or !image.png|thumbnail! → proper reference
+    # Images: !image.png! or !image.png|thumbnail! ? proper reference
     # If issue_key is provided, point to _attachments/ISSUEKEY_filename
     def convert_image(m):
         ref = m.group(1)
@@ -457,7 +481,7 @@ def jira_markup_to_md(text, issue_key=None):
         return f"![{filename}]({filename})"
     t = re.sub(r"!([^!\n]+?)!", convert_image, t)
 
-    # ── Phase 6: Spacing cleanup ──
+    # ?? Phase 6: Spacing cleanup ??
 
     # Collapse 3+ consecutive newlines to 2 (one blank line)
     t = re.sub(r"\n{3,}", "\n\n", t)
@@ -502,14 +526,14 @@ def _fetch_attachment_binary(session, att_id, content_hint, dest):
 
     Jira Data Center's ``/secure/attachment/{id}/{filename}`` servlet rejects
     PAT-authenticated requests with 403 even when the same session works
-    against ``/rest/api/2/*`` — the servlet wants a session cookie + CSRF
+    against ``/rest/api/2/*`` ? the servlet wants a session cookie + CSRF
     token rather than a Bearer header. The REST attachment endpoint accepts
     PAT auth and (a) confirms we have access to the attachment, (b) returns
     a fresh ``content`` URL whose redirect chain establishes session state
     the servlet then honors. The ``X-Atlassian-Token: no-check`` header
     bypasses the CSRF/Referer guard for both calls.
 
-    ``content_hint`` is the URL Jira embedded in the parent issue payload —
+    ``content_hint`` is the URL Jira embedded in the parent issue payload ?
     used as a fallback when the metadata fetch fails (e.g. an old token
     that lost ``BROWSE_PROJECTS`` but kept attachment visibility).
     """
@@ -545,8 +569,8 @@ def _fetch_attachment_binary(session, att_id, content_hint, dest):
                 f.write(chunk)
         return True
     except Exception as e:
-        print(f"   ⚠ Failed to download {dest.name} (id={att_id}): {e}")
-        # Partial files leave a half-written .png that Obsidian can't render —
+        print(f"   ? Failed to download {dest.name} (id={att_id}): {e}")
+        # Partial files leave a half-written .png that Obsidian can't render ?
         # remove it so a later backfill pass treats the slot as empty and
         # retries cleanly.
         try:
@@ -561,7 +585,7 @@ def download_attachments(session, issue_key, attachments, output_dir):
     """Download all attachments for an issue into the _attachments folder.
 
     Returns a tuple ``(downloaded, failed)`` where ``downloaded`` maps the
-    original Jira filename → local filename (with issue-key prefix) and
+    original Jira filename ? local filename (with issue-key prefix) and
     ``failed`` lists ``{key, id, filename}`` records that couldn't be
     fetched. Files already on disk with matching size are treated as
     downloaded without a re-fetch.
@@ -587,8 +611,8 @@ def download_attachments(session, issue_key, attachments, output_dir):
         local_name = sanitize_filename(f"{issue_key}_{original_name}")
         if len(local_name) > _MAX_ATTACHMENT_NAME_LEN:
             print(
-                f"   ⚠ {issue_key}: skipping attachment with overlong name "
-                f"({len(local_name)} chars) — likely a URL pasted into the description"
+                f"   ? {issue_key}: skipping attachment with overlong name "
+                f"({len(local_name)} chars) ? likely a URL pasted into the description"
             )
             failed.append({"key": issue_key, "id": att_id, "filename": original_name})
             continue
@@ -603,7 +627,7 @@ def download_attachments(session, issue_key, attachments, output_dir):
                 downloaded[original_name] = local_name
                 continue
         except OSError as exc:
-            print(f"   ⚠ {issue_key}: cannot stat {local_name[:60]}…: {exc}")
+            print(f"   ? {issue_key}: cannot stat {local_name[:60]}?: {exc}")
             failed.append({"key": issue_key, "id": att_id, "filename": original_name})
             continue
 
@@ -616,7 +640,7 @@ def download_attachments(session, issue_key, attachments, output_dir):
 
 
 # Pattern for the embedded-attachment wikilink the description converter
-# emits — ``![[_attachments/{KEY}_{name}]]`` — used by the backfill scan
+# emits ? ``![[_attachments/{KEY}_{name}]]`` ? used by the backfill scan
 # to discover orphaned references.
 _EMBED_REF_RE = re.compile(
     r"!\[\[_attachments/([A-Z][A-Z0-9]+-\d+)_([^\]\|]+?)(?:\|[^\]]*)?\]\]"
@@ -663,7 +687,7 @@ def _fetch_attachments_batch(session, issue_keys):
                 resp.raise_for_status()
                 data = resp.json()
             except Exception as e:
-                print(f"   ⚠ Backfill: batch lookup failed ({len(chunk)} keys): {e}")
+                print(f"   ? Backfill: batch lookup failed ({len(chunk)} keys): {e}")
                 break
             for issue in data.get("issues", []) or []:
                 k = issue.get("key")
@@ -695,7 +719,7 @@ def _fetch_issue_attachments_via_search(session, issue_key):
             return []
         return issues[0].get("fields", {}).get("attachment") or []
     except Exception as e:
-        print(f"   ⚠ Backfill: search lookup failed for {issue_key}: {e}")
+        print(f"   ? Backfill: search lookup failed for {issue_key}: {e}")
         return []
 
 
@@ -710,7 +734,7 @@ def _fetch_issue_attachments_via_issue(session, issue_key):
         resp.raise_for_status()
         return resp.json().get("fields", {}).get("attachment") or []
     except Exception as e:
-        print(f"   ⚠ Backfill: issue lookup failed for {issue_key}: {e}")
+        print(f"   ? Backfill: issue lookup failed for {issue_key}: {e}")
         return []
 
 
@@ -726,7 +750,7 @@ def fetch_issue_attachments(session, issue_key):
     works for cross-project JQL feeds (WPM) while the single-issue
     endpoint works for direct project syncs (ACE2E etc.).
     """
-    # Issue endpoint first — cheaper (no JQL parser) and worked for the
+    # Issue endpoint first ? cheaper (no JQL parser) and worked for the
     # WPM JQL backfill in production. Fall back to search if it returns
     # nothing, since search picks up some issues the issue endpoint
     # silently strips.
@@ -775,7 +799,7 @@ def backfill_missing_attachments(session, vault_root, projects=None):
                 local_name = sanitize_filename(f"{issue_key}_{original_name}")
                 if len(local_name) > _MAX_ATTACHMENT_NAME_LEN:
                     # The ref is too long to ever land on disk (URL pasted
-                    # into a description, etc.). Don't try to backfill —
+                    # into a description, etc.). Don't try to backfill ?
                     # download_attachments would skip it anyway.
                     continue
                 local_path = att_dir / local_name
@@ -789,17 +813,17 @@ def backfill_missing_attachments(session, vault_root, projects=None):
                 missing_by_issue.setdefault((project_dir, issue_key), set()).add(original_name)
 
     if not missing_by_issue:
-        print(f"   ✓ Attachment backfill: scanned {scanned} file(s), nothing missing.")
+        print(f"   ? Attachment backfill: scanned {scanned} file(s), nothing missing.")
         return {"scanned": scanned, "missing": 0, "recovered": 0, "still_missing": 0}
 
     total_missing = sum(len(v) for v in missing_by_issue.values())
     print(
-        f"   🔧 Attachment backfill: {total_missing} missing across "
+        f"   ? Attachment backfill: {total_missing} missing across "
         f"{len(missing_by_issue)} issue(s)..."
     )
 
     # Batch-load attachment metadata for every missing issue up front via
-    # one or more JQL searches — much faster than per-issue calls and the
+    # one or more JQL searches ? much faster than per-issue calls and the
     # only path that reliably surfaces the attachment field on
     # Lampstrack.
     issue_keys = sorted({k for (_d, k) in missing_by_issue.keys()})
@@ -820,7 +844,7 @@ def backfill_missing_attachments(session, vault_root, projects=None):
             # its attachments, or the PAT can't see them. Track the count
             # so the summary line shows how often this happens.
             issues_no_attachments += 1
-        # Build a name → attachment lookup; some Jira instances serve
+        # Build a name ? attachment lookup; some Jira instances serve
         # space-encoded filenames, so look up by the normalized form too.
         by_name: dict = {}
         for att in attachments:
@@ -833,8 +857,8 @@ def backfill_missing_attachments(session, vault_root, projects=None):
         unknown = [name for name, att in targets if not att]
         if unknown:
             print(
-                f"      ⚠ {issue_key}: {len(unknown)} ref(s) missing from Jira's "
-                f"attachment list ({', '.join(sorted(unknown)[:3])}…)"
+                f"      ? {issue_key}: {len(unknown)} ref(s) missing from Jira's "
+                f"attachment list ({', '.join(sorted(unknown)[:3])}?)"
             )
             still_missing += len(unknown)
         if not wanted_atts:
@@ -851,7 +875,7 @@ def backfill_missing_attachments(session, vault_root, projects=None):
         else ""
     )
     print(
-        f"   ✓ Attachment backfill: recovered {recovered}, "
+        f"   ? Attachment backfill: recovered {recovered}, "
         f"still missing {still_missing}.{no_att_msg}"
     )
     return {
@@ -862,9 +886,9 @@ def backfill_missing_attachments(session, vault_root, projects=None):
     }
 
 
-# ──────────────────────────────────────────────
+# ??????????????????????????????????????????????
 # MARKDOWN GENERATION
-# ──────────────────────────────────────────────
+# ??????????????????????????????????????????????
 
 def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
     """Build the full Obsidian markdown for a single Jira issue."""
@@ -891,13 +915,27 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
     sprints = extract_sprint_names(fields.get("customfield_10007"))
     jira_url = f"{JIRA_BASE_URL}/browse/{key}"
 
+    # Custom fields for reporting (Epic Link, Resource Group, Product Owner, Resource Queue)
+    epic_link_raw = fields.get(EPIC_LINK_FIELD)
+    epic_link = str(epic_link_raw) if epic_link_raw else ""
+    resource_group_raw = fields.get(RESOURCE_GROUP_FIELD)
+    resource_group = resource_group_raw.get("name", "") if isinstance(resource_group_raw, dict) else ""
+    product_owner_raw = fields.get(PRODUCT_OWNER_FIELD)
+    product_owner = person_name(product_owner_raw)
+    resource_queue_raw = fields.get(RESOURCE_QUEUE_FIELD)
+    resource_queue = resource_queue_raw.get("value", "") if isinstance(resource_queue_raw, dict) else ""
+
+    # Parent key for sub-task ? epic rollups
+    parent = fields.get("parent")
+    parent_key = parent["key"] if parent else ""
+
     # Time tracking
     tt = fields.get("timetracking") or {}
     original_estimate = tt.get("originalEstimate", "")
     time_spent = tt.get("timeSpent", "")
     remaining = tt.get("remainingEstimate", "")
 
-    # ── Frontmatter ──
+    # ?? Frontmatter ??
     tags = [f"jira/{issue_type.lower().replace(' ', '-')}",
             f"status/{status.lower().replace(' ', '-')}"]
     if priority != "None":
@@ -905,7 +943,7 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
     for label in labels:
         tags.append(f"label/{label}")
 
-    # YAML-escape the summary — double quotes inside must become \" so the
+    # YAML-escape the summary ? double quotes inside must become \" so the
     # frontmatter parser treats the whole string as one value. Extracted
     # outside the f-string because Python 3.11 (Railway) rejects backslashes
     # inside f-string expressions.
@@ -931,7 +969,7 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
     if story_points:
         fm_lines.append(f"story_points: {story_points}")
     # Nested f-strings with escaped quotes break Python 3.11 (Railway),
-    # which forbids backslashes anywhere inside an f-string expression —
+    # which forbids backslashes anywhere inside an f-string expression ?
     # including in a nested f-string that lives inside the outer expression.
     # Build the joined YAML list outside the outer f-string.
     if sprints:
@@ -952,6 +990,28 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
         fm_lines.append(f"time_spent: \"{time_spent}\"")
     if remaining:
         fm_lines.append(f"remaining_estimate: \"{remaining}\"")
+    # Time in seconds for dashboard calculations (parallel to human-readable)
+    original_seconds = tt.get("originalEstimateSeconds")
+    spent_seconds = tt.get("timeSpentSeconds")
+    remaining_seconds = tt.get("remainingEstimateSeconds")
+    if original_seconds is not None:
+        fm_lines.append(f"original_estimate_seconds: {original_seconds}")
+    if spent_seconds is not None:
+        fm_lines.append(f"time_spent_seconds: {spent_seconds}")
+    if remaining_seconds is not None:
+        fm_lines.append(f"remaining_estimate_seconds: {remaining_seconds}")
+    # Reporting fields for Report-tab parity
+    if epic_link:
+        fm_lines.append(f"epic_link: \"{epic_link}\"")
+    if resource_group:
+        resource_group_escaped = resource_group.replace('"', '\\"')
+        fm_lines.append(f"resource_group: \"{resource_group_escaped}\"")
+    if product_owner:
+        fm_lines.append(f"product_owner: \"{product_owner}\"")
+    if resource_queue:
+        fm_lines.append(f"resource_queue: \"{resource_queue}\"")
+    if parent_key:
+        fm_lines.append(f"parent_key: \"{parent_key}\"")
     fm_lines.append(f"jira_url: {jira_url}")
     tags_yaml = ", ".join('"' + t + '"' for t in tags)
     fm_lines.append(f"tags: [{tags_yaml}]")
@@ -959,14 +1019,14 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
 
     parts = ["\n".join(fm_lines), ""]
 
-    # ── Title ──
+    # ?? Title ??
     parts.append(f"# {key}: {summary}")
     parts.append("")
-    parts.append(f"> **Status:** {status}  ·  **Priority:** {priority}  ·  **Assignee:** {assignee}")
+    parts.append(f"> **Status:** {status}  ?  **Priority:** {priority}  ?  **Assignee:** {assignee}")
     parts.append(f"> [Open in Jira]({jira_url})")
     parts.append("")
 
-    # ── Parent / Epic link ──
+    # ?? Parent / Epic link ??
     parent = fields.get("parent")
     if parent:
         parent_key = parent["key"]
@@ -974,7 +1034,7 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
         parts.append(f"**Parent:** {issue_wikilink(parent_key, parent_summary)}")
         parts.append("")
 
-    # ── Description ──
+    # ?? Description ??
     parts.append("## Description")
     parts.append("")
     if description:
@@ -983,7 +1043,7 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
         parts.append("*No description provided.*")
     parts.append("")
 
-    # ── Subtasks ──
+    # ?? Subtasks ??
     subtasks = fields.get("subtasks") or []
     if subtasks:
         parts.append("## Subtasks")
@@ -996,7 +1056,7 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
             parts.append(f"- [{done}] {issue_wikilink(st_key, st_summary)}  `{st_status}`")
         parts.append("")
 
-    # ── Linked Issues ──
+    # ?? Linked Issues ??
     links = fields.get("issuelinks") or []
     if links:
         parts.append("## Linked Issues")
@@ -1016,7 +1076,7 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
             parts.append(f"- **{direction}** {issue_wikilink(linked_key, linked_summary)}")
         parts.append("")
 
-    # ── Attachments ──
+    # ?? Attachments ??
     attachments = fields.get("attachment") or []
     if attachments:
         parts.append("## Attachments")
@@ -1032,20 +1092,20 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
             local_name = downloaded_attachments.get(name)
             if local_name:
                 if ext in IMAGE_EXTENSIONS:
-                    # Embed image inline — renders in Obsidian reading view
+                    # Embed image inline ? renders in Obsidian reading view
                     parts.append(f"![[{ATTACHMENTS_FOLDER}/{local_name}]]")
-                    parts.append(f"*{name} — {size_kb} KB, uploaded by {author} on {created_at}*")
+                    parts.append(f"*{name} ? {size_kb} KB, uploaded by {author} on {created_at}*")
                 else:
                     # Link non-image files
                     parts.append(
                         f"- [[{ATTACHMENTS_FOLDER}/{local_name}|{name}]]  ({size_kb} KB, by {author} on {created_at})")
             else:
                 # Fallback to Jira URL if download failed
-                parts.append(f"- [{name}]({url})  ({size_kb} KB, by {author} on {created_at}) ⚠ *not downloaded*")
+                parts.append(f"- [{name}]({url})  ({size_kb} KB, by {author} on {created_at}) ? *not downloaded*")
             parts.append("")
         parts.append("")
 
-    # ── Time Tracking ──
+    # ?? Time Tracking ??
     if original_estimate or time_spent:
         parts.append("## Time Tracking")
         parts.append("")
@@ -1057,7 +1117,7 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
             parts.append(f"- **Remaining:** {remaining}")
         parts.append("")
 
-    # ── Comments ──
+    # ?? Comments ??
     comments = fields.get("comment", {}).get("comments", [])
     if comments:
         parts.append("## Comments")
@@ -1066,14 +1126,14 @@ def build_issue_markdown(issue, issue_lookup, downloaded_attachments=None):
             author = person_name(c.get("author"))
             dt = format_datetime(c.get("created"))
             body = jira_markup_to_md(c.get("body", ""), issue_key=key)
-            parts.append(f"### {author} — {dt}")
+            parts.append(f"### {author} ? {dt}")
             parts.append("")
             parts.append(body)
             parts.append("")
 
-    # ── Metadata footer ──
+    # ?? Metadata footer ??
     parts.append("---")
-    parts.append(f"*Created: {created} · Updated: {updated} · Reporter: {reporter}*")
+    parts.append(f"*Created: {created} ? Updated: {updated} ? Reporter: {reporter}*")
 
     return "\n".join(parts)
 
@@ -1085,13 +1145,13 @@ def build_moc(issues_by_type, project_key):
 
     lines = [
         "---",
-        f"title: \"{project_key} — Project Map of Content\"",
+        f"title: \"{project_key} ? Project Map of Content\"",
         f"generated: {now}",
         f"total_issues: {total}",
         "tags: [\"MOC\", \"jira\"]",
         "---",
         "",
-        f"# 🗺️ {project_key} — Project Map of Content",
+        f"# ?? {project_key} ? Project Map of Content",
         "",
         f"*Auto-generated from Jira on {now}. {total} issues total.*",
         "",
@@ -1118,7 +1178,7 @@ def build_moc(issues_by_type, project_key):
             status = issue["fields"].get("status", {}).get("name", "")
             assignee = person_name(issue["fields"].get("assignee"))
             link = issue_wikilink(key, summary)
-            lines.append(f"- {link}  `{status}`  → {assignee}")
+            lines.append(f"- {link}  `{status}`  ? {assignee}")
         lines.append("")
 
     return "\n".join(lines)
@@ -1134,7 +1194,7 @@ def build_dashboard(issues, project_key):
         "tags: [\"dashboard\", \"jira\"]",
         "---",
         "",
-        f"# 📊 {project_key} Dashboard",
+        f"# [CHART] {project_key} Dashboard",
         "",
         "Use this with the **Dataview** plugin for dynamic queries.",
         "",
@@ -1181,9 +1241,9 @@ def build_dashboard(issues, project_key):
     return "\n".join(lines)
 
 
-# ──────────────────────────────────────────────
+# ??????????????????????????????????????????????
 # MAIN
-# ──────────────────────────────────────────────
+# ??????????????????????????????????????????????
 
 def load_sync_state(output):
     """Load the last sync timestamp from the state file."""
@@ -1209,10 +1269,10 @@ def save_sync_state(output, project_key):
 
 
 def collect_existing_issues(output, project_key=None):
-    """Scan the vault folder and return all existing issue keys → file paths.
+    """Scan the vault folder and return all existing issue keys ? file paths.
 
     If ``project_key`` is given, only files whose name starts with that key
-    are returned. If ``None``, any Jira-style key (``ABC-123``) is matched —
+    are returned. If ``None``, any Jira-style key (``ABC-123``) is matched ?
     used for JQL feeds whose output folder can span many projects (e.g. WPM).
     """
     existing = {}
@@ -1238,25 +1298,25 @@ def sync_project(session, project_key, force_full=False):
     print(f"  Output:  {output.resolve()}")
     print(f"{'=' * 60}")
 
-    # ── Decide: full vs incremental sync ──
+    # ?? Decide: full vs incremental sync ??
     last_sync = None if force_full else load_sync_state(output)
 
     if last_sync:
-        print(f"🔄 Incremental sync — fetching issues updated since {last_sync}...")
+        print(f"[R] Incremental sync ? fetching issues updated since {last_sync}...")
         print(f"   (use --full to force a complete refresh)\n")
         issues, names_map = fetch_all_issues(session, project_key, since=last_sync)
 
         if not issues:
             save_sync_state(output, project_key)
-            print("✅ No issues changed since last sync. Everything is up to date.\n")
+            print("[+] No issues changed since last sync. Everything is up to date.\n")
             return
-        print(f"   {len(issues)} issue(s) changed — updating those files...\n")
+        print(f"   {len(issues)} issue(s) changed ? updating those files...\n")
     else:
-        print(f"📥 Full export — fetching all issues in project {project_key}...")
+        print(f"[INBOX] Full export ? fetching all issues in project {project_key}...")
         issues, names_map = fetch_all_issues(session, project_key)
 
         if not issues:
-            print(f"⚠ No issues found for {project_key}. Check the project key.\n")
+            print(f"? No issues found for {project_key}. Check the project key.\n")
             return
 
     # Build lookup for wikilinks
@@ -1277,7 +1337,7 @@ def sync_project(session, project_key, force_full=False):
         itype = issue["fields"].get("issuetype", {}).get("name", "Other")
         issues_by_type.setdefault(itype, []).append(issue)
 
-    print(f"📝 Writing to: {output.resolve()}\n")
+    print(f"[#] Writing to: {output.resolve()}\n")
 
     # Create type-based folders and write issue files
     count = 0
@@ -1298,14 +1358,19 @@ def sync_project(session, project_key, force_full=False):
             attachments = issue["fields"].get("attachment") or []
             downloaded = {}
             if attachments:
-                print(f"   📎 {key}: downloading {len(attachments)} attachment(s)...")
+                print(f"   ? {key}: downloading {len(attachments)} attachment(s)...")
                 downloaded, failed = download_attachments(session, key, attachments, output)
                 att_count += len(downloaded)
                 if failed:
-                    print(f"      ⚠ {len(failed)} attachment(s) failed; backfill will retry")
+                    print(f"      ? {len(failed)} attachment(s) failed; backfill will retry")
 
             md = build_issue_markdown(issue, issue_lookup, downloaded)
-            (type_dir / filename).write_text(md, encoding="utf-8")
+            try:
+                (type_dir / filename).write_text(md, encoding="utf-8")
+            except PermissionError as e:
+                print(f"[SKIP] Permission denied for {filename}: {e}")
+            except Exception as e:
+                print(f"[WARN] Failed to write {filename}: {e}")
             count += 1
 
     # Rebuild MOC from all vault files (full or incremental)
@@ -1373,8 +1438,8 @@ def sync_project(session, project_key, force_full=False):
 
     mode = "updated" if last_sync else "generated"
     att_msg = f", {att_count} attachments downloaded" if att_count else ""
-    print(f"\n✅ {project_key}: {mode.capitalize()} {count} issue files + MOC + Dashboard{att_msg}.")
-    print(f"   📂 {output.resolve()}")
+    print(f"\n[+] {project_key}: {mode.capitalize()} {count} issue files + MOC + Dashboard{att_msg}.")
+    print(f"   ? {output.resolve()}")
     for issue_type in sorted(issues_by_type.keys()):
         n = len(issues_by_type[issue_type])
         print(f"      {sanitize_filename(issue_type)}/  ({n} files {mode})")
@@ -1418,38 +1483,38 @@ def sync_jql(session, jql, output_name, force_full=False):
     output.mkdir(parents=True, exist_ok=True)
 
     print(f"{'=' * 60}")
-    print(f"  Custom JQL sync → {output_name}/")
+    print(f"  Custom JQL sync ? {output_name}/")
     print(f"  Output:  {output.resolve()}")
     print(f"  JQL:     {jql[:120]}{'...' if len(jql) > 120 else ''}")
     print(f"{'=' * 60}")
 
-    # ── Decide: full vs incremental sync ──
+    # ?? Decide: full vs incremental sync ??
     last_sync = None if force_full else load_sync_state(output)
 
     if last_sync:
         effective_jql = _apply_incremental_filter(jql, last_sync)
-        print(f"🔄 Incremental sync — fetching issues updated since {last_sync}...")
+        print(f"[R] Incremental sync ? fetching issues updated since {last_sync}...")
         print(f"   (pass fullRefresh=true to force a complete refresh)\n")
         issues, names_map = fetch_all_issues_jql(session, effective_jql)
 
         if not issues:
             save_sync_state(output, output_name)
-            print("✅ No issues changed since last sync. Everything is up to date.\n")
+            print("[+] No issues changed since last sync. Everything is up to date.\n")
             return
-        print(f"   {len(issues)} issue(s) changed — updating those files...\n")
+        print(f"   {len(issues)} issue(s) changed ? updating those files...\n")
     else:
-        print(f"\n📥 Full export — fetching all issues matching JQL...")
+        print(f"\n[INBOX] Full export ? fetching all issues matching JQL...")
         issues, names_map = fetch_all_issues_jql(session, jql)
 
         if not issues:
-            print(f"⚠ No issues found for the JQL query.\n")
+            print(f"? No issues found for the JQL query.\n")
             return
 
     # Build lookup for wikilinks
     issue_lookup = {i["key"]: i for i in issues}
 
     # On incremental runs, remove old files for changed issues so an issue
-    # whose type changed (e.g. Story → Task) ends up in the correct folder
+    # whose type changed (e.g. Story ? Task) ends up in the correct folder
     # instead of existing in both.
     if last_sync:
         existing = collect_existing_issues(output)
@@ -1464,13 +1529,13 @@ def sync_jql(session, jql, output_name, force_full=False):
         issues_by_type.setdefault(itype, []).append(issue)
 
     # Track which Jira projects are represented (in this delta, not the
-    # whole vault — accurate for the message printed below).
+    # whole vault ? accurate for the message printed below).
     projects_seen = {}
     for issue in issues:
         proj = issue["key"].rsplit("-", 1)[0]
         projects_seen[proj] = projects_seen.get(proj, 0) + 1
 
-    print(f"\n📝 Writing {len(issues)} issues to: {output.resolve()}")
+    print(f"\n[#] Writing {len(issues)} issues to: {output.resolve()}")
     print(f"   Projects found: {', '.join(f'{k} ({v})' for k, v in sorted(projects_seen.items()))}\n")
 
     # Create type-based folders and write issue files
@@ -1492,18 +1557,23 @@ def sync_jql(session, jql, output_name, force_full=False):
             attachments = issue["fields"].get("attachment") or []
             downloaded = {}
             if attachments:
-                print(f"   📎 {key}: downloading {len(attachments)} attachment(s)...")
+                print(f"   ? {key}: downloading {len(attachments)} attachment(s)...")
                 downloaded, failed = download_attachments(session, key, attachments, output)
                 att_count += len(downloaded)
                 if failed:
-                    print(f"      ⚠ {len(failed)} attachment(s) failed; backfill will retry")
+                    print(f"      ? {len(failed)} attachment(s) failed; backfill will retry")
 
             md = build_issue_markdown(issue, issue_lookup, downloaded)
-            (type_dir / filename).write_text(md, encoding="utf-8")
+            try:
+                (type_dir / filename).write_text(md, encoding="utf-8")
+            except PermissionError as e:
+                print(f"[SKIP] Permission denied for {filename}: {e}")
+            except Exception as e:
+                print(f"[WARN] Failed to write {filename}: {e}")
             count += 1
 
     # Rebuild MOC/Dashboard from the delta + stubs of untouched existing
-    # files, so the index reflects the whole vault — same approach as
+    # files, so the index reflects the whole vault ? same approach as
     # sync_project.
     if not last_sync:
         all_issues_for_moc = issues
@@ -1554,8 +1624,8 @@ def sync_jql(session, jql, output_name, force_full=False):
 
     mode = "Updated" if last_sync else "Generated"
     att_msg = f", {att_count} attachments downloaded" if att_count else ""
-    print(f"\n✅ {output_name}: {mode} {count} issue files + MOC + Dashboard{att_msg}.")
-    print(f"   📂 {output.resolve()}")
+    print(f"\n[+] {output_name}: {mode} {count} issue files + MOC + Dashboard{att_msg}.")
+    print(f"   ? {output.resolve()}")
     for issue_type in sorted(issues_by_type.keys()):
         n = len(issues_by_type[issue_type])
         print(f"      {sanitize_filename(issue_type)}/  ({n} files {mode.lower()})")
@@ -1585,7 +1655,7 @@ def main():
         elif args[i] == "--jql-file" and i + 1 < len(args):
             jql_path = Path(args[i + 1])
             if not jql_path.exists():
-                print(f"❌ JQL file not found: {jql_path}")
+                print(f"[-] JQL file not found: {jql_path}")
                 sys.exit(1)
             custom_jql = jql_path.read_text(encoding="utf-8").strip()
             print(f"   Loaded JQL from: {jql_path}")
@@ -1602,12 +1672,12 @@ def main():
     project_keys = filtered_args
 
     if JIRA_PAT == "YOUR_PAT_HERE":
-        print("⚠️  Please set your PAT!")
+        print("??  Please set your PAT!")
         print("   Either edit JIRA_PAT in the script, or run:")
         print(f'   JIRA_PAT="your-token" python {sys.argv[0]} ACE2E ACEDS')
         sys.exit(1)
 
-    print(f"🔌 Connecting to {JIRA_BASE_URL}...")
+    print(f"[~] Connecting to {JIRA_BASE_URL}...")
     session = jira_session()
 
     # Quick auth check
@@ -1617,7 +1687,7 @@ def main():
         user = me.json()
         print(f"   Authenticated as: {user.get('displayName', user.get('name', '?'))}")
     except Exception as e:
-        print(f"❌ Authentication failed: {e}")
+        print(f"[-] Authentication failed: {e}")
         print("   Check your PAT and base URL.")
         sys.exit(1)
 
@@ -1627,10 +1697,10 @@ def main():
     if custom_jql:
         if not output_name:
             output_name = "CUSTOM"
-        print(f"   Mode:       Custom JQL → {output_name}/")
+        print(f"   Mode:       Custom JQL ? {output_name}/")
         print()
         sync_jql(session, custom_jql, output_name)
-        print("🏁 JQL sync complete!")
+        print("? JQL sync complete!")
         return
 
     # Standard per-project mode
@@ -1642,7 +1712,7 @@ def main():
         print("   Mode:       --backfill-attachments (skip sync, only re-fetch missing files)")
         print()
         backfill_missing_attachments(session, VAULT_ROOT, project_keys)
-        print("🏁 Backfill complete!")
+        print("? Backfill complete!")
         return
     if force_full:
         print(f"   Mode:       --full (forced complete refresh)")
@@ -1653,7 +1723,7 @@ def main():
 
     backfill_missing_attachments(session, VAULT_ROOT, project_keys)
 
-    print("🏁 All projects synced!")
+    print("? All projects synced!")
 
 
 if __name__ == "__main__":

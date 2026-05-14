@@ -1434,6 +1434,167 @@
   .launch-dashboard .lcc-flow-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* ── Epic progress panel ───────────────────────────────────── */
+.launch-dashboard .lcc-ep-panel { display: flex; flex-direction: column; }
+
+/* Summary strip — three stat cells in a row */
+.launch-dashboard .lcc-ep-summary {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+  margin-bottom: 14px;
+}
+.launch-dashboard .lcc-ep-sum-cell {
+  padding: 10px 12px; border-radius: var(--lcc-radius-sm);
+  background: var(--glass-bg-faint); border: 1px solid var(--glass-border);
+}
+.launch-dashboard .lcc-ep-sum-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--lcc-text-faint); margin-bottom: 4px;
+}
+.launch-dashboard .lcc-ep-sum-value {
+  font-size: 14px; font-weight: 600; color: var(--lcc-text);
+  font-family: var(--aurora-font-mono); margin-bottom: 6px;
+}
+.launch-dashboard .lcc-ep-sum-bar {
+  display: flex; align-items: center; gap: 8px;
+}
+.launch-dashboard .lcc-ep-sum-pct {
+  font-size: 11px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-dim); flex-shrink: 0;
+}
+.launch-dashboard .lcc-ep-sum-dim {
+  font-size: 10px; color: var(--lcc-text-faint); margin-top: 4px;
+}
+
+/* Controls row — sort pills + toggle */
+.launch-dashboard .lcc-ep-controls {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 12px;
+}
+.launch-dashboard .lcc-ep-sort-pills {
+  display: flex; gap: 4px;
+}
+.launch-dashboard .lcc-ep-pill {
+  font-size: 10.5px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--glass-border); background: transparent;
+  color: var(--lcc-text-dim); cursor: pointer; font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+.launch-dashboard .lcc-ep-pill:hover { background: var(--glass-bg-faint); }
+.launch-dashboard .lcc-ep-pill.active {
+  background: var(--lcc-blue-bg); color: var(--lcc-blue);
+  border-color: var(--lcc-blue);
+}
+.launch-dashboard .lcc-ep-toggle {
+  margin-left: auto; display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--lcc-text-dim); cursor: pointer;
+}
+.launch-dashboard .lcc-ep-toggle input { accent-color: var(--lcc-blue); }
+
+/* Epic rows */
+.launch-dashboard .lcc-ep-list {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.launch-dashboard .lcc-ep-row {
+  border-radius: var(--lcc-radius-sm); padding: 8px 10px;
+  transition: background 0.12s;
+}
+.launch-dashboard .lcc-ep-row:hover { background: var(--glass-bg-faint); }
+.launch-dashboard .lcc-ep-row.completed { opacity: 0.55; }
+.launch-dashboard .lcc-ep-row-head {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; text-align: left; background: none; border: none;
+  color: var(--lcc-text); cursor: pointer; padding: 0; font: inherit;
+}
+.launch-dashboard .lcc-ep-chevron {
+  flex-shrink: 0; color: var(--lcc-text-faint);
+  display: flex; align-items: center;
+}
+.launch-dashboard .lcc-ep-name {
+  font-size: 12.5px; font-weight: 500; color: var(--lcc-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0; flex: 1;
+}
+.launch-dashboard .lcc-ep-team {
+  font-size: 10px; padding: 1px 7px; border-radius: 999px;
+  background: var(--glass-bg-faint); border: 1px solid var(--glass-border);
+  color: var(--lcc-text-dim); white-space: nowrap; flex-shrink: 0;
+}
+.launch-dashboard .lcc-ep-count {
+  font-size: 11px; font-family: var(--aurora-font-mono);
+  color: var(--lcc-text-dim); white-space: nowrap; flex-shrink: 0;
+}
+.launch-dashboard .lcc-ep-count.dim { color: var(--lcc-text-faint); }
+
+/* Dual progress bars */
+.launch-dashboard .lcc-ep-bars {
+  display: flex; flex-direction: column; gap: 3px;
+  padding-left: 20px; margin-top: 5px;
+}
+.launch-dashboard .lcc-ep-bar-row {
+  display: grid; grid-template-columns: 36px 1fr 64px;
+  align-items: center; gap: 6px;
+}
+.launch-dashboard .lcc-ep-bar-label {
+  font-size: 10px; color: var(--lcc-text-faint);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.launch-dashboard .lcc-ep-track {
+  position: relative; height: 10px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05); overflow: hidden;
+  flex: 1;
+}
+.launch-dashboard .lcc-ep-fill {
+  position: absolute; inset: 0 auto 0 0; border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.launch-dashboard .lcc-ep-fill[data-tone="green"] { background: var(--lcc-green); }
+.launch-dashboard .lcc-ep-fill[data-tone="blue"]  { background: var(--lcc-blue); }
+.launch-dashboard .lcc-ep-fill[data-tone="amber"] { background: var(--lcc-amber); }
+.launch-dashboard .lcc-ep-fill[data-tone="red"]   { background: var(--lcc-red); }
+.launch-dashboard .lcc-ep-bar-num {
+  text-align: right; font-size: 10.5px;
+  font-family: var(--aurora-font-mono); color: var(--lcc-text-dim);
+}
+
+/* Detail accordion */
+.launch-dashboard .lcc-ep-detail {
+  padding: 8px 10px 4px 20px; margin-top: 4px;
+  border-top: 1px solid var(--glass-border);
+}
+.launch-dashboard .lcc-ep-detail dl {
+  display: grid; grid-template-columns: auto 1fr; gap: 3px 12px;
+  margin: 0; font-size: 11.5px;
+}
+.launch-dashboard .lcc-ep-detail dt {
+  color: var(--lcc-text-faint); font-weight: 500;
+}
+.launch-dashboard .lcc-ep-detail dd {
+  color: var(--lcc-text-dim); margin: 0;
+}
+
+/* Expand button */
+.launch-dashboard .lcc-ep-expand {
+  margin-top: 8px; padding: 6px 12px;
+  font-size: 11px; color: var(--lcc-blue); background: none;
+  border: 1px solid var(--glass-border); border-radius: var(--lcc-radius-sm);
+  cursor: pointer; width: 100%; text-align: center;
+  transition: background 0.15s;
+}
+.launch-dashboard .lcc-ep-expand:hover { background: var(--glass-bg-faint); }
+
+/* Ungrouped bucket */
+.launch-dashboard .lcc-ep-ungrouped {
+  margin-top: 12px; padding: 10px 12px; border-radius: var(--lcc-radius-sm);
+  background: var(--glass-bg-faint); border: 1px solid var(--glass-border);
+}
+.launch-dashboard .lcc-ep-ungrouped .lcc-ep-row-head { cursor: default; }
+.launch-dashboard .lcc-ep-ungrouped .lcc-ep-bars { padding-left: 0; }
+
+/* Light theme overrides */
+[data-theme="light"] .launch-dashboard .lcc-ep-track {
+  background: rgba(0, 0, 0, 0.06);
+}
+
 /* ── Task-status strip ─────────────────────────────────────── */
 .launch-dashboard .lcc-ts-panel { display: flex; flex-direction: column; }
 .launch-dashboard .lcc-ts-stack { display: flex; flex-direction: column; gap: 8px; }

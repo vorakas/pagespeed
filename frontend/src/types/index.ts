@@ -716,6 +716,14 @@ export interface RawTaskRecord {
   uatStatus: string | null
   completion: string | null
   url: string | null
+  epicLink: string | null
+  resourceGroup: string | null
+  productOwner: string | null
+  resourceQueue: string | null
+  parentKey: string | null
+  originalEstimateSeconds: number | null
+  timeSpentSeconds: number | null
+  remainingEstimateSeconds: number | null
 }
 
 export interface MigrationTaskStatusRow {
@@ -1146,6 +1154,52 @@ export interface MigrationSnapshotDiffResponse {
   diff: MigrationSnapshotDiff | null
 }
 
+export interface EpicProgressRow {
+  epicKey: string
+  summary: string
+  status: string | null
+  totalTasks: number
+  resolvedTasks: number
+  activeTasks: number
+  taskPct: number
+  originalEstimateHours: number
+  timeSpentHours: number
+  remainingEstimateHours: number
+  hoursPct: number | null
+  tasksWithEstimates: number
+  team: string | null
+}
+
+export interface EpicProgressUngrouped {
+  totalTasks: number
+  resolvedTasks: number
+  activeTasks: number
+  taskPct: number
+  originalEstimateHours: number
+  timeSpentHours: number
+  remainingEstimateHours: number
+  hoursPct: number | null
+}
+
+export interface EpicProgressTotals {
+  totalTasks: number
+  resolvedTasks: number
+  activeTasks: number
+  taskPct: number
+  originalEstimateHours: number
+  timeSpentHours: number
+  remainingEstimateHours: number
+  hoursPct: number | null
+  tasksWithEstimates: number
+  epicCount: number
+}
+
+export interface EpicProgressResponse {
+  epics: EpicProgressRow[]
+  ungrouped: EpicProgressUngrouped
+  totals: EpicProgressTotals
+}
+
 export interface MigrationDashboardOverview {
   health: MigrationHealthSnapshot
   kpis: MigrationKpis
@@ -1157,6 +1211,7 @@ export interface MigrationDashboardOverview {
   taskStatus: MigrationTaskStatusRow[]
   trend: MigrationTrendPoint[]
   sources: MigrationSource[]
+  epicProgress: EpicProgressResponse
   snapshotDiff: MigrationSnapshotDiffResponse | null
 }
 

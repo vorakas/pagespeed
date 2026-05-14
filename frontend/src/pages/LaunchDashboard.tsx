@@ -18,7 +18,9 @@ import {
 import { SidePanel, type SidePanelTarget } from "@/components/launch-dashboard/SidePanel"
 import { WhatChangedToday } from "@/components/launch-dashboard/WhatChangedToday"
 import { LaunchPriorityDailyStatus } from "@/components/launch-dashboard/LaunchPriorityDailyStatus"
+import { EpicProgress } from "@/components/launch-dashboard/EpicProgress"
 import type {
+  EpicProgressResponse,
   MigrationLaunchPriorities,
   MigrationBlocker,
   MigrationHealthSnapshot,
@@ -62,6 +64,7 @@ export function LaunchDashboard() {
   const [taskStatus, setTaskStatus] = useState<MigrationTaskStatusRow[] | null>(null)
   const [launchPriorities, setLaunchPriorities] = useState<MigrationLaunchPriorities | null>(null)
   const [sources, setSources] = useState<MigrationSource[] | null>(null)
+  const [epicProgress, setEpicProgress] = useState<EpicProgressResponse | null>(null)
   const [snapshotDiff, setSnapshotDiff] = useState<MigrationSnapshotDiffResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -111,6 +114,7 @@ export function LaunchDashboard() {
       setLaunchPriorities(overview.launchPriorities)
       setTaskStatus(overview.taskStatus)
       setSources(overview.sources)
+      setEpicProgress(overview.epicProgress)
       setSnapshotDiff(overview.snapshotDiff)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard")
@@ -207,6 +211,8 @@ export function LaunchDashboard() {
             snapshot={snapshotDiff?.latest ?? null}
             launchPriorities={launchPriorities}
           />
+
+          <EpicProgress data={epicProgress} />
 
           <div
             style={{
