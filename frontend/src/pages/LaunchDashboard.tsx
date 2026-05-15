@@ -19,8 +19,10 @@ import { SidePanel, type SidePanelTarget } from "@/components/launch-dashboard/S
 import { WhatChangedToday } from "@/components/launch-dashboard/WhatChangedToday"
 import { LaunchPriorityDailyStatus } from "@/components/launch-dashboard/LaunchPriorityDailyStatus"
 import { EpicProgress } from "@/components/launch-dashboard/EpicProgress"
+import { LaunchReportSections } from "@/components/launch-dashboard/LaunchReportSections"
 import type {
   EpicProgressResponse,
+  LaunchReportResponse,
   MigrationLaunchPriorities,
   MigrationBlocker,
   MigrationHealthSnapshot,
@@ -66,6 +68,7 @@ export function LaunchDashboard() {
   const [sources, setSources] = useState<MigrationSource[] | null>(null)
   const [epicProgress, setEpicProgress] = useState<EpicProgressResponse | null>(null)
   const [snapshotDiff, setSnapshotDiff] = useState<MigrationSnapshotDiffResponse | null>(null)
+  const [launchReport, setLaunchReport] = useState<LaunchReportResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [streamFilter, setStreamFilter] = useState<IncidentFilter>("all")
@@ -102,7 +105,10 @@ export function LaunchDashboard() {
         await fetch("/api/dashboard/snapshots/reingest", { method: "POST" }).catch(() => null)
       }
 
-      const overview = await api.getMigrationOverview()
+      const [overview, report] = await Promise.all([
+        api.getMigrationOverview(),
+        api.getLaunchReport().catch(() => null),
+      ])
       const bugs24h = await api.getMigrationNewBugs(1).catch(() => overview.newBugs)
       setHealth(overview.health)
       setKpis(overview.kpis)
@@ -116,6 +122,7 @@ export function LaunchDashboard() {
       setSources(overview.sources)
       setEpicProgress(overview.epicProgress)
       setSnapshotDiff(overview.snapshotDiff)
+      setLaunchReport(report)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard")
     } finally {
@@ -204,6 +211,8 @@ export function LaunchDashboard() {
             onRefresh={() => void loadAll(true)}
             refreshing={refreshing}
           />
+
+          <LaunchReportSections data={launchReport} />
 
           <WhatChangedToday />
 
