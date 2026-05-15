@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional
@@ -54,6 +54,7 @@ class RawTask:
     status: Optional[str] = None
     priority: Optional[str] = None
     launch_priority: Optional[str] = None
+    labels: List[str] = field(default_factory=list)
     assignee: Optional[str] = None
     created: Optional[str] = None
     updated: Optional[str] = None
@@ -85,6 +86,7 @@ class RawTask:
             "status": self.status,
             "priority": self.priority,
             "launchPriority": self.launch_priority,
+            "labels": self.labels,
             "assignee": self.assignee,
             "created": self.created,
             "updated": self.updated,
@@ -213,6 +215,7 @@ class RawTaskScanner:
             status=_str(fm.get("status")),
             priority=_str(fm.get("priority") or fm.get("task_priority")),
             launch_priority=_str(fm.get("launch_priority") or fm.get("Launch Priority")),
+            labels=_list(fm.get("labels")),
             assignee=_str(fm.get("assignee")),
             created=_str(fm.get("created")),
             updated=_str(fm.get("updated") or fm.get("modified")),
@@ -384,6 +387,28 @@ def _str(value: Any) -> Optional[str]:
         text = value.strip()
         return text or None
     return str(value)
+
+
+def _list(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("[") and text.endswith("]"):
+            inner = text[1:-1].strip()
+            if not inner:
+                return []
+            return [
+                part.strip().strip('"').strip("'")
+                for part in inner.split(",")
+                if part.strip().strip('"').strip("'")
+            ]
+        return [text]
+    return [str(value)]
 
 
 def _int(value: Any) -> Optional[int]:

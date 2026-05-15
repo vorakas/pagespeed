@@ -36,6 +36,35 @@ class RawScannerNewBugsTest(unittest.TestCase):
         self.assertEqual(tasks[0].launch_priority, "P1")
         self.assertEqual(tasks[0].to_dict()["launchPriority"], "P1")
 
+    def test_parses_jira_labels_into_api_payload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            task_path = (
+                root
+                / "raw"
+                / "WPM"
+                / "Task"
+                / "WPM-5471 - Build commerce item.md"
+            )
+            task_path.parent.mkdir(parents=True)
+            task_path.write_text(
+                "---\n"
+                "key: WPM-5471\n"
+                "summary: \"Build commerce item\"\n"
+                "type: Task\n"
+                "status: Closed\n"
+                "labels: [\"AC-P1\", \"adobe-commerce\"]\n"
+                "---\n"
+                "body\n",
+                encoding="utf-8",
+            )
+
+            tasks = list(RawTaskScanner(VaultReader(root)).iter_tasks())
+
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].labels, ["AC-P1", "adobe-commerce"])
+        self.assertEqual(tasks[0].to_dict()["labels"], ["AC-P1", "adobe-commerce"])
+
     def test_asana_implementation_items_without_type_count_as_new_bugs(self):
         today = date(2026, 5, 13)
         task = RawTask(
