@@ -484,7 +484,7 @@ export function QaTesting() {
                 type="button"
                 variant={preset === option ? "default" : "ghost"}
                 size="sm"
-                className={preset === option ? "text-black hover:text-black" : undefined}
+                className={preset === option ? "!text-black hover:!text-black" : undefined}
                 onClick={() => handlePreset(option)}
               >
                 {option === "24h" ? "Last 24h" : option === "sinceYesterday" ? "Since yesterday" : option === "7d" ? "7d" : option}
