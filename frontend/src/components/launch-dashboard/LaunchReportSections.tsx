@@ -16,7 +16,7 @@ interface LaunchReportSectionsProps {
 }
 
 interface DiagnosticSummary {
-  total: number
+  warningCount: number
   items: Array<[string, number]>
 }
 
