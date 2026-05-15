@@ -187,6 +187,69 @@ function RangeProgressDialog({
   )
 }
 
+function BlockedTestCasesDialog({
+  open,
+  onOpenChange,
+  rows,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  rows: Array<QaTestCase & { cycleKey: string; cycleName: string; section: string }>
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>Blocked Test Cases</DialogTitle>
+          <DialogDescription>All currently blocked test cases in the loaded round cycles.</DialogDescription>
+        </DialogHeader>
+        <div className="overflow-auto rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-background text-left text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Cycle</th>
+                <th className="px-4 py-3">Test Case</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Assigned</th>
+                <th className="px-4 py-3">Executed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                    No currently blocked test cases found.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((testCase) => (
+                  <tr key={`${testCase.cycleKey}-${testCase.key}`} className="border-t border-border">
+                    <td className="max-w-xs px-4 py-3">
+                      <div className="font-medium">{testCase.cycleName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {testCase.section} · {testCase.cycleKey}
+                      </div>
+                    </td>
+                    <td className="max-w-md px-4 py-3">
+                      <div className="font-medium">{testCase.key}</div>
+                      <div className="text-muted-foreground">{testCase.name || "Name unavailable"}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={statusClass(testCase.status)}>{testCase.status}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{testCase.assignedTo || "Unassigned"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{formatDateTime(testCase.executedAt)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function TaskMovementDialog({
   open,
   onOpenChange,
@@ -327,6 +390,7 @@ export function QaTesting() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rangeDialogOpen, setRangeDialogOpen] = useState(false)
+  const [blockedDialogOpen, setBlockedDialogOpen] = useState(false)
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
 
   async function loadReport(forceRefresh = false) {
@@ -372,6 +436,21 @@ export function QaTesting() {
       (report?.cycles ?? []).flatMap((cycle) =>
         cycle.testCases
           .filter((testCase) => testCase.inRange)
+          .map((testCase) => ({
+            ...testCase,
+            cycleKey: cycle.key,
+            cycleName: cycle.name,
+            section: cycle.section,
+          })),
+      ),
+    [report],
+  )
+
+  const blockedRows = useMemo(
+    () =>
+      (report?.cycles ?? []).flatMap((cycle) =>
+        cycle.testCases
+          .filter((testCase) => testCase.status.toLowerCase().includes("blocked"))
           .map((testCase) => ({
             ...testCase,
             cycleKey: cycle.key,
@@ -436,7 +515,7 @@ export function QaTesting() {
 
       {report ? (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <SummaryCard label="Cycles" value={report.summary.cycleCount} detail="Round cycles in Adobe Commerce E2E" />
             <SummaryCard label="Total Cases" value={report.summary.totalCases} detail={`${report.summary.remainingCases} remaining overall`} />
             <SummaryCard label="Overall Progress" value={`${report.summary.progressPercent}%`} detail={`${report.summary.executedCases} cases executed`} />
@@ -445,6 +524,12 @@ export function QaTesting() {
               value={`${report.summary.rangeProgressPercent}%`}
               detail={`${report.summary.executedInRange} cases executed in range`}
               onClick={() => setRangeDialogOpen(true)}
+            />
+            <SummaryCard
+              label="Blocked Test Cases"
+              value={blockedRows.length}
+              detail="Currently blocked across loaded cycles"
+              onClick={() => setBlockedDialogOpen(true)}
             />
             <SummaryCard
               label="Task Movement"
@@ -458,6 +543,11 @@ export function QaTesting() {
             open={rangeDialogOpen}
             onOpenChange={setRangeDialogOpen}
             rows={rangeExecutedRows}
+          />
+          <BlockedTestCasesDialog
+            open={blockedDialogOpen}
+            onOpenChange={setBlockedDialogOpen}
+            rows={blockedRows}
           />
           <TaskMovementDialog
             open={taskDialogOpen}
