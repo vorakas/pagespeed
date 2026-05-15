@@ -967,8 +967,13 @@ class ApiClient {
     return this.request(`/api/requirements/knowledge-bases/${kbId}/common-questions`)
   }
 
-  async getQaTestingReport(start: string, end: string, forceRefresh = false): Promise<QaTestingReport> {
-    const params = new URLSearchParams({ start, end })
+  async getQaTestingReport(
+    start: string,
+    end: string,
+    forceRefresh = false,
+    taskWindow: "range" | "sinceYesterday" = "sinceYesterday",
+  ): Promise<QaTestingReport> {
+    const params = new URLSearchParams({ start, end, taskWindow })
     if (forceRefresh) params.set("forceRefresh", "true")
     return this.request(`/api/requirements/qa-testing/report?${params.toString()}`)
   }

@@ -18,7 +18,7 @@ import { Progress } from "@/components/ui/progress"
 import { api } from "@/services/api"
 import type { QaTaskStatusChange, QaTestCycle, QaTestingReport } from "@/types"
 
-type Preset = "sinceYesterday" | "today" | "yesterday" | "7d" | "custom"
+type Preset = "24h" | "sinceYesterday" | "today" | "yesterday" | "7d" | "custom"
 
 function toLocalPickerValue(date: Date) {
   const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
@@ -54,6 +54,9 @@ function statusClass(status: string) {
 
 function applyPreset(preset: Preset) {
   const now = new Date()
+  if (preset === "24h") {
+    return { start: new Date(now.getTime() - 24 * 60 * 60 * 1000), end: now }
+  }
   if (preset === "sinceYesterday") {
     const start = new Date(now)
     start.setDate(start.getDate() - 1)
@@ -202,8 +205,8 @@ function TaskMovementTable({ changes }: { changes: QaTaskStatusChange[] }) {
 }
 
 export function QaTesting() {
-  const initialRange = useMemo(() => applyPreset("sinceYesterday"), [])
-  const [preset, setPreset] = useState<Preset>("sinceYesterday")
+  const initialRange = useMemo(() => applyPreset("24h"), [])
+  const [preset, setPreset] = useState<Preset>("24h")
   const [start, setStart] = useState(toLocalPickerValue(initialRange.start))
   const [end, setEnd] = useState(toLocalPickerValue(initialRange.end))
   const [report, setReport] = useState<QaTestingReport | null>(null)
@@ -214,7 +217,12 @@ export function QaTesting() {
     setLoading(true)
     setError(null)
     try {
-      setReport(await api.getQaTestingReport(fromLocalPickerValue(start), fromLocalPickerValue(end), forceRefresh))
+      setReport(await api.getQaTestingReport(
+        fromLocalPickerValue(start),
+        fromLocalPickerValue(end),
+        forceRefresh,
+        "sinceYesterday",
+      ))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load QA testing report")
     } finally {
@@ -257,16 +265,18 @@ export function QaTesting() {
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
+          <span className="pb-2 text-sm font-medium text-foreground">Range:</span>
           <div className="flex rounded-md border border-border p-1">
-            {(["sinceYesterday", "today", "yesterday", "7d"] as Preset[]).map((option) => (
+            {(["24h", "sinceYesterday", "today", "yesterday", "7d"] as Preset[]).map((option) => (
               <Button
                 key={option}
                 type="button"
                 variant={preset === option ? "default" : "ghost"}
                 size="sm"
+                className={preset === option ? "text-black hover:text-black" : undefined}
                 onClick={() => handlePreset(option)}
               >
-                {option === "sinceYesterday" ? "Since yesterday" : option === "7d" ? "7d" : option}
+                {option === "24h" ? "Last 24h" : option === "sinceYesterday" ? "Since yesterday" : option === "7d" ? "7d" : option}
               </Button>
             ))}
           </div>
@@ -338,7 +348,9 @@ export function QaTesting() {
           <Card>
             <CardHeader>
               <CardTitle>Jira Task Movement</CardTitle>
-              <CardDescription>Tasks in the configured ACE2E epics whose status changed during the selected range.</CardDescription>
+              <CardDescription>
+                Tasks in the configured ACE2E epics whose status changed since Jira startOfDay(-1).
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <TaskMovementTable changes={report.taskMovement.changes} />

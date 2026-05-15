@@ -3,6 +3,7 @@ import unittest
 
 from services.qa_testing_service import (
     QaTestingReportService,
+    TaskWindow,
     build_status_change_jql,
     build_cycle_report,
     build_daily_burndown,
@@ -114,8 +115,21 @@ class QaTestingServiceTest(unittest.TestCase):
 
         jql = build_status_change_jql(start, end)
 
-        self.assertIn('status changed AFTER "2026/05/14 00:00"', jql)
-        self.assertIn('status changed BEFORE "2026/05/15 12:30"', jql)
+        self.assertIn('status changed AFTER "2026/05/13 17:00"', jql)
+        self.assertIn('status changed BEFORE "2026/05/15 05:30"', jql)
+
+    def test_status_change_jql_can_use_jira_since_yesterday_window(self):
+        now = datetime(2026, 5, 15, 22, 30, tzinfo=timezone.utc)
+
+        jql = build_status_change_jql(
+            datetime(2026, 5, 14, 22, 30, tzinfo=timezone.utc),
+            now,
+            task_window=TaskWindow.SINCE_YESTERDAY,
+            now=now,
+        )
+
+        self.assertIn("status changed AFTER startOfDay(-1)", jql)
+        self.assertNotIn("status changed BEFORE", jql)
 
     def test_collapse_latest_status_changes_returns_one_row_per_task(self):
         changes = [
@@ -140,7 +154,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 self.cycle_calls += 1
                 return []
 
-            def _fetch_task_status_changes(self, start, end):
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
                 self.task_calls += 1
                 return []
 
@@ -166,7 +180,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 self.calls += 1
                 return []
 
-            def _fetch_task_status_changes(self, start, end):
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
                 return []
 
         service = FakeService()
@@ -178,7 +192,7 @@ class QaTestingServiceTest(unittest.TestCase):
         second = service.build_report(start, second_end)
 
         self.assertEqual(service.calls, 1)
-        self.assertEqual(first["cache"]["key"], "2026-05-14T00:00Z|2026-05-15T12:00Z")
+        self.assertEqual(first["cache"]["key"], "2026-05-14T00:00Z|2026-05-15T12:00Z|tasks:sinceYesterday")
         self.assertTrue(second["cache"]["hit"])
 
 

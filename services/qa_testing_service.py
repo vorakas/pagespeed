@@ -6,8 +6,10 @@ from copy import deepcopy
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 import re
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -24,6 +26,12 @@ EPIC_LINK_JQL = (
     ") AND issuetype != Epic"
 )
 CACHE_TTL_SECONDS = 15 * 60
+JIRA_TIMEZONE = ZoneInfo("America/Los_Angeles")
+
+
+class TaskWindow(str, Enum):
+    RANGE = "range"
+    SINCE_YESTERDAY = "sinceYesterday"
 
 
 def parse_jira_datetime(value: str | None) -> datetime | None:
@@ -223,14 +231,34 @@ def collapse_latest_status_changes(changes: list[dict[str, Any]]) -> list[dict[s
     return sorted(latest_by_key.values(), key=lambda change: change.get("changedAt") or "", reverse=True)
 
 
-def build_status_change_jql(start: datetime, end: datetime) -> str:
+def build_status_change_jql(
+    start: datetime,
+    end: datetime,
+    task_window: TaskWindow = TaskWindow.RANGE,
+    now: datetime | None = None,
+) -> str:
     date_format = "%Y/%m/%d %H:%M"
+    if task_window == TaskWindow.SINCE_YESTERDAY:
+        return f"{EPIC_LINK_JQL} AND status changed AFTER startOfDay(-1) ORDER BY updated DESC"
     return (
         f"{EPIC_LINK_JQL} AND status changed AFTER "
-        f'"{start.astimezone(timezone.utc).strftime(date_format)}" '
-        f'AND status changed BEFORE "{end.astimezone(timezone.utc).strftime(date_format)}" '
+        f'"{start.astimezone(JIRA_TIMEZONE).strftime(date_format)}" '
+        f'AND status changed BEFORE "{end.astimezone(JIRA_TIMEZONE).strftime(date_format)}" '
         "ORDER BY updated DESC"
     )
+
+
+def task_window_bounds(
+    start: datetime,
+    end: datetime,
+    task_window: TaskWindow,
+    now: datetime | None = None,
+) -> tuple[datetime, datetime]:
+    if task_window != TaskWindow.SINCE_YESTERDAY:
+        return start, end
+    local_now = (now or datetime.now(timezone.utc)).astimezone(JIRA_TIMEZONE)
+    local_start = (local_now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return local_start.astimezone(timezone.utc), end
 
 
 class QaTestingReportService:
@@ -246,13 +274,19 @@ class QaTestingReportService:
         self.cache_ttl_seconds = CACHE_TTL_SECONDS
         self._report_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
 
-    def build_report(self, start: datetime, end: datetime, force_refresh: bool = False) -> dict[str, Any]:
+    def build_report(
+        self,
+        start: datetime,
+        end: datetime,
+        force_refresh: bool = False,
+        task_window: TaskWindow = TaskWindow.SINCE_YESTERDAY,
+    ) -> dict[str, Any]:
         if not self.jira_pat:
             raise ValueError("JIRA_PAT is not configured")
         if end < start:
             raise ValueError("end must be after start")
 
-        cache_key = self._cache_key(start, end)
+        cache_key = self._cache_key(start, end, task_window)
         cached = self._report_cache.get(cache_key)
         now = datetime.now(timezone.utc)
         if not force_refresh and cached is not None:
@@ -269,7 +303,7 @@ class QaTestingReportService:
                 return report
 
         cycles = self._fetch_round_cycle_reports(start, end)
-        task_changes = self._fetch_task_status_changes(start, end)
+        task_changes = self._fetch_task_status_changes(start, end, task_window)
         summary = self._summarize(cycles, task_changes)
         report = {
             "range": {"start": to_iso(start), "end": to_iso(end)},
@@ -277,7 +311,7 @@ class QaTestingReportService:
             "cycles": cycles,
             "burndown": build_daily_burndown(cycles, start, end),
             "taskMovement": {
-                "jql": build_status_change_jql(start, end),
+                "jql": build_status_change_jql(start, end, task_window=task_window),
                 "totalChanges": len(task_changes),
                 "changes": task_changes,
             },
@@ -291,10 +325,10 @@ class QaTestingReportService:
         }
         return report
 
-    def _cache_key(self, start: datetime, end: datetime) -> str:
+    def _cache_key(self, start: datetime, end: datetime, task_window: TaskWindow) -> str:
         start_key = self._cache_bucket(start).strftime("%Y-%m-%dT%H:%MZ")
         end_key = self._cache_bucket(end).strftime("%Y-%m-%dT%H:%MZ")
-        return f"{start_key}|{end_key}"
+        return f"{start_key}|{end_key}|tasks:{task_window.value}"
 
     def _cache_bucket(self, value: datetime) -> datetime:
         utc_value = value.astimezone(timezone.utc)
@@ -349,11 +383,17 @@ class QaTestingReportService:
                 continue
             names[key] = str(test_case.get("name") or test_case.get("title") or "")
 
-    def _fetch_task_status_changes(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
+    def _fetch_task_status_changes(
+        self,
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow = TaskWindow.SINCE_YESTERDAY,
+    ) -> list[dict[str, Any]]:
+        task_start, task_end = task_window_bounds(start, end, task_window)
         data = self._get_json(
             "/rest/api/2/search",
             {
-                "jql": build_status_change_jql(start, end),
+                "jql": build_status_change_jql(start, end, task_window=task_window),
                 "fields": "summary,issuetype,status,assignee,updated",
                 "expand": "changelog",
                 "maxResults": 100,
@@ -362,7 +402,7 @@ class QaTestingReportService:
         issues = data.get("issues") or []
         changes: list[dict[str, Any]] = []
         for issue in issues:
-            changes.extend(extract_status_changes(issue, start, end))
+            changes.extend(extract_status_changes(issue, task_start, task_end))
         return collapse_latest_status_changes(changes)
 
     def _summarize(self, cycles: list[dict[str, Any]], task_changes: list[dict[str, Any]]) -> dict[str, Any]:

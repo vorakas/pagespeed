@@ -10,7 +10,7 @@ import requests
 from flask import Blueprint, jsonify, request, send_file
 
 from services.ai_config_service import AiConfigService
-from services.qa_testing_service import QaTestingReportService, parse_jira_datetime
+from services.qa_testing_service import QaTestingReportService, TaskWindow, parse_jira_datetime
 from services.requirement_kb_service import RequirementKbService
 
 
@@ -55,8 +55,18 @@ def create_requirements_blueprint(
         if end < start:
             return jsonify({"error": "end must be after start"}), 400
         force_refresh = request.args.get("forceRefresh", "").lower() in {"1", "true", "yes"}
+        raw_task_window = request.args.get("taskWindow") or TaskWindow.SINCE_YESTERDAY.value
         try:
-            return jsonify(qa_testing_service.build_report(start, end, force_refresh=force_refresh))
+            task_window = TaskWindow(raw_task_window)
+        except ValueError:
+            return jsonify({"error": "taskWindow must be 'range' or 'sinceYesterday'"}), 400
+        try:
+            return jsonify(qa_testing_service.build_report(
+                start,
+                end,
+                force_refresh=force_refresh,
+                task_window=task_window,
+            ))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except requests.HTTPError as exc:
