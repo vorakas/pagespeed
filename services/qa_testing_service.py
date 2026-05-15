@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from data_access.jira_user_cache_repository import JiraUserCacheRepository
+from data_access.qa_cycle_repository import QaCycleRepository
 from data_access.qa_report_cache_repository import QaReportCacheRepository
 from data_access.qa_test_case_cache_repository import QaTestCaseCacheRepository
 
@@ -275,6 +276,7 @@ class QaTestingReportService:
         test_case_cache_repo: QaTestCaseCacheRepository | None = None,
         user_cache_repo: JiraUserCacheRepository | None = None,
         report_cache_repo: QaReportCacheRepository | None = None,
+        cycle_repo: QaCycleRepository | None = None,
     ) -> None:
         self.jira_pat = jira_pat
         self.jira_base_url = jira_base_url.rstrip("/")
@@ -282,6 +284,7 @@ class QaTestingReportService:
         self.test_case_cache_repo = test_case_cache_repo
         self.user_cache_repo = user_cache_repo
         self.report_cache_repo = report_cache_repo
+        self.cycle_repo = cycle_repo
         self.cache_ttl_seconds = CACHE_TTL_SECONDS
         self._report_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
         self._refresh_lock = threading.Lock()
@@ -577,16 +580,62 @@ class QaTestingReportService:
             for cycle in cycles
             if is_adobe_master_cycle(cycle) and is_round_cycle(str(cycle.get("name") or ""))
         ]
-        reports: list[dict[str, Any]] = []
-        details: list[dict[str, Any]] = []
-        with ThreadPoolExecutor(max_workers=6) as executor:
-            futures = [
-                executor.submit(self._get_json, f"/rest/atm/1.0/testrun/{cycle.get('key')}")
-                for cycle in matching
-            ]
-            for future in as_completed(futures):
-                details.append(future.result())
+        if self.cycle_repo is not None:
+            return self._fetch_round_cycle_reports_from_cycle_cache(matching, start, end)
 
+        return self._build_reports_from_cycle_details(
+            self._fetch_cycle_details(matching),
+            start,
+            end,
+        )
+
+    def _fetch_round_cycle_reports_from_cycle_cache(
+        self,
+        matching: list[dict[str, Any]],
+        start: datetime,
+        end: datetime,
+    ) -> list[dict[str, Any]]:
+        cycle_keys = [str(cycle.get("key") or "") for cycle in matching if cycle.get("key")]
+        stored = self.cycle_repo.get_summaries(cycle_keys)
+        changed = []
+        for cycle in matching:
+            key = str(cycle.get("key") or "")
+            if not key:
+                continue
+            stored_cycle = stored.get(key)
+            if not stored_cycle or str(stored_cycle.get("updated_on") or "") != str(cycle.get("updatedOn") or ""):
+                changed.append(cycle)
+        changed_details = self._fetch_cycle_details(changed)
+        for detail in changed_details:
+            self.cycle_repo.upsert_cycle_detail(detail)
+        details = self.cycle_repo.get_cycle_details(cycle_keys)
+        return self._build_reports_from_cycle_details(details, start, end)
+
+    def _fetch_cycle_details(self, cycles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        details: list[dict[str, Any]] = []
+        if not cycles:
+            return details
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {
+                executor.submit(self._get_json, f"/rest/atm/1.0/testrun/{cycle.get('key')}"): cycle
+                for cycle in cycles
+            }
+            for future in as_completed(futures):
+                detail = future.result()
+                cycle = futures[future]
+                for field in ("key", "name", "folder", "status", "projectKey", "createdOn", "updatedOn", "testCaseCount"):
+                    if not detail.get(field) and cycle.get(field):
+                        detail[field] = cycle.get(field)
+                details.append(detail)
+        return details
+
+    def _build_reports_from_cycle_details(
+        self,
+        details: list[dict[str, Any]],
+        start: datetime,
+        end: datetime,
+    ) -> list[dict[str, Any]]:
+        reports: list[dict[str, Any]] = []
         test_case_keys = sorted({
             str(item.get("testCaseKey") or "")
             for detail in details

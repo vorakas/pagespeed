@@ -412,6 +412,42 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS qa_test_cycles (
+                cycle_key TEXT PRIMARY KEY,
+                name TEXT NOT NULL DEFAULT '',
+                folder TEXT NOT NULL DEFAULT '',
+                section TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT '',
+                project_key TEXT NOT NULL DEFAULT '',
+                created_on TEXT,
+                updated_on TEXT,
+                test_case_count INTEGER DEFAULT 0,
+                raw_json TEXT,
+                synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS qa_test_cycle_items (
+                cycle_key TEXT NOT NULL,
+                test_case_key TEXT NOT NULL,
+                item_id TEXT,
+                status TEXT NOT NULL DEFAULT '',
+                assigned_to TEXT NOT NULL DEFAULT '',
+                executed_by TEXT NOT NULL DEFAULT '',
+                user_key TEXT NOT NULL DEFAULT '',
+                execution_date TEXT,
+                actual_start_date TEXT,
+                actual_end_date TEXT,
+                planned_start_date TEXT,
+                planned_end_date TEXT,
+                raw_json TEXT,
+                synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (cycle_key, test_case_key)
+            )
+        """)
+
         self._create_postgres_requirement_tables(cursor)
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS mime_type TEXT")
@@ -593,6 +629,42 @@ class ConnectionManager:
                 refresh_error TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS qa_test_cycles (
+                cycle_key TEXT PRIMARY KEY,
+                name TEXT NOT NULL DEFAULT '',
+                folder TEXT NOT NULL DEFAULT '',
+                section TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT '',
+                project_key TEXT NOT NULL DEFAULT '',
+                created_on TEXT,
+                updated_on TEXT,
+                test_case_count INTEGER DEFAULT 0,
+                raw_json TEXT,
+                synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS qa_test_cycle_items (
+                cycle_key TEXT NOT NULL,
+                test_case_key TEXT NOT NULL,
+                item_id TEXT,
+                status TEXT NOT NULL DEFAULT '',
+                assigned_to TEXT NOT NULL DEFAULT '',
+                executed_by TEXT NOT NULL DEFAULT '',
+                user_key TEXT NOT NULL DEFAULT '',
+                execution_date TEXT,
+                actual_start_date TEXT,
+                actual_end_date TEXT,
+                planned_start_date TEXT,
+                planned_end_date TEXT,
+                raw_json TEXT,
+                synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (cycle_key, test_case_key)
             )
         """)
 
@@ -889,6 +961,14 @@ class ConnectionManager:
             ON qa_report_cache (updated_at DESC)
             """,
             """
+            CREATE INDEX IF NOT EXISTS idx_qa_test_cycles_updated_on
+            ON qa_test_cycles (updated_on)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_qa_test_cycle_items_cycle_key
+            ON qa_test_cycle_items (cycle_key)
+            """,
+            """
             CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb
             ON requirement_sources (kb_id)
             """,
@@ -954,6 +1034,14 @@ class ConnectionManager:
             """
             CREATE INDEX IF NOT EXISTS idx_qa_report_cache_updated_at
             ON qa_report_cache (updated_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_qa_test_cycles_updated_on
+            ON qa_test_cycles (updated_on)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_qa_test_cycle_items_cycle_key
+            ON qa_test_cycle_items (cycle_key)
             """,
             """
             CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb

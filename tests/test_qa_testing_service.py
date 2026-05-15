@@ -365,6 +365,112 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertTrue(report["cache"]["stale"])
         self.assertTrue(report["cache"]["refreshInProgress"])
 
+    def test_unchanged_cycle_uses_cached_detail_without_detail_fetch(self):
+        class FakeCycleRepo:
+            def __init__(self):
+                self.upserts = []
+
+            def get_summaries(self, cycle_keys):
+                return {"TC-C1": {"updated_on": "2026-05-15T12:00:00.000Z"}}
+
+            def upsert_cycle_detail(self, detail):
+                self.upserts.append(detail)
+
+            def get_cycle_details(self, cycle_keys):
+                return [
+                    {
+                        "key": "TC-C1",
+                        "name": "Checkout Round 1",
+                        "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                        "status": "In Progress",
+                        "items": [{"testCaseKey": "TC-T1", "status": "Pass"}],
+                    }
+                ]
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cycle_repo):
+                super().__init__("token", cycle_repo=cycle_repo)
+
+            def _get_json(self, path, params=None):
+                if path.endswith("/testrun/search"):
+                    return [
+                        {
+                            "key": "TC-C1",
+                            "name": "Checkout Round 1",
+                            "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                            "updatedOn": "2026-05-15T12:00:00.000Z",
+                        }
+                    ]
+                raise AssertionError(f"Detail fetch should not run for unchanged cycle: {path}")
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return []
+
+        cycle_repo = FakeCycleRepo()
+        service = FakeService(cycle_repo)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, force_refresh=True)
+
+        self.assertEqual(report["summary"]["cycleCount"], 1)
+        self.assertEqual(report["summary"]["totalCases"], 1)
+        self.assertEqual(cycle_repo.upserts, [])
+
+    def test_changed_cycle_fetches_detail_and_updates_cycle_cache(self):
+        class FakeCycleRepo:
+            def __init__(self):
+                self.upserts = []
+
+            def get_summaries(self, cycle_keys):
+                return {"TC-C1": {"updated_on": "2026-05-14T12:00:00.000Z"}}
+
+            def upsert_cycle_detail(self, detail):
+                self.upserts.append(detail)
+
+            def get_cycle_details(self, cycle_keys):
+                return self.upserts
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cycle_repo):
+                super().__init__("token", cycle_repo=cycle_repo)
+                self.detail_fetches = 0
+
+            def _get_json(self, path, params=None):
+                if path.endswith("/testrun/search"):
+                    return [
+                        {
+                            "key": "TC-C1",
+                            "name": "Checkout Round 1",
+                            "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                            "updatedOn": "2026-05-15T12:00:00.000Z",
+                        }
+                    ]
+                if path.endswith("/testrun/TC-C1"):
+                    self.detail_fetches += 1
+                    return {
+                        "key": "TC-C1",
+                        "name": "Checkout Round 1",
+                        "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                        "items": [{"testCaseKey": "TC-T1", "status": "Pass"}],
+                    }
+                raise AssertionError(path)
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return []
+
+        cycle_repo = FakeCycleRepo()
+        service = FakeService(cycle_repo)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, force_refresh=True)
+
+        self.assertEqual(service.detail_fetches, 1)
+        self.assertEqual(cycle_repo.upserts[0]["key"], "TC-C1")
+        self.assertEqual(cycle_repo.upserts[0]["updatedOn"], "2026-05-15T12:00:00.000Z")
+        self.assertEqual(report["summary"]["totalCases"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
