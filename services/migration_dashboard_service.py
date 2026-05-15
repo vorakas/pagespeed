@@ -47,6 +47,7 @@ from services.obsidian_sync.vault_parser import (
 )
 from services.obsidian_sync.vault_reader import VaultReader
 from services.obsidian_sync.workstream_md_parser import parse_workstream_markdown
+from services.launch_report import build_launch_report
 
 
 logger = logging.getLogger(__name__)
@@ -239,6 +240,9 @@ class MigrationDashboardService:
 
     def get_epic_progress(self) -> dict:
         return self._cached("epicProgress", self._compute_epic_progress)
+
+    def get_launch_report(self) -> dict:
+        return self._cached("launch_report", lambda: build_launch_report(self._raw_tasks()))
 
     def get_teams(self) -> List[dict]:
         return self._cached("teams", self._compute_teams)

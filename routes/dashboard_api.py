@@ -99,6 +99,12 @@ def create_dashboard_blueprint(
             return jsonify({"error": "vault not found"}), 404
         return jsonify(service.get_epic_progress())
 
+    @bp.route("/api/dashboard/launch-report", methods=["GET"])
+    def launch_report():
+        if not service.is_available():
+            return jsonify({"error": "vault not found"}), 404
+        return jsonify(service.get_launch_report())
+
     @bp.route("/api/dashboard/new-bugs", methods=["GET"])
     def new_bugs():
         if not service.is_available():
