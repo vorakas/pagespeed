@@ -238,6 +238,7 @@ def _section_diagnostics(rows: list[dict], unassigned: dict) -> dict:
 
 def _totals(rows: list[dict]) -> dict:
     return {
+        "rowCount": len(rows),
         "completedHours": sum(row["completedHours"] for row in rows),
         "remainingHours": sum(row["remainingHours"] for row in rows),
         "passedTc": sum(row.get("passedTc") or 0 for row in rows),

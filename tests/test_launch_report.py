@@ -40,6 +40,8 @@ class LaunchReportTest(unittest.TestCase):
 
         self.assertEqual(len(report["lampsPlusDevelopment"]["rows"]), 25)
         self.assertEqual(len(report["e2eTesting"]["rows"]), 32)
+        self.assertEqual(report["lampsPlusDevelopment"]["totals"]["rowCount"], 25)
+        self.assertEqual(report["e2eTesting"]["totals"]["rowCount"], 32)
 
     def test_development_rollup_resolves_epic_link_key_to_spreadsheet_grouping(self):
         report = build_launch_report([
