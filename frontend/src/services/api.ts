@@ -53,6 +53,7 @@ import type {
   MigrationTeam,
   MigrationWorkstreamDetail,
   MigrationDashboardOverview,
+  LaunchReportResponse,
   EpicProgressResponse,
   MigrationSnapshot,
   MigrationSnapshotDiff,
@@ -843,6 +844,10 @@ class ApiClient {
 
   async getEpicProgress(): Promise<EpicProgressResponse> {
     return this.request("/api/dashboard/epic-progress")
+  }
+
+  async getLaunchReport(): Promise<LaunchReportResponse> {
+    return this.request("/api/dashboard/launch-report")
   }
 
   async getMigrationSources(): Promise<MigrationSource[]> {

@@ -661,6 +661,61 @@ export interface MigrationKpis {
   failedQa: number
 }
 
+export interface LaunchReportDiagnostics {
+  countedIssueCount: number
+  excludedIssueCount: number
+  missingEpicLinkCount: number
+  unresolvedEpicNameCount: number
+  missingPhaseLabelCount: number
+  missingEstimateCount: number
+}
+
+export interface LaunchReportDevelopmentRow {
+  reportGrouping: string
+  epicKey: string | null
+  phaseLabel: string
+  status: "Complete" | "Pending"
+  completedHours: number
+  remainingHours: number
+  progressPercent: number
+  issueKeys: string[]
+  diagnostics: LaunchReportDiagnostics
+}
+
+export interface LaunchReportE2eRow {
+  reportGrouping: string
+  epicKey: string | null
+  phaseLabel: string
+  cnxOk: number | null
+  passedTc: number
+  failedTc: number
+  completedHours: number
+  remainingHours: number
+  progressPercent: number
+  doneCount: number | null
+  issueKeys: string[]
+  diagnostics: LaunchReportDiagnostics
+}
+
+export interface LaunchReportSection<T> {
+  rows: T[]
+  totals: {
+    completedHours: number
+    remainingHours: number
+    passedTc: number
+    failedTc: number
+    rowCount: number
+  }
+  diagnostics: LaunchReportDiagnostics
+}
+
+export interface LaunchReportResponse {
+  phase: string
+  generatedAt: string
+  lampsPlusDevelopment: LaunchReportSection<LaunchReportDevelopmentRow>
+  e2eTesting: LaunchReportSection<LaunchReportE2eRow>
+}
+
 export interface MigrationSource {
   key: string
   kind: "jira" | "asana" | string
