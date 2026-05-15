@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -15,6 +16,13 @@ NS = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 
 SECTION_DEVELOPMENT = "lampsPlusDevelopment"
 SECTION_E2E = "e2eTesting"
+ACTIONABLE_DIAGNOSTICS = (
+    "excludedIssueCount",
+    "missingEpicLinkCount",
+    "unresolvedEpicNameCount",
+    "missingPhaseLabelCount",
+    "missingEstimateCount",
+)
 
 
 def fetch_launch_report(base_url: str) -> dict:
@@ -54,8 +62,8 @@ def read_development_rows(rows_by_number: dict[int, dict[str, str]]) -> list[dic
             rows.append(
                 {
                     "reportGrouping": row["B"],
-                    "completedHours": number(row.get("E")),
-                    "remainingHours": number(row.get("F")),
+                    "completedHours": required_number(row.get("E"), row_num, "E"),
+                    "remainingHours": required_number(row.get("F"), row_num, "F"),
                 }
             )
     return rows
@@ -69,10 +77,10 @@ def read_e2e_rows(rows_by_number: dict[int, dict[str, str]]) -> list[dict]:
             rows.append(
                 {
                     "reportGrouping": row["J"],
-                    "passedTc": number(row.get("M")),
-                    "failedTc": number(row.get("N")),
-                    "completedHours": number(row.get("O")),
-                    "remainingHours": number(row.get("P")),
+                    "passedTc": required_number(row.get("M"), row_num, "M"),
+                    "failedTc": required_number(row.get("N"), row_num, "N"),
+                    "completedHours": required_number(row.get("O"), row_num, "O"),
+                    "remainingHours": required_number(row.get("P"), row_num, "P"),
                 }
             )
     return rows
@@ -109,13 +117,40 @@ def cell_value(cell: ET.Element, shared: list[str]) -> str:
     return raw
 
 
-def number(value: str | None) -> int:
+def required_number(value: str | None, row_num: int, column: str) -> int:
     if value is None or value == "":
         return 0
+    normalized = normalize_number_text(value)
+    try:
+        return int(float(normalized))
+    except (TypeError, ValueError):
+        raise ValueError(f"invalid numeric value at row {row_num}, column {column}: {value!r}")
+
+
+def response_number(value: object) -> int:
+    if value is None or value == "":
+        return 0
+    if isinstance(value, str):
+        value = normalize_number_text(value)
     try:
         return int(float(value))
     except (TypeError, ValueError):
-        return 0
+        raise ValueError(f"invalid numeric value in launch-report response: {value!r}")
+
+
+def normalize_number_text(value: str) -> str:
+    normalized = value.strip()
+    if "," not in normalized:
+        return normalized
+
+    integer_part = normalized.split(".", 1)[0]
+    signless = integer_part[1:] if integer_part.startswith(("-", "+")) else integer_part
+    groups = signless.split(",")
+    if not groups or not (1 <= len(groups[0]) <= 3) or not groups[0].isdigit():
+        return normalized
+    if not all(len(group) == 3 and group.isdigit() for group in groups[1:]):
+        return normalized
+    return normalized.replace(",", "")
 
 
 def compare(workbook: dict, launch_report: dict) -> dict:
@@ -173,9 +208,9 @@ def compare_section(
 
         diagnostics = actual.get("diagnostics") or {}
         deltas = {
-            field: {"pharos": number(actual.get(field)), "workbook": expected.get(field, 0)}
+            field: {"pharos": response_number(actual.get(field)), "workbook": expected.get(field, 0)}
             for field in fields
-            if expected.get(field, 0) != number(actual.get(field))
+            if expected.get(field, 0) != response_number(actual.get(field))
         }
         if not deltas:
             classification = "matched"
@@ -202,7 +237,7 @@ def compare_section(
         report_grouping = actual.get("reportGrouping")
         if not report_grouping or report_grouping in workbook_by_name:
             continue
-        values = {field: number(actual.get(field)) for field in fields}
+        values = {field: response_number(actual.get(field)) for field in fields}
         diagnostics = actual.get("diagnostics") or {}
         if any(values.values()) or diagnostic_total(diagnostics):
             rows.append(
@@ -220,7 +255,7 @@ def compare_section(
 
 
 def diagnostic_total(diagnostics: dict) -> int:
-    return sum(number(value) for value in diagnostics.values())
+    return sum(response_number(diagnostics.get(key)) for key in ACTIONABLE_DIAGNOSTICS)
 
 
 def count_classification(rows: list[dict], classification: str) -> int:
@@ -235,9 +270,26 @@ def main() -> int:
     parser.add_argument("--base-url", default="http://127.0.0.1:5000", help="Pharos base URL.")
     args = parser.parse_args()
 
-    workbook = read_report_rows(Path(args.workbook))
-    launch_report = fetch_launch_report(args.base_url)
-    result = compare(workbook, launch_report)
+    try:
+        workbook = read_report_rows(Path(args.workbook))
+        launch_report = fetch_launch_report(args.base_url)
+        result = compare(workbook, launch_report)
+    except urllib.error.HTTPError as exc:
+        print(f"error: launch-report fetch failed: HTTP {exc.code}", file=sys.stderr)
+        return 2
+    except urllib.error.URLError as exc:
+        print(f"error: launch-report fetch failed: {exc.reason}", file=sys.stderr)
+        return 2
+    except TimeoutError as exc:
+        print(f"error: launch-report fetch timed out: {exc}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print(f"error: launch-report response was not valid JSON: {exc}", file=sys.stderr)
+        return 2
+    except (KeyError, ValueError, ET.ParseError, OSError, zipfile.BadZipFile) as exc:
+        print(f"error: validation input parse failed: {exc}", file=sys.stderr)
+        return 2
+
     print(json.dumps(result, indent=2, sort_keys=True))
     summary = result["summary"]
     return 1 if summary["mappingGapRows"] or summary["dataGapRows"] else 0
