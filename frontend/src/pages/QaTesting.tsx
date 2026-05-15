@@ -500,10 +500,14 @@ export function QaTesting() {
         </div>
       </div>
 
-      {report?.cache?.lastRefreshedAt ? (
+      {report?.cache ? (
         <div className="text-sm text-muted-foreground">
-          Jira data refreshed {formatDateTime(report.cache.lastRefreshedAt)}
+          {report.cache.lastRefreshedAt
+            ? `Jira data refreshed ${formatDateTime(report.cache.lastRefreshedAt)}`
+            : "Jira data refresh has started"}
           {report.cache.hit ? " from cache" : ""}. Cached for {Math.round(report.cache.ttlSeconds / 60)} minutes.
+          {report.cache.refreshInProgress ? " Refreshing Jira data in the background." : ""}
+          {report.cache.stale ? " Showing last available snapshot until refresh finishes." : ""}
           {report.nameCache ? (
             <>
               {" "}Test case names: {report.nameCache.hitCount} cached

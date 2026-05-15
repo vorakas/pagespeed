@@ -65,6 +65,7 @@ from data_access import (
     BlazemeterRunRepository,
     ConnectionManager,
     JiraUserCacheRepository,
+    QaReportCacheRepository,
     QaTestCaseCacheRepository,
     SiteRepository,
     SnapshotRepository,
@@ -317,6 +318,7 @@ def create_app() -> Flask:
         jira_base_url=JIRA_BASE_URL,
         test_case_cache_repo=QaTestCaseCacheRepository(conn_mgr),
         user_cache_repo=JiraUserCacheRepository(conn_mgr),
+        report_cache_repo=QaReportCacheRepository(conn_mgr),
     )
 
     # ---- Migration status snapshots (history + what-changed-today) ----

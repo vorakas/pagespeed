@@ -395,6 +395,23 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS qa_report_cache (
+                cache_key TEXT PRIMARY KEY,
+                range_start TEXT NOT NULL,
+                range_end TEXT NOT NULL,
+                task_window TEXT NOT NULL,
+                report_json TEXT,
+                last_refreshed_at TIMESTAMP,
+                refresh_started_at TIMESTAMP,
+                refresh_finished_at TIMESTAMP,
+                refresh_status TEXT NOT NULL DEFAULT 'idle',
+                refresh_error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         self._create_postgres_requirement_tables(cursor)
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS mime_type TEXT")
@@ -559,6 +576,23 @@ class ConnectionManager:
                 user_key TEXT PRIMARY KEY,
                 display_name TEXT NOT NULL DEFAULT '',
                 fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS qa_report_cache (
+                cache_key TEXT PRIMARY KEY,
+                range_start TEXT NOT NULL,
+                range_end TEXT NOT NULL,
+                task_window TEXT NOT NULL,
+                report_json TEXT,
+                last_refreshed_at TIMESTAMP,
+                refresh_started_at TIMESTAMP,
+                refresh_finished_at TIMESTAMP,
+                refresh_status TEXT NOT NULL DEFAULT 'idle',
+                refresh_error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -851,6 +885,10 @@ class ConnectionManager:
             ON jira_user_cache (fetched_at)
             """,
             """
+            CREATE INDEX IF NOT EXISTS idx_qa_report_cache_updated_at
+            ON qa_report_cache (updated_at DESC)
+            """,
+            """
             CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb
             ON requirement_sources (kb_id)
             """,
@@ -912,6 +950,10 @@ class ConnectionManager:
             """
             CREATE INDEX IF NOT EXISTS idx_jira_user_cache_fetched_at
             ON jira_user_cache (fetched_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_qa_report_cache_updated_at
+            ON qa_report_cache (updated_at DESC)
             """,
             """
             CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb

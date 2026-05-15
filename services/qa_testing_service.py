@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from data_access.jira_user_cache_repository import JiraUserCacheRepository
+from data_access.qa_report_cache_repository import QaReportCacheRepository
 from data_access.qa_test_case_cache_repository import QaTestCaseCacheRepository
 
 
@@ -273,12 +274,14 @@ class QaTestingReportService:
         project_key: str = "TC",
         test_case_cache_repo: QaTestCaseCacheRepository | None = None,
         user_cache_repo: JiraUserCacheRepository | None = None,
+        report_cache_repo: QaReportCacheRepository | None = None,
     ) -> None:
         self.jira_pat = jira_pat
         self.jira_base_url = jira_base_url.rstrip("/")
         self.project_key = project_key
         self.test_case_cache_repo = test_case_cache_repo
         self.user_cache_repo = user_cache_repo
+        self.report_cache_repo = report_cache_repo
         self.cache_ttl_seconds = CACHE_TTL_SECONDS
         self._report_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
         self._refresh_lock = threading.Lock()
@@ -300,6 +303,15 @@ class QaTestingReportService:
             raise ValueError("end must be after start")
 
         cache_key = self._cache_key(start, end, task_window)
+        if self.report_cache_repo is not None:
+            return self._build_report_with_persistent_cache(
+                cache_key,
+                start,
+                end,
+                force_refresh,
+                task_window,
+            )
+
         cached = self._report_cache.get(cache_key)
         now = datetime.now(timezone.utc)
         if not force_refresh and cached is not None:
@@ -315,6 +327,25 @@ class QaTestingReportService:
                 }
                 return report
 
+        report = self._build_report_uncached(start, end, task_window)
+        self._report_cache[cache_key] = (now, deepcopy(report))
+        report["cache"] = {
+            "hit": False,
+            "key": cache_key,
+            "lastRefreshedAt": to_iso(now),
+            "ttlSeconds": self.cache_ttl_seconds,
+            "stale": False,
+            "refreshInProgress": False,
+            "shared": False,
+        }
+        return report
+
+    def _build_report_uncached(
+        self,
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow,
+    ) -> dict[str, Any]:
         self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
         self._last_user_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
         cycles = self._fetch_round_cycle_reports(start, end)
@@ -333,14 +364,181 @@ class QaTestingReportService:
             "nameCache": self._last_name_cache,
             "userCache": self._last_user_cache,
         }
-        self._report_cache[cache_key] = (now, deepcopy(report))
+        return report
+
+    def _build_report_with_persistent_cache(
+        self,
+        cache_key: str,
+        start: datetime,
+        end: datetime,
+        force_refresh: bool,
+        task_window: TaskWindow,
+    ) -> dict[str, Any]:
+        cached = self.report_cache_repo.get(cache_key)
+        now = datetime.now(timezone.utc)
+        cached_report = deepcopy(cached.get("report")) if cached and cached.get("report") else None
+        last_refreshed_at = parse_jira_datetime(cached.get("lastRefreshedAt")) if cached else None
+        is_fresh = (
+            cached_report is not None
+            and last_refreshed_at is not None
+            and (now - last_refreshed_at).total_seconds() <= self.cache_ttl_seconds
+        )
+
+        if cached_report is not None and is_fresh and not force_refresh:
+            return self._attach_cache_metadata(
+                cached_report,
+                cache_key,
+                cached,
+                hit=True,
+                stale=False,
+                refresh_in_progress=False,
+            )
+
+        if cached_report is not None:
+            started = self._try_start_persistent_refresh(cache_key, start, end, task_window)
+            if started:
+                self._start_report_refresh_thread(cache_key, start, end, task_window)
+            return self._attach_cache_metadata(
+                cached_report,
+                cache_key,
+                self.report_cache_repo.get(cache_key) or cached,
+                hit=True,
+                stale=True,
+                refresh_in_progress=started or (cached.get("refreshStatus") == "refreshing"),
+            )
+
+        started = self._try_start_persistent_refresh(cache_key, start, end, task_window)
+        if not started:
+            return self._attach_cache_metadata(
+                self._empty_report(start, end, task_window),
+                cache_key,
+                self.report_cache_repo.get(cache_key) or {},
+                hit=False,
+                stale=True,
+                refresh_in_progress=True,
+            )
+
+        try:
+            report = self._build_report_uncached(start, end, task_window)
+            self._save_persistent_report(cache_key, start, end, task_window, report)
+            return self._attach_cache_metadata(
+                report,
+                cache_key,
+                self.report_cache_repo.get(cache_key) or {},
+                hit=False,
+                stale=False,
+                refresh_in_progress=False,
+            )
+        except Exception as exc:
+            self.report_cache_repo.mark_refresh_failed(cache_key, str(exc))
+            raise
+
+    def _try_start_persistent_refresh(
+        self,
+        cache_key: str,
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow,
+    ) -> bool:
+        return self.report_cache_repo.try_start_refresh(
+            cache_key,
+            to_iso(start) or "",
+            to_iso(end) or "",
+            task_window.value,
+        )
+
+    def _save_persistent_report(
+        self,
+        cache_key: str,
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow,
+        report: dict[str, Any],
+    ) -> None:
+        self.report_cache_repo.save_report(
+            cache_key,
+            to_iso(start) or "",
+            to_iso(end) or "",
+            task_window.value,
+            report,
+        )
+
+    def _start_report_refresh_thread(
+        self,
+        cache_key: str,
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow,
+    ) -> None:
+        thread = threading.Thread(
+            target=self._refresh_report_cache,
+            args=(cache_key, start, end, task_window),
+            daemon=True,
+            name="qa-report-cache-refresh",
+        )
+        thread.start()
+
+    def _refresh_report_cache(
+        self,
+        cache_key: str,
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow,
+    ) -> None:
+        try:
+            report = self._build_report_uncached(start, end, task_window)
+            self._save_persistent_report(cache_key, start, end, task_window, report)
+        except Exception as exc:
+            self.report_cache_repo.mark_refresh_failed(cache_key, str(exc))
+
+    def _attach_cache_metadata(
+        self,
+        report: dict[str, Any],
+        cache_key: str,
+        cached: dict[str, Any],
+        hit: bool,
+        stale: bool,
+        refresh_in_progress: bool,
+    ) -> dict[str, Any]:
         report["cache"] = {
-            "hit": False,
+            "hit": hit,
             "key": cache_key,
-            "lastRefreshedAt": to_iso(now),
+            "lastRefreshedAt": cached.get("lastRefreshedAt"),
             "ttlSeconds": self.cache_ttl_seconds,
+            "stale": stale,
+            "refreshInProgress": refresh_in_progress,
+            "refreshStartedAt": cached.get("refreshStartedAt"),
+            "refreshStatus": cached.get("refreshStatus") or "idle",
+            "refreshError": cached.get("refreshError"),
+            "shared": True,
         }
         return report
+
+    def _empty_report(self, start: datetime, end: datetime, task_window: TaskWindow) -> dict[str, Any]:
+        return {
+            "range": {"start": to_iso(start), "end": to_iso(end)},
+            "summary": {
+                "cycleCount": 0,
+                "totalCases": 0,
+                "executedCases": 0,
+                "executedInRange": 0,
+                "remainingCases": 0,
+                "progressPercent": 0,
+                "rangeProgressPercent": 0,
+                "statusCounts": {},
+                "rangeStatusCounts": {},
+                "taskStatusChanges": 0,
+            },
+            "cycles": [],
+            "burndown": [],
+            "taskMovement": {
+                "jql": build_status_change_jql(start, end, task_window=task_window),
+                "totalChanges": 0,
+                "changes": [],
+            },
+            "nameCache": {"hitCount": 0, "missCount": 0, "refreshQueued": 0},
+            "userCache": {"hitCount": 0, "missCount": 0, "refreshQueued": 0},
+        }
 
     def _cache_key(self, start: datetime, end: datetime, task_window: TaskWindow) -> str:
         start_key = self._cache_bucket(start).strftime("%Y-%m-%dT%H:%MZ")

@@ -301,6 +301,70 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(service.queued_users, ["JIRAUSER2"])
         self.assertEqual(report["userCache"], {"hitCount": 1, "missCount": 1, "refreshQueued": 1})
 
+    def test_build_report_returns_fresh_persistent_cache_without_jira_fetch(self):
+        class FakeReportCache:
+            def get(self, cache_key):
+                return {
+                    "report": {"summary": {"totalCases": 7}, "cycles": [], "burndown": [], "taskMovement": {}},
+                    "lastRefreshedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "refreshStatus": "idle",
+                }
+
+        class FakeService(QaTestingReportService):
+            def __init__(self):
+                super().__init__("token", report_cache_repo=FakeReportCache())
+
+            def _fetch_round_cycle_reports(self, start, end):
+                raise AssertionError("Jira fetch should not run for fresh persistent cache")
+
+        service = FakeService()
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end)
+
+        self.assertEqual(report["summary"]["totalCases"], 7)
+        self.assertTrue(report["cache"]["hit"])
+        self.assertTrue(report["cache"]["shared"])
+        self.assertFalse(report["cache"]["stale"])
+
+    def test_build_report_returns_stale_persistent_cache_and_queues_refresh(self):
+        class FakeReportCache:
+            def __init__(self):
+                self.started = False
+
+            def get(self, cache_key):
+                return {
+                    "report": {"summary": {"totalCases": 7}, "cycles": [], "burndown": [], "taskMovement": {}},
+                    "lastRefreshedAt": "2026-05-01T00:00:00Z",
+                    "refreshStatus": "idle",
+                }
+
+            def try_start_refresh(self, *args, **kwargs):
+                self.started = True
+                return True
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cache):
+                super().__init__("token", report_cache_repo=cache)
+                self.thread_started = False
+
+            def _start_report_refresh_thread(self, cache_key, start, end, task_window):
+                self.thread_started = True
+
+        cache = FakeReportCache()
+        service = FakeService(cache)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end)
+
+        self.assertEqual(report["summary"]["totalCases"], 7)
+        self.assertTrue(cache.started)
+        self.assertTrue(service.thread_started)
+        self.assertTrue(report["cache"]["stale"])
+        self.assertTrue(report["cache"]["refreshInProgress"])
+
 
 if __name__ == "__main__":
     unittest.main()

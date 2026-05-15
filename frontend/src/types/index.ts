@@ -1524,6 +1524,12 @@ export interface QaTestingReport {
     key: string
     lastRefreshedAt?: string | null
     ttlSeconds: number
+    stale?: boolean
+    refreshInProgress?: boolean
+    refreshStartedAt?: string | null
+    refreshStatus?: string
+    refreshError?: string | null
+    shared?: boolean
   }
 }
 
