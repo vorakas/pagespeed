@@ -45,6 +45,31 @@ class LaunchReportTest(unittest.TestCase):
         self.assertEqual(report["lampsPlusDevelopment"]["totals"]["rowCount"], 25)
         self.assertEqual(report["e2eTesting"]["totals"]["rowCount"], 32)
 
+    def test_empty_development_rows_use_numeric_pending_contract(self):
+        report = build_launch_report([])
+
+        row = row_by_name(report, "lampsPlusDevelopment", "AC Implementation - Commerce Implementation")
+
+        self.assertEqual(row["status"], "Pending")
+        self.assertEqual(row["progressPercent"], 0)
+
+    def test_complete_development_rows_use_complete_status_contract(self):
+        report = build_launch_report([
+            task(
+                "WPM-5471",
+                "Build commerce item",
+                epic_link="AC Implementation - Commerce Implementation",
+                labels=["AC-P1"],
+                spent=3600,
+                remaining=0,
+            ),
+        ])
+
+        row = row_by_name(report, "lampsPlusDevelopment", "AC Implementation - Commerce Implementation")
+
+        self.assertEqual(row["status"], "Complete")
+        self.assertEqual(row["progressPercent"], 100)
+
     def test_development_rollup_resolves_epic_link_key_to_spreadsheet_grouping(self):
         report = build_launch_report([
             task("ACM-4", "AC Implementation - Commerce Implementation", task_type="Epic"),
@@ -72,6 +97,8 @@ class LaunchReportTest(unittest.TestCase):
         self.assertEqual(row["phaseLabel"], "AC-P1")
         self.assertEqual(row["completedHours"], 3)
         self.assertEqual(row["remainingHours"], 1)
+        self.assertEqual(row["status"], "Pending")
+        self.assertEqual(row["progressPercent"], 75)
         self.assertEqual(row["issueKeys"], ["WPM-5470", "WPM-5471"])
         self.assertEqual(row["diagnostics"]["countedIssueCount"], 2)
         self.assertEqual(row["diagnostics"]["missingPhaseLabelCount"], 0)

@@ -302,21 +302,17 @@ def _section_for_task(task: RawTask) -> str:
     return SECTION_DEVELOPMENT
 
 
-def _progress_percent(completed_hours: int, remaining_hours: int) -> Optional[int]:
+def _progress_percent(completed_hours: int, remaining_hours: int) -> int:
     total = completed_hours + remaining_hours
     if total == 0:
-        return None
+        return 0
     return round((completed_hours / total) * 100)
 
 
 def _status(completed_hours: int, remaining_hours: int) -> str:
-    if completed_hours == 0 and remaining_hours == 0:
-        return "Not Started"
-    if remaining_hours == 0:
-        return "Done"
-    if completed_hours == 0:
-        return "Not Started"
-    return "In Progress"
+    if completed_hours > 0 and remaining_hours == 0:
+        return "Complete"
+    return "Pending"
 
 
 def _is_epic(task: RawTask) -> bool:
