@@ -503,6 +503,12 @@ export function QaTesting() {
         <div className="text-sm text-muted-foreground">
           Jira data refreshed {formatDateTime(report.cache.lastRefreshedAt)}
           {report.cache.hit ? " from cache" : ""}. Cached for {Math.round(report.cache.ttlSeconds / 60)} minutes.
+          {report.nameCache ? (
+            <>
+              {" "}Test case names: {report.nameCache.hitCount} cached
+              {report.nameCache.refreshQueued > 0 ? `, ${report.nameCache.refreshQueued} queued for background refresh` : ""}.
+            </>
+          ) : null}
         </div>
       ) : null}
 

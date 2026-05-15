@@ -64,6 +64,7 @@ from data_access import (
     BlazemeterPresetRepository,
     BlazemeterRunRepository,
     ConnectionManager,
+    QaTestCaseCacheRepository,
     SiteRepository,
     SnapshotRepository,
     UrlRepository,
@@ -313,6 +314,7 @@ def create_app() -> Flask:
     qa_testing_service = QaTestingReportService(
         jira_pat=JIRA_PAT or "",
         jira_base_url=JIRA_BASE_URL,
+        test_case_cache_repo=QaTestCaseCacheRepository(conn_mgr),
     )
 
     # ---- Migration status snapshots (history + what-changed-today) ----

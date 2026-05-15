@@ -376,6 +376,17 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS qa_test_case_cache (
+                test_case_key TEXT PRIMARY KEY,
+                name TEXT NOT NULL DEFAULT '',
+                folder TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT '',
+                priority TEXT NOT NULL DEFAULT '',
+                fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         self._create_postgres_requirement_tables(cursor)
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS mime_type TEXT")
@@ -521,6 +532,17 @@ class ConnectionManager:
                 fetched_at TEXT NOT NULL,
                 platform TEXT,
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS qa_test_case_cache (
+                test_case_key TEXT PRIMARY KEY,
+                name TEXT NOT NULL DEFAULT '',
+                folder TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT '',
+                priority TEXT NOT NULL DEFAULT '',
+                fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -805,6 +827,10 @@ class ConnectionManager:
             ON applitools_batches (uploaded_at DESC)
             """,
             """
+            CREATE INDEX IF NOT EXISTS idx_qa_test_case_cache_fetched_at
+            ON qa_test_case_cache (fetched_at)
+            """,
+            """
             CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb
             ON requirement_sources (kb_id)
             """,
@@ -858,6 +884,10 @@ class ConnectionManager:
             """
             CREATE INDEX IF NOT EXISTS idx_applitools_batches_uploaded_at
             ON applitools_batches (uploaded_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_qa_test_case_cache_fetched_at
+            ON qa_test_case_cache (fetched_at)
             """,
             """
             CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb

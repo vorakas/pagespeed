@@ -8,10 +8,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 import re
+import threading
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import requests
+
+from data_access.qa_test_case_cache_repository import QaTestCaseCacheRepository
 
 
 ADOBE_MASTER_FOLDER = "/Adobe Commerce E2E Master Test Cycles"
@@ -267,12 +270,17 @@ class QaTestingReportService:
         jira_pat: str,
         jira_base_url: str = "https://lampstrack.lampsplus.com",
         project_key: str = "TC",
+        test_case_cache_repo: QaTestCaseCacheRepository | None = None,
     ) -> None:
         self.jira_pat = jira_pat
         self.jira_base_url = jira_base_url.rstrip("/")
         self.project_key = project_key
+        self.test_case_cache_repo = test_case_cache_repo
         self.cache_ttl_seconds = CACHE_TTL_SECONDS
         self._report_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
+        self._refresh_lock = threading.Lock()
+        self._refreshing_test_case_keys: set[str] = set()
+        self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
 
     def build_report(
         self,
@@ -302,6 +310,7 @@ class QaTestingReportService:
                 }
                 return report
 
+        self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
         cycles = self._fetch_round_cycle_reports(start, end)
         task_changes = self._fetch_task_status_changes(start, end, task_window)
         summary = self._summarize(cycles, task_changes)
@@ -315,6 +324,7 @@ class QaTestingReportService:
                 "totalChanges": len(task_changes),
                 "changes": task_changes,
             },
+            "nameCache": self._last_name_cache,
         }
         self._report_cache[cache_key] = (now, deepcopy(report))
         report["cache"] = {
@@ -363,14 +373,92 @@ class QaTestingReportService:
             if is_adobe_master_cycle(cycle) and is_round_cycle(str(cycle.get("name") or ""))
         ]
         reports: list[dict[str, Any]] = []
+        details: list[dict[str, Any]] = []
         with ThreadPoolExecutor(max_workers=6) as executor:
             futures = [
                 executor.submit(self._get_json, f"/rest/atm/1.0/testrun/{cycle.get('key')}")
                 for cycle in matching
             ]
             for future in as_completed(futures):
-                reports.append(build_cycle_report(future.result(), {}, start, end))
+                details.append(future.result())
+
+        test_case_keys = sorted({
+            str(item.get("testCaseKey") or "")
+            for detail in details
+            for item in (detail.get("items") or [])
+            if item.get("testCaseKey")
+        })
+        test_case_names = self._cached_test_case_names(test_case_keys)
+        for detail in details:
+            reports.append(build_cycle_report(detail, test_case_names, start, end))
         return sorted(reports, key=lambda cycle: (cycle["section"], cycle["name"] or ""))
+
+    def _cached_test_case_names(self, keys: list[str]) -> dict[str, str]:
+        if self.test_case_cache_repo is None:
+            self._last_name_cache = {
+                "hitCount": 0,
+                "missCount": len(keys),
+                "refreshQueued": 0,
+            }
+            return {}
+
+        cached = self.test_case_cache_repo.get_many(keys)
+        stale_keys = self.test_case_cache_repo.stale_or_missing_keys(keys, max_age_days=30)
+        queued = self._queue_test_case_name_refresh(stale_keys)
+        self._last_name_cache = {
+            "hitCount": len(cached),
+            "missCount": len(stale_keys),
+            "refreshQueued": queued,
+        }
+        return {
+            key: str(row.get("name") or "")
+            for key, row in cached.items()
+        }
+
+    def _queue_test_case_name_refresh(self, keys: list[str]) -> int:
+        if self.test_case_cache_repo is None:
+            return 0
+        with self._refresh_lock:
+            to_refresh = [
+                key for key in sorted({key for key in keys if key})
+                if key not in self._refreshing_test_case_keys
+            ]
+            self._refreshing_test_case_keys.update(to_refresh)
+        if not to_refresh:
+            return 0
+        thread = threading.Thread(
+            target=self._refresh_test_case_names,
+            args=(to_refresh,),
+            daemon=True,
+            name="qa-test-case-cache-refresh",
+        )
+        thread.start()
+        return len(to_refresh)
+
+    def _refresh_test_case_names(self, keys: list[str]) -> None:
+        rows: list[dict[str, Any]] = []
+        try:
+            for key in keys:
+                try:
+                    test_case = self._get_json(f"/rest/atm/1.0/testcase/{key}")
+                except requests.RequestException:
+                    continue
+                rows.append({
+                    "testCaseKey": key,
+                    "name": str(test_case.get("name") or test_case.get("title") or ""),
+                    "folder": folder_name(test_case),
+                    "status": status_name(test_case.get("status")),
+                    "priority": status_name(test_case.get("priority")),
+                })
+                if len(rows) >= 10:
+                    self.test_case_cache_repo.upsert_many(rows)
+                    rows = []
+            if rows:
+                self.test_case_cache_repo.upsert_many(rows)
+        finally:
+            with self._refresh_lock:
+                for key in keys:
+                    self._refreshing_test_case_keys.discard(key)
 
     def _fill_test_case_names(self, names: dict[str, str], keys: list[str]) -> None:
         for key in keys:

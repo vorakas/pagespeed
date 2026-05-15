@@ -195,6 +195,59 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(first["cache"]["key"], "2026-05-14T00:00Z|2026-05-15T12:00Z|tasks:sinceYesterday")
         self.assertTrue(second["cache"]["hit"])
 
+    def test_build_report_uses_cached_test_case_names_and_queues_missing_names(self):
+        class FakeCache:
+            def get_many(self, keys):
+                return {"TC-T1": {"name": "Cached checkout case"}}
+
+            def stale_or_missing_keys(self, keys, max_age_days=30):
+                return ["TC-T2"]
+
+        class FakeService(QaTestingReportService):
+            def __init__(self):
+                super().__init__("token", test_case_cache_repo=FakeCache())
+                self.queued = []
+
+            def _get_json(self, path, params=None):
+                if path.endswith("/testrun/search"):
+                    return [
+                        {
+                            "key": "TC-C1",
+                            "name": "Checkout Round 1",
+                            "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                        }
+                    ]
+                if path.endswith("/testrun/TC-C1"):
+                    return {
+                        "key": "TC-C1",
+                        "name": "Checkout Round 1",
+                        "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                        "items": [
+                            {"testCaseKey": "TC-T1", "status": "Pass"},
+                            {"testCaseKey": "TC-T2", "status": "Not Executed"},
+                        ],
+                    }
+                raise AssertionError(path)
+
+            def _queue_test_case_name_refresh(self, keys):
+                self.queued.extend(keys)
+                return len(keys)
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return []
+
+        service = FakeService()
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, force_refresh=True)
+
+        test_cases = report["cycles"][0]["testCases"]
+        self.assertEqual(test_cases[0]["name"], "Cached checkout case")
+        self.assertEqual(test_cases[1]["name"], "")
+        self.assertEqual(service.queued, ["TC-T2"])
+        self.assertEqual(report["nameCache"], {"hitCount": 1, "missCount": 1, "refreshQueued": 1})
+
 
 if __name__ == "__main__":
     unittest.main()

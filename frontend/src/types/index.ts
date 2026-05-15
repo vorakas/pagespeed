@@ -1509,6 +1509,11 @@ export interface QaTestingReport {
     totalChanges: number
     changes: QaTaskStatusChange[]
   }
+  nameCache?: {
+    hitCount: number
+    missCount: number
+    refreshQueued: number
+  }
   cache?: {
     hit: boolean
     key: string
