@@ -18,7 +18,7 @@ import { Progress } from "@/components/ui/progress"
 import { api } from "@/services/api"
 import type { QaTaskStatusChange, QaTestCycle, QaTestingReport } from "@/types"
 
-type Preset = "24h" | "today" | "yesterday" | "7d" | "custom"
+type Preset = "sinceYesterday" | "today" | "yesterday" | "7d" | "custom"
 
 function toLocalPickerValue(date: Date) {
   const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
@@ -54,6 +54,12 @@ function statusClass(status: string) {
 
 function applyPreset(preset: Preset) {
   const now = new Date()
+  if (preset === "sinceYesterday") {
+    const start = new Date(now)
+    start.setDate(start.getDate() - 1)
+    start.setHours(0, 0, 0, 0)
+    return { start, end: now }
+  }
   if (preset === "today") {
     const start = new Date(now)
     start.setHours(0, 0, 0, 0)
@@ -196,19 +202,19 @@ function TaskMovementTable({ changes }: { changes: QaTaskStatusChange[] }) {
 }
 
 export function QaTesting() {
-  const initialRange = useMemo(() => applyPreset("24h"), [])
-  const [preset, setPreset] = useState<Preset>("24h")
+  const initialRange = useMemo(() => applyPreset("sinceYesterday"), [])
+  const [preset, setPreset] = useState<Preset>("sinceYesterday")
   const [start, setStart] = useState(toLocalPickerValue(initialRange.start))
   const [end, setEnd] = useState(toLocalPickerValue(initialRange.end))
   const [report, setReport] = useState<QaTestingReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function loadReport() {
+  async function loadReport(forceRefresh = false) {
     setLoading(true)
     setError(null)
     try {
-      setReport(await api.getQaTestingReport(fromLocalPickerValue(start), fromLocalPickerValue(end)))
+      setReport(await api.getQaTestingReport(fromLocalPickerValue(start), fromLocalPickerValue(end), forceRefresh))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load QA testing report")
     } finally {
@@ -252,7 +258,7 @@ export function QaTesting() {
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex rounded-md border border-border p-1">
-            {(["24h", "today", "yesterday", "7d"] as Preset[]).map((option) => (
+            {(["sinceYesterday", "today", "yesterday", "7d"] as Preset[]).map((option) => (
               <Button
                 key={option}
                 type="button"
@@ -260,18 +266,25 @@ export function QaTesting() {
                 size="sm"
                 onClick={() => handlePreset(option)}
               >
-                {option === "24h" ? "24h" : option === "7d" ? "7d" : option}
+                {option === "sinceYesterday" ? "Since yesterday" : option === "7d" ? "7d" : option}
               </Button>
             ))}
           </div>
           <DateTimePicker value={start} onChange={(value) => { setPreset("custom"); setStart(value) }} />
           <DateTimePicker value={end} onChange={(value) => { setPreset("custom"); setEnd(value) }} />
-          <Button onClick={loadReport} disabled={loading}>
+          <Button onClick={() => loadReport(true)} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Refresh
+            Refresh from Jira
           </Button>
         </div>
       </div>
+
+      {report?.cache?.lastRefreshedAt ? (
+        <div className="text-sm text-muted-foreground">
+          Jira data refreshed {formatDateTime(report.cache.lastRefreshedAt)}
+          {report.cache.hit ? " from cache" : ""}. Cached for {Math.round(report.cache.ttlSeconds / 60)} minutes.
+        </div>
+      ) : null}
 
       {error ? (
         <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">

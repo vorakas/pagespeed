@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
@@ -22,6 +23,7 @@ EPIC_LINK_JQL = (
     "ACE2E-28,ACE2E-27,ACE2E-26,ACE2E-25,ACE2E-24"
     ") AND issuetype != Epic"
 )
+CACHE_TTL_SECONDS = 15 * 60
 
 
 def parse_jira_datetime(value: str | None) -> datetime | None:
@@ -209,12 +211,25 @@ def extract_status_changes(
     return changes
 
 
+def collapse_latest_status_changes(changes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    latest_by_key: dict[str, dict[str, Any]] = {}
+    for change in changes:
+        key = str(change.get("key") or "")
+        if not key:
+            continue
+        current = latest_by_key.get(key)
+        if current is None or str(change.get("changedAt") or "") > str(current.get("changedAt") or ""):
+            latest_by_key[key] = change
+    return sorted(latest_by_key.values(), key=lambda change: change.get("changedAt") or "", reverse=True)
+
+
 def build_status_change_jql(start: datetime, end: datetime) -> str:
     date_format = "%Y/%m/%d %H:%M"
     return (
-        f"{EPIC_LINK_JQL} AND status changed DURING "
-        f'("{start.astimezone(timezone.utc).strftime(date_format)}", '
-        f'"{end.astimezone(timezone.utc).strftime(date_format)}") ORDER BY updated DESC'
+        f"{EPIC_LINK_JQL} AND status changed AFTER "
+        f'"{start.astimezone(timezone.utc).strftime(date_format)}" '
+        f'AND status changed BEFORE "{end.astimezone(timezone.utc).strftime(date_format)}" '
+        "ORDER BY updated DESC"
     )
 
 
@@ -228,17 +243,35 @@ class QaTestingReportService:
         self.jira_pat = jira_pat
         self.jira_base_url = jira_base_url.rstrip("/")
         self.project_key = project_key
+        self.cache_ttl_seconds = CACHE_TTL_SECONDS
+        self._report_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
 
-    def build_report(self, start: datetime, end: datetime) -> dict[str, Any]:
+    def build_report(self, start: datetime, end: datetime, force_refresh: bool = False) -> dict[str, Any]:
         if not self.jira_pat:
             raise ValueError("JIRA_PAT is not configured")
         if end < start:
             raise ValueError("end must be after start")
 
+        cache_key = self._cache_key(start, end)
+        cached = self._report_cache.get(cache_key)
+        now = datetime.now(timezone.utc)
+        if not force_refresh and cached is not None:
+            refreshed_at, cached_report = cached
+            age = (now - refreshed_at).total_seconds()
+            if age <= self.cache_ttl_seconds:
+                report = deepcopy(cached_report)
+                report["cache"] = {
+                    "hit": True,
+                    "key": cache_key,
+                    "lastRefreshedAt": to_iso(refreshed_at),
+                    "ttlSeconds": self.cache_ttl_seconds,
+                }
+                return report
+
         cycles = self._fetch_round_cycle_reports(start, end)
         task_changes = self._fetch_task_status_changes(start, end)
         summary = self._summarize(cycles, task_changes)
-        return {
+        report = {
             "range": {"start": to_iso(start), "end": to_iso(end)},
             "summary": summary,
             "cycles": cycles,
@@ -249,6 +282,24 @@ class QaTestingReportService:
                 "changes": task_changes,
             },
         }
+        self._report_cache[cache_key] = (now, deepcopy(report))
+        report["cache"] = {
+            "hit": False,
+            "key": cache_key,
+            "lastRefreshedAt": to_iso(now),
+            "ttlSeconds": self.cache_ttl_seconds,
+        }
+        return report
+
+    def _cache_key(self, start: datetime, end: datetime) -> str:
+        start_key = self._cache_bucket(start).strftime("%Y-%m-%dT%H:%MZ")
+        end_key = self._cache_bucket(end).strftime("%Y-%m-%dT%H:%MZ")
+        return f"{start_key}|{end_key}"
+
+    def _cache_bucket(self, value: datetime) -> datetime:
+        utc_value = value.astimezone(timezone.utc)
+        minute = (utc_value.minute // 15) * 15
+        return utc_value.replace(minute=minute, second=0, microsecond=0)
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.jira_pat}", "Accept": "application/json"}
@@ -312,7 +363,7 @@ class QaTestingReportService:
         changes: list[dict[str, Any]] = []
         for issue in issues:
             changes.extend(extract_status_changes(issue, start, end))
-        return sorted(changes, key=lambda change: change.get("changedAt") or "", reverse=True)
+        return collapse_latest_status_changes(changes)
 
     def _summarize(self, cycles: list[dict[str, Any]], task_changes: list[dict[str, Any]]) -> dict[str, Any]:
         total_cases = sum(cycle["totalCases"] for cycle in cycles)

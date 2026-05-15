@@ -1509,6 +1509,12 @@ export interface QaTestingReport {
     totalChanges: number
     changes: QaTaskStatusChange[]
   }
+  cache?: {
+    hit: boolean
+    key: string
+    lastRefreshedAt?: string | null
+    ttlSeconds: number
+  }
 }
 
 // ---------- API Responses ----------

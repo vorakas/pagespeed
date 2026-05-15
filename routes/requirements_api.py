@@ -54,8 +54,9 @@ def create_requirements_blueprint(
         start = _parse_range_param("start") or (end - timedelta(days=1))
         if end < start:
             return jsonify({"error": "end must be after start"}), 400
+        force_refresh = request.args.get("forceRefresh", "").lower() in {"1", "true", "yes"}
         try:
-            return jsonify(qa_testing_service.build_report(start, end))
+            return jsonify(qa_testing_service.build_report(start, end, force_refresh=force_refresh))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except requests.HTTPError as exc:

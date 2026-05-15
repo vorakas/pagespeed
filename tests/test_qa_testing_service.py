@@ -2,8 +2,11 @@ from datetime import datetime, timezone
 import unittest
 
 from services.qa_testing_service import (
+    QaTestingReportService,
+    build_status_change_jql,
     build_cycle_report,
     build_daily_burndown,
+    collapse_latest_status_changes,
     extract_status_changes,
     is_round_cycle,
 )
@@ -104,6 +107,79 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(changes[0]["fromStatus"], "To Do")
         self.assertEqual(changes[0]["toStatus"], "In QA")
         self.assertEqual(changes[0]["changedBy"], "Adam Blais")
+
+    def test_status_change_jql_uses_exact_datetime_bounds(self):
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 12, 30, tzinfo=timezone.utc)
+
+        jql = build_status_change_jql(start, end)
+
+        self.assertIn('status changed AFTER "2026/05/14 00:00"', jql)
+        self.assertIn('status changed BEFORE "2026/05/15 12:30"', jql)
+
+    def test_collapse_latest_status_changes_returns_one_row_per_task(self):
+        changes = [
+            {"key": "ACE2E-1", "changedAt": "2026-05-14T08:00:00Z", "toStatus": "In Progress"},
+            {"key": "ACE2E-1", "changedAt": "2026-05-14T09:00:00Z", "toStatus": "QA"},
+            {"key": "ACE2E-2", "changedAt": "2026-05-14T07:00:00Z", "toStatus": "Groomed"},
+        ]
+
+        collapsed = collapse_latest_status_changes(changes)
+
+        self.assertEqual([change["key"] for change in collapsed], ["ACE2E-1", "ACE2E-2"])
+        self.assertEqual(collapsed[0]["toStatus"], "QA")
+
+    def test_build_report_returns_cached_response_for_same_range(self):
+        class FakeService(QaTestingReportService):
+            def __init__(self):
+                super().__init__("token")
+                self.cycle_calls = 0
+                self.task_calls = 0
+
+            def _fetch_round_cycle_reports(self, start, end):
+                self.cycle_calls += 1
+                return []
+
+            def _fetch_task_status_changes(self, start, end):
+                self.task_calls += 1
+                return []
+
+        service = FakeService()
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        first = service.build_report(start, end)
+        second = service.build_report(start, end)
+
+        self.assertEqual(service.cycle_calls, 1)
+        self.assertEqual(service.task_calls, 1)
+        self.assertTrue(second["cache"]["hit"])
+        self.assertEqual(first["cache"]["key"], second["cache"]["key"])
+
+    def test_build_report_cache_key_uses_15_minute_buckets(self):
+        class FakeService(QaTestingReportService):
+            def __init__(self):
+                super().__init__("token")
+                self.calls = 0
+
+            def _fetch_round_cycle_reports(self, start, end):
+                self.calls += 1
+                return []
+
+            def _fetch_task_status_changes(self, start, end):
+                return []
+
+        service = FakeService()
+        start = datetime(2026, 5, 14, 0, 2, tzinfo=timezone.utc)
+        first_end = datetime(2026, 5, 15, 12, 1, tzinfo=timezone.utc)
+        second_end = datetime(2026, 5, 15, 12, 14, tzinfo=timezone.utc)
+
+        first = service.build_report(start, first_end)
+        second = service.build_report(start, second_end)
+
+        self.assertEqual(service.calls, 1)
+        self.assertEqual(first["cache"]["key"], "2026-05-14T00:00Z|2026-05-15T12:00Z")
+        self.assertTrue(second["cache"]["hit"])
 
 
 if __name__ == "__main__":
