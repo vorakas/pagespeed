@@ -708,6 +708,7 @@ export interface RawTaskRecord {
   status: string | null
   priority: string | null
   launchPriority: string | null
+  labels: string[]
   assignee: string | null
   created: string | null
   updated: string | null
