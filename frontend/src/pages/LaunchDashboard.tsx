@@ -69,6 +69,7 @@ export function LaunchDashboard() {
   const [epicProgress, setEpicProgress] = useState<EpicProgressResponse | null>(null)
   const [snapshotDiff, setSnapshotDiff] = useState<MigrationSnapshotDiffResponse | null>(null)
   const [launchReport, setLaunchReport] = useState<LaunchReportResponse | null>(null)
+  const [launchReportError, setLaunchReportError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [streamFilter, setStreamFilter] = useState<IncidentFilter>("all")
@@ -105,9 +106,15 @@ export function LaunchDashboard() {
         await fetch("/api/dashboard/snapshots/reingest", { method: "POST" }).catch(() => null)
       }
 
-      const [overview, report] = await Promise.all([
+      const [overview, reportResult] = await Promise.all([
         api.getMigrationOverview(),
-        api.getLaunchReport().catch(() => null),
+        api
+          .getLaunchReport()
+          .then((data) => ({ data, error: null }))
+          .catch((err) => ({
+            data: null,
+            error: err instanceof Error ? err.message : "Failed to load launch report",
+          })),
       ])
       const bugs24h = await api.getMigrationNewBugs(1).catch(() => overview.newBugs)
       setHealth(overview.health)
@@ -122,7 +129,8 @@ export function LaunchDashboard() {
       setSources(overview.sources)
       setEpicProgress(overview.epicProgress)
       setSnapshotDiff(overview.snapshotDiff)
-      setLaunchReport(report)
+      setLaunchReport(reportResult.data)
+      setLaunchReportError(reportResult.error)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard")
     } finally {
@@ -212,7 +220,7 @@ export function LaunchDashboard() {
             refreshing={refreshing}
           />
 
-          <LaunchReportSections data={launchReport} />
+          <LaunchReportSections data={launchReport} error={launchReportError} />
 
           <WhatChangedToday />
 

@@ -12,6 +12,7 @@ type RowKind = "development" | "e2e"
 
 interface LaunchReportSectionsProps {
   data: LaunchReportResponse | null
+  error?: string | null
 }
 
 interface DiagnosticSummary {
@@ -28,7 +29,15 @@ const diagnosticLabels: Array<[keyof LaunchReportDiagnostics, string]> = [
   ["missingEstimateCount", "Missing estimates"],
 ]
 
-export function LaunchReportSections({ data }: LaunchReportSectionsProps) {
+const warningDiagnosticKeys: Array<keyof LaunchReportDiagnostics> = [
+  "excludedIssueCount",
+  "missingEpicLinkCount",
+  "unresolvedEpicNameCount",
+  "missingPhaseLabelCount",
+  "missingEstimateCount",
+]
+
+export function LaunchReportSections({ data, error }: LaunchReportSectionsProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
 
   const phaseLabel = data?.phase ?? "loading"
@@ -52,7 +61,12 @@ export function LaunchReportSections({ data }: LaunchReportSectionsProps) {
         {data && <span style={stampStyle}>Generated {formatGeneratedAt(data.generatedAt)}</span>}
       </div>
 
-      {!data ? (
+      {error ? (
+        <div role="status" style={errorStyle}>
+          <AlertTriangle size={15} aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      ) : !data ? (
         <div style={loadingStyle}>Loading launch report sections...</div>
       ) : (
         <div style={tablesStyle}>
@@ -260,12 +274,17 @@ function StatusPill({ status }: { status: LaunchReportDevelopmentRow["status"] }
 }
 
 function DiagnosticIcon({ summary }: { summary: DiagnosticSummary }) {
-  const hasIssues = summary.total > 0
-  const Icon = hasIssues ? AlertTriangle : CheckCircle2
+  const hasWarnings = summary.warningCount > 0
+  const Icon = hasWarnings ? AlertTriangle : CheckCircle2
+  const label = hasWarnings
+    ? `${summary.warningCount} report diagnostic warnings`
+    : "No report diagnostic warnings"
   return (
     <span
-      title={`${summary.total} diagnostic flags`}
-      style={{ color: hasIssues ? "var(--lcc-amber)" : "var(--lcc-green)" }}
+      aria-label={label}
+      role="img"
+      title={label}
+      style={{ color: hasWarnings ? "var(--lcc-amber)" : "var(--lcc-green)" }}
     >
       <Icon size={16} aria-hidden="true" />
     </span>
@@ -307,8 +326,8 @@ function Td({
 function useDiagnosticSummary(diagnostics: LaunchReportDiagnostics, issueKeyCount: number) {
   return useMemo(() => {
     const items = diagnosticLabels.map(([key, label]) => [label, diagnostics[key]] as [string, number])
-    const total = items.reduce((sum, [, value]) => sum + value, issueKeyCount)
-    return { total, items: [["Counted issue keys", issueKeyCount] as [string, number], ...items] }
+    const warningCount = warningDiagnosticKeys.reduce((sum, key) => sum + diagnostics[key], 0)
+    return { warningCount, items: [["Counted issue keys", issueKeyCount] as [string, number], ...items] }
   }, [diagnostics, issueKeyCount])
 }
 
@@ -370,6 +389,17 @@ const loadingStyle: CSSProperties = {
   color: "var(--lcc-text-faint)",
   fontSize: 12,
   padding: "16px 12px",
+}
+
+const errorStyle: CSSProperties = {
+  alignItems: "center",
+  border: "1px solid rgba(245, 158, 11, 0.35)",
+  borderRadius: 6,
+  color: "var(--lcc-amber)",
+  display: "flex",
+  fontSize: 12,
+  gap: 8,
+  padding: "12px",
 }
 
 const tablesStyle: CSSProperties = {
