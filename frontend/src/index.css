@@ -210,6 +210,35 @@
   .light *::-webkit-scrollbar-thumb:hover {
     background-color: hsl(214 32% 72%);
   }
+  .themed-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(217 19% 27%) transparent;
+  }
+  .light .themed-scrollbar {
+    scrollbar-color: hsl(214 32% 82%) transparent;
+  }
+  .themed-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .themed-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .themed-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(217 19% 27%);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .themed-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(217 19% 35%);
+  }
+  .light .themed-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(214 32% 82%);
+  }
+  .light .themed-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(214 32% 72%);
+  }
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);

@@ -140,7 +140,7 @@ function RangeProgressDialog({
           <DialogTitle>Range Progress Test Cases</DialogTitle>
           <DialogDescription>Test cases executed inside the selected test-case range.</DialogDescription>
         </DialogHeader>
-        <div className="overflow-auto rounded-lg border border-border">
+        <div className="themed-scrollbar max-h-[65vh] overflow-auto rounded-lg border border-border">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-background text-left text-xs uppercase text-muted-foreground">
               <tr>
@@ -203,7 +203,7 @@ function BlockedTestCasesDialog({
           <DialogTitle>Blocked Test Cases</DialogTitle>
           <DialogDescription>All currently blocked test cases in the loaded round cycles.</DialogDescription>
         </DialogHeader>
-        <div className="overflow-auto rounded-lg border border-border">
+        <div className="themed-scrollbar max-h-[65vh] overflow-auto rounded-lg border border-border">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-background text-left text-xs uppercase text-muted-foreground">
               <tr>
@@ -266,7 +266,7 @@ function TaskMovementDialog({
           <DialogTitle>Task Movement</DialogTitle>
           <DialogDescription>Jira tasks whose status changed in the task movement window.</DialogDescription>
         </DialogHeader>
-        <TaskMovementTable changes={changes} />
+        <TaskMovementTable changes={changes} constrained />
       </DialogContent>
     </Dialog>
   )
@@ -339,12 +339,12 @@ function CycleCard({ cycle }: { cycle: QaTestCycle }) {
   )
 }
 
-function TaskMovementTable({ changes }: { changes: QaTaskStatusChange[] }) {
+function TaskMovementTable({ changes, constrained = false }: { changes: QaTaskStatusChange[]; constrained?: boolean }) {
   if (changes.length === 0) {
     return <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">No task status changes matched this range.</div>
   }
   return (
-    <div className="overflow-auto rounded-lg border border-border">
+    <div className={`themed-scrollbar overflow-auto rounded-lg border border-border ${constrained ? "max-h-[65vh]" : ""}`}>
       <table className="w-full text-sm">
         <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
           <tr>
