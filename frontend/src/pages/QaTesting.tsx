@@ -14,9 +14,16 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DateTimePicker } from "@/components/ui/date-time-picker"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { api } from "@/services/api"
-import type { QaTaskStatusChange, QaTestCycle, QaTestingReport } from "@/types"
+import type { QaTaskStatusChange, QaTestCase, QaTestCycle, QaTestingReport } from "@/types"
 
 type Preset = "24h" | "sinceYesterday" | "today" | "yesterday" | "7d" | "custom"
 
@@ -83,15 +90,122 @@ function applyPreset(preset: Preset) {
   return { start: new Date(now.getTime() - 24 * 60 * 60 * 1000), end: now }
 }
 
-function SummaryCard({ label, value, detail }: { label: string; value: string | number; detail: string }) {
+function SummaryCard({
+  label,
+  value,
+  detail,
+  onClick,
+}: {
+  label: string
+  value: string | number
+  detail: string
+  onClick?: () => void
+}) {
   return (
-    <Card>
+    <Card
+      className={onClick ? "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/5" : undefined}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (!onClick) return
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onClick()
+        }
+      }}
+    >
       <CardHeader className="pb-2">
         <CardDescription>{label}</CardDescription>
         <CardTitle className="text-2xl tabular-nums">{value}</CardTitle>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">{detail}</CardContent>
     </Card>
+  )
+}
+
+function RangeProgressDialog({
+  open,
+  onOpenChange,
+  rows,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  rows: Array<QaTestCase & { cycleKey: string; cycleName: string; section: string }>
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>Range Progress Test Cases</DialogTitle>
+          <DialogDescription>Test cases executed inside the selected test-case range.</DialogDescription>
+        </DialogHeader>
+        <div className="overflow-auto rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-background text-left text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Cycle</th>
+                <th className="px-4 py-3">Test Case</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Executed</th>
+                <th className="px-4 py-3">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                    No test cases were executed in this range.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((testCase) => (
+                  <tr key={`${testCase.cycleKey}-${testCase.key}-${testCase.executedAt}`} className="border-t border-border">
+                    <td className="max-w-xs px-4 py-3">
+                      <div className="font-medium">{testCase.cycleName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {testCase.section} · {testCase.cycleKey}
+                      </div>
+                    </td>
+                    <td className="max-w-md px-4 py-3">
+                      <div className="font-medium">{testCase.key}</div>
+                      <div className="text-muted-foreground">{testCase.name || "Name unavailable"}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={statusClass(testCase.status)}>{testCase.status}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{testCase.executedBy || "-"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{formatDateTime(testCase.executedAt)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function TaskMovementDialog({
+  open,
+  onOpenChange,
+  changes,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  changes: QaTaskStatusChange[]
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Task Movement</DialogTitle>
+          <DialogDescription>Jira tasks whose status changed in the task movement window.</DialogDescription>
+        </DialogHeader>
+        <TaskMovementTable changes={changes} />
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -212,6 +326,8 @@ export function QaTesting() {
   const [report, setReport] = useState<QaTestingReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [rangeDialogOpen, setRangeDialogOpen] = useState(false)
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
 
   async function loadReport(forceRefresh = false) {
     setLoading(true)
@@ -250,6 +366,21 @@ export function QaTesting() {
     }
     return Array.from(groups.entries())
   }, [report])
+
+  const rangeExecutedRows = useMemo(
+    () =>
+      (report?.cycles ?? []).flatMap((cycle) =>
+        cycle.testCases
+          .filter((testCase) => testCase.inRange)
+          .map((testCase) => ({
+            ...testCase,
+            cycleKey: cycle.key,
+            cycleName: cycle.name,
+            section: cycle.section,
+          })),
+      ),
+    [report],
+  )
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -309,9 +440,30 @@ export function QaTesting() {
             <SummaryCard label="Cycles" value={report.summary.cycleCount} detail="Round cycles in Adobe Commerce E2E" />
             <SummaryCard label="Total Cases" value={report.summary.totalCases} detail={`${report.summary.remainingCases} remaining overall`} />
             <SummaryCard label="Overall Progress" value={`${report.summary.progressPercent}%`} detail={`${report.summary.executedCases} cases executed`} />
-            <SummaryCard label="Range Progress" value={`${report.summary.rangeProgressPercent}%`} detail={`${report.summary.executedInRange} cases executed in range`} />
-            <SummaryCard label="Task Movement" value={report.summary.taskStatusChanges} detail="Jira status changes in range" />
+            <SummaryCard
+              label="Range Progress"
+              value={`${report.summary.rangeProgressPercent}%`}
+              detail={`${report.summary.executedInRange} cases executed in range`}
+              onClick={() => setRangeDialogOpen(true)}
+            />
+            <SummaryCard
+              label="Task Movement"
+              value={report.summary.taskStatusChanges}
+              detail="Jira tasks changed since yesterday"
+              onClick={() => setTaskDialogOpen(true)}
+            />
           </div>
+
+          <RangeProgressDialog
+            open={rangeDialogOpen}
+            onOpenChange={setRangeDialogOpen}
+            rows={rangeExecutedRows}
+          />
+          <TaskMovementDialog
+            open={taskDialogOpen}
+            onOpenChange={setTaskDialogOpen}
+            changes={report.taskMovement.changes}
+          />
 
           <Card>
             <CardHeader>
