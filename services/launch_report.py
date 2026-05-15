@@ -20,6 +20,7 @@ DIAGNOSTIC_KEYS = (
     "missingPhaseLabelCount",
     "missingEstimateCount",
 )
+MAX_PARENT_DEPTH = 20
 
 DEVELOPMENT_GROUPINGS = [
     "AC Implementation - App Builder Integration",
@@ -83,6 +84,7 @@ E2E_GROUPINGS = [
     "AC E2E - User Session Management",
     "AC E2E - Wish List",
 ]
+REPORT_GROUPINGS = frozenset(DEVELOPMENT_GROUPINGS + E2E_GROUPINGS)
 
 
 def build_launch_report(
@@ -138,7 +140,7 @@ def _group_tasks_by_report_grouping(
 
     for task in tasks:
         grouping, epic_key, diagnostic_key = _report_grouping(task, by_key)
-        if grouping in DEVELOPMENT_GROUPINGS or grouping in E2E_GROUPINGS:
+        if grouping in REPORT_GROUPINGS:
             grouped[grouping].append(task)
             if epic_key:
                 epic_keys.setdefault(grouping, epic_key)
@@ -152,10 +154,23 @@ def _group_tasks_by_report_grouping(
 def _report_grouping(
     task: RawTask,
     by_key: dict[str, RawTask],
+    visited: Optional[set[str]] = None,
+    depth: int = 0,
 ) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    visited = visited or set()
+    task_key = task.key or ""
+    if task_key:
+        if task_key in visited:
+            return None, None, "missingEpicLinkCount"
+        visited.add(task_key)
+    if depth > MAX_PARENT_DEPTH:
+        return None, None, "missingEpicLinkCount"
+
     if _is_epic(task):
         return task.summary, task.key, None
     if task.epic_link:
+        if task.epic_link in REPORT_GROUPINGS:
+            return task.epic_link, None, None
         epic = by_key.get(task.epic_link)
         if epic and epic.summary:
             return epic.summary, epic.key, None
@@ -163,9 +178,16 @@ def _report_grouping(
     if task.parent_key:
         parent = by_key.get(task.parent_key)
         if parent:
-            parent_grouping, parent_epic_key, _ = _report_grouping(parent, by_key)
+            parent_grouping, parent_epic_key, parent_diagnostic = _report_grouping(
+                parent,
+                by_key,
+                visited,
+                depth + 1,
+            )
             if parent_grouping:
                 return parent_grouping, parent_epic_key, None
+            if parent_diagnostic:
+                return None, None, parent_diagnostic
         return None, None, "missingEpicLinkCount"
     return None, None, "missingEpicLinkCount"
 
@@ -197,8 +219,8 @@ def _e2e_row(report_grouping: str, tasks: list[RawTask], epic_key: Optional[str]
         "reportGrouping": report_grouping,
         "epicKey": epic_key,
         "phaseLabel": PHASE_LABEL,
-        "passedTc": sum(1 for task in counted if task.status == "Closed"),
-        "failedTc": sum(1 for task in counted if task.status == "Failed QA"),
+        "passedTc": sum(1 for task in counted if _normalized_status(task) == "closed"),
+        "failedTc": sum(1 for task in counted if _normalized_status(task) == "failed qa"),
         "cnxOk": None,
         "doneCount": None,
         "completedHours": completed_hours,
@@ -264,6 +286,10 @@ def _empty_diagnostics() -> dict:
 
 def _missing_estimate(task: RawTask) -> bool:
     return task.time_spent_seconds is None and task.remaining_estimate_seconds is None
+
+
+def _normalized_status(task: RawTask) -> str:
+    return (task.status or "").casefold()
 
 
 def _section_for_task(task: RawTask) -> str:

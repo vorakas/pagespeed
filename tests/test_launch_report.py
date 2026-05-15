@@ -11,6 +11,7 @@ def task(
     task_type="Task",
     status=None,
     epic_link=None,
+    parent_key=None,
     labels=None,
     spent=None,
     remaining=None,
@@ -24,6 +25,7 @@ def task(
         task_type=task_type,
         status=status,
         epic_link=epic_link,
+        parent_key=parent_key,
         labels=labels or [],
         time_spent_seconds=spent,
         remaining_estimate_seconds=remaining,
@@ -74,6 +76,26 @@ class LaunchReportTest(unittest.TestCase):
         self.assertEqual(row["diagnostics"]["countedIssueCount"], 2)
         self.assertEqual(row["diagnostics"]["missingPhaseLabelCount"], 0)
 
+    def test_development_rollup_accepts_display_name_epic_link(self):
+        report = build_launch_report([
+            task(
+                "WPM-5471",
+                "Build commerce item",
+                epic_link="AC Implementation - Commerce Implementation",
+                labels=["AC-P1"],
+                spent=7200,
+                remaining=3600,
+            ),
+        ])
+
+        row = row_by_name(report, "lampsPlusDevelopment", "AC Implementation - Commerce Implementation")
+
+        self.assertIsNone(row["epicKey"])
+        self.assertEqual(row["completedHours"], 2)
+        self.assertEqual(row["remainingHours"], 1)
+        self.assertEqual(row["issueKeys"], ["WPM-5471"])
+        self.assertEqual(report["lampsPlusDevelopment"]["diagnostics"]["unresolvedEpicNameCount"], 0)
+
     def test_excludes_missing_ac_p1_label_from_totals_and_flags_diagnostic(self):
         report = build_launch_report([
             task("ACM-4", "AC Implementation - Commerce Implementation", task_type="Epic"),
@@ -117,13 +139,23 @@ class LaunchReportTest(unittest.TestCase):
 
         self.assertEqual(diagnostics["missingEpicLinkCount"], 1)
 
+    def test_cyclic_parent_relationship_diagnoses_without_crashing(self):
+        report = build_launch_report([
+            task("WPM-5471", "Cycle one", parent_key="WPM-5472", labels=["AC-P1"], spent=3600),
+            task("WPM-5472", "Cycle two", parent_key="WPM-5471", labels=["AC-P1"], spent=3600),
+        ])
+
+        diagnostics = report["lampsPlusDevelopment"]["diagnostics"]
+
+        self.assertEqual(diagnostics["missingEpicLinkCount"], 2)
+
     def test_e2e_counts_closed_and_failed_qa_by_grouping(self):
         report = build_launch_report([
             task("ACE2E-33", "AC E2E - Account Management", task_type="Epic"),
             task(
                 "ACE2E-40",
                 "Passing account test",
-                status="Closed",
+                status="closed",
                 epic_link="ACE2E-33",
                 labels=["AC-P1"],
                 spent=3600,
@@ -131,7 +163,7 @@ class LaunchReportTest(unittest.TestCase):
             task(
                 "ACE2E-41",
                 "Failing account test",
-                status="Failed QA",
+                status="failed qa",
                 epic_link="ACE2E-33",
                 labels=["AC-P1"],
                 remaining=7200,
