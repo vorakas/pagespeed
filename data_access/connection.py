@@ -387,6 +387,14 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS jira_user_cache (
+                user_key TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL DEFAULT '',
+                fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         self._create_postgres_requirement_tables(cursor)
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS mime_type TEXT")
@@ -542,6 +550,14 @@ class ConnectionManager:
                 folder TEXT NOT NULL DEFAULT '',
                 status TEXT NOT NULL DEFAULT '',
                 priority TEXT NOT NULL DEFAULT '',
+                fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS jira_user_cache (
+                user_key TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL DEFAULT '',
                 fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -831,6 +847,10 @@ class ConnectionManager:
             ON qa_test_case_cache (fetched_at)
             """,
             """
+            CREATE INDEX IF NOT EXISTS idx_jira_user_cache_fetched_at
+            ON jira_user_cache (fetched_at)
+            """,
+            """
             CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb
             ON requirement_sources (kb_id)
             """,
@@ -888,6 +908,10 @@ class ConnectionManager:
             """
             CREATE INDEX IF NOT EXISTS idx_qa_test_case_cache_fetched_at
             ON qa_test_case_cache (fetched_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_jira_user_cache_fetched_at
+            ON jira_user_cache (fetched_at)
             """,
             """
             CREATE INDEX IF NOT EXISTS idx_requirement_sources_kb

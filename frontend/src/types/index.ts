@@ -1514,6 +1514,11 @@ export interface QaTestingReport {
     missCount: number
     refreshQueued: number
   }
+  userCache?: {
+    hitCount: number
+    missCount: number
+    refreshQueued: number
+  }
   cache?: {
     hit: boolean
     key: string

@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from data_access.jira_user_cache_repository import JiraUserCacheRepository
 from data_access.qa_test_case_cache_repository import QaTestCaseCacheRepository
 
 
@@ -271,16 +272,20 @@ class QaTestingReportService:
         jira_base_url: str = "https://lampstrack.lampsplus.com",
         project_key: str = "TC",
         test_case_cache_repo: QaTestCaseCacheRepository | None = None,
+        user_cache_repo: JiraUserCacheRepository | None = None,
     ) -> None:
         self.jira_pat = jira_pat
         self.jira_base_url = jira_base_url.rstrip("/")
         self.project_key = project_key
         self.test_case_cache_repo = test_case_cache_repo
+        self.user_cache_repo = user_cache_repo
         self.cache_ttl_seconds = CACHE_TTL_SECONDS
         self._report_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
         self._refresh_lock = threading.Lock()
         self._refreshing_test_case_keys: set[str] = set()
+        self._refreshing_user_keys: set[str] = set()
         self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
+        self._last_user_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
 
     def build_report(
         self,
@@ -311,6 +316,7 @@ class QaTestingReportService:
                 return report
 
         self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
+        self._last_user_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
         cycles = self._fetch_round_cycle_reports(start, end)
         task_changes = self._fetch_task_status_changes(start, end, task_window)
         summary = self._summarize(cycles, task_changes)
@@ -325,6 +331,7 @@ class QaTestingReportService:
                 "changes": task_changes,
             },
             "nameCache": self._last_name_cache,
+            "userCache": self._last_user_cache,
         }
         self._report_cache[cache_key] = (now, deepcopy(report))
         report["cache"] = {
@@ -389,8 +396,11 @@ class QaTestingReportService:
             if item.get("testCaseKey")
         })
         test_case_names = self._cached_test_case_names(test_case_keys)
+        user_names = self._cached_user_names(self._user_keys_from_cycle_details(details))
         for detail in details:
-            reports.append(build_cycle_report(detail, test_case_names, start, end))
+            report = build_cycle_report(detail, test_case_names, start, end)
+            self._apply_user_names(report, user_names)
+            reports.append(report)
         return sorted(reports, key=lambda cycle: (cycle["section"], cycle["name"] or ""))
 
     def _cached_test_case_names(self, keys: list[str]) -> dict[str, str]:
@@ -459,6 +469,79 @@ class QaTestingReportService:
             with self._refresh_lock:
                 for key in keys:
                     self._refreshing_test_case_keys.discard(key)
+
+    def _user_keys_from_cycle_details(self, details: list[dict[str, Any]]) -> list[str]:
+        keys: set[str] = set()
+        for detail in details:
+            for item in detail.get("items") or []:
+                for field in ("assignedTo", "executedBy"):
+                    raw = display_name(item.get(field))
+                    if raw.startswith("JIRAUSER"):
+                        keys.add(raw)
+        return sorted(keys)
+
+    def _cached_user_names(self, keys: list[str]) -> dict[str, str]:
+        if self.user_cache_repo is None:
+            self._last_user_cache = {"hitCount": 0, "missCount": len(keys), "refreshQueued": 0}
+            return {}
+        cached = self.user_cache_repo.get_many(keys)
+        stale_keys = self.user_cache_repo.stale_or_missing_keys(keys, max_age_days=180)
+        queued = self._queue_user_refresh(stale_keys)
+        self._last_user_cache = {
+            "hitCount": len(cached),
+            "missCount": len(stale_keys),
+            "refreshQueued": queued,
+        }
+        return {key: str(row.get("display_name") or "") for key, row in cached.items()}
+
+    def _queue_user_refresh(self, keys: list[str]) -> int:
+        if self.user_cache_repo is None:
+            return 0
+        with self._refresh_lock:
+            to_refresh = [
+                key for key in sorted({key for key in keys if key})
+                if key not in self._refreshing_user_keys
+            ]
+            self._refreshing_user_keys.update(to_refresh)
+        if not to_refresh:
+            return 0
+        thread = threading.Thread(
+            target=self._refresh_user_names,
+            args=(to_refresh,),
+            daemon=True,
+            name="jira-user-cache-refresh",
+        )
+        thread.start()
+        return len(to_refresh)
+
+    def _refresh_user_names(self, keys: list[str]) -> None:
+        rows: list[dict[str, Any]] = []
+        try:
+            for key in keys:
+                try:
+                    user = self._get_json("/rest/api/2/user", {"key": key})
+                except requests.RequestException:
+                    continue
+                rows.append({
+                    "userKey": key,
+                    "displayName": user.get("displayName") or user.get("name") or key,
+                })
+                if len(rows) >= 20:
+                    self.user_cache_repo.upsert_many(rows)
+                    rows = []
+            if rows:
+                self.user_cache_repo.upsert_many(rows)
+        finally:
+            with self._refresh_lock:
+                for key in keys:
+                    self._refreshing_user_keys.discard(key)
+
+    def _apply_user_names(self, cycle_report: dict[str, Any], user_names: dict[str, str]) -> None:
+        for test_case in cycle_report.get("testCases") or []:
+            for field in ("assignedTo", "executedBy"):
+                raw = str(test_case.get(field) or "")
+                if raw in user_names and user_names[raw]:
+                    test_case[field] = user_names[raw]
 
     def _fill_test_case_names(self, names: dict[str, str], keys: list[str]) -> None:
         for key in keys:

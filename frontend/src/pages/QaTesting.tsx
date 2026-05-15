@@ -509,6 +509,12 @@ export function QaTesting() {
               {report.nameCache.refreshQueued > 0 ? `, ${report.nameCache.refreshQueued} queued for background refresh` : ""}.
             </>
           ) : null}
+          {report.userCache ? (
+            <>
+              {" "}Jira users: {report.userCache.hitCount} cached
+              {report.userCache.refreshQueued > 0 ? `, ${report.userCache.refreshQueued} queued for background refresh` : ""}.
+            </>
+          ) : null}
         </div>
       ) : null}
 
