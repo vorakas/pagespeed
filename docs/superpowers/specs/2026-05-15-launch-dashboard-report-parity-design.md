@@ -149,6 +149,8 @@ The new report sections should sit beside or above those panels, but not change 
 
 Create a local validation path that parses the workbook `Adobe Commerce - Path to Launch.xlsx` and compares the Pharos launch-report response row by row.
 
+The spreadsheet is not a continuously fresh source. It is updated roughly once or twice per day, while Pharos pulls Jira/Vault data hourly. Validation must therefore be timestamp-aware: a mismatch is only a parity defect when the compared data windows are aligned or when the delta cannot be explained by spreadsheet staleness.
+
 Validation should report:
 
 - exact row matches
@@ -157,8 +159,18 @@ Validation should report:
 - passed/failed TC deltas
 - rows missing from Pharos
 - rows with Jira data that cannot be explained by Epic Link or `AC-P1`
+- spreadsheet snapshot timestamp when available
+- Pharos sync timestamp
+- freshness delta between spreadsheet and Pharos data
 
 The workbook is a validation fixture, not a production data source.
+
+Validation output should classify deltas as:
+
+- `matched`: values align
+- `freshness-drift`: Pharos is newer than the spreadsheet and the difference may be expected
+- `mapping-gap`: Epic Link, label, or row membership cannot explain the difference
+- `data-gap`: expected Jira fields are missing or unresolved
 
 ## UI Design
 
