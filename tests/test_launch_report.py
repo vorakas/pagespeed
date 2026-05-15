@@ -35,6 +35,12 @@ def row_by_name(report, section, name):
 
 
 class LaunchReportTest(unittest.TestCase):
+    def test_report_contains_fixed_canonical_row_counts(self):
+        report = build_launch_report([])
+
+        self.assertEqual(len(report["lampsPlusDevelopment"]["rows"]), 25)
+        self.assertEqual(len(report["e2eTesting"]["rows"]), 32)
+
     def test_development_rollup_resolves_epic_link_key_to_spreadsheet_grouping(self):
         report = build_launch_report([
             task("ACM-4", "AC Implementation - Commerce Implementation", task_type="Epic"),
@@ -132,6 +138,14 @@ class LaunchReportTest(unittest.TestCase):
 
         row = row_by_name(report, "e2eTesting", "AC E2E - Account Management")
 
+        self.assertEqual(row["epicKey"], "ACE2E-33")
+        self.assertEqual(row["phaseLabel"], "AC-P1")
+        self.assertIn("countedIssueCount", row["diagnostics"])
+        self.assertIn("excludedIssueCount", row["diagnostics"])
+        self.assertIn("missingEpicLinkCount", row["diagnostics"])
+        self.assertIn("unresolvedEpicNameCount", row["diagnostics"])
+        self.assertIn("missingPhaseLabelCount", row["diagnostics"])
+        self.assertIn("missingEstimateCount", row["diagnostics"])
         self.assertEqual(row["passedTc"], 1)
         self.assertEqual(row["failedTc"], 1)
         self.assertEqual(row["completedHours"], 1)
