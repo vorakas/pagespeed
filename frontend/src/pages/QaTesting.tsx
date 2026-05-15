@@ -52,6 +52,7 @@ function formatDate(value: string) {
 
 function statusClass(status: string) {
   const normalized = status.toLowerCase()
+  if (normalized === "not executed") return "bg-slate-500/15 text-slate-700 dark:text-slate-300"
   if (["pass", "passed", "done"].includes(normalized)) return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
   if (["fail", "failed"].includes(normalized)) return "bg-red-500/10 text-red-700 dark:text-red-300"
   if (normalized.includes("progress")) return "bg-blue-500/10 text-blue-700 dark:text-blue-300"
@@ -286,7 +287,7 @@ function CycleCard({ cycle }: { cycle: QaTestCycle }) {
           <div className="text-sm text-muted-foreground">{cycle.folder}</div>
           <div className="flex flex-wrap gap-2">
             {statusEntries.map(([status, count]) => (
-              <Badge key={status} variant="outline" className={statusClass(status)}>
+              <Badge key={status} className={statusClass(status)}>
                 {status}: {count}
               </Badge>
             ))}
