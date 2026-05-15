@@ -12,6 +12,7 @@ import {
   Waves,
   Network,
   CircleHelp,
+  ClipboardCheck,
   Settings,
   Sun,
   Moon,
@@ -44,6 +45,7 @@ const NAV: NavSection[] = [
         activePrefix: "/dashboard/workstreams",
       },
       { label: "Requirement Questions", href: "/dashboard/requirements", icon: CircleHelp },
+      { label: "QA Testing", href: "/dashboard/qa-testing", icon: ClipboardCheck },
     ],
   },
   {

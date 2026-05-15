@@ -1435,6 +1435,82 @@ export interface AiUsageSummary {
   recent: AiUsageEvent[]
 }
 
+// ---------- QA Testing ----------
+
+export interface QaTestCase {
+  id?: number | string | null
+  key: string
+  name: string
+  status: string
+  assignedTo: string
+  executedBy: string
+  executedAt?: string | null
+  plannedStartDate?: string | null
+  plannedEndDate?: string | null
+  inRange: boolean
+}
+
+export interface QaTestCycle {
+  key: string
+  name: string
+  folder: string
+  section: string
+  status: string
+  totalCases: number
+  executedCases: number
+  executedInRange: number
+  progressPercent: number
+  rangeProgressPercent: number
+  statusCounts: Record<string, number>
+  rangeStatusCounts: Record<string, number>
+  testCases: QaTestCase[]
+  updatedOn?: string | null
+}
+
+export interface QaBurndownPoint {
+  date: string
+  executed: number
+  remaining: number
+}
+
+export interface QaTaskStatusChange {
+  key: string
+  summary: string
+  issueType: string
+  currentStatus: string
+  assignee: string
+  fromStatus: string
+  toStatus: string
+  changedAt: string
+  changedBy: string
+}
+
+export interface QaTestingReport {
+  range: {
+    start: string
+    end: string
+  }
+  summary: {
+    cycleCount: number
+    totalCases: number
+    executedCases: number
+    executedInRange: number
+    remainingCases: number
+    progressPercent: number
+    rangeProgressPercent: number
+    statusCounts: Record<string, number>
+    rangeStatusCounts: Record<string, number>
+    taskStatusChanges: number
+  }
+  cycles: QaTestCycle[]
+  burndown: QaBurndownPoint[]
+  taskMovement: {
+    jql: string
+    totalChanges: number
+    changes: QaTaskStatusChange[]
+  }
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {

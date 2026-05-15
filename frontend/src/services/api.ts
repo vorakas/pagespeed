@@ -68,6 +68,7 @@ import type {
   RequirementCommonQuestion,
   RequirementKnowledgeBase,
   RequirementSource,
+  QaTestingReport,
   AiUsageSummary,
 } from "@/types"
 
@@ -964,6 +965,11 @@ class ApiClient {
 
   async getRequirementCommonQuestions(kbId: number): Promise<RequirementCommonQuestion[]> {
     return this.request(`/api/requirements/knowledge-bases/${kbId}/common-questions`)
+  }
+
+  async getQaTestingReport(start: string, end: string): Promise<QaTestingReport> {
+    const params = new URLSearchParams({ start, end })
+    return this.request(`/api/requirements/qa-testing/report?${params.toString()}`)
   }
 
   async addRequirementTaskSource(kbId: number, sourcePath: string): Promise<RequirementSource> {

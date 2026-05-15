@@ -30,6 +30,7 @@ from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService
+from services.qa_testing_service import QaTestingReportService
 from services.requirement_kb_service import RequirementKbService
 from services.site_service import SiteService
 from services.snapshot_service import SnapshotService
@@ -63,6 +64,7 @@ def register_blueprints(
     applitools_helper_token: "str | None" = None,
     requirement_service: "RequirementKbService | None" = None,
     ai_config_service: "AiConfigService | None" = None,
+    qa_testing_service: "QaTestingReportService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -82,7 +84,11 @@ def register_blueprints(
     app.register_blueprint(create_azure_blueprint())
     app.register_blueprint(create_ai_blueprint(ai_config_service))
     if requirement_service is not None:
-        app.register_blueprint(create_requirements_blueprint(requirement_service, ai_config_service))
+        app.register_blueprint(create_requirements_blueprint(
+            requirement_service,
+            ai_config_service,
+            qa_testing_service,
+        ))
     app.register_blueprint(create_devops_blueprint(
         server_pat=devops_pat,
         server_organization=devops_organization,

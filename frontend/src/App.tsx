@@ -30,6 +30,7 @@ const ProjectDashboard = lazy(() =>
 const RequirementQuestions = lazy(() =>
   import("@/pages/RequirementQuestions").then((module) => ({ default: module.RequirementQuestions })),
 )
+const QaTesting = lazy(() => import("@/pages/QaTesting").then((module) => ({ default: module.QaTesting })))
 
 function RouteFallback() {
   return (
@@ -63,6 +64,7 @@ export default function App() {
                   <Route path="dashboard/history" element={<StatusHistory />} />
                   <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
                   <Route path="dashboard/requirements" element={<RequirementQuestions />} />
+                  <Route path="dashboard/qa-testing" element={<QaTesting />} />
                   <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>

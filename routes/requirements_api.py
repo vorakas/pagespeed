@@ -4,17 +4,28 @@ from __future__ import annotations
 
 import io
 
+from datetime import datetime, timedelta, timezone
+
+import requests
 from flask import Blueprint, jsonify, request, send_file
 
 from services.ai_config_service import AiConfigService
+from services.qa_testing_service import QaTestingReportService, parse_jira_datetime
 from services.requirement_kb_service import RequirementKbService
 
 
 def create_requirements_blueprint(
     requirement_service: RequirementKbService,
     ai_config_service: AiConfigService | None = None,
+    qa_testing_service: QaTestingReportService | None = None,
 ) -> Blueprint:
     bp = Blueprint("requirements_api", __name__, url_prefix="/api/requirements")
+
+    def _parse_range_param(name: str) -> datetime | None:
+        raw = request.args.get(name)
+        if not raw:
+            return None
+        return parse_jira_datetime(raw)
 
     @bp.get("/knowledge-bases")
     def list_knowledge_bases():
@@ -34,6 +45,24 @@ def create_requirements_blueprint(
     @bp.post("/seed/calculator")
     def seed_calculator():
         return jsonify(requirement_service.ensure_calculator_seed())
+
+    @bp.get("/qa-testing/report")
+    def qa_testing_report():
+        if qa_testing_service is None:
+            return jsonify({"error": "QA testing report service is not configured"}), 503
+        end = _parse_range_param("end") or datetime.now(timezone.utc)
+        start = _parse_range_param("start") or (end - timedelta(days=1))
+        if end < start:
+            return jsonify({"error": "end must be after start"}), 400
+        try:
+            return jsonify(qa_testing_service.build_report(start, end))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except requests.HTTPError as exc:
+            status_code = exc.response.status_code if exc.response is not None else 502
+            return jsonify({"error": "Jira API request failed", "details": str(exc)}), status_code
+        except requests.RequestException as exc:
+            return jsonify({"error": "Jira API request failed", "details": str(exc)}), 502
 
     @bp.post("/discover")
     def discover_candidates():

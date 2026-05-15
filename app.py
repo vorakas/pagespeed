@@ -85,6 +85,7 @@ from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService, SyncAlreadyRunning
 from services.obsidian_sync.vault_reader import VaultReader
+from services.qa_testing_service import QaTestingReportService
 from services.requirement_kb_service import RequirementKbService
 from services.scheduling_window import ActiveHoursWindow
 from services.snapshot_service import SnapshotService
@@ -309,6 +310,10 @@ def create_app() -> Flask:
 
     ai_config_service = AiConfigService(conn_mgr)
     requirement_service = RequirementKbService(conn_mgr, OBSIDIAN_VAULT_ROOT)
+    qa_testing_service = QaTestingReportService(
+        jira_pat=JIRA_PAT or "",
+        jira_base_url=JIRA_BASE_URL,
+    )
 
     # ---- Migration status snapshots (history + what-changed-today) ----
     snapshot_repo = SnapshotRepository(conn_mgr)
@@ -525,6 +530,7 @@ def create_app() -> Flask:
         applitools_helper_token=APPLITOOLS_HELPER_TOKEN,
         requirement_service=requirement_service,
         ai_config_service=ai_config_service,
+        qa_testing_service=qa_testing_service,
     )
 
     # ---- Centralized error handlers ----
