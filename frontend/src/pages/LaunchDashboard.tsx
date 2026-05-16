@@ -5,8 +5,6 @@ import { api } from "@/services/api"
 import { LaunchShell } from "@/components/launch-dashboard/LaunchShell"
 import { LeftRail } from "@/components/launch-dashboard/LeftRail"
 import { HeroStrip, type HeroIssueKpi } from "@/components/launch-dashboard/HeroStrip"
-import { P1Burndown } from "@/components/launch-dashboard/P1Burndown"
-import { TaskStatusStrip } from "@/components/launch-dashboard/TaskStatusStrip"
 import {
   IncidentStream,
 } from "@/components/launch-dashboard/IncidentStream"
@@ -18,10 +16,8 @@ import {
 import { SidePanel, type SidePanelTarget } from "@/components/launch-dashboard/SidePanel"
 import { WhatChangedToday } from "@/components/launch-dashboard/WhatChangedToday"
 import { LaunchPriorityDailyStatus } from "@/components/launch-dashboard/LaunchPriorityDailyStatus"
-import { EpicProgress } from "@/components/launch-dashboard/EpicProgress"
 import { LaunchReportSections } from "@/components/launch-dashboard/LaunchReportSections"
 import type {
-  EpicProgressResponse,
   LaunchReportResponse,
   MigrationLaunchPriorities,
   MigrationBlocker,
@@ -29,7 +25,6 @@ import type {
   MigrationKpis,
   MigrationSnapshotDiffResponse,
   MigrationSource,
-  MigrationTaskStatusRow,
   MigrationWorkstream,
   RawTaskRecord,
 } from "@/types"
@@ -63,10 +58,8 @@ export function LaunchDashboard() {
   const [prodFailures, setProdFailures] = useState<RawTaskRecord[] | null>(null)
   const [newBugs, setNewBugs] = useState<RawTaskRecord[] | null>(null)
   const [newBugs24h, setNewBugs24h] = useState<RawTaskRecord[] | null>(null)
-  const [taskStatus, setTaskStatus] = useState<MigrationTaskStatusRow[] | null>(null)
   const [launchPriorities, setLaunchPriorities] = useState<MigrationLaunchPriorities | null>(null)
   const [sources, setSources] = useState<MigrationSource[] | null>(null)
-  const [epicProgress, setEpicProgress] = useState<EpicProgressResponse | null>(null)
   const [snapshotDiff, setSnapshotDiff] = useState<MigrationSnapshotDiffResponse | null>(null)
   const [launchReport, setLaunchReport] = useState<LaunchReportResponse | null>(null)
   const [launchReportError, setLaunchReportError] = useState<string | null>(null)
@@ -125,9 +118,7 @@ export function LaunchDashboard() {
       setNewBugs(overview.newBugs)
       setNewBugs24h(bugs24h)
       setLaunchPriorities(overview.launchPriorities)
-      setTaskStatus(overview.taskStatus)
       setSources(overview.sources)
-      setEpicProgress(overview.epicProgress)
       setSnapshotDiff(overview.snapshotDiff)
       setLaunchReport(reportResult.data)
       setLaunchReportError(reportResult.error)
@@ -228,19 +219,6 @@ export function LaunchDashboard() {
             snapshot={snapshotDiff?.latest ?? null}
             launchPriorities={launchPriorities}
           />
-
-          <EpicProgress data={epicProgress} />
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1.6fr 1fr",
-              gap: 14,
-            }}
-          >
-            <P1Burndown launchPriorities={launchPriorities} />
-            {taskStatus && <TaskStatusStrip rows={taskStatus} />}
-          </div>
         </main>
 
         <IncidentStream
