@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
+import { buildQaBurndown } from "@/lib/qaBurndown"
 import { api } from "@/services/api"
 import type { QaTaskStatusChange, QaTestCase, QaTestCycle, QaTestingReport } from "@/types"
 
@@ -135,12 +136,10 @@ function initialStoredRanges() {
   }
 }
 
-function reportRequestKey(start: string, end: string, burndownStart: string, burndownEnd: string) {
+function reportRequestKey(start: string, end: string) {
   return [
     fromLocalPickerValue(start),
     fromLocalPickerValue(end),
-    fromLocalPickerValue(burndownStart),
-    fromLocalPickerValue(burndownEnd),
     "tasks:sinceYesterday",
   ].join("|")
 }
@@ -468,7 +467,9 @@ export function QaTesting() {
   const [end, setEnd] = useState(toLocalPickerValue(initialRanges.range.end))
   const [burndownStart, setBurndownStart] = useState(toLocalPickerValue(initialRanges.burndownRange.start))
   const [burndownEnd, setBurndownEnd] = useState(toLocalPickerValue(initialRanges.burndownRange.end))
-  const currentRequestKey = reportRequestKey(start, end, burndownStart, burndownEnd)
+  const [appliedBurndownStart, setAppliedBurndownStart] = useState(burndownStart)
+  const [appliedBurndownEnd, setAppliedBurndownEnd] = useState(burndownEnd)
+  const currentRequestKey = reportRequestKey(start, end)
   const [report, setReport] = useState<QaTestingReport | null>(() => readStoredReport(currentRequestKey))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -543,6 +544,11 @@ export function QaTesting() {
     setEnd(toLocalPickerValue(next.end))
   }
 
+  function applyBurndownRange() {
+    setAppliedBurndownStart(burndownStart)
+    setAppliedBurndownEnd(burndownEnd)
+  }
+
   const groupedCycles = useMemo(() => {
     const groups = new Map<string, QaTestCycle[]>()
     for (const cycle of report?.cycles ?? []) {
@@ -579,6 +585,18 @@ export function QaTesting() {
           })),
       ),
     [report],
+  )
+
+  const burndownData = useMemo(
+    () =>
+      report
+        ? buildQaBurndown(
+          report.cycles,
+          fromLocalPickerValue(appliedBurndownStart),
+          fromLocalPickerValue(appliedBurndownEnd),
+        )
+        : [],
+    [appliedBurndownEnd, appliedBurndownStart, report],
   )
 
   return (
@@ -719,15 +737,15 @@ export function QaTesting() {
                 <span className="pb-2 text-sm font-medium text-foreground">Burndown Range:</span>
                 <DateTimePicker value={burndownStart} onChange={setBurndownStart} />
                 <DateTimePicker value={burndownEnd} onChange={setBurndownEnd} />
-                <Button type="button" variant="secondary" onClick={() => loadReport(true)} disabled={loading}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                <Button type="button" variant="secondary" onClick={applyBurndownRange}>
+                  <RefreshCw className="h-4 w-4" />
                   Apply
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={report.burndown} margin={{ left: 4, right: 16, top: 12, bottom: 0 }}>
+                <AreaChart data={burndownData} margin={{ left: 4, right: 16, top: 12, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(226, 232, 240, 0.24)" />
                   <XAxis
                     dataKey="date"
@@ -744,7 +762,10 @@ export function QaTesting() {
                     axisLine={{ stroke: "rgba(226, 232, 240, 0.32)" }}
                     tickLine={{ stroke: "rgba(226, 232, 240, 0.32)" }}
                   />
-                  <Tooltip labelFormatter={formatDate} />
+                  <Tooltip
+                    labelFormatter={formatDate}
+                    labelStyle={{ color: "rgb(15, 23, 42)", fontWeight: 700 }}
+                  />
                   <Area type="monotone" dataKey="remaining" stackId="1" stroke="#ef4444" fill="#ef444433" name="Remaining" />
                   <Area type="monotone" dataKey="executed" stackId="2" stroke="#10b981" fill="#10b98133" name="Executed" />
                 </AreaChart>
