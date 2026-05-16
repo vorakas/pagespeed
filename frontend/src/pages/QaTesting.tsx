@@ -26,6 +26,13 @@ import { api } from "@/services/api"
 import type { QaTaskStatusChange, QaTestCase, QaTestCycle, QaTestingReport } from "@/types"
 
 type Preset = "24h" | "sinceYesterday" | "today" | "yesterday" | "7d" | "custom"
+const QA_RANGE_SESSION_KEY = "qaTestingRange"
+
+function snapToQuarterHour(date: Date) {
+  const snapped = new Date(date)
+  snapped.setMinutes(Math.floor(snapped.getMinutes() / 15) * 15, 0, 0)
+  return snapped
+}
 
 function toLocalPickerValue(date: Date) {
   const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
@@ -61,7 +68,7 @@ function statusClass(status: string) {
 }
 
 function applyPreset(preset: Preset) {
-  const now = new Date()
+  const now = snapToQuarterHour(new Date())
   if (preset === "24h") {
     return { start: new Date(now.getTime() - 24 * 60 * 60 * 1000), end: now }
   }
@@ -89,6 +96,35 @@ function applyPreset(preset: Preset) {
     return { start, end: now }
   }
   return { start: new Date(now.getTime() - 24 * 60 * 60 * 1000), end: now }
+}
+
+function initialStoredRanges() {
+  const fallbackRange = applyPreset("24h")
+  const fallbackBurndownRange = applyPreset("7d")
+  if (typeof window === "undefined") {
+    return {
+      range: fallbackRange,
+      burndownRange: fallbackBurndownRange,
+      preset: "24h" as Preset,
+    }
+  }
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(QA_RANGE_SESSION_KEY) || "{}")
+    if (stored?.start && stored?.end && stored?.burndownStart && stored?.burndownEnd) {
+      return {
+        range: { start: new Date(stored.start), end: new Date(stored.end) },
+        burndownRange: { start: new Date(stored.burndownStart), end: new Date(stored.burndownEnd) },
+        preset: (stored.preset || "custom") as Preset,
+      }
+    }
+  } catch {
+    // Ignore malformed session state and fall back to stable defaults.
+  }
+  return {
+    range: fallbackRange,
+    burndownRange: fallbackBurndownRange,
+    preset: "24h" as Preset,
+  }
 }
 
 function SummaryCard({
@@ -383,13 +419,12 @@ function TaskMovementTable({ changes, constrained = false }: { changes: QaTaskSt
 }
 
 export function QaTesting() {
-  const initialRange = useMemo(() => applyPreset("24h"), [])
-  const initialBurndownRange = useMemo(() => applyPreset("7d"), [])
-  const [preset, setPreset] = useState<Preset>("24h")
-  const [start, setStart] = useState(toLocalPickerValue(initialRange.start))
-  const [end, setEnd] = useState(toLocalPickerValue(initialRange.end))
-  const [burndownStart, setBurndownStart] = useState(toLocalPickerValue(initialBurndownRange.start))
-  const [burndownEnd, setBurndownEnd] = useState(toLocalPickerValue(initialBurndownRange.end))
+  const initialRanges = useMemo(() => initialStoredRanges(), [])
+  const [preset, setPreset] = useState<Preset>(initialRanges.preset)
+  const [start, setStart] = useState(toLocalPickerValue(initialRanges.range.start))
+  const [end, setEnd] = useState(toLocalPickerValue(initialRanges.range.end))
+  const [burndownStart, setBurndownStart] = useState(toLocalPickerValue(initialRanges.burndownRange.start))
+  const [burndownEnd, setBurndownEnd] = useState(toLocalPickerValue(initialRanges.burndownRange.end))
   const [report, setReport] = useState<QaTestingReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -420,6 +455,16 @@ export function QaTesting() {
     void loadReport()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    window.sessionStorage.setItem(QA_RANGE_SESSION_KEY, JSON.stringify({
+      preset,
+      start: fromLocalPickerValue(start),
+      end: fromLocalPickerValue(end),
+      burndownStart: fromLocalPickerValue(burndownStart),
+      burndownEnd: fromLocalPickerValue(burndownEnd),
+    }))
+  }, [preset, start, end, burndownStart, burndownEnd])
 
   const waitingForInitialSnapshot = Boolean(
     report?.cache?.refreshInProgress
