@@ -27,6 +27,7 @@ import type { QaTaskStatusChange, QaTestCase, QaTestCycle, QaTestingReport } fro
 
 type Preset = "24h" | "sinceYesterday" | "today" | "yesterday" | "7d" | "custom"
 const QA_RANGE_SESSION_KEY = "qaTestingRange"
+const QA_REPORT_SESSION_KEY = "qaTestingReportSnapshot"
 
 function snapToQuarterHour(date: Date) {
   const snapped = new Date(date)
@@ -125,6 +126,41 @@ function initialStoredRanges() {
     burndownRange: fallbackBurndownRange,
     preset: "24h" as Preset,
   }
+}
+
+function reportRequestKey(start: string, end: string, burndownStart: string, burndownEnd: string) {
+  return [
+    fromLocalPickerValue(start),
+    fromLocalPickerValue(end),
+    fromLocalPickerValue(burndownStart),
+    fromLocalPickerValue(burndownEnd),
+    "tasks:sinceYesterday",
+  ].join("|")
+}
+
+function readStoredReport(requestKey: string) {
+  if (typeof window === "undefined") return null
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(QA_REPORT_SESSION_KEY) || "{}")
+    if (stored?.requestKey === requestKey && stored?.report) {
+      return stored.report as QaTestingReport
+    }
+  } catch {
+    // Ignore malformed snapshots.
+  }
+  return null
+}
+
+function storeReportSnapshot(requestKey: string, report: QaTestingReport) {
+  if (typeof window === "undefined") return
+  if (report.summary.cycleCount === 0 && report.summary.totalCases === 0 && report.cache?.refreshInProgress) {
+    return
+  }
+  window.sessionStorage.setItem(QA_REPORT_SESSION_KEY, JSON.stringify({
+    requestKey,
+    savedAt: new Date().toISOString(),
+    report,
+  }))
 }
 
 function SummaryCard({
@@ -425,7 +461,8 @@ export function QaTesting() {
   const [end, setEnd] = useState(toLocalPickerValue(initialRanges.range.end))
   const [burndownStart, setBurndownStart] = useState(toLocalPickerValue(initialRanges.burndownRange.start))
   const [burndownEnd, setBurndownEnd] = useState(toLocalPickerValue(initialRanges.burndownRange.end))
-  const [report, setReport] = useState<QaTestingReport | null>(null)
+  const currentRequestKey = reportRequestKey(start, end, burndownStart, burndownEnd)
+  const [report, setReport] = useState<QaTestingReport | null>(() => readStoredReport(currentRequestKey))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rangeDialogOpen, setRangeDialogOpen] = useState(false)
@@ -436,14 +473,16 @@ export function QaTesting() {
     setLoading(true)
     setError(null)
     try {
-      setReport(await api.getQaTestingReport(
+      const nextReport = await api.getQaTestingReport(
         fromLocalPickerValue(start),
         fromLocalPickerValue(end),
         forceRefresh,
         "sinceYesterday",
         fromLocalPickerValue(burndownStart),
         fromLocalPickerValue(burndownEnd),
-      ))
+      )
+      setReport(nextReport)
+      storeReportSnapshot(currentRequestKey, nextReport)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load QA testing report")
     } finally {
@@ -452,7 +491,9 @@ export function QaTesting() {
   }
 
   useEffect(() => {
-    void loadReport()
+    if (!report) {
+      void loadReport()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -465,6 +506,11 @@ export function QaTesting() {
       burndownEnd: fromLocalPickerValue(burndownEnd),
     }))
   }, [preset, start, end, burndownStart, burndownEnd])
+
+  useEffect(() => {
+    const storedReport = readStoredReport(currentRequestKey)
+    setReport(storedReport)
+  }, [currentRequestKey])
 
   const waitingForInitialSnapshot = Boolean(
     report?.cache?.refreshInProgress
