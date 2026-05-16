@@ -54,6 +54,10 @@ def create_requirements_blueprint(
         start = _parse_range_param("start") or (end - timedelta(days=1))
         if end < start:
             return jsonify({"error": "end must be after start"}), 400
+        burndown_end = _parse_range_param("burndownEnd") or end
+        burndown_start = _parse_range_param("burndownStart") or (burndown_end - timedelta(days=7))
+        if burndown_end < burndown_start:
+            return jsonify({"error": "burndownEnd must be after burndownStart"}), 400
         force_refresh = request.args.get("forceRefresh", "").lower() in {"1", "true", "yes"}
         raw_task_window = request.args.get("taskWindow") or TaskWindow.SINCE_YESTERDAY.value
         try:
@@ -66,6 +70,8 @@ def create_requirements_blueprint(
                 end,
                 force_refresh=force_refresh,
                 task_window=task_window,
+                burndown_start=burndown_start,
+                burndown_end=burndown_end,
             ))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400

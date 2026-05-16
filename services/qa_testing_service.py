@@ -299,13 +299,19 @@ class QaTestingReportService:
         end: datetime,
         force_refresh: bool = False,
         task_window: TaskWindow = TaskWindow.SINCE_YESTERDAY,
+        burndown_start: datetime | None = None,
+        burndown_end: datetime | None = None,
     ) -> dict[str, Any]:
         if not self.jira_pat:
             raise ValueError("JIRA_PAT is not configured")
         if end < start:
             raise ValueError("end must be after start")
+        burndown_start = burndown_start or start
+        burndown_end = burndown_end or end
+        if burndown_end < burndown_start:
+            raise ValueError("burndownEnd must be after burndownStart")
 
-        cache_key = self._cache_key(start, end, task_window)
+        cache_key = self._cache_key(start, end, task_window, burndown_start, burndown_end)
         if self.report_cache_repo is not None:
             return self._build_report_with_persistent_cache(
                 cache_key,
@@ -313,6 +319,8 @@ class QaTestingReportService:
                 end,
                 force_refresh,
                 task_window,
+                burndown_start,
+                burndown_end,
             )
 
         cached = self._report_cache.get(cache_key)
@@ -330,7 +338,7 @@ class QaTestingReportService:
                 }
                 return report
 
-        report = self._build_report_uncached(start, end, task_window)
+        report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end)
         self._report_cache[cache_key] = (now, deepcopy(report))
         report["cache"] = {
             "hit": False,
@@ -348,6 +356,8 @@ class QaTestingReportService:
         start: datetime,
         end: datetime,
         task_window: TaskWindow,
+        burndown_start: datetime,
+        burndown_end: datetime,
     ) -> dict[str, Any]:
         self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
         self._last_user_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
@@ -356,9 +366,10 @@ class QaTestingReportService:
         summary = self._summarize(cycles, task_changes)
         report = {
             "range": {"start": to_iso(start), "end": to_iso(end)},
+            "burndownRange": {"start": to_iso(burndown_start), "end": to_iso(burndown_end)},
             "summary": summary,
             "cycles": cycles,
-            "burndown": build_daily_burndown(cycles, start, end),
+            "burndown": build_daily_burndown(cycles, burndown_start, burndown_end),
             "taskMovement": {
                 "jql": build_status_change_jql(start, end, task_window=task_window),
                 "totalChanges": len(task_changes),
@@ -376,6 +387,8 @@ class QaTestingReportService:
         end: datetime,
         force_refresh: bool,
         task_window: TaskWindow,
+        burndown_start: datetime,
+        burndown_end: datetime,
     ) -> dict[str, Any]:
         cached = self.report_cache_repo.get(cache_key)
         now = datetime.now(timezone.utc)
@@ -405,7 +418,7 @@ class QaTestingReportService:
         if cached_report is not None and not force_refresh and not cached_has_name_misses:
             started = self._try_start_persistent_refresh(cache_key, start, end, task_window)
             if started:
-                self._start_report_refresh_thread(cache_key, start, end, task_window)
+                self._start_report_refresh_thread(cache_key, start, end, task_window, burndown_start, burndown_end)
             return self._attach_cache_metadata(
                 cached_report,
                 cache_key,
@@ -427,7 +440,7 @@ class QaTestingReportService:
                     refresh_in_progress=True,
                 )
             return self._attach_cache_metadata(
-                self._empty_report(start, end, task_window),
+                self._empty_report(start, end, task_window, burndown_start, burndown_end),
                 cache_key,
                 self.report_cache_repo.get(cache_key) or {},
                 hit=False,
@@ -436,7 +449,7 @@ class QaTestingReportService:
             )
 
         try:
-            report = self._build_report_uncached(start, end, task_window)
+            report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end)
             self._save_persistent_report(cache_key, start, end, task_window, report)
             return self._attach_cache_metadata(
                 report,
@@ -494,10 +507,12 @@ class QaTestingReportService:
         start: datetime,
         end: datetime,
         task_window: TaskWindow,
+        burndown_start: datetime,
+        burndown_end: datetime,
     ) -> None:
         thread = threading.Thread(
             target=self._refresh_report_cache,
-            args=(cache_key, start, end, task_window),
+            args=(cache_key, start, end, task_window, burndown_start, burndown_end),
             daemon=True,
             name="qa-report-cache-refresh",
         )
@@ -509,9 +524,11 @@ class QaTestingReportService:
         start: datetime,
         end: datetime,
         task_window: TaskWindow,
+        burndown_start: datetime,
+        burndown_end: datetime,
     ) -> None:
         try:
-            report = self._build_report_uncached(start, end, task_window)
+            report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end)
             self._save_persistent_report(cache_key, start, end, task_window, report)
         except Exception as exc:
             self.report_cache_repo.mark_refresh_failed(cache_key, str(exc))
@@ -539,9 +556,17 @@ class QaTestingReportService:
         }
         return report
 
-    def _empty_report(self, start: datetime, end: datetime, task_window: TaskWindow) -> dict[str, Any]:
+    def _empty_report(
+        self,
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow,
+        burndown_start: datetime,
+        burndown_end: datetime,
+    ) -> dict[str, Any]:
         return {
             "range": {"start": to_iso(start), "end": to_iso(end)},
+            "burndownRange": {"start": to_iso(burndown_start), "end": to_iso(burndown_end)},
             "summary": {
                 "cycleCount": 0,
                 "totalCases": 0,
@@ -565,10 +590,19 @@ class QaTestingReportService:
             "userCache": {"hitCount": 0, "missCount": 0, "refreshQueued": 0},
         }
 
-    def _cache_key(self, start: datetime, end: datetime, task_window: TaskWindow) -> str:
+    def _cache_key(
+        self,
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow,
+        burndown_start: datetime,
+        burndown_end: datetime,
+    ) -> str:
         start_key = self._cache_bucket(start).strftime("%Y-%m-%dT%H:%MZ")
         end_key = self._cache_bucket(end).strftime("%Y-%m-%dT%H:%MZ")
-        return f"{start_key}|{end_key}|tasks:{task_window.value}"
+        burndown_start_key = self._cache_bucket(burndown_start).strftime("%Y-%m-%dT%H:%MZ")
+        burndown_end_key = self._cache_bucket(burndown_end).strftime("%Y-%m-%dT%H:%MZ")
+        return f"{start_key}|{end_key}|burndown:{burndown_start_key}|{burndown_end_key}|tasks:{task_window.value}"
 
     def _cache_bucket(self, value: datetime) -> datetime:
         utc_value = value.astimezone(timezone.utc)

@@ -1490,6 +1490,10 @@ export interface QaTestingReport {
     start: string
     end: string
   }
+  burndownRange: {
+    start: string
+    end: string
+  }
   summary: {
     cycleCount: number
     totalCases: number

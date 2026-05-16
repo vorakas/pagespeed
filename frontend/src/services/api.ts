@@ -972,9 +972,13 @@ class ApiClient {
     end: string,
     forceRefresh = false,
     taskWindow: "range" | "sinceYesterday" = "sinceYesterday",
+    burndownStart?: string,
+    burndownEnd?: string,
   ): Promise<QaTestingReport> {
     const params = new URLSearchParams({ start, end, taskWindow })
     if (forceRefresh) params.set("forceRefresh", "true")
+    if (burndownStart) params.set("burndownStart", burndownStart)
+    if (burndownEnd) params.set("burndownEnd", burndownEnd)
     return this.request(`/api/requirements/qa-testing/report?${params.toString()}`)
   }
 

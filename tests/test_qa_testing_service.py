@@ -170,6 +170,52 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertTrue(second["cache"]["hit"])
         self.assertEqual(first["cache"]["key"], second["cache"]["key"])
 
+    def test_build_report_uses_separate_burndown_range(self):
+        class FakeService(QaTestingReportService):
+            def __init__(self):
+                super().__init__("token")
+
+            def _fetch_round_cycle_reports(self, start, end):
+                return [
+                    {
+                        "key": "TC-C1",
+                        "name": "Checkout Round 1",
+                        "section": "Checkout",
+                        "totalCases": 1,
+                        "executedCases": 1,
+                        "executedInRange": 0,
+                        "progressPercent": 100,
+                        "rangeProgressPercent": 0,
+                        "statusCounts": {"Pass": 1},
+                        "rangeStatusCounts": {},
+                        "testCases": [
+                            {
+                                "key": "TC-T1",
+                                "name": "Checkout succeeds",
+                                "status": "Pass",
+                                "executedAt": "2026-05-12T12:00:00Z",
+                                "inRange": False,
+                            }
+                        ],
+                    }
+                ]
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return []
+
+        service = FakeService()
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+        burndown_start = datetime(2026, 5, 9, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, burndown_start=burndown_start, burndown_end=end)
+
+        self.assertEqual(report["range"]["start"], "2026-05-14T00:00:00Z")
+        self.assertEqual(report["burndownRange"]["start"], "2026-05-09T00:00:00Z")
+        self.assertEqual(report["burndown"][3]["date"], "2026-05-12")
+        self.assertEqual(report["burndown"][3]["executed"], 1)
+        self.assertEqual(report["burndown"][3]["remaining"], 0)
+
     def test_build_report_cache_key_uses_15_minute_buckets(self):
         class FakeService(QaTestingReportService):
             def __init__(self):
@@ -192,7 +238,10 @@ class QaTestingServiceTest(unittest.TestCase):
         second = service.build_report(start, second_end)
 
         self.assertEqual(service.calls, 1)
-        self.assertEqual(first["cache"]["key"], "2026-05-14T00:00Z|2026-05-15T12:00Z|tasks:sinceYesterday")
+        self.assertEqual(
+            first["cache"]["key"],
+            "2026-05-14T00:00Z|2026-05-15T12:00Z|burndown:2026-05-14T00:00Z|2026-05-15T12:00Z|tasks:sinceYesterday",
+        )
         self.assertTrue(second["cache"]["hit"])
 
     def test_build_report_uses_cached_test_case_names_and_queues_missing_names(self):
@@ -350,7 +399,14 @@ class QaTestingServiceTest(unittest.TestCase):
             def __init__(self):
                 super().__init__("token", report_cache_repo=FakeReportCache())
 
-            def _build_report_uncached(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+            def _build_report_uncached(
+                self,
+                start,
+                end,
+                task_window=TaskWindow.SINCE_YESTERDAY,
+                burndown_start=None,
+                burndown_end=None,
+            ):
                 return {"summary": {"totalCases": 9}, "cycles": [], "burndown": [], "taskMovement": {}}
 
         service = FakeService()
@@ -391,7 +447,14 @@ class QaTestingServiceTest(unittest.TestCase):
             def __init__(self):
                 super().__init__("token", report_cache_repo=FakeReportCache())
 
-            def _build_report_uncached(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+            def _build_report_uncached(
+                self,
+                start,
+                end,
+                task_window=TaskWindow.SINCE_YESTERDAY,
+                burndown_start=None,
+                burndown_end=None,
+            ):
                 return {
                     "summary": {"totalCases": 9},
                     "cycles": [],
@@ -426,7 +489,14 @@ class QaTestingServiceTest(unittest.TestCase):
             def __init__(self):
                 super().__init__("token", report_cache_repo=FakeReportCache())
 
-            def _build_report_uncached(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+            def _build_report_uncached(
+                self,
+                start,
+                end,
+                task_window=TaskWindow.SINCE_YESTERDAY,
+                burndown_start=None,
+                burndown_end=None,
+            ):
                 raise AssertionError("Refresh should not rebuild while another refresh is active")
 
         service = FakeService()
@@ -461,7 +531,15 @@ class QaTestingServiceTest(unittest.TestCase):
                 super().__init__("token", report_cache_repo=cache)
                 self.thread_started = False
 
-            def _start_report_refresh_thread(self, cache_key, start, end, task_window):
+            def _start_report_refresh_thread(
+                self,
+                cache_key,
+                start,
+                end,
+                task_window,
+                burndown_start,
+                burndown_end,
+            ):
                 self.thread_started = True
 
         cache = FakeReportCache()

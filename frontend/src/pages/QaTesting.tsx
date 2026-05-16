@@ -384,9 +384,12 @@ function TaskMovementTable({ changes, constrained = false }: { changes: QaTaskSt
 
 export function QaTesting() {
   const initialRange = useMemo(() => applyPreset("24h"), [])
+  const initialBurndownRange = useMemo(() => applyPreset("7d"), [])
   const [preset, setPreset] = useState<Preset>("24h")
   const [start, setStart] = useState(toLocalPickerValue(initialRange.start))
   const [end, setEnd] = useState(toLocalPickerValue(initialRange.end))
+  const [burndownStart, setBurndownStart] = useState(toLocalPickerValue(initialBurndownRange.start))
+  const [burndownEnd, setBurndownEnd] = useState(toLocalPickerValue(initialBurndownRange.end))
   const [report, setReport] = useState<QaTestingReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -403,6 +406,8 @@ export function QaTesting() {
         fromLocalPickerValue(end),
         forceRefresh,
         "sinceYesterday",
+        fromLocalPickerValue(burndownStart),
+        fromLocalPickerValue(burndownEnd),
       ))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load QA testing report")
@@ -573,9 +578,20 @@ export function QaTesting() {
           />
 
           <Card>
-            <CardHeader>
-              <CardTitle>Burndown</CardTitle>
-              <CardDescription>Executed test cases and remaining cases across the selected range.</CardDescription>
+            <CardHeader className="gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>Burndown</CardTitle>
+                <CardDescription>Executed test cases and remaining cases across the burndown range.</CardDescription>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <span className="pb-2 text-sm font-medium text-foreground">Burndown Range:</span>
+                <DateTimePicker value={burndownStart} onChange={setBurndownStart} />
+                <DateTimePicker value={burndownEnd} onChange={setBurndownEnd} />
+                <Button type="button" variant="secondary" onClick={() => loadReport(true)} disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Apply
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
