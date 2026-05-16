@@ -34,6 +34,7 @@ const RANGE_PRESET_OPTIONS: Array<{ value: Preset; label: string }> = [
   { value: "yesterday", label: "yesterday" },
   { value: "7d", label: "7d" },
 ]
+const CYCLE_SECTION_ORDER = ["Desktop or Tablet", "Mobile", "LP Sections & Pages", "LP Features"]
 const QA_RANGE_SESSION_KEY = "qaTestingRange"
 const QA_REPORT_SESSION_KEY = "qaTestingReportSnapshot"
 
@@ -418,6 +419,46 @@ function CycleCard({ cycle }: { cycle: QaTestCycle }) {
   )
 }
 
+function CycleSectionGroup({ section, cycles }: { section: string; cycles: QaTestCycle[] }) {
+  const totalCases = cycles.reduce((sum, cycle) => sum + cycle.totalCases, 0)
+  const executedCases = cycles.reduce((sum, cycle) => sum + cycle.executedCases, 0)
+  const progressPercent = totalCases > 0 ? Math.round((executedCases / totalCases) * 100) : 0
+
+  return (
+    <details className="group/section overflow-hidden rounded-lg border border-border bg-card">
+      <summary className="grid cursor-pointer gap-4 p-4 md:grid-cols-[minmax(0,1fr)_18rem_2rem]">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-heading text-lg font-semibold tracking-normal">{section}</h3>
+            <Badge variant="outline">{cycles.length} cycles</Badge>
+            <Badge variant="outline">{totalCases} cases</Badge>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {executedCases} executed · {Math.max(totalCases - executedCases, 0)} remaining
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span>Overall progress</span>
+            <span className="font-medium tabular-nums">{progressPercent}%</span>
+          </div>
+          <Progress value={progressPercent} />
+        </div>
+        <ChevronDown className="mt-1 h-5 w-5 text-muted-foreground transition-transform group-open/section:rotate-180" />
+      </summary>
+      <div className="space-y-3 border-t border-border p-3">
+        {cycles.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+            No test cycles in this category.
+          </div>
+        ) : (
+          cycles.map((cycle) => <CycleCard key={cycle.key} cycle={cycle} />)
+        )}
+      </div>
+    </details>
+  )
+}
+
 function TaskMovementTable({ changes, constrained = false }: { changes: QaTaskStatusChange[]; constrained?: boolean }) {
   if (changes.length === 0) {
     return <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">No task status changes matched this range.</div>
@@ -554,7 +595,9 @@ export function QaTesting() {
     for (const cycle of report?.cycles ?? []) {
       groups.set(cycle.section, [...(groups.get(cycle.section) ?? []), cycle])
     }
-    return Array.from(groups.entries())
+    const orderedGroups = CYCLE_SECTION_ORDER.map((section) => [section, groups.get(section) ?? []] as [string, QaTestCycle[]])
+    const extraGroups = Array.from(groups.entries()).filter(([section]) => !CYCLE_SECTION_ORDER.includes(section))
+    return [...orderedGroups, ...extraGroups]
   }, [report])
 
   const rangeExecutedRows = useMemo(
@@ -778,12 +821,7 @@ export function QaTesting() {
               <h2 className="font-heading text-xl font-semibold tracking-normal">Test Cycle Progress</h2>
               <p className="text-sm text-muted-foreground">Expand a cycle to inspect every included test case and its current status.</p>
             </div>
-            {groupedCycles.map(([section, cycles]) => (
-              <div key={section} className="space-y-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{section}</h3>
-                {cycles.map((cycle) => <CycleCard key={cycle.key} cycle={cycle} />)}
-              </div>
-            ))}
+            {groupedCycles.map(([section, cycles]) => <CycleSectionGroup key={section} section={section} cycles={cycles} />)}
           </section>
 
           <Card>
