@@ -417,6 +417,15 @@ class QaTestingReportService:
 
         started = self._try_start_persistent_refresh(cache_key, start, end, task_window)
         if not started:
+            if cached_report is not None:
+                return self._attach_cache_metadata(
+                    cached_report,
+                    cache_key,
+                    self.report_cache_repo.get(cache_key) or cached,
+                    hit=True,
+                    stale=True,
+                    refresh_in_progress=True,
+                )
             return self._attach_cache_metadata(
                 self._empty_report(start, end, task_window),
                 cache_key,
