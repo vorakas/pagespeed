@@ -68,6 +68,33 @@ class QaReportCacheRepositoryTest(unittest.TestCase):
         self.assertEqual(row["refreshStatus"], "failed")
         self.assertEqual(row["refreshError"], "Jira timeout")
 
+    def test_get_latest_successful_returns_most_recent_saved_snapshot(self):
+        self.repo.save_report(
+            "older-key",
+            "2026-05-14T00:00Z",
+            "2026-05-15T00:00Z",
+            "sinceYesterday",
+            {"summary": {"totalCases": 7}},
+        )
+        self.repo.save_report(
+            "newer-key",
+            "2026-05-15T00:00Z",
+            "2026-05-16T00:00Z",
+            "sinceYesterday",
+            {"summary": {"totalCases": 11}},
+        )
+        self.repo.try_start_refresh(
+            "incomplete-key",
+            "2026-05-16T00:00Z",
+            "2026-05-17T00:00Z",
+            "sinceYesterday",
+        )
+
+        row = self.repo.get_latest_successful()
+
+        self.assertEqual(row["cacheKey"], "newer-key")
+        self.assertEqual(row["report"]["summary"]["totalCases"], 11)
+
 
 if __name__ == "__main__":
     unittest.main()

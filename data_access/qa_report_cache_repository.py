@@ -34,6 +34,27 @@ class QaReportCacheRepository:
             raise DatabaseError(f"Failed to read QA report cache: {exc}") from exc
         return _decode_report_row(row)
 
+    def get_latest_successful(self) -> dict[str, Any] | None:
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT cache_key, range_start, range_end, task_window, report_json,
+                           last_refreshed_at, refresh_started_at, refresh_finished_at,
+                           refresh_status, refresh_error
+                    FROM qa_report_cache
+                    WHERE report_json IS NOT NULL
+                      AND last_refreshed_at IS NOT NULL
+                    ORDER BY last_refreshed_at DESC
+                    LIMIT 1
+                    """
+                )
+                row = self._cm.row_to_dict(cursor)
+        except Exception as exc:
+            raise DatabaseError(f"Failed to read latest QA report cache: {exc}") from exc
+        return _decode_report_row(row)
+
     def save_report(
         self,
         cache_key: str,

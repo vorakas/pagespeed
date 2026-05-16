@@ -391,42 +391,34 @@ class QaTestingReportService:
         burndown_end: datetime,
     ) -> dict[str, Any]:
         cached = self.report_cache_repo.get(cache_key)
-        now = datetime.now(timezone.utc)
         cached_report = deepcopy(cached.get("report")) if cached and cached.get("report") else None
-        last_refreshed_at = parse_jira_datetime(cached.get("lastRefreshedAt")) if cached else None
-        is_fresh = (
-            cached_report is not None
-            and last_refreshed_at is not None
-            and (now - last_refreshed_at).total_seconds() <= self.cache_ttl_seconds
-        )
-
         cached_has_name_misses = (
             cached_report is not None
             and self._report_has_name_cache_misses(cached_report)
         )
 
-        if cached_report is not None and is_fresh and not force_refresh and not cached_has_name_misses:
-            return self._attach_cache_metadata(
-                cached_report,
-                cache_key,
-                cached,
-                hit=True,
-                stale=False,
-                refresh_in_progress=False,
-            )
-
-        if cached_report is not None and not force_refresh and not cached_has_name_misses:
-            started = self._try_start_persistent_refresh(cache_key, start, end, task_window)
-            if started:
-                self._start_report_refresh_thread(cache_key, start, end, task_window, burndown_start, burndown_end)
-            return self._attach_cache_metadata(
-                cached_report,
-                cache_key,
-                self.report_cache_repo.get(cache_key) or cached,
-                hit=True,
-                stale=True,
-                refresh_in_progress=started or (cached.get("refreshStatus") == "refreshing"),
-            )
+        if not force_refresh:
+            if cached_report is not None and not cached_has_name_misses:
+                return self._attach_cache_metadata(
+                    cached_report,
+                    cache_key,
+                    cached,
+                    hit=True,
+                    stale=False,
+                    refresh_in_progress=cached.get("refreshStatus") == "refreshing",
+                )
+            latest = self.report_cache_repo.get_latest_successful()
+            latest_report = deepcopy(latest.get("report")) if latest and latest.get("report") else None
+            if latest_report is not None and not self._report_has_name_cache_misses(latest_report):
+                latest_key = latest.get("cacheKey") or cache_key
+                return self._attach_cache_metadata(
+                    latest_report,
+                    latest_key,
+                    latest,
+                    hit=True,
+                    stale=latest_key != cache_key or latest.get("refreshStatus") == "refreshing",
+                    refresh_in_progress=latest.get("refreshStatus") == "refreshing",
+                )
 
         started = self._try_start_persistent_refresh(cache_key, start, end, task_window)
         if not started:

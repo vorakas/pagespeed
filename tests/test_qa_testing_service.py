@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime, timezone
 import unittest
 
@@ -432,6 +433,141 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertTrue(report["cache"]["shared"])
         self.assertFalse(report["cache"]["stale"])
 
+    def test_build_report_uses_latest_shared_snapshot_when_requested_key_missing(self):
+        class FakeReportCache:
+            def __init__(self):
+                self.started = False
+
+            def get(self, cache_key):
+                return None
+
+            def get_latest_successful(self):
+                return {
+                    "cacheKey": "older-default-snapshot",
+                    "report": {"summary": {"totalCases": 11}, "cycles": [], "burndown": [], "taskMovement": {}},
+                    "lastRefreshedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "refreshStatus": "idle",
+                }
+
+            def try_start_refresh(self, *args, **kwargs):
+                self.started = True
+                return True
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cache):
+                super().__init__("token", report_cache_repo=cache)
+
+            def _build_report_uncached(self, *args, **kwargs):
+                raise AssertionError("Normal page load should not refresh when a shared snapshot exists")
+
+        cache = FakeReportCache()
+        service = FakeService(cache)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end)
+
+        self.assertEqual(report["summary"]["totalCases"], 11)
+        self.assertTrue(report["cache"]["hit"])
+        self.assertEqual(report["cache"]["key"], "older-default-snapshot")
+        self.assertFalse(cache.started)
+
+    def test_initial_persistent_load_builds_once_then_reuses_snapshot(self):
+        class FakeReportCache:
+            def __init__(self):
+                self.rows = {}
+                self.started = 0
+
+            def get(self, cache_key):
+                return self.rows.get(cache_key)
+
+            def get_latest_successful(self):
+                rows = list(self.rows.values())
+                return rows[-1] if rows else None
+
+            def try_start_refresh(self, *args, **kwargs):
+                self.started += 1
+                return True
+
+            def save_report(self, cache_key, range_start, range_end, task_window, report):
+                self.rows[cache_key] = {
+                    "cacheKey": cache_key,
+                    "rangeStart": range_start,
+                    "rangeEnd": range_end,
+                    "taskWindow": task_window,
+                    "report": deepcopy(report),
+                    "lastRefreshedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "refreshStatus": "idle",
+                }
+
+            def mark_refresh_failed(self, *args, **kwargs):
+                return None
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cache):
+                super().__init__("token", report_cache_repo=cache)
+                self.build_count = 0
+
+            def _build_report_uncached(self, *args, **kwargs):
+                self.build_count += 1
+                return {"summary": {"totalCases": 13}, "cycles": [], "burndown": [], "taskMovement": {}}
+
+        cache = FakeReportCache()
+        service = FakeService(cache)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        first = service.build_report(start, end)
+        second = service.build_report(start, end)
+        third = service.build_report(start.replace(hour=1), end.replace(hour=1))
+
+        self.assertFalse(first["cache"]["hit"])
+        self.assertTrue(second["cache"]["hit"])
+        self.assertTrue(third["cache"]["hit"])
+        self.assertTrue(third["cache"]["stale"])
+        self.assertEqual(service.build_count, 1)
+        self.assertEqual(cache.started, 1)
+
+    def test_force_refresh_ignores_latest_shared_snapshot_and_rebuilds(self):
+        class FakeReportCache:
+            def get(self, cache_key):
+                return None
+
+            def get_latest_successful(self):
+                return None
+
+            def try_start_refresh(self, *args, **kwargs):
+                return True
+
+            def save_report(self, *args, **kwargs):
+                return None
+
+            def mark_refresh_failed(self, *args, **kwargs):
+                return None
+
+        class FakeService(QaTestingReportService):
+            def __init__(self):
+                super().__init__("token", report_cache_repo=FakeReportCache())
+
+            def _build_report_uncached(
+                self,
+                start,
+                end,
+                task_window=TaskWindow.SINCE_YESTERDAY,
+                burndown_start=None,
+                burndown_end=None,
+            ):
+                return {"summary": {"totalCases": 12}, "cycles": [], "burndown": [], "taskMovement": {}}
+
+        service = FakeService()
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, force_refresh=True)
+
+        self.assertEqual(report["summary"]["totalCases"], 12)
+        self.assertFalse(report["cache"]["hit"])
+
     def test_force_refresh_rebuilds_when_persistent_cache_exists(self):
         class FakeReportCache:
             def get(self, cache_key):
@@ -443,6 +579,9 @@ class QaTestingServiceTest(unittest.TestCase):
 
             def try_start_refresh(self, *args, **kwargs):
                 return True
+
+            def get_latest_successful(self):
+                return None
 
             def save_report(self, *args, **kwargs):
                 return None
@@ -491,6 +630,9 @@ class QaTestingServiceTest(unittest.TestCase):
 
             def try_start_refresh(self, *args, **kwargs):
                 return True
+
+            def get_latest_successful(self):
+                return None
 
             def save_report(self, *args, **kwargs):
                 return None
@@ -565,7 +707,7 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertTrue(report["cache"]["stale"])
         self.assertTrue(report["cache"]["refreshInProgress"])
 
-    def test_build_report_returns_stale_persistent_cache_and_queues_refresh(self):
+    def test_build_report_returns_persistent_cache_without_auto_refresh(self):
         class FakeReportCache:
             def __init__(self):
                 self.started = False
@@ -605,10 +747,10 @@ class QaTestingServiceTest(unittest.TestCase):
         report = service.build_report(start, end)
 
         self.assertEqual(report["summary"]["totalCases"], 7)
-        self.assertTrue(cache.started)
-        self.assertTrue(service.thread_started)
-        self.assertTrue(report["cache"]["stale"])
-        self.assertTrue(report["cache"]["refreshInProgress"])
+        self.assertFalse(cache.started)
+        self.assertFalse(service.thread_started)
+        self.assertFalse(report["cache"]["stale"])
+        self.assertFalse(report["cache"]["refreshInProgress"])
 
     def test_unchanged_cycle_uses_cached_detail_without_detail_fetch(self):
         class FakeCycleRepo:
