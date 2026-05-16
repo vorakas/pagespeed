@@ -26,6 +26,13 @@ import { api } from "@/services/api"
 import type { QaTaskStatusChange, QaTestCase, QaTestCycle, QaTestingReport } from "@/types"
 
 type Preset = "24h" | "sinceYesterday" | "today" | "yesterday" | "7d" | "custom"
+const RANGE_PRESET_OPTIONS: Array<{ value: Preset; label: string }> = [
+  { value: "24h", label: "Last 24h" },
+  { value: "sinceYesterday", label: "Since yesterday" },
+  { value: "today", label: "today" },
+  { value: "yesterday", label: "yesterday" },
+  { value: "7d", label: "7d" },
+]
 const QA_RANGE_SESSION_KEY = "qaTestingRange"
 const QA_REPORT_SESSION_KEY = "qaTestingReportSnapshot"
 
@@ -587,19 +594,23 @@ export function QaTesting() {
             Round-based test cycle progress and Jira task movement for Lamps Plus Features.
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <span className="pb-2 text-sm font-medium text-foreground">Range:</span>
-          <div className="flex rounded-md border border-border p-1">
-            {(["24h", "sinceYesterday", "today", "yesterday", "7d"] as Preset[]).map((option) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-foreground">Range:</span>
+          <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border bg-background/30 p-1">
+            {RANGE_PRESET_OPTIONS.map((option) => (
               <Button
-                key={option}
+                key={option.value}
                 type="button"
-                variant={preset === option ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
-                className={preset === option ? "!text-black hover:!text-black" : undefined}
-                onClick={() => handlePreset(option)}
+                className={
+                  preset === option.value
+                    ? "h-7 min-w-14 rounded-md px-3 text-xs font-semibold leading-none !text-black bg-primary hover:bg-primary/90 hover:!text-black"
+                    : "h-7 min-w-14 rounded-md px-3 text-xs font-semibold leading-none text-foreground/85 hover:bg-muted/70 hover:text-foreground"
+                }
+                onClick={() => handlePreset(option.value)}
               >
-                {option === "24h" ? "Last 24h" : option === "sinceYesterday" ? "Since yesterday" : option === "7d" ? "7d" : option}
+                {option.label}
               </Button>
             ))}
           </div>
