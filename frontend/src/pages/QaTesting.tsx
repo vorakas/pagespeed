@@ -717,9 +717,22 @@ export function QaTesting() {
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={report.burndown} margin={{ left: 4, right: 16, top: 12, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="date" tickFormatter={formatDate} className="text-xs" />
-                  <YAxis allowDecimals={false} className="text-xs" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(226, 232, 240, 0.24)" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatDate}
+                    className="text-xs"
+                    tick={{ fill: "rgba(248, 250, 252, 0.86)" }}
+                    axisLine={{ stroke: "rgba(226, 232, 240, 0.32)" }}
+                    tickLine={{ stroke: "rgba(226, 232, 240, 0.32)" }}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    className="text-xs"
+                    tick={{ fill: "rgba(248, 250, 252, 0.86)" }}
+                    axisLine={{ stroke: "rgba(226, 232, 240, 0.32)" }}
+                    tickLine={{ stroke: "rgba(226, 232, 240, 0.32)" }}
+                  />
                   <Tooltip labelFormatter={formatDate} />
                   <Area type="monotone" dataKey="remaining" stackId="1" stroke="#ef4444" fill="#ef444433" name="Remaining" />
                   <Area type="monotone" dataKey="executed" stackId="2" stroke="#10b981" fill="#10b98133" name="Executed" />
