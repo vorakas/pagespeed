@@ -462,6 +462,7 @@ class QaTestingReportService:
             to_iso(start) or "",
             to_iso(end) or "",
             task_window.value,
+            lock_timeout_minutes=2,
         )
 
     def _save_persistent_report(
