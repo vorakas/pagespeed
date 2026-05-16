@@ -623,14 +623,7 @@ class QaTestingReportService:
         return response.json()
 
     def _fetch_round_cycle_reports(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
-        data = self._get_json(
-            "/rest/atm/1.0/testrun/search",
-            {
-                "query": f'projectKey = "{self.project_key}" AND folder = "{ADOBE_MASTER_FOLDER}"',
-                "maxResults": 50,
-            },
-        )
-        cycles = data if isinstance(data, list) else data.get("values") or data.get("results") or data.get("items") or []
+        cycles = self._fetch_adobe_master_cycles()
         matching = [
             cycle
             for cycle in cycles
@@ -644,6 +637,54 @@ class QaTestingReportService:
             start,
             end,
         )
+
+    def _fetch_adobe_master_cycles(self) -> list[dict[str, Any]]:
+        page_size = 100
+        start_at = 0
+        cycles: list[dict[str, Any]] = []
+        seen_keys: set[str] = set()
+
+        while True:
+            params: dict[str, Any] = {
+                "query": f'projectKey = "{self.project_key}" AND folder = "{ADOBE_MASTER_FOLDER}"',
+                "maxResults": page_size,
+            }
+            if start_at:
+                params["startAt"] = start_at
+
+            data = self._get_json("/rest/atm/1.0/testrun/search", params)
+            page = data if isinstance(data, list) else data.get("values") or data.get("results") or data.get("items") or []
+            new_count = 0
+            for cycle in page:
+                key = str(cycle.get("key") or "")
+                if key and key in seen_keys:
+                    continue
+                if key:
+                    seen_keys.add(key)
+                cycles.append(cycle)
+                new_count += 1
+
+            if len(page) < page_size or new_count == 0:
+                break
+
+            next_start = start_at + len(page)
+            if isinstance(data, dict):
+                try:
+                    next_start = int(data.get("startAt") or start_at) + len(page)
+                except (TypeError, ValueError):
+                    next_start = start_at + len(page)
+                try:
+                    total = int(data.get("total"))
+                except (TypeError, ValueError):
+                    total = None
+                if total is not None and next_start >= total:
+                    break
+
+            if next_start <= start_at:
+                break
+            start_at = next_start
+
+        return cycles
 
     def _fetch_round_cycle_reports_from_cycle_cache(
         self,

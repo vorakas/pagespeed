@@ -216,6 +216,61 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(report["burndown"][3]["executed"], 1)
         self.assertEqual(report["burndown"][3]["remaining"], 0)
 
+    def test_cycle_search_paginates_full_adobe_master_folder(self):
+        def cycle(key: str, name: str) -> dict:
+            return {
+                "key": key,
+                "name": name,
+                "folder": "/Adobe Commerce E2E Master Test Cycles/Desktop or Tablet/PDP",
+                "status": "In Progress",
+                "testCaseCount": 0,
+            }
+
+        class FakeService(QaTestingReportService):
+            def __init__(self):
+                super().__init__("token")
+                self.start_offsets = []
+
+            def _get_json(self, path, params=None):
+                if path.endswith("/testrun/search"):
+                    start_at = int((params or {}).get("startAt") or 0)
+                    self.start_offsets.append(start_at)
+                    if start_at == 0:
+                        return {
+                            "values": [
+                                cycle(f"TC-C{i}", f"Feature {i} E2E Testing - Round 1")
+                                for i in range(1000, 1100)
+                            ],
+                            "startAt": 0,
+                            "maxResults": 100,
+                            "total": 101,
+                        }
+                    if start_at == 100:
+                        return {
+                            "values": [cycle("TC-C1484", "PDP E2E Testing - Desktop - Round 1")],
+                            "startAt": 100,
+                            "maxResults": 100,
+                            "total": 101,
+                        }
+                    return {"values": [], "startAt": start_at, "maxResults": 100, "total": 101}
+                raise AssertionError(path)
+
+            def _fetch_cycle_details(self, cycles):
+                return [{**cycle, "items": []} for cycle in cycles]
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return []
+
+        service = FakeService()
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, force_refresh=True)
+
+        self.assertEqual(service.start_offsets, [0, 100])
+        self.assertEqual(report["summary"]["cycleCount"], 101)
+        self.assertIn("TC-C1484", {cycle["key"] for cycle in report["cycles"]})
+
     def test_build_report_cache_key_uses_15_minute_buckets(self):
         class FakeService(QaTestingReportService):
             def __init__(self):
