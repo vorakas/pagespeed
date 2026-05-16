@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { buildQaBurndown } from "@/lib/qaBurndown"
+import { normalizeQaCycleSection } from "@/lib/qaCycleSections"
 import { api } from "@/services/api"
 import type { QaTaskStatusChange, QaTestCase, QaTestCycle, QaTestingReport } from "@/types"
 
@@ -593,7 +594,8 @@ export function QaTesting() {
   const groupedCycles = useMemo(() => {
     const groups = new Map<string, QaTestCycle[]>()
     for (const cycle of report?.cycles ?? []) {
-      groups.set(cycle.section, [...(groups.get(cycle.section) ?? []), cycle])
+      const section = normalizeQaCycleSection(cycle)
+      groups.set(section, [...(groups.get(section) ?? []), cycle])
     }
     const orderedGroups = CYCLE_SECTION_ORDER.map((section) => [section, groups.get(section) ?? []] as [string, QaTestCycle[]])
     const extraGroups = Array.from(groups.entries()).filter(([section]) => !CYCLE_SECTION_ORDER.includes(section))
@@ -609,7 +611,7 @@ export function QaTesting() {
             ...testCase,
             cycleKey: cycle.key,
             cycleName: cycle.name,
-            section: cycle.section,
+            section: normalizeQaCycleSection(cycle),
           })),
       ),
     [report],
@@ -624,7 +626,7 @@ export function QaTesting() {
             ...testCase,
             cycleKey: cycle.key,
             cycleName: cycle.name,
-            section: cycle.section,
+            section: normalizeQaCycleSection(cycle),
           })),
       ),
     [report],

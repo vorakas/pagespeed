@@ -50,6 +50,34 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertTrue(report["testCases"][0]["inRange"])
         self.assertFalse(report["testCases"][1]["inRange"])
 
+    def test_build_cycle_report_places_known_root_cycles_in_expected_sections(self):
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        cases = [
+            ("TC-C1426", "Bloomreach LP Feature E2E Testing - Desktop - Round 1", "LP Features"),
+            ("TC-C1427", "Bloomreach LP Feature E2E Testing - Mobile - Round 1", "LP Features"),
+            ("TC-C1570", "Search & Sort Page E2E Testing - Desktop - Round 1", "Desktop or Tablet"),
+            ("TC-C1569", "Search & Sort Page E2E Testing - Mobile - Round 1", "Mobile"),
+        ]
+
+        for key, name, expected_section in cases:
+            with self.subTest(key=key):
+                report = build_cycle_report(
+                    {
+                        "key": key,
+                        "name": name,
+                        "folder": "/Adobe Commerce E2E Master Test Cycles",
+                        "status": "In Progress",
+                        "items": [],
+                    },
+                    {},
+                    start,
+                    end,
+                )
+
+                self.assertEqual(report["section"], expected_section)
+
     def test_daily_burndown_accumulates_executions_by_day(self):
         start = datetime(2026, 5, 13, 0, 0, tzinfo=timezone.utc)
         end = datetime(2026, 5, 15, 23, 59, tzinfo=timezone.utc)

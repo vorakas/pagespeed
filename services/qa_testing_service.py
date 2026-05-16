@@ -33,6 +33,12 @@ EPIC_LINK_JQL = (
 )
 CACHE_TTL_SECONDS = 15 * 60
 JIRA_TIMEZONE = ZoneInfo("America/Los_Angeles")
+ROOT_CYCLE_SECTION_OVERRIDES = {
+    "TC-C1426": "LP Features",
+    "TC-C1427": "LP Features",
+    "TC-C1570": "Desktop or Tablet",
+    "TC-C1569": "Mobile",
+}
 
 
 class TaskWindow(str, Enum):
@@ -83,6 +89,23 @@ def top_section(folder: str) -> str:
         return "Other"
     rest = folder[len(ADOBE_MASTER_FOLDER) :].strip("/")
     return rest.split("/")[0].strip() if rest else "Root"
+
+
+def cycle_section(cycle: dict[str, Any], folder: str) -> str:
+    section = top_section(folder)
+    if section != "Root":
+        return section
+    key = str(cycle.get("key") or "")
+    if key in ROOT_CYCLE_SECTION_OVERRIDES:
+        return ROOT_CYCLE_SECTION_OVERRIDES[key]
+    name = str(cycle.get("name") or "").lower()
+    if "bloomreach" in name:
+        return "LP Features"
+    if "desktop" in name or "tablet" in name:
+        return "Desktop or Tablet"
+    if "mobile" in name:
+        return "Mobile"
+    return section
 
 
 def status_name(value: Any) -> str:
@@ -145,7 +168,7 @@ def build_cycle_report(
         "key": cycle.get("key"),
         "name": cycle.get("name"),
         "folder": folder,
-        "section": top_section(folder),
+        "section": cycle_section(cycle, folder),
         "status": status_name(cycle.get("status")),
         "totalCases": total,
         "executedCases": executed_total,
