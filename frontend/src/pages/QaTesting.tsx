@@ -421,6 +421,22 @@ export function QaTesting() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const waitingForInitialSnapshot = Boolean(
+    report?.cache?.refreshInProgress
+    && report.summary.cycleCount === 0
+    && report.summary.totalCases === 0
+    && report.burndown.length === 0,
+  )
+
+  useEffect(() => {
+    if (!waitingForInitialSnapshot) return undefined
+    const timer = window.setTimeout(() => {
+      void loadReport()
+    }, 30_000)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForInitialSnapshot, report?.cache?.refreshStartedAt])
+
   function handlePreset(nextPreset: Preset) {
     setPreset(nextPreset)
     if (nextPreset === "custom") return
@@ -535,7 +551,21 @@ export function QaTesting() {
         </div>
       ) : null}
 
-      {report ? (
+      {waitingForInitialSnapshot ? (
+        <Card>
+          <CardContent className="flex min-h-72 flex-col items-center justify-center gap-3 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div>
+              <div className="font-heading text-lg font-semibold tracking-normal">Building QA report</div>
+              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                Pulling all Adobe Commerce E2E test cycles from Jira. The dashboard will refresh automatically when the first snapshot is ready.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {report && !waitingForInitialSnapshot ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <SummaryCard label="Cycles" value={report.summary.cycleCount} detail="Round cycles in Adobe Commerce E2E" />
