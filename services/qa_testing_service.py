@@ -387,7 +387,12 @@ class QaTestingReportService:
             and (now - last_refreshed_at).total_seconds() <= self.cache_ttl_seconds
         )
 
-        if cached_report is not None and is_fresh and not force_refresh:
+        cached_has_name_misses = (
+            cached_report is not None
+            and self._report_has_name_cache_misses(cached_report)
+        )
+
+        if cached_report is not None and is_fresh and not force_refresh and not cached_has_name_misses:
             return self._attach_cache_metadata(
                 cached_report,
                 cache_key,
@@ -397,7 +402,7 @@ class QaTestingReportService:
                 refresh_in_progress=False,
             )
 
-        if cached_report is not None:
+        if cached_report is not None and not force_refresh and not cached_has_name_misses:
             started = self._try_start_persistent_refresh(cache_key, start, end, task_window)
             if started:
                 self._start_report_refresh_thread(cache_key, start, end, task_window)
@@ -465,6 +470,13 @@ class QaTestingReportService:
             task_window.value,
             report,
         )
+
+    def _report_has_name_cache_misses(self, report: dict[str, Any]) -> bool:
+        for cache_key in ("nameCache", "userCache"):
+            cache_info = report.get(cache_key) or {}
+            if int(cache_info.get("missCount") or 0) > 0:
+                return True
+        return False
 
     def _start_report_refresh_thread(
         self,
