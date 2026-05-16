@@ -612,8 +612,11 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(report["summary"]["totalCases"], 9)
         self.assertFalse(report["cache"]["hit"])
 
-    def test_fresh_persistent_cache_with_name_misses_rebuilds(self):
+    def test_persistent_cache_with_name_misses_still_returns_snapshot_without_refresh(self):
         class FakeReportCache:
+            def __init__(self):
+                self.started = False
+
             def get(self, cache_key):
                 return {
                     "report": {
@@ -629,6 +632,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 }
 
             def try_start_refresh(self, *args, **kwargs):
+                self.started = True
                 return True
 
             def get_latest_successful(self):
@@ -641,8 +645,8 @@ class QaTestingServiceTest(unittest.TestCase):
                 return None
 
         class FakeService(QaTestingReportService):
-            def __init__(self):
-                super().__init__("token", report_cache_repo=FakeReportCache())
+            def __init__(self, cache):
+                super().__init__("token", report_cache_repo=cache)
 
             def _build_report_uncached(
                 self,
@@ -661,14 +665,17 @@ class QaTestingServiceTest(unittest.TestCase):
                     "userCache": {"hitCount": 1, "missCount": 0, "refreshQueued": 0},
                 }
 
-        service = FakeService()
+        cache = FakeReportCache()
+        service = FakeService(cache)
         start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
         end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
 
         report = service.build_report(start, end)
 
-        self.assertEqual(report["summary"]["totalCases"], 9)
-        self.assertFalse(report["cache"]["hit"])
+        self.assertEqual(report["summary"]["totalCases"], 7)
+        self.assertTrue(report["cache"]["hit"])
+        self.assertFalse(cache.started)
+        self.assertEqual(report["nameCache"]["missCount"], 1)
 
     def test_force_refresh_returns_stale_cache_when_refresh_already_running(self):
         class FakeReportCache:

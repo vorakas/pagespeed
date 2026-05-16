@@ -392,13 +392,9 @@ class QaTestingReportService:
     ) -> dict[str, Any]:
         cached = self.report_cache_repo.get(cache_key)
         cached_report = deepcopy(cached.get("report")) if cached and cached.get("report") else None
-        cached_has_name_misses = (
-            cached_report is not None
-            and self._report_has_name_cache_misses(cached_report)
-        )
 
         if not force_refresh:
-            if cached_report is not None and not cached_has_name_misses:
+            if cached_report is not None:
                 return self._attach_cache_metadata(
                     cached_report,
                     cache_key,
@@ -409,7 +405,7 @@ class QaTestingReportService:
                 )
             latest = self.report_cache_repo.get_latest_successful()
             latest_report = deepcopy(latest.get("report")) if latest and latest.get("report") else None
-            if latest_report is not None and not self._report_has_name_cache_misses(latest_report):
+            if latest_report is not None:
                 latest_key = latest.get("cacheKey") or cache_key
                 return self._attach_cache_metadata(
                     latest_report,
