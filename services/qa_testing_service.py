@@ -418,6 +418,7 @@ class QaTestingReportService:
 
         if not force_refresh:
             if cached_report is not None:
+                self._recalculate_cached_report_ranges(cached_report, start, end, task_window, burndown_start, burndown_end)
                 return self._attach_cache_metadata(
                     cached_report,
                     cache_key,
@@ -430,6 +431,7 @@ class QaTestingReportService:
             latest_report = deepcopy(latest.get("report")) if latest and latest.get("report") else None
             if latest_report is not None:
                 latest_key = latest.get("cacheKey") or cache_key
+                self._recalculate_cached_report_ranges(latest_report, start, end, task_window, burndown_start, burndown_end)
                 return self._attach_cache_metadata(
                     latest_report,
                     latest_key,
@@ -442,6 +444,7 @@ class QaTestingReportService:
         started = self._try_start_persistent_refresh(cache_key, start, end, task_window)
         if not started:
             if cached_report is not None:
+                self._recalculate_cached_report_ranges(cached_report, start, end, task_window, burndown_start, burndown_end)
                 return self._attach_cache_metadata(
                     cached_report,
                     cache_key,
@@ -473,6 +476,43 @@ class QaTestingReportService:
         except Exception as exc:
             self.report_cache_repo.mark_refresh_failed(cache_key, str(exc))
             raise
+
+    def _recalculate_cached_report_ranges(
+        self,
+        report: dict[str, Any],
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow,
+        burndown_start: datetime,
+        burndown_end: datetime,
+    ) -> None:
+        cycles = report.get("cycles") or []
+        if not cycles:
+            return
+        for cycle in cycles:
+            range_status_counts: Counter[str] = Counter()
+            executed_in_range = 0
+            test_cases = cycle.get("testCases") or []
+            for test_case in test_cases:
+                executed_at = parse_jira_datetime(test_case.get("executedAt"))
+                in_range = is_in_range(executed_at, start, end)
+                test_case["inRange"] = in_range
+                if in_range:
+                    range_status_counts[str(test_case.get("status") or "Unknown")] += 1
+                    executed_in_range += 1
+            total = int(cycle.get("totalCases") or len(test_cases) or 0)
+            cycle["executedInRange"] = executed_in_range
+            cycle["rangeProgressPercent"] = round((executed_in_range / total) * 100) if total else 0
+            cycle["rangeStatusCounts"] = dict(range_status_counts)
+
+        task_changes = (report.get("taskMovement") or {}).get("changes") or []
+        report["range"] = {"start": to_iso(start), "end": to_iso(end)}
+        report["burndownRange"] = {"start": to_iso(burndown_start), "end": to_iso(burndown_end)}
+        report["summary"] = self._summarize(cycles, task_changes)
+        report["burndown"] = build_daily_burndown(cycles, burndown_start, burndown_end)
+        if isinstance(report.get("taskMovement"), dict):
+            report["taskMovement"]["jql"] = build_status_change_jql(start, end, task_window=task_window)
+            report["taskMovement"]["totalChanges"] = len(task_changes)
 
     def _try_start_persistent_refresh(
         self,

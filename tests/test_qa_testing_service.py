@@ -500,6 +500,97 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(report["cache"]["key"], "older-default-snapshot")
         self.assertFalse(cache.started)
 
+    def test_shared_snapshot_recomputes_range_progress_for_requested_range(self):
+        class FakeReportCache:
+            def __init__(self):
+                self.started = False
+
+            def get(self, cache_key):
+                return None
+
+            def get_latest_successful(self):
+                return {
+                    "cacheKey": "older-default-snapshot",
+                    "report": {
+                        "range": {"start": "2026-05-10T00:00:00Z", "end": "2026-05-11T00:00:00Z"},
+                        "burndownRange": {"start": "2026-05-10T00:00:00Z", "end": "2026-05-11T00:00:00Z"},
+                        "summary": {
+                            "cycleCount": 1,
+                            "totalCases": 2,
+                            "executedCases": 2,
+                            "executedInRange": 0,
+                            "remainingCases": 0,
+                            "progressPercent": 100,
+                            "rangeProgressPercent": 0,
+                            "statusCounts": {"Pass": 2},
+                            "rangeStatusCounts": {},
+                            "taskStatusChanges": 0,
+                        },
+                        "cycles": [
+                            {
+                                "key": "TC-C1",
+                                "name": "Checkout Round 1",
+                                "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                                "section": "LP Features",
+                                "status": "In Progress",
+                                "totalCases": 2,
+                                "executedCases": 2,
+                                "executedInRange": 0,
+                                "progressPercent": 100,
+                                "rangeProgressPercent": 0,
+                                "statusCounts": {"Pass": 2},
+                                "rangeStatusCounts": {},
+                                "testCases": [
+                                    {
+                                        "key": "TC-T1",
+                                        "name": "In requested range",
+                                        "status": "Pass",
+                                        "executedAt": "2026-05-14T12:00:00Z",
+                                        "inRange": False,
+                                    },
+                                    {
+                                        "key": "TC-T2",
+                                        "name": "Outside requested range",
+                                        "status": "Pass",
+                                        "executedAt": "2026-05-13T12:00:00Z",
+                                        "inRange": False,
+                                    },
+                                ],
+                            }
+                        ],
+                        "burndown": [],
+                        "taskMovement": {"jql": "old", "totalChanges": 0, "changes": []},
+                    },
+                    "lastRefreshedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "refreshStatus": "idle",
+                }
+
+            def try_start_refresh(self, *args, **kwargs):
+                self.started = True
+                return True
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cache):
+                super().__init__("token", report_cache_repo=cache)
+
+            def _build_report_uncached(self, *args, **kwargs):
+                raise AssertionError("Normal page load should not refresh when a shared snapshot exists")
+
+        cache = FakeReportCache()
+        service = FakeService(cache)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end)
+
+        self.assertEqual(report["range"], {"start": "2026-05-14T00:00:00Z", "end": "2026-05-15T00:00:00Z"})
+        self.assertEqual(report["summary"]["executedInRange"], 1)
+        self.assertEqual(report["summary"]["rangeProgressPercent"], 50)
+        self.assertEqual(report["summary"]["rangeStatusCounts"], {"Pass": 1})
+        self.assertTrue(report["cycles"][0]["testCases"][0]["inRange"])
+        self.assertFalse(report["cycles"][0]["testCases"][1]["inRange"])
+        self.assertFalse(cache.started)
+
     def test_initial_persistent_load_builds_once_then_reuses_snapshot(self):
         class FakeReportCache:
             def __init__(self):
