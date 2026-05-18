@@ -67,6 +67,13 @@ function timestampValue(value: string | null | undefined) {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
+function statusCount(counts: Record<string, number> | undefined, labels: string[]) {
+  const wanted = new Set(labels.map((label) => label.toLowerCase()))
+  return Object.entries(counts ?? {}).reduce((total, [status, count]) => (
+    wanted.has(status.toLowerCase()) ? total + Number(count || 0) : total
+  ), 0)
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return "Not executed"
   return new Intl.DateTimeFormat(undefined, {
@@ -662,6 +669,9 @@ export function QaTesting() {
         : [],
     [appliedBurndownEnd, appliedBurndownStart, report],
   )
+  const rangeFailedCount = statusCount(report?.summary.rangeStatusCounts, ["Fail", "Failed"])
+  const rangePassedCount = statusCount(report?.summary.rangeStatusCounts, ["Pass", "Passed"])
+  const rangeBlockedCount = statusCount(report?.summary.rangeStatusCounts, ["Blocked"])
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -763,7 +773,7 @@ export function QaTesting() {
 
       {report && !waitingForInitialSnapshot && !waitingForForcedSnapshot ? (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-9">
             <SummaryCard label="Cycles" value={report.summary.cycleCount} detail="Round cycles in Adobe Commerce E2E" />
             <SummaryCard label="Total Cases" value={report.summary.totalCases} detail={`${report.summary.remainingCases} remaining overall`} />
             <SummaryCard label="Overall Progress" value={`${report.summary.progressPercent}%`} detail={`${report.summary.executedCases} cases executed`} />
@@ -774,7 +784,22 @@ export function QaTesting() {
               onClick={() => setRangeDialogOpen(true)}
             />
             <SummaryCard
-              label="Blocked Test Cases"
+              label="Failed"
+              value={rangeFailedCount}
+              detail="Failed in selected range"
+            />
+            <SummaryCard
+              label="Passed"
+              value={rangePassedCount}
+              detail="Passed in selected range"
+            />
+            <SummaryCard
+              label="Blocked"
+              value={rangeBlockedCount}
+              detail="Blocked in selected range"
+            />
+            <SummaryCard
+              label="Total Blocked Test Cases"
               value={blockedRows.length}
               detail="Currently blocked across loaded cycles"
               onClick={() => setBlockedDialogOpen(true)}
