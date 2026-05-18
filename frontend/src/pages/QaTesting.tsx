@@ -54,6 +54,13 @@ function fromLocalPickerValue(value: string) {
   return new Date(value).toISOString()
 }
 
+function isWithinRange(value: string | null | undefined, startValue: string, endValue: string) {
+  if (!value) return false
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return false
+  return timestamp >= new Date(startValue).getTime() && timestamp <= new Date(endValue).getTime()
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return "Not executed"
   return new Intl.DateTimeFormat(undefined, {
@@ -115,6 +122,7 @@ function initialStoredRanges() {
   if (typeof window === "undefined") {
     return {
       range: fallbackRange,
+      customRange: fallbackRange,
       burndownRange: fallbackBurndownRange,
       preset: "24h" as Preset,
     }
@@ -122,10 +130,18 @@ function initialStoredRanges() {
   try {
     const stored = JSON.parse(window.sessionStorage.getItem(QA_RANGE_SESSION_KEY) || "{}")
     if (stored?.start && stored?.end && stored?.burndownStart && stored?.burndownEnd) {
+      const storedPreset = (stored.preset || "custom") as Preset
+      const activeRange = storedPreset === "custom"
+        ? { start: new Date(stored.start), end: new Date(stored.end) }
+        : applyPreset(storedPreset)
       return {
-        range: { start: new Date(stored.start), end: new Date(stored.end) },
+        range: activeRange,
+        customRange: {
+          start: new Date(stored.customStart || stored.start),
+          end: new Date(stored.customEnd || stored.end),
+        },
         burndownRange: { start: new Date(stored.burndownStart), end: new Date(stored.burndownEnd) },
-        preset: (stored.preset || "custom") as Preset,
+        preset: storedPreset,
       }
     }
   } catch {
@@ -133,6 +149,7 @@ function initialStoredRanges() {
   }
   return {
     range: fallbackRange,
+    customRange: fallbackRange,
     burndownRange: fallbackBurndownRange,
     preset: "24h" as Preset,
   }
@@ -482,6 +499,8 @@ export function QaTesting() {
   const [preset, setPreset] = useState<Preset>(initialRanges.preset)
   const [start, setStart] = useState(toLocalPickerValue(initialRanges.range.start))
   const [end, setEnd] = useState(toLocalPickerValue(initialRanges.range.end))
+  const [customStart, setCustomStart] = useState(toLocalPickerValue(initialRanges.customRange.start))
+  const [customEnd, setCustomEnd] = useState(toLocalPickerValue(initialRanges.customRange.end))
   const [burndownStart, setBurndownStart] = useState(toLocalPickerValue(initialRanges.burndownRange.start))
   const [burndownEnd, setBurndownEnd] = useState(toLocalPickerValue(initialRanges.burndownRange.end))
   const [appliedBurndownStart, setAppliedBurndownStart] = useState(burndownStart)
@@ -534,10 +553,12 @@ export function QaTesting() {
       preset,
       start: fromLocalPickerValue(start),
       end: fromLocalPickerValue(end),
+      customStart: fromLocalPickerValue(customStart),
+      customEnd: fromLocalPickerValue(customEnd),
       burndownStart: fromLocalPickerValue(burndownStart),
       burndownEnd: fromLocalPickerValue(burndownEnd),
     }))
-  }, [preset, start, end, burndownStart, burndownEnd])
+  }, [preset, start, end, customStart, customEnd, burndownStart, burndownEnd])
 
   const waitingForInitialSnapshot = Boolean(
     report?.cache?.refreshInProgress
@@ -567,6 +588,14 @@ export function QaTesting() {
     const next = applyPreset(nextPreset)
     setStart(toLocalPickerValue(next.start))
     setEnd(toLocalPickerValue(next.end))
+    setCustomStart(toLocalPickerValue(next.start))
+    setCustomEnd(toLocalPickerValue(next.end))
+  }
+
+  function handleSetRange() {
+    setPreset("custom")
+    setStart(customStart)
+    setEnd(customEnd)
   }
 
   function applyBurndownRange() {
@@ -590,6 +619,7 @@ export function QaTesting() {
       (report?.cycles ?? []).flatMap((cycle) =>
         cycle.testCases
           .filter((testCase) => testCase.inRange)
+          .filter((testCase) => isWithinRange(testCase.executedAt, fromLocalPickerValue(start), fromLocalPickerValue(end)))
           .map((testCase) => ({
             ...testCase,
             cycleKey: cycle.key,
@@ -597,7 +627,7 @@ export function QaTesting() {
             section: normalizeQaCycleSection(cycle),
           })),
       ),
-    [report],
+    [end, report, start],
   )
 
   const blockedRows = useMemo(
@@ -660,8 +690,18 @@ export function QaTesting() {
               </Button>
             ))}
           </div>
-          <DateTimePicker value={start} onChange={(value) => { setPreset("custom"); setStart(value) }} />
-          <DateTimePicker value={end} onChange={(value) => { setPreset("custom"); setEnd(value) }} />
+          <span className="text-sm font-medium text-muted-foreground">Custom:</span>
+          <DateTimePicker value={customStart} onChange={setCustomStart} disabled={loading} />
+          <DateTimePicker value={customEnd} onChange={setCustomEnd} disabled={loading} />
+          <Button
+            type="button"
+            variant={preset === "custom" ? "default" : "secondary"}
+            onClick={handleSetRange}
+            disabled={loading}
+            className={preset === "custom" ? "!text-black" : ""}
+          >
+            Set Range
+          </Button>
           <Button onClick={() => loadReport(true)} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Refresh from Jira

@@ -10,6 +10,7 @@ interface DateTimePickerProps {
   value: string // "YYYY-MM-DDTHH:mm" format
   onChange: (value: string) => void
   className?: string
+  disabled?: boolean
 }
 
 function TimeSegment({
@@ -75,7 +76,7 @@ function AmPmToggle({ value, onChange }: { value: "AM" | "PM"; onChange: (value:
   )
 }
 
-export function DateTimePicker({ value, onChange, className }: DateTimePickerProps) {
+export function DateTimePicker({ value, onChange, className, disabled = false }: DateTimePickerProps) {
   const [open, setOpen] = useState(false)
 
   const dateValue = value ? new Date(value) : new Date()
@@ -121,10 +122,11 @@ export function DateTimePicker({ value, onChange, className }: DateTimePickerPro
   )
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open && !disabled} onOpenChange={(nextOpen) => setOpen(disabled ? false : nextOpen)}>
       <PopoverTrigger>
         <Button
           variant="outline"
+          disabled={disabled}
           className={cn(
             "justify-start text-left font-normal",
             !value && "text-muted-foreground",
