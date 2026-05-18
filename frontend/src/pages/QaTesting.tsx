@@ -340,7 +340,7 @@ function TaskMovementDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-5xl">
+      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-[90rem]">
         <DialogHeader>
           <DialogTitle>Task Movement</DialogTitle>
           <DialogDescription>Jira tasks whose status changed in the task movement window.</DialogDescription>
@@ -468,9 +468,9 @@ function TaskMovementTable({ changes, constrained = false }: { changes: QaTaskSt
         <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
           <tr>
             <th className="px-4 py-3">Task</th>
-            <th className="px-4 py-3">Transition</th>
-            <th className="px-4 py-3">Assignee</th>
-            <th className="px-4 py-3">Changed</th>
+            <th className="w-72 px-4 py-3">Transition</th>
+            <th className="w-44 px-4 py-3">Assignee</th>
+            <th className="w-56 px-4 py-3">Changed</th>
           </tr>
         </thead>
         <tbody>
@@ -487,8 +487,8 @@ function TaskMovementTable({ changes, constrained = false }: { changes: QaTaskSt
                   <Badge className={statusClass(change.toStatus)}>{change.toStatus}</Badge>
                 </div>
               </td>
-              <td className="px-4 py-3 text-muted-foreground">{change.assignee || "Unassigned"}</td>
-              <td className="px-4 py-3 text-muted-foreground">
+              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{change.assignee || "Unassigned"}</td>
+              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                 {formatDateTime(change.changedAt)}
                 {change.changedBy ? ` by ${change.changedBy}` : ""}
               </td>
