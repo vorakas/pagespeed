@@ -179,7 +179,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 self.cycle_calls = 0
                 self.task_calls = 0
 
-            def _fetch_round_cycle_reports(self, start, end):
+            def _fetch_round_cycle_reports(self, start, end, force_refresh=False):
                 self.cycle_calls += 1
                 return []
 
@@ -204,7 +204,7 @@ class QaTestingServiceTest(unittest.TestCase):
             def __init__(self):
                 super().__init__("token")
 
-            def _fetch_round_cycle_reports(self, start, end):
+            def _fetch_round_cycle_reports(self, start, end, force_refresh=False):
                 return [
                     {
                         "key": "TC-C1",
@@ -306,7 +306,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 super().__init__("token")
                 self.calls = 0
 
-            def _fetch_round_cycle_reports(self, start, end):
+            def _fetch_round_cycle_reports(self, start, end, force_refresh=False):
                 self.calls += 1
                 return []
 
@@ -447,7 +447,7 @@ class QaTestingServiceTest(unittest.TestCase):
             def __init__(self):
                 super().__init__("token", report_cache_repo=FakeReportCache())
 
-            def _fetch_round_cycle_reports(self, start, end):
+            def _fetch_round_cycle_reports(self, start, end, force_refresh=False):
                 raise AssertionError("Jira fetch should not run for fresh persistent cache")
 
         service = FakeService()
@@ -675,6 +675,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 task_window=TaskWindow.SINCE_YESTERDAY,
                 burndown_start=None,
                 burndown_end=None,
+                force_refresh=False,
             ):
                 return {"summary": {"totalCases": 12}, "cycles": [], "burndown": [], "taskMovement": {}}
 
@@ -719,6 +720,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 task_window=TaskWindow.SINCE_YESTERDAY,
                 burndown_start=None,
                 burndown_end=None,
+                force_refresh=False,
             ):
                 return {"summary": {"totalCases": 9}, "cycles": [], "burndown": [], "taskMovement": {}}
 
@@ -774,6 +776,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 task_window=TaskWindow.SINCE_YESTERDAY,
                 burndown_start=None,
                 burndown_end=None,
+                force_refresh=False,
             ):
                 return {
                     "summary": {"totalCases": 9},
@@ -819,6 +822,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 task_window=TaskWindow.SINCE_YESTERDAY,
                 burndown_start=None,
                 burndown_end=None,
+                force_refresh=False,
             ):
                 raise AssertionError("Refresh should not rebuild while another refresh is active")
 
@@ -878,7 +882,7 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertFalse(report["cache"]["stale"])
         self.assertFalse(report["cache"]["refreshInProgress"])
 
-    def test_unchanged_cycle_uses_cached_detail_without_detail_fetch(self):
+    def test_unchanged_cycle_uses_cached_detail_without_detail_fetch_on_normal_build(self):
         class FakeCycleRepo:
             def __init__(self):
                 self.upserts = []
@@ -924,11 +928,66 @@ class QaTestingServiceTest(unittest.TestCase):
         start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
         end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
 
-        report = service.build_report(start, end, force_refresh=True)
+        report = service.build_report(start, end)
 
         self.assertEqual(report["summary"]["cycleCount"], 1)
         self.assertEqual(report["summary"]["totalCases"], 1)
         self.assertEqual(cycle_repo.upserts, [])
+
+    def test_force_refresh_fetches_detail_even_when_cycle_updated_on_unchanged(self):
+        class FakeCycleRepo:
+            def __init__(self):
+                self.upserts = []
+
+            def get_summaries(self, cycle_keys):
+                return {"TC-C1": {"updated_on": "2026-05-15T12:00:00.000Z"}}
+
+            def upsert_cycle_detail(self, detail):
+                self.upserts.append(detail)
+
+            def get_cycle_details(self, cycle_keys):
+                return self.upserts
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cycle_repo):
+                super().__init__("token", cycle_repo=cycle_repo)
+                self.detail_fetches = 0
+
+            def _get_json(self, path, params=None):
+                if path.endswith("/testrun/search"):
+                    return [
+                        {
+                            "key": "TC-C1",
+                            "name": "Checkout Round 1",
+                            "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                            "updatedOn": "2026-05-15T12:00:00.000Z",
+                        }
+                    ]
+                if path.endswith("/testrun/TC-C1"):
+                    self.detail_fetches += 1
+                    return {
+                        "key": "TC-C1",
+                        "name": "Checkout Round 1",
+                        "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                        "updatedOn": "2026-05-15T12:00:00.000Z",
+                        "items": [{"testCaseKey": "TC-T1", "status": "Blocked"}],
+                    }
+                raise AssertionError(path)
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return [{"key": "ACE2E-1", "changedAt": "2026-05-14T12:00:00Z"}]
+
+        cycle_repo = FakeCycleRepo()
+        service = FakeService(cycle_repo)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, force_refresh=True)
+
+        self.assertEqual(service.detail_fetches, 1)
+        self.assertEqual(cycle_repo.upserts[0]["items"][0]["status"], "Blocked")
+        self.assertEqual(report["cycles"][0]["statusCounts"], {"Blocked": 1})
+        self.assertEqual(report["summary"]["taskStatusChanges"], 1)
 
     def test_changed_cycle_fetches_detail_and_updates_cycle_cache(self):
         class FakeCycleRepo:

@@ -361,7 +361,7 @@ class QaTestingReportService:
                 }
                 return report
 
-        report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end)
+        report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end, force_refresh)
         self._report_cache[cache_key] = (now, deepcopy(report))
         report["cache"] = {
             "hit": False,
@@ -381,10 +381,11 @@ class QaTestingReportService:
         task_window: TaskWindow,
         burndown_start: datetime,
         burndown_end: datetime,
+        force_refresh: bool = False,
     ) -> dict[str, Any]:
         self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
         self._last_user_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
-        cycles = self._fetch_round_cycle_reports(start, end)
+        cycles = self._fetch_round_cycle_reports(start, end, force_refresh)
         task_changes = self._fetch_task_status_changes(start, end, task_window)
         summary = self._summarize(cycles, task_changes)
         report = {
@@ -441,7 +442,7 @@ class QaTestingReportService:
                     refresh_in_progress=latest.get("refreshStatus") == "refreshing",
                 )
 
-        started = self._try_start_persistent_refresh(cache_key, start, end, task_window)
+        started = self._try_start_persistent_refresh(cache_key, start, end, task_window, force_refresh=force_refresh)
         if not started:
             if cached_report is not None:
                 self._recalculate_cached_report_ranges(cached_report, start, end, task_window, burndown_start, burndown_end)
@@ -463,7 +464,7 @@ class QaTestingReportService:
             )
 
         try:
-            report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end)
+            report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end, force_refresh)
             self._save_persistent_report(cache_key, start, end, task_window, report)
             return self._attach_cache_metadata(
                 report,
@@ -520,13 +521,14 @@ class QaTestingReportService:
         start: datetime,
         end: datetime,
         task_window: TaskWindow,
+        force_refresh: bool = False,
     ) -> bool:
         return self.report_cache_repo.try_start_refresh(
             cache_key,
             to_iso(start) or "",
             to_iso(end) or "",
             task_window.value,
-            lock_timeout_minutes=10,
+            lock_timeout_minutes=0 if force_refresh else 10,
         )
 
     def _save_persistent_report(
@@ -673,13 +675,19 @@ class QaTestingReportService:
         response.raise_for_status()
         return response.json()
 
-    def _fetch_round_cycle_reports(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
+    def _fetch_round_cycle_reports(self, start: datetime, end: datetime, force_refresh: bool = False) -> list[dict[str, Any]]:
         cycles = self._fetch_adobe_master_cycles()
         matching = [
             cycle
             for cycle in cycles
             if is_adobe_master_cycle(cycle) and is_round_cycle(str(cycle.get("name") or ""))
         ]
+        if force_refresh:
+            details = self._fetch_cycle_details(matching)
+            if self.cycle_repo is not None:
+                for detail in details:
+                    self.cycle_repo.upsert_cycle_detail(detail)
+            return self._build_reports_from_cycle_details(details, start, end)
         if self.cycle_repo is not None:
             return self._fetch_round_cycle_reports_from_cycle_cache(matching, start, end)
 
