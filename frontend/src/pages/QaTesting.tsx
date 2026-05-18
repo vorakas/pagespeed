@@ -490,6 +490,7 @@ export function QaTesting() {
   const [report, setReport] = useState<QaTestingReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [refreshingFromJira, setRefreshingFromJira] = useState(false)
   const [rangeDialogOpen, setRangeDialogOpen] = useState(false)
   const [blockedDialogOpen, setBlockedDialogOpen] = useState(false)
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
@@ -497,6 +498,7 @@ export function QaTesting() {
   async function loadReport(forceRefresh = false) {
     setLoading(true)
     setError(null)
+    if (forceRefresh) setRefreshingFromJira(true)
     try {
       const nextReport = await api.getQaTestingReport(
         fromLocalPickerValue(start),
@@ -507,8 +509,12 @@ export function QaTesting() {
         fromLocalPickerValue(burndownEnd),
       )
       setReport(nextReport)
+      if (!nextReport.cache?.refreshInProgress) {
+        setRefreshingFromJira(false)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load QA testing report")
+      if (forceRefresh) setRefreshingFromJira(false)
     } finally {
       setLoading(false)
     }
@@ -539,15 +545,21 @@ export function QaTesting() {
     && report.summary.totalCases === 0
     && report.burndown.length === 0,
   )
+  const waitingForForcedSnapshot = Boolean(
+    refreshingFromJira
+    && report?.cache?.refreshInProgress
+    && report.cache.stale,
+  )
+  const refreshPollActive = Boolean(report?.cache?.refreshInProgress || refreshingFromJira)
 
   useEffect(() => {
-    if (!waitingForInitialSnapshot) return undefined
+    if (!refreshPollActive || loading) return undefined
     const timer = window.setTimeout(() => {
       void loadReport()
-    }, 30_000)
+    }, 5_000)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waitingForInitialSnapshot, report?.cache?.refreshStartedAt])
+  }, [refreshPollActive, loading, report?.cache?.refreshStartedAt, report?.cache?.lastRefreshedAt])
 
   function handlePreset(nextPreset: Preset) {
     setPreset(nextPreset)
@@ -687,21 +699,23 @@ export function QaTesting() {
         </div>
       ) : null}
 
-      {waitingForInitialSnapshot ? (
+      {waitingForInitialSnapshot || waitingForForcedSnapshot ? (
         <Card>
           <CardContent className="flex min-h-72 flex-col items-center justify-center gap-3 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <div>
-              <div className="font-heading text-lg font-semibold tracking-normal">Building QA report</div>
+              <div className="font-heading text-lg font-semibold tracking-normal">
+                {waitingForForcedSnapshot ? "Refreshing QA report" : "Building QA report"}
+              </div>
               <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                Pulling all Adobe Commerce E2E test cycles from Jira. The dashboard will refresh automatically when the first snapshot is ready.
+                Pulling Adobe Commerce E2E data from Jira. The dashboard will refresh automatically when the new snapshot is ready.
               </p>
             </div>
           </CardContent>
         </Card>
       ) : null}
 
-      {report && !waitingForInitialSnapshot ? (
+      {report && !waitingForInitialSnapshot && !waitingForForcedSnapshot ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <SummaryCard label="Cycles" value={report.summary.cycleCount} detail="Round cycles in Adobe Commerce E2E" />
@@ -779,7 +793,7 @@ export function QaTesting() {
                     tickLine={{ stroke: "rgba(226, 232, 240, 0.32)" }}
                   />
                   <Tooltip
-                    labelFormatter={formatDate}
+                    labelFormatter={(value) => formatDate(String(value || ""))}
                     labelStyle={{ color: "rgb(15, 23, 42)", fontWeight: 700 }}
                   />
                   <Area type="monotone" dataKey="remaining" stackId="1" stroke="#ef4444" fill="#ef444433" name="Remaining" />
