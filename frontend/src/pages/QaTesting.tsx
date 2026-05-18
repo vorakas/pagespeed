@@ -28,6 +28,7 @@ import { api } from "@/services/api"
 import type { QaTaskStatusChange, QaTestCase, QaTestCycle, QaTestingReport } from "@/types"
 
 type Preset = "24h" | "sinceYesterday" | "today" | "yesterday" | "7d" | "custom"
+type SummaryTone = "failed" | "passed" | "blocked" | "inProgress"
 const RANGE_PRESET_OPTIONS: Array<{ value: Preset; label: string }> = [
   { value: "24h", label: "Last 24h" },
   { value: "sinceYesterday", label: "Since yesterday" },
@@ -39,6 +40,24 @@ type RangeStatusModal = "failed" | "passed" | "blocked" | "inProgress"
 const CYCLE_SECTION_ORDER = ["Desktop or Tablet", "Mobile", "LP Sections & Pages", "LP Features"]
 const QA_RANGE_SESSION_KEY = "qaTestingRange"
 const QA_REPORT_SESSION_KEY = "qaTestingReportSnapshot"
+const SUMMARY_TONE_CLASSES: Record<SummaryTone, { card: string; value: string }> = {
+  failed: {
+    card: "border-red-500/30 bg-red-500/5 hover:border-red-500/60 hover:bg-red-500/10",
+    value: "text-red-700 dark:text-red-300",
+  },
+  passed: {
+    card: "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/60 hover:bg-emerald-500/10",
+    value: "text-emerald-700 dark:text-emerald-300",
+  },
+  blocked: {
+    card: "border-yellow-500/30 bg-yellow-500/5 hover:border-yellow-500/60 hover:bg-yellow-500/10",
+    value: "text-yellow-700 dark:text-yellow-300",
+  },
+  inProgress: {
+    card: "border-blue-500/30 bg-blue-500/5 hover:border-blue-500/60 hover:bg-blue-500/10",
+    value: "text-blue-700 dark:text-blue-300",
+  },
+}
 
 function snapToQuarterHour(date: Date) {
   const snapped = new Date(date)
@@ -180,15 +199,23 @@ function SummaryCard({
   value,
   detail,
   onClick,
+  tone,
 }: {
   label: string
   value: string | number
   detail: string
   onClick?: () => void
+  tone?: SummaryTone
 }) {
+  const toneClasses = tone ? SUMMARY_TONE_CLASSES[tone] : null
+  const cardClassName = [
+    toneClasses?.card,
+    onClick && (toneClasses ? "cursor-pointer transition-colors" : "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/5"),
+  ].filter(Boolean).join(" ")
+
   return (
     <Card
-      className={onClick ? "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/5" : undefined}
+      className={cardClassName || undefined}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
@@ -202,7 +229,7 @@ function SummaryCard({
     >
       <CardHeader className="pb-2">
         <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl tabular-nums">{value}</CardTitle>
+        <CardTitle className={`text-2xl tabular-nums ${toneClasses?.value ?? ""}`}>{value}</CardTitle>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">{detail}</CardContent>
     </Card>
@@ -834,24 +861,28 @@ export function QaTesting() {
               value={rangeFailedRows.length}
               detail="Failed in selected range"
               onClick={() => setRangeStatusModal("failed")}
+              tone="failed"
             />
             <SummaryCard
               label="Passed"
               value={rangePassedRows.length}
               detail="Passed in selected range"
               onClick={() => setRangeStatusModal("passed")}
+              tone="passed"
             />
             <SummaryCard
               label="Blocked"
               value={rangeBlockedRows.length}
               detail="Blocked in selected range"
               onClick={() => setRangeStatusModal("blocked")}
+              tone="blocked"
             />
             <SummaryCard
               label="In Progress"
               value={rangeInProgressRows.length}
               detail="In progress in selected range"
               onClick={() => setRangeStatusModal("inProgress")}
+              tone="inProgress"
             />
             <SummaryCard
               label="Total Blocked Test Cases"
