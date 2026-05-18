@@ -35,6 +35,7 @@ const RANGE_PRESET_OPTIONS: Array<{ value: Preset; label: string }> = [
   { value: "yesterday", label: "yesterday" },
   { value: "7d", label: "7d" },
 ]
+type RangeStatusModal = "failed" | "passed" | "blocked" | "inProgress"
 const CYCLE_SECTION_ORDER = ["Desktop or Tablet", "Mobile", "LP Sections & Pages", "LP Features"]
 const QA_RANGE_SESSION_KEY = "qaTestingRange"
 const QA_REPORT_SESSION_KEY = "qaTestingReportSnapshot"
@@ -67,11 +68,9 @@ function timestampValue(value: string | null | undefined) {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
-function statusCount(counts: Record<string, number> | undefined, labels: string[]) {
+function statusMatches(status: string | undefined, labels: string[]) {
   const wanted = new Set(labels.map((label) => label.toLowerCase()))
-  return Object.entries(counts ?? {}).reduce((total, [status, count]) => (
-    wanted.has(status.toLowerCase()) ? total + Number(count || 0) : total
-  ), 0)
+  return wanted.has(String(status || "").toLowerCase())
 }
 
 function formatDateTime(value?: string | null) {
@@ -214,17 +213,23 @@ function RangeProgressDialog({
   open,
   onOpenChange,
   rows,
+  title = "Range Progress Test Cases",
+  description = "Test cases executed inside the selected test-case range.",
+  emptyMessage = "No test cases were executed in this range.",
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   rows: Array<QaTestCase & { cycleKey: string; cycleName: string; section: string }>
+  title?: string
+  description?: string
+  emptyMessage?: string
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-[90rem]">
         <DialogHeader>
-          <DialogTitle>Range Progress Test Cases</DialogTitle>
-          <DialogDescription>Test cases executed inside the selected test-case range.</DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="themed-scrollbar max-h-[65vh] overflow-auto rounded-lg border border-border">
           <table className="w-full text-sm">
@@ -241,7 +246,7 @@ function RangeProgressDialog({
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                    No test cases were executed in this range.
+                    {emptyMessage}
                   </td>
                 </tr>
               ) : (
@@ -524,6 +529,7 @@ export function QaTesting() {
   const [error, setError] = useState<string | null>(null)
   const [refreshingFromJira, setRefreshingFromJira] = useState(false)
   const [rangeDialogOpen, setRangeDialogOpen] = useState(false)
+  const [rangeStatusModal, setRangeStatusModal] = useState<RangeStatusModal | null>(null)
   const [blockedDialogOpen, setBlockedDialogOpen] = useState(false)
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
 
@@ -642,6 +648,22 @@ export function QaTesting() {
       ),
     [end, report, start],
   )
+  const rangeFailedRows = useMemo(
+    () => rangeExecutedRows.filter((testCase) => statusMatches(testCase.status, ["Fail", "Failed"])),
+    [rangeExecutedRows],
+  )
+  const rangePassedRows = useMemo(
+    () => rangeExecutedRows.filter((testCase) => statusMatches(testCase.status, ["Pass", "Passed"])),
+    [rangeExecutedRows],
+  )
+  const rangeBlockedRows = useMemo(
+    () => rangeExecutedRows.filter((testCase) => statusMatches(testCase.status, ["Blocked"])),
+    [rangeExecutedRows],
+  )
+  const rangeInProgressRows = useMemo(
+    () => rangeExecutedRows.filter((testCase) => statusMatches(testCase.status, ["In Progress"])),
+    [rangeExecutedRows],
+  )
 
   const blockedRows = useMemo(
     () =>
@@ -669,9 +691,33 @@ export function QaTesting() {
         : [],
     [appliedBurndownEnd, appliedBurndownStart, report],
   )
-  const rangeFailedCount = statusCount(report?.summary.rangeStatusCounts, ["Fail", "Failed"])
-  const rangePassedCount = statusCount(report?.summary.rangeStatusCounts, ["Pass", "Passed"])
-  const rangeBlockedCount = statusCount(report?.summary.rangeStatusCounts, ["Blocked"])
+  const rangeStatusModalConfig = {
+    failed: {
+      title: "Failed Test Cases",
+      description: "Test cases marked failed inside the selected range.",
+      emptyMessage: "No failed test cases were found in this range.",
+      rows: rangeFailedRows,
+    },
+    passed: {
+      title: "Passed Test Cases",
+      description: "Test cases marked passed inside the selected range.",
+      emptyMessage: "No passed test cases were found in this range.",
+      rows: rangePassedRows,
+    },
+    blocked: {
+      title: "Blocked Test Cases In Range",
+      description: "Test cases marked blocked inside the selected range.",
+      emptyMessage: "No blocked test cases were found in this range.",
+      rows: rangeBlockedRows,
+    },
+    inProgress: {
+      title: "In Progress Test Cases",
+      description: "Test cases marked in progress inside the selected range.",
+      emptyMessage: "No in progress test cases were found in this range.",
+      rows: rangeInProgressRows,
+    },
+  }
+  const selectedRangeStatusModal = rangeStatusModal ? rangeStatusModalConfig[rangeStatusModal] : null
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -773,7 +819,7 @@ export function QaTesting() {
 
       {report && !waitingForInitialSnapshot && !waitingForForcedSnapshot ? (
         <>
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-9">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-10">
             <SummaryCard label="Cycles" value={report.summary.cycleCount} detail="Round cycles in Adobe Commerce E2E" />
             <SummaryCard label="Total Cases" value={report.summary.totalCases} detail={`${report.summary.remainingCases} remaining overall`} />
             <SummaryCard label="Overall Progress" value={`${report.summary.progressPercent}%`} detail={`${report.summary.executedCases} cases executed`} />
@@ -785,18 +831,27 @@ export function QaTesting() {
             />
             <SummaryCard
               label="Failed"
-              value={rangeFailedCount}
+              value={rangeFailedRows.length}
               detail="Failed in selected range"
+              onClick={() => setRangeStatusModal("failed")}
             />
             <SummaryCard
               label="Passed"
-              value={rangePassedCount}
+              value={rangePassedRows.length}
               detail="Passed in selected range"
+              onClick={() => setRangeStatusModal("passed")}
             />
             <SummaryCard
               label="Blocked"
-              value={rangeBlockedCount}
+              value={rangeBlockedRows.length}
               detail="Blocked in selected range"
+              onClick={() => setRangeStatusModal("blocked")}
+            />
+            <SummaryCard
+              label="In Progress"
+              value={rangeInProgressRows.length}
+              detail="In progress in selected range"
+              onClick={() => setRangeStatusModal("inProgress")}
             />
             <SummaryCard
               label="Total Blocked Test Cases"
@@ -816,6 +871,16 @@ export function QaTesting() {
             open={rangeDialogOpen}
             onOpenChange={setRangeDialogOpen}
             rows={rangeExecutedRows}
+          />
+          <RangeProgressDialog
+            open={rangeStatusModal !== null}
+            onOpenChange={(open) => {
+              if (!open) setRangeStatusModal(null)
+            }}
+            rows={selectedRangeStatusModal?.rows ?? []}
+            title={selectedRangeStatusModal?.title}
+            description={selectedRangeStatusModal?.description}
+            emptyMessage={selectedRangeStatusModal?.emptyMessage}
           />
           <BlockedTestCasesDialog
             open={blockedDialogOpen}
