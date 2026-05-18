@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type CSSProperties } from "react"
 import {
   Area,
   AreaChart,
@@ -40,22 +40,22 @@ type RangeStatusModal = "failed" | "passed" | "blocked" | "inProgress"
 const CYCLE_SECTION_ORDER = ["Desktop or Tablet", "Mobile", "LP Sections & Pages", "LP Features"]
 const QA_RANGE_SESSION_KEY = "qaTestingRange"
 const QA_REPORT_SESSION_KEY = "qaTestingReportSnapshot"
-const SUMMARY_TONE_CLASSES: Record<SummaryTone, { card: string; value: string }> = {
+const SUMMARY_TONE_STYLES: Record<SummaryTone, { card: CSSProperties; value: CSSProperties }> = {
   failed: {
-    card: "border-red-500/30 bg-red-500/5 hover:border-red-500/60 hover:bg-red-500/10",
-    value: "text-red-700 dark:text-red-300",
+    card: { borderColor: "oklch(63.7% 0.237 25.331 / 0.45)", backgroundColor: "oklch(63.7% 0.237 25.331 / 0.10)" },
+    value: { color: "oklch(70.4% 0.191 22.216)" },
   },
   passed: {
-    card: "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/60 hover:bg-emerald-500/10",
-    value: "text-emerald-700 dark:text-emerald-300",
+    card: { borderColor: "oklch(69.6% 0.17 162.48 / 0.45)", backgroundColor: "oklch(69.6% 0.17 162.48 / 0.10)" },
+    value: { color: "oklch(76.5% 0.177 163.223)" },
   },
   blocked: {
-    card: "border-yellow-500/30 bg-yellow-500/5 hover:border-yellow-500/60 hover:bg-yellow-500/10",
-    value: "text-yellow-700 dark:text-yellow-300",
+    card: { borderColor: "oklch(79.5% 0.184 86.047 / 0.45)", backgroundColor: "oklch(79.5% 0.184 86.047 / 0.10)" },
+    value: { color: "oklch(90.5% 0.182 98.111)" },
   },
   inProgress: {
-    card: "border-blue-500/30 bg-blue-500/5 hover:border-blue-500/60 hover:bg-blue-500/10",
-    value: "text-blue-700 dark:text-blue-300",
+    card: { borderColor: "oklch(62.3% 0.214 259.815 / 0.45)", backgroundColor: "oklch(62.3% 0.214 259.815 / 0.10)" },
+    value: { color: "oklch(70.7% 0.165 254.624)" },
   },
 }
 
@@ -207,15 +207,16 @@ function SummaryCard({
   onClick?: () => void
   tone?: SummaryTone
 }) {
-  const toneClasses = tone ? SUMMARY_TONE_CLASSES[tone] : null
+  const toneStyles = tone ? SUMMARY_TONE_STYLES[tone] : null
   const cardClassName = [
-    toneClasses?.card,
-    onClick && (toneClasses ? "cursor-pointer transition-colors" : "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/5"),
+    toneStyles && "border",
+    onClick && (toneStyles ? "cursor-pointer transition-colors hover:brightness-110" : "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/5"),
   ].filter(Boolean).join(" ")
 
   return (
     <Card
       className={cardClassName || undefined}
+      style={toneStyles?.card}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
@@ -229,7 +230,7 @@ function SummaryCard({
     >
       <CardHeader className="pb-2">
         <CardDescription>{label}</CardDescription>
-        <CardTitle className={`text-2xl tabular-nums ${toneClasses?.value ?? ""}`}>{value}</CardTitle>
+        <CardTitle className="text-2xl tabular-nums" style={toneStyles?.value}>{value}</CardTitle>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">{detail}</CardContent>
     </Card>
