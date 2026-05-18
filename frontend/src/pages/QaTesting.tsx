@@ -146,31 +146,6 @@ function reportRequestKey(start: string, end: string) {
   ].join("|")
 }
 
-function readStoredReport(requestKey: string) {
-  if (typeof window === "undefined") return null
-  try {
-    const stored = JSON.parse(window.sessionStorage.getItem(QA_REPORT_SESSION_KEY) || "{}")
-    if (stored?.requestKey === requestKey && stored?.report) {
-      return stored.report as QaTestingReport
-    }
-  } catch {
-    // Ignore malformed snapshots.
-  }
-  return null
-}
-
-function storeReportSnapshot(requestKey: string, report: QaTestingReport) {
-  if (typeof window === "undefined") return
-  if (report.summary.cycleCount === 0 && report.summary.totalCases === 0 && report.cache?.refreshInProgress) {
-    return
-  }
-  window.sessionStorage.setItem(QA_REPORT_SESSION_KEY, JSON.stringify({
-    requestKey,
-    savedAt: new Date().toISOString(),
-    report,
-  }))
-}
-
 function SummaryCard({
   label,
   value,
@@ -512,7 +487,7 @@ export function QaTesting() {
   const [appliedBurndownStart, setAppliedBurndownStart] = useState(burndownStart)
   const [appliedBurndownEnd, setAppliedBurndownEnd] = useState(burndownEnd)
   const currentRequestKey = reportRequestKey(start, end)
-  const [report, setReport] = useState<QaTestingReport | null>(() => readStoredReport(currentRequestKey))
+  const [report, setReport] = useState<QaTestingReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rangeDialogOpen, setRangeDialogOpen] = useState(false)
@@ -532,7 +507,6 @@ export function QaTesting() {
         fromLocalPickerValue(burndownEnd),
       )
       setReport(nextReport)
-      storeReportSnapshot(currentRequestKey, nextReport)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load QA testing report")
     } finally {
@@ -541,11 +515,13 @@ export function QaTesting() {
   }
 
   useEffect(() => {
-    if (!report) {
-      void loadReport()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    window.sessionStorage.removeItem(QA_REPORT_SESSION_KEY)
   }, [])
+
+  useEffect(() => {
+    void loadReport()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRequestKey])
 
   useEffect(() => {
     window.sessionStorage.setItem(QA_RANGE_SESSION_KEY, JSON.stringify({
@@ -556,11 +532,6 @@ export function QaTesting() {
       burndownEnd: fromLocalPickerValue(burndownEnd),
     }))
   }, [preset, start, end, burndownStart, burndownEnd])
-
-  useEffect(() => {
-    const storedReport = readStoredReport(currentRequestKey)
-    setReport(storedReport)
-  }, [currentRequestKey])
 
   const waitingForInitialSnapshot = Boolean(
     report?.cache?.refreshInProgress
