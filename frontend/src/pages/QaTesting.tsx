@@ -792,7 +792,7 @@ export function QaTesting() {
           >
             Set Range
           </Button>
-          <Button onClick={() => loadReport(true)} disabled={loading}>
+          <Button onClick={() => loadReport(true)} disabled={loading} className="!text-black">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Refresh from Jira
           </Button>
