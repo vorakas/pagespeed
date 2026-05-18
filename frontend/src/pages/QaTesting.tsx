@@ -61,6 +61,12 @@ function isWithinRange(value: string | null | undefined, startValue: string, end
   return timestamp >= new Date(startValue).getTime() && timestamp <= new Date(endValue).getTime()
 }
 
+function timestampValue(value: string | null | undefined) {
+  if (!value) return 0
+  const timestamp = new Date(value).getTime()
+  return Number.isNaN(timestamp) ? 0 : timestamp
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return "Not executed"
   return new Intl.DateTimeFormat(undefined, {
@@ -208,7 +214,7 @@ function RangeProgressDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-6xl">
+      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-[90rem]">
         <DialogHeader>
           <DialogTitle>Range Progress Test Cases</DialogTitle>
           <DialogDescription>Test cases executed inside the selected test-case range.</DialogDescription>
@@ -219,9 +225,9 @@ function RangeProgressDialog({
               <tr>
                 <th className="px-4 py-3">Cycle</th>
                 <th className="px-4 py-3">Test Case</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Executed</th>
-                <th className="px-4 py-3">When</th>
+                <th className="w-32 px-4 py-3">Status</th>
+                <th className="w-44 px-4 py-3">Executed</th>
+                <th className="w-32 px-4 py-3">When</th>
               </tr>
             </thead>
             <tbody>
@@ -247,8 +253,8 @@ function RangeProgressDialog({
                     <td className="px-4 py-3">
                       <Badge className={statusClass(testCase.status)}>{testCase.status}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{testCase.executedBy || "-"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDateTime(testCase.executedAt)}</td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{testCase.executedBy || "-"}</td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatDateTime(testCase.executedAt)}</td>
                   </tr>
                 ))
               )}
@@ -271,7 +277,7 @@ function BlockedTestCasesDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-6xl">
+      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-[90rem]">
         <DialogHeader>
           <DialogTitle>Blocked Test Cases</DialogTitle>
           <DialogDescription>All currently blocked test cases in the loaded round cycles.</DialogDescription>
@@ -282,9 +288,9 @@ function BlockedTestCasesDialog({
               <tr>
                 <th className="px-4 py-3">Cycle</th>
                 <th className="px-4 py-3">Test Case</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Assigned</th>
-                <th className="px-4 py-3">Executed</th>
+                <th className="w-32 px-4 py-3">Status</th>
+                <th className="w-44 px-4 py-3">Assigned</th>
+                <th className="w-32 px-4 py-3">Executed</th>
               </tr>
             </thead>
             <tbody>
@@ -310,8 +316,8 @@ function BlockedTestCasesDialog({
                     <td className="px-4 py-3">
                       <Badge className={statusClass(testCase.status)}>{testCase.status}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{testCase.assignedTo || "Unassigned"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatDateTime(testCase.executedAt)}</td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{testCase.assignedTo || "Unassigned"}</td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatDateTime(testCase.executedAt)}</td>
                   </tr>
                 ))
               )}
@@ -641,7 +647,7 @@ export function QaTesting() {
             cycleName: cycle.name,
             section: normalizeQaCycleSection(cycle),
           })),
-      ),
+      ).sort((a, b) => timestampValue(b.executedAt) - timestampValue(a.executedAt)),
     [report],
   )
 
