@@ -753,14 +753,19 @@ class QaTestingReportService:
             return self._get_json(path, params)
 
     def _fetch_round_cycle_reports(self, start: datetime, end: datetime, force_refresh: bool = False) -> list[dict[str, Any]]:
-        try:
-            cycles = self._fetch_adobe_master_cycles()
-        except (requests.Timeout, requests.ConnectionError):
-            if self.cycle_repo is None:
-                raise
-            cycles = self._cached_adobe_master_cycles()
-            if not cycles:
-                raise
+        cycles: list[dict[str, Any]] | None = None
+        if force_refresh:
+            cached_cycles = self._cached_adobe_master_cycles()
+            if cached_cycles:
+                cycles = cached_cycles
+
+        if cycles is None:
+            try:
+                cycles = self._fetch_adobe_master_cycles()
+            except (requests.Timeout, requests.ConnectionError):
+                cycles = self._cached_adobe_master_cycles()
+                if not cycles:
+                    raise
         matching = [
             cycle
             for cycle in cycles
@@ -830,7 +835,7 @@ class QaTestingReportService:
         return cycles
 
     def _cached_adobe_master_cycles(self) -> list[dict[str, Any]]:
-        if self.cycle_repo is None:
+        if self.cycle_repo is None or not hasattr(self.cycle_repo, "get_all_summaries"):
             return []
         rows = self.cycle_repo.get_all_summaries()
         return [
