@@ -36,6 +36,22 @@ class QaCycleRepository:
             raise DatabaseError(f"Failed to read QA cycle summaries: {exc}") from exc
         return {row["cycle_key"]: row for row in rows}
 
+    def get_all_summaries(self) -> list[dict[str, Any]]:
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT cycle_key, name, folder, section, status, project_key,
+                           created_on, updated_on, test_case_count, synced_at
+                    FROM qa_test_cycles
+                    ORDER BY section, name
+                    """
+                )
+                return self._cm.rows_to_dicts(cursor)
+        except Exception as exc:
+            raise DatabaseError(f"Failed to read QA cycle summaries: {exc}") from exc
+
     def upsert_cycle_detail(self, detail: dict[str, Any]) -> None:
         cycle_key = str(detail.get("key") or "")
         if not cycle_key:

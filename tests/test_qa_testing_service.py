@@ -2,6 +2,8 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import unittest
 
+import requests
+
 from services.qa_testing_service import (
     QaTestingReportService,
     TaskWindow,
@@ -1103,6 +1105,61 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(service.detail_fetches, 1)
         self.assertEqual(cycle_repo.upserts[0]["key"], "TC-C1")
         self.assertEqual(cycle_repo.upserts[0]["updatedOn"], "2026-05-15T12:00:00.000Z")
+        self.assertEqual(report["summary"]["totalCases"], 1)
+
+    def test_cycle_search_timeout_falls_back_to_cached_cycle_list(self):
+        class FakeCycleRepo:
+            def __init__(self):
+                self.upserts = []
+
+            def get_all_summaries(self):
+                return [
+                    {
+                        "cycle_key": "TC-C1",
+                        "name": "Checkout Round 1",
+                        "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                        "status": "In Progress",
+                        "project_key": "TC",
+                        "created_on": "2026-05-14T00:00:00.000Z",
+                        "updated_on": "2026-05-15T12:00:00.000Z",
+                        "test_case_count": 1,
+                    }
+                ]
+
+            def upsert_cycle_detail(self, detail):
+                self.upserts.append(detail)
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cycle_repo):
+                super().__init__("token", cycle_repo=cycle_repo)
+                self.detail_keys = []
+
+            def _fetch_adobe_master_cycles(self):
+                raise requests.Timeout("cycle search timed out")
+
+            def _fetch_cycle_details(self, cycles):
+                self.detail_keys = [cycle["key"] for cycle in cycles]
+                return [
+                    {
+                        "key": "TC-C1",
+                        "name": "Checkout Round 1",
+                        "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                        "items": [{"testCaseKey": "TC-T1", "status": "Pass"}],
+                    }
+                ]
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return []
+
+        cycle_repo = FakeCycleRepo()
+        service = FakeService(cycle_repo)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, force_refresh=True)
+
+        self.assertEqual(service.detail_keys, ["TC-C1"])
+        self.assertEqual(cycle_repo.upserts[0]["key"], "TC-C1")
         self.assertEqual(report["summary"]["totalCases"], 1)
 
 

@@ -725,18 +725,33 @@ class QaTestingReportService:
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.jira_pat}", "Accept": "application/json"}
 
-    def _get_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
+    def _get_json(self, path: str, params: dict[str, Any] | None = None, timeout: int = 180) -> Any:
         response = requests.get(
             f"{self.jira_base_url}{path}",
             params=params,
             headers=self._headers(),
-            timeout=180,
+            timeout=timeout,
         )
         response.raise_for_status()
         return response.json()
 
+    def _get_json_with_timeout(self, path: str, params: dict[str, Any] | None = None, timeout: int = 180) -> Any:
+        try:
+            return self._get_json(path, params, timeout=timeout)
+        except TypeError as exc:
+            if "timeout" not in str(exc):
+                raise
+            return self._get_json(path, params)
+
     def _fetch_round_cycle_reports(self, start: datetime, end: datetime, force_refresh: bool = False) -> list[dict[str, Any]]:
-        cycles = self._fetch_adobe_master_cycles()
+        try:
+            cycles = self._fetch_adobe_master_cycles()
+        except (requests.Timeout, requests.ConnectionError):
+            if self.cycle_repo is None:
+                raise
+            cycles = self._cached_adobe_master_cycles()
+            if not cycles:
+                raise
         matching = [
             cycle
             for cycle in cycles
@@ -771,7 +786,7 @@ class QaTestingReportService:
             if start_at:
                 params["startAt"] = start_at
 
-            data = self._get_json("/rest/atm/1.0/testrun/search", params)
+            data = self._get_json_with_timeout("/rest/atm/1.0/testrun/search", params, timeout=45)
             page = data if isinstance(data, list) else data.get("values") or data.get("results") or data.get("items") or []
             new_count = 0
             for cycle in page:
@@ -804,6 +819,25 @@ class QaTestingReportService:
             start_at = next_start
 
         return cycles
+
+    def _cached_adobe_master_cycles(self) -> list[dict[str, Any]]:
+        if self.cycle_repo is None:
+            return []
+        rows = self.cycle_repo.get_all_summaries()
+        return [
+            {
+                "key": row.get("cycle_key"),
+                "name": row.get("name"),
+                "folder": row.get("folder"),
+                "status": row.get("status"),
+                "projectKey": row.get("project_key"),
+                "createdOn": row.get("created_on"),
+                "updatedOn": row.get("updated_on"),
+                "testCaseCount": row.get("test_case_count"),
+            }
+            for row in rows
+            if row.get("cycle_key")
+        ]
 
     def _fetch_round_cycle_reports_from_cycle_cache(
         self,
