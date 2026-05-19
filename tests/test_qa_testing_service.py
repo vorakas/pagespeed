@@ -667,6 +667,8 @@ class QaTestingServiceTest(unittest.TestCase):
         class FakeService(QaTestingReportService):
             def __init__(self):
                 super().__init__("token", report_cache_repo=FakeReportCache())
+                self.thread_started = False
+                self.thread_force_refresh = False
 
             def _build_report_uncached(
                 self,
@@ -677,7 +679,20 @@ class QaTestingServiceTest(unittest.TestCase):
                 burndown_end=None,
                 force_refresh=False,
             ):
-                return {"summary": {"totalCases": 12}, "cycles": [], "burndown": [], "taskMovement": {}}
+                raise AssertionError("Force refresh should rebuild in the background")
+
+            def _start_report_refresh_thread(
+                self,
+                cache_key,
+                start,
+                end,
+                task_window,
+                burndown_start,
+                burndown_end,
+                force_refresh=False,
+            ):
+                self.thread_started = True
+                self.thread_force_refresh = force_refresh
 
         service = FakeService()
         start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
@@ -685,8 +700,12 @@ class QaTestingServiceTest(unittest.TestCase):
 
         report = service.build_report(start, end, force_refresh=True)
 
-        self.assertEqual(report["summary"]["totalCases"], 12)
+        self.assertEqual(report["summary"]["totalCases"], 0)
         self.assertFalse(report["cache"]["hit"])
+        self.assertTrue(report["cache"]["stale"])
+        self.assertTrue(report["cache"]["refreshInProgress"])
+        self.assertTrue(service.thread_started)
+        self.assertTrue(service.thread_force_refresh)
 
     def test_force_refresh_rebuilds_when_persistent_cache_exists(self):
         class FakeReportCache:
@@ -712,6 +731,8 @@ class QaTestingServiceTest(unittest.TestCase):
         class FakeService(QaTestingReportService):
             def __init__(self):
                 super().__init__("token", report_cache_repo=FakeReportCache())
+                self.thread_started = False
+                self.thread_force_refresh = False
 
             def _build_report_uncached(
                 self,
@@ -722,7 +743,20 @@ class QaTestingServiceTest(unittest.TestCase):
                 burndown_end=None,
                 force_refresh=False,
             ):
-                return {"summary": {"totalCases": 9}, "cycles": [], "burndown": [], "taskMovement": {}}
+                raise AssertionError("Force refresh should rebuild in the background")
+
+            def _start_report_refresh_thread(
+                self,
+                cache_key,
+                start,
+                end,
+                task_window,
+                burndown_start,
+                burndown_end,
+                force_refresh=False,
+            ):
+                self.thread_started = True
+                self.thread_force_refresh = force_refresh
 
         service = FakeService()
         start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
@@ -730,8 +764,12 @@ class QaTestingServiceTest(unittest.TestCase):
 
         report = service.build_report(start, end, force_refresh=True)
 
-        self.assertEqual(report["summary"]["totalCases"], 9)
-        self.assertFalse(report["cache"]["hit"])
+        self.assertEqual(report["summary"]["totalCases"], 7)
+        self.assertTrue(report["cache"]["hit"])
+        self.assertTrue(report["cache"]["stale"])
+        self.assertTrue(report["cache"]["refreshInProgress"])
+        self.assertTrue(service.thread_started)
+        self.assertTrue(service.thread_force_refresh)
 
     def test_persistent_cache_with_name_misses_still_returns_snapshot_without_refresh(self):
         class FakeReportCache:
@@ -837,6 +875,29 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertTrue(report["cache"]["stale"])
         self.assertTrue(report["cache"]["refreshInProgress"])
 
+    def test_refreshing_persistent_cache_is_marked_stale_on_normal_read(self):
+        class FakeReportCache:
+            def get(self, cache_key):
+                return {
+                    "report": {"summary": {"totalCases": 7}, "cycles": [], "burndown": [], "taskMovement": {}},
+                    "lastRefreshedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "refreshStatus": "refreshing",
+                }
+
+            def try_start_refresh(self, *args, **kwargs):
+                raise AssertionError("Cached reads should not start another refresh")
+
+        service = QaTestingReportService("token", report_cache_repo=FakeReportCache())
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end)
+
+        self.assertEqual(report["summary"]["totalCases"], 7)
+        self.assertTrue(report["cache"]["hit"])
+        self.assertTrue(report["cache"]["stale"])
+        self.assertTrue(report["cache"]["refreshInProgress"])
+
     def test_build_report_returns_persistent_cache_without_auto_refresh(self):
         class FakeReportCache:
             def __init__(self):
@@ -866,6 +927,7 @@ class QaTestingServiceTest(unittest.TestCase):
                 task_window,
                 burndown_start,
                 burndown_end,
+                force_refresh=False,
             ):
                 self.thread_started = True
 

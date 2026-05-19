@@ -419,14 +419,15 @@ class QaTestingReportService:
 
         if not force_refresh:
             if cached_report is not None:
+                refresh_in_progress = cached.get("refreshStatus") == "refreshing"
                 self._recalculate_cached_report_ranges(cached_report, start, end, task_window, burndown_start, burndown_end)
                 return self._attach_cache_metadata(
                     cached_report,
                     cache_key,
                     cached,
                     hit=True,
-                    stale=False,
-                    refresh_in_progress=cached.get("refreshStatus") == "refreshing",
+                    stale=refresh_in_progress,
+                    refresh_in_progress=refresh_in_progress,
                 )
             latest = self.report_cache_repo.get_latest_successful()
             latest_report = deepcopy(latest.get("report")) if latest and latest.get("report") else None
@@ -463,6 +464,26 @@ class QaTestingReportService:
                 refresh_in_progress=True,
             )
 
+        if force_refresh:
+            self._start_report_refresh_thread(
+                cache_key,
+                start,
+                end,
+                task_window,
+                burndown_start,
+                burndown_end,
+                force_refresh=True,
+            )
+            return self._report_during_refresh(
+                cache_key,
+                start,
+                end,
+                task_window,
+                burndown_start,
+                burndown_end,
+                cached_report,
+            )
+
         try:
             report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end, force_refresh)
             self._save_persistent_report(cache_key, start, end, task_window, report)
@@ -477,6 +498,43 @@ class QaTestingReportService:
         except Exception as exc:
             self.report_cache_repo.mark_refresh_failed(cache_key, str(exc))
             raise
+
+    def _report_during_refresh(
+        self,
+        cache_key: str,
+        start: datetime,
+        end: datetime,
+        task_window: TaskWindow,
+        burndown_start: datetime,
+        burndown_end: datetime,
+        cached_report: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        cache_metadata = self.report_cache_repo.get(cache_key) or {}
+        report = deepcopy(cached_report) if cached_report is not None else None
+
+        if report is None:
+            latest = self.report_cache_repo.get_latest_successful()
+            report = deepcopy(latest.get("report")) if latest and latest.get("report") else None
+
+        if report is None:
+            return self._attach_cache_metadata(
+                self._empty_report(start, end, task_window, burndown_start, burndown_end),
+                cache_key,
+                cache_metadata,
+                hit=False,
+                stale=True,
+                refresh_in_progress=True,
+            )
+
+        self._recalculate_cached_report_ranges(report, start, end, task_window, burndown_start, burndown_end)
+        return self._attach_cache_metadata(
+            report,
+            cache_key,
+            cache_metadata,
+            hit=True,
+            stale=True,
+            refresh_in_progress=True,
+        )
 
     def _recalculate_cached_report_ranges(
         self,
@@ -562,10 +620,11 @@ class QaTestingReportService:
         task_window: TaskWindow,
         burndown_start: datetime,
         burndown_end: datetime,
+        force_refresh: bool = False,
     ) -> None:
         thread = threading.Thread(
             target=self._refresh_report_cache,
-            args=(cache_key, start, end, task_window, burndown_start, burndown_end),
+            args=(cache_key, start, end, task_window, burndown_start, burndown_end, force_refresh),
             daemon=True,
             name="qa-report-cache-refresh",
         )
@@ -579,9 +638,10 @@ class QaTestingReportService:
         task_window: TaskWindow,
         burndown_start: datetime,
         burndown_end: datetime,
+        force_refresh: bool = False,
     ) -> None:
         try:
-            report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end)
+            report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end, force_refresh)
             self._save_persistent_report(cache_key, start, end, task_window, report)
         except Exception as exc:
             self.report_cache_repo.mark_refresh_failed(cache_key, str(exc))
