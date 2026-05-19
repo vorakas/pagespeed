@@ -433,14 +433,23 @@ class QaTestingReportService:
             latest_report = deepcopy(latest.get("report")) if latest and latest.get("report") else None
             if latest_report is not None:
                 latest_key = latest.get("cacheKey") or cache_key
+                exact_refresh_in_progress = cached is not None and cached.get("refreshStatus") == "refreshing"
+                cache_metadata = latest
+                metadata_key = latest_key
+                if exact_refresh_in_progress:
+                    cache_metadata = dict(latest)
+                    cache_metadata["refreshStatus"] = cached.get("refreshStatus")
+                    cache_metadata["refreshStartedAt"] = cached.get("refreshStartedAt")
+                    cache_metadata["refreshError"] = cached.get("refreshError")
+                    metadata_key = cache_key
                 self._recalculate_cached_report_ranges(latest_report, start, end, task_window, burndown_start, burndown_end)
                 return self._attach_cache_metadata(
                     latest_report,
-                    latest_key,
-                    latest,
+                    metadata_key,
+                    cache_metadata,
                     hit=True,
-                    stale=latest_key != cache_key or latest.get("refreshStatus") == "refreshing",
-                    refresh_in_progress=latest.get("refreshStatus") == "refreshing",
+                    stale=metadata_key != cache_key or exact_refresh_in_progress or latest.get("refreshStatus") == "refreshing",
+                    refresh_in_progress=exact_refresh_in_progress or latest.get("refreshStatus") == "refreshing",
                 )
 
         started = self._try_start_persistent_refresh(cache_key, start, end, task_window, force_refresh=force_refresh)

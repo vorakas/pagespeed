@@ -877,6 +877,39 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertTrue(report["cache"]["stale"])
         self.assertTrue(report["cache"]["refreshInProgress"])
 
+    def test_latest_snapshot_keeps_exact_refresh_in_progress_flag(self):
+        class FakeReportCache:
+            def get(self, cache_key):
+                return {
+                    "report": None,
+                    "refreshStatus": "refreshing",
+                    "refreshStartedAt": "2026-05-15T12:00:00Z",
+                    "refreshError": None,
+                }
+
+            def get_latest_successful(self):
+                return {
+                    "cacheKey": "older-cache-key",
+                    "report": {"summary": {"totalCases": 7}, "cycles": [], "burndown": [], "taskMovement": {}},
+                    "lastRefreshedAt": "2026-05-15T11:00:00Z",
+                    "refreshStatus": "idle",
+                }
+
+            def try_start_refresh(self, *args, **kwargs):
+                raise AssertionError("Latest snapshot should be used while exact refresh is active")
+
+        service = QaTestingReportService("token", report_cache_repo=FakeReportCache())
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end)
+
+        self.assertEqual(report["summary"]["totalCases"], 7)
+        self.assertTrue(report["cache"]["hit"])
+        self.assertTrue(report["cache"]["stale"])
+        self.assertTrue(report["cache"]["refreshInProgress"])
+        self.assertEqual(report["cache"]["refreshStartedAt"], "2026-05-15T12:00:00Z")
+
     def test_refreshing_persistent_cache_is_marked_stale_on_normal_read(self):
         class FakeReportCache:
             def get(self, cache_key):
