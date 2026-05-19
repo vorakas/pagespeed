@@ -774,8 +774,7 @@ class QaTestingReportService:
         if force_refresh:
             details = self._fetch_cycle_details(matching)
             if self.cycle_repo is not None:
-                for detail in details:
-                    self.cycle_repo.upsert_cycle_detail(detail)
+                self._start_cycle_detail_upsert_thread(details)
             return self._build_reports_from_cycle_details(details, start, end)
         if self.cycle_repo is not None:
             return self._fetch_round_cycle_reports_from_cycle_cache(matching, start, end)
@@ -892,6 +891,23 @@ class QaTestingReportService:
                         detail[field] = cycle.get(field)
                 details.append(detail)
         return details
+
+    def _start_cycle_detail_upsert_thread(self, details: list[dict[str, Any]]) -> None:
+        if not details or self.cycle_repo is None:
+            return
+        thread = threading.Thread(
+            target=self._upsert_cycle_details,
+            args=(details,),
+            daemon=True,
+            name="qa-cycle-detail-cache-upsert",
+        )
+        thread.start()
+
+    def _upsert_cycle_details(self, details: list[dict[str, Any]]) -> None:
+        if self.cycle_repo is None:
+            return
+        for detail in details:
+            self.cycle_repo.upsert_cycle_detail(detail)
 
     def _build_reports_from_cycle_details(
         self,
