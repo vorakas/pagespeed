@@ -7,6 +7,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+import logging
 import re
 import threading
 from typing import Any
@@ -39,6 +40,7 @@ ROOT_CYCLE_SECTION_OVERRIDES = {
     "TC-C1570": "Desktop or Tablet",
     "TC-C1569": "Mobile",
 }
+logger = logging.getLogger(__name__)
 
 
 class TaskWindow(str, Enum):
@@ -650,9 +652,18 @@ class QaTestingReportService:
         force_refresh: bool = False,
     ) -> None:
         try:
+            logger.info("QA report refresh started: cache_key=%s force_refresh=%s", cache_key, force_refresh)
             report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end, force_refresh)
+            logger.info(
+                "QA report refresh built: cache_key=%s cycles=%s total_cases=%s",
+                cache_key,
+                len(report.get("cycles") or []),
+                (report.get("summary") or {}).get("totalCases"),
+            )
             self._save_persistent_report(cache_key, start, end, task_window, report)
+            logger.info("QA report refresh saved: cache_key=%s", cache_key)
         except Exception as exc:
+            logger.exception("QA report refresh failed: cache_key=%s", cache_key)
             self.report_cache_repo.mark_refresh_failed(cache_key, str(exc))
 
     def _attach_cache_metadata(
@@ -757,6 +768,7 @@ class QaTestingReportService:
         if force_refresh:
             cached_cycles = self._cached_adobe_master_cycles()
             if cached_cycles:
+                logger.info("QA refresh using cached cycle list: %s cycles", len(cached_cycles))
                 cycles = cached_cycles
 
         if cycles is None:
@@ -772,7 +784,9 @@ class QaTestingReportService:
             if is_adobe_master_cycle(cycle) and is_round_cycle(str(cycle.get("name") or ""))
         ]
         if force_refresh:
+            logger.info("QA refresh fetching cycle details: %s cycles", len(matching))
             details = self._fetch_cycle_details(matching)
+            logger.info("QA refresh fetched cycle details: %s details", len(details))
             if self.cycle_repo is not None:
                 self._start_cycle_detail_upsert_thread(details)
             return self._build_reports_from_cycle_details(details, start, end)
@@ -906,8 +920,10 @@ class QaTestingReportService:
     def _upsert_cycle_details(self, details: list[dict[str, Any]]) -> None:
         if self.cycle_repo is None:
             return
+        logger.info("QA cycle cache upsert started: %s details", len(details))
         for detail in details:
             self.cycle_repo.upsert_cycle_detail(detail)
+        logger.info("QA cycle cache upsert finished: %s details", len(details))
 
     def _build_reports_from_cycle_details(
         self,
