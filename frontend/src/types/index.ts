@@ -1533,6 +1533,16 @@ export interface QaTestingReport {
     refreshStartedAt?: string | null
     refreshStatus?: string
     refreshError?: string | null
+    refreshMetadata?: {
+      stage?: string
+      message?: string
+      completedChunks?: number
+      totalChunks?: number | null
+      completedItems?: number
+      totalItems?: number | null
+      warnings?: string[]
+      error?: string | null
+    }
     shared?: boolean
   }
 }

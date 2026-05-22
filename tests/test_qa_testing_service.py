@@ -1121,6 +1121,105 @@ class QaTestingServiceTest(unittest.TestCase):
 
         self.assertGreaterEqual(service.search_timeout, 180)
 
+    def test_force_refresh_records_chunk_progress_metadata(self):
+        class FakeReportCache:
+            def __init__(self):
+                self.metadata_updates = []
+                self.saved_metadata = None
+
+            def get(self, cache_key):
+                return {
+                    "report": {"summary": { "totalCases": 1 }, "cycles": [], "burndown": [], "taskMovement": {}},
+                    "lastRefreshedAt": "2026-05-01T00:00:00Z",
+                    "refreshStatus": "idle",
+                }
+
+            def try_start_refresh(self, *args, **kwargs):
+                return True
+
+            def get_latest_successful(self):
+                return None
+
+            def update_refresh_metadata(self, cache_key, metadata):
+                self.metadata_updates.append(metadata)
+
+            def save_report(self, *args, **kwargs):
+                self.saved_metadata = kwargs.get("refresh_metadata")
+
+            def mark_refresh_failed(self, *args, **kwargs):
+                return None
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cache):
+                super().__init__("token", report_cache_repo=cache)
+
+            def _start_report_refresh_thread(
+                self,
+                cache_key,
+                start,
+                end,
+                task_window,
+                burndown_start,
+                burndown_end,
+                force_refresh=False,
+            ):
+                self._refresh_report_cache(cache_key, start, end, task_window, burndown_start, burndown_end, force_refresh)
+
+            def _get_json(self, path, params=None, timeout=180):
+                if path.endswith("/testrun/search"):
+                    start_at = int((params or {}).get("startAt") or 0)
+                    if start_at == 0:
+                        return {
+                            "values": [
+                                {
+                                    "key": f"TC-C{i}",
+                                    "name": f"Feature {i} E2E Testing - Round 1",
+                                    "folder": "/Adobe Commerce E2E Master Test Cycles/Desktop or Tablet/PDP",
+                                }
+                                for i in range(25)
+                            ],
+                            "startAt": 0,
+                            "total": 30,
+                        }
+                    return {
+                        "values": [
+                            {
+                                "key": f"TC-C{i}",
+                                "name": f"Feature {i} E2E Testing - Round 1",
+                                "folder": "/Adobe Commerce E2E Master Test Cycles/Desktop or Tablet/PDP",
+                            }
+                            for i in range(25, 30)
+                        ],
+                        "startAt": start_at,
+                        "total": 30,
+                    }
+                if "/testrun/" in path:
+                    key = path.rsplit("/", 1)[-1]
+                    return {
+                        "key": key,
+                        "name": f"{key} Round",
+                        "folder": "/Adobe Commerce E2E Master Test Cycles/Desktop or Tablet/PDP",
+                        "items": [{"testCaseKey": f"{key}-T1", "status": "Pass"}],
+                    }
+                raise AssertionError(path)
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return []
+
+        cache = FakeReportCache()
+        service = FakeService(cache)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        service.build_report(start, end, force_refresh=True)
+
+        stages = [update.get("stage") for update in cache.metadata_updates]
+        self.assertIn("discoveringCycles", stages)
+        self.assertIn("fetchingCycleDetails", stages)
+        self.assertIn("savingReport", stages)
+        self.assertEqual(cache.saved_metadata["stage"], "complete")
+        self.assertEqual(cache.saved_metadata["completedItems"], 30)
+
     def test_force_refresh_fetches_detail_even_when_cycle_updated_on_unchanged(self):
         class FakeCycleRepo:
             def __init__(self):

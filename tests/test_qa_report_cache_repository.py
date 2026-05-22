@@ -68,6 +68,32 @@ class QaReportCacheRepositoryTest(unittest.TestCase):
         self.assertEqual(row["refreshStatus"], "failed")
         self.assertEqual(row["refreshError"], "Jira timeout")
 
+    def test_update_refresh_metadata_records_visible_progress(self):
+        self.repo.try_start_refresh(
+            "range-key",
+            "2026-05-14T00:00Z",
+            "2026-05-15T00:00Z",
+            "sinceYesterday",
+        )
+
+        self.repo.update_refresh_metadata(
+            "range-key",
+            {
+                "stage": "fetchingCycleDetails",
+                "message": "Fetching Jira cycle details 10/25",
+                "completedItems": 10,
+                "totalItems": 25,
+                "warnings": ["Cycle discovery fell back to cached data"],
+            },
+        )
+        row = self.repo.get("range-key")
+
+        self.assertEqual(row["refreshStatus"], "refreshing")
+        self.assertIsNone(row["refreshError"])
+        self.assertEqual(row["refreshMetadata"]["stage"], "fetchingCycleDetails")
+        self.assertEqual(row["refreshMetadata"]["completedItems"], 10)
+        self.assertEqual(row["refreshMetadata"]["warnings"], ["Cycle discovery fell back to cached data"])
+
     def test_get_latest_successful_returns_most_recent_saved_snapshot(self):
         self.repo.save_report(
             "older-key",

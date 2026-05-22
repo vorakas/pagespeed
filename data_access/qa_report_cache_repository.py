@@ -62,17 +62,19 @@ class QaReportCacheRepository:
         range_end: str,
         task_window: str,
         report: dict[str, Any],
+        refresh_metadata: dict[str, Any] | None = None,
     ) -> None:
         ph = self._cm.placeholder()
         now = datetime.now(timezone.utc).isoformat()
         payload = json.dumps(report)
+        metadata_payload = _encode_refresh_metadata(refresh_metadata)
         statement = f"""
             INSERT INTO qa_report_cache (
                 cache_key, range_start, range_end, task_window, report_json,
                 last_refreshed_at, refresh_started_at, refresh_finished_at,
                 refresh_status, refresh_error, updated_at
             )
-            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, NULL, {ph}, {ph}, NULL, {ph})
+            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, NULL, {ph}, {ph}, {ph}, {ph})
             ON CONFLICT (cache_key) DO UPDATE SET
                 range_start = EXCLUDED.range_start,
                 range_end = EXCLUDED.range_end,
@@ -82,7 +84,7 @@ class QaReportCacheRepository:
                 refresh_started_at = NULL,
                 refresh_finished_at = EXCLUDED.refresh_finished_at,
                 refresh_status = EXCLUDED.refresh_status,
-                refresh_error = NULL,
+                refresh_error = EXCLUDED.refresh_error,
                 updated_at = EXCLUDED.updated_at
         """
         try:
@@ -99,6 +101,7 @@ class QaReportCacheRepository:
                         now,
                         now,
                         "idle",
+                        metadata_payload,
                         now,
                     ),
                 )
@@ -148,9 +151,33 @@ class QaReportCacheRepository:
             raise DatabaseError(f"Failed to start QA report refresh: {exc}") from exc
         return True
 
+    def update_refresh_metadata(self, cache_key: str, metadata: dict[str, Any]) -> None:
+        ph = self._cm.placeholder()
+        now = datetime.now(timezone.utc).isoformat()
+        payload = _encode_refresh_metadata(metadata)
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE qa_report_cache
+                    SET refresh_error = {ph},
+                        updated_at = {ph}
+                    WHERE cache_key = {ph}
+                    """,
+                    (payload, now, cache_key),
+                )
+        except Exception as exc:
+            raise DatabaseError(f"Failed to update QA report refresh metadata: {exc}") from exc
+
     def mark_refresh_failed(self, cache_key: str, error: str) -> None:
         ph = self._cm.placeholder()
         now = datetime.now(timezone.utc).isoformat()
+        metadata = _encode_refresh_metadata({
+            "stage": "failed",
+            "message": "Jira refresh failed",
+            "error": error[:500],
+        })
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
@@ -164,7 +191,7 @@ class QaReportCacheRepository:
                         updated_at = {ph}
                     WHERE cache_key = {ph}
                     """,
-                    ("failed", error[:500], now, now, cache_key),
+                    ("failed", metadata, now, now, cache_key),
                 )
         except Exception as exc:
             raise DatabaseError(f"Failed to mark QA report refresh failed: {exc}") from exc
@@ -180,7 +207,10 @@ def _decode_report_row(row: dict[str, Any] | None) -> dict[str, Any] | None:
             report = json.loads(report_json)
         except (TypeError, json.JSONDecodeError):
             report = None
-    return {
+    refresh_error = row.get("refresh_error")
+    refresh_metadata = _decode_refresh_metadata(refresh_error)
+    visible_error = refresh_metadata.get("error") if refresh_metadata else refresh_error
+    decoded = {
         "cacheKey": row.get("cache_key"),
         "rangeStart": row.get("range_start"),
         "rangeEnd": row.get("range_end"),
@@ -190,8 +220,27 @@ def _decode_report_row(row: dict[str, Any] | None) -> dict[str, Any] | None:
         "refreshStartedAt": _to_iso(row.get("refresh_started_at")),
         "refreshFinishedAt": _to_iso(row.get("refresh_finished_at")),
         "refreshStatus": row.get("refresh_status") or "idle",
-        "refreshError": row.get("refresh_error"),
+        "refreshError": visible_error,
     }
+    if refresh_metadata:
+        decoded["refreshMetadata"] = refresh_metadata
+    return decoded
+
+
+def _encode_refresh_metadata(metadata: dict[str, Any] | None) -> str | None:
+    if not metadata:
+        return None
+    return json.dumps(metadata)
+
+
+def _decode_refresh_metadata(value: Any) -> dict[str, Any] | None:
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        parsed = json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 def _parse_cached_datetime(value: Any) -> datetime | None:

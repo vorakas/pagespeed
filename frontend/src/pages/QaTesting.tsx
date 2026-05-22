@@ -194,6 +194,11 @@ function reportRequestKey(start: string, end: string) {
   ].join("|")
 }
 
+function refreshProgressPercent(metadata: NonNullable<QaTestingReport["cache"]>["refreshMetadata"]) {
+  if (!metadata?.totalItems || metadata.totalItems <= 0 || metadata.completedItems == null) return null
+  return Math.max(0, Math.min(100, Math.round((metadata.completedItems / metadata.totalItems) * 100)))
+}
+
 function SummaryCard({
   label,
   value,
@@ -619,6 +624,10 @@ export function QaTesting() {
     && report.cache.stale,
   )
   const refreshPollActive = Boolean(report?.cache?.refreshInProgress || refreshingFromJira)
+  const refreshMetadata = report?.cache?.refreshMetadata
+  const refreshPercent = refreshProgressPercent(refreshMetadata)
+  const refreshHasProblem = Boolean(report?.cache?.refreshError || refreshMetadata?.error || (refreshMetadata?.warnings?.length ?? 0) > 0)
+  const showRefreshStatus = Boolean(report?.cache?.refreshInProgress || refreshHasProblem)
 
   useEffect(() => {
     if (!refreshPollActive || loading) return undefined
@@ -819,6 +828,45 @@ export function QaTesting() {
               {report.userCache.refreshQueued > 0 ? `, ${report.userCache.refreshQueued} queued for background refresh` : ""}.
             </>
           ) : null}
+        </div>
+      ) : null}
+
+      {showRefreshStatus ? (
+        <div
+          className={[
+            "rounded-lg border p-4 text-sm",
+            refreshHasProblem
+              ? "border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+              : "border-primary/25 bg-primary/10 text-foreground",
+          ].join(" ")}
+        >
+          <div className="flex items-start gap-3">
+            {report?.cache?.refreshInProgress ? (
+              <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+            ) : (
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            )}
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="font-medium">
+                {report?.cache?.refreshError || refreshMetadata?.error || refreshMetadata?.message || "Jira refresh status unavailable"}
+              </div>
+              {refreshMetadata?.completedItems != null || refreshMetadata?.totalItems ? (
+                <div className="text-xs opacity-80">
+                  {refreshMetadata.completedItems ?? 0}
+                  {refreshMetadata.totalItems ? `/${refreshMetadata.totalItems}` : ""} items
+                  {refreshMetadata.stage ? ` · ${refreshMetadata.stage}` : ""}
+                </div>
+              ) : null}
+              {refreshPercent != null ? <Progress value={refreshPercent} /> : null}
+              {refreshMetadata?.warnings?.length ? (
+                <ul className="space-y-1 text-xs opacity-90">
+                  {refreshMetadata.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </div>
         </div>
       ) : null}
 

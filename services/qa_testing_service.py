@@ -10,7 +10,7 @@ from enum import Enum
 import logging
 import re
 import threading
-from typing import Any
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 import requests
@@ -34,6 +34,8 @@ EPIC_LINK_JQL = (
 )
 CACHE_TTL_SECONDS = 15 * 60
 JIRA_TIMEZONE = ZoneInfo("America/Los_Angeles")
+CYCLE_SEARCH_PAGE_SIZE = 25
+CYCLE_DETAIL_BATCH_SIZE = 10
 ROOT_CYCLE_SECTION_OVERRIDES = {
     "TC-C1426": "LP Features",
     "TC-C1427": "LP Features",
@@ -384,10 +386,11 @@ class QaTestingReportService:
         burndown_start: datetime,
         burndown_end: datetime,
         force_refresh: bool = False,
+        progress: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
         self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
         self._last_user_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
-        cycles = self._fetch_round_cycle_reports(start, end, force_refresh)
+        cycles = self._fetch_round_cycle_reports_with_progress(start, end, force_refresh, progress)
         task_changes = self._fetch_task_status_changes(start, end, task_window)
         summary = self._summarize(cycles, task_changes)
         report = {
@@ -607,14 +610,27 @@ class QaTestingReportService:
         end: datetime,
         task_window: TaskWindow,
         report: dict[str, Any],
+        refresh_metadata: dict[str, Any] | None = None,
     ) -> None:
-        self.report_cache_repo.save_report(
-            cache_key,
-            to_iso(start) or "",
-            to_iso(end) or "",
-            task_window.value,
-            report,
-        )
+        try:
+            self.report_cache_repo.save_report(
+                cache_key,
+                to_iso(start) or "",
+                to_iso(end) or "",
+                task_window.value,
+                report,
+                refresh_metadata=refresh_metadata,
+            )
+        except TypeError as exc:
+            if "refresh_metadata" not in str(exc):
+                raise
+            self.report_cache_repo.save_report(
+                cache_key,
+                to_iso(start) or "",
+                to_iso(end) or "",
+                task_window.value,
+                report,
+            )
 
     def _report_has_name_cache_misses(self, report: dict[str, Any]) -> bool:
         for cache_key in ("nameCache", "userCache"):
@@ -651,20 +667,63 @@ class QaTestingReportService:
         burndown_end: datetime,
         force_refresh: bool = False,
     ) -> None:
+        warnings: list[str] = []
+
+        def publish(metadata: dict[str, Any]) -> dict[str, Any]:
+            warning = metadata.pop("warning", None)
+            if warning:
+                warnings.append(str(warning))
+            if warnings:
+                metadata["warnings"] = list(warnings)
+            self._update_refresh_metadata(cache_key, metadata)
+            return metadata
+
         try:
             logger.info("QA report refresh started: cache_key=%s force_refresh=%s", cache_key, force_refresh)
-            report = self._build_report_uncached(start, end, task_window, burndown_start, burndown_end, force_refresh)
+            publish({
+                "stage": "discoveringCycles",
+                "message": "Starting Jira cycle discovery",
+                "completedItems": 0,
+            })
+            report = self._build_report_uncached(
+                start,
+                end,
+                task_window,
+                burndown_start,
+                burndown_end,
+                force_refresh,
+                progress=publish,
+            )
             logger.info(
                 "QA report refresh built: cache_key=%s cycles=%s total_cases=%s",
                 cache_key,
                 len(report.get("cycles") or []),
                 (report.get("summary") or {}).get("totalCases"),
             )
-            self._save_persistent_report(cache_key, start, end, task_window, report)
+            publish({
+                "stage": "savingReport",
+                "message": "Saving refreshed Jira snapshot",
+                "completedItems": len(report.get("cycles") or []),
+                "totalItems": len(report.get("cycles") or []),
+            })
+            complete_metadata = {
+                "stage": "complete",
+                "message": "Jira refresh complete",
+                "completedItems": len(report.get("cycles") or []),
+                "totalItems": len(report.get("cycles") or []),
+            }
+            if warnings:
+                complete_metadata["warnings"] = list(warnings)
+            self._save_persistent_report(cache_key, start, end, task_window, report, refresh_metadata=complete_metadata)
             logger.info("QA report refresh saved: cache_key=%s", cache_key)
         except Exception as exc:
             logger.exception("QA report refresh failed: cache_key=%s", cache_key)
             self.report_cache_repo.mark_refresh_failed(cache_key, str(exc))
+
+    def _update_refresh_metadata(self, cache_key: str, metadata: dict[str, Any]) -> None:
+        if self.report_cache_repo is None or not hasattr(self.report_cache_repo, "update_refresh_metadata"):
+            return
+        self.report_cache_repo.update_refresh_metadata(cache_key, metadata)
 
     def _attach_cache_metadata(
         self,
@@ -763,14 +822,47 @@ class QaTestingReportService:
                 raise
             return self._get_json(path, params)
 
-    def _fetch_round_cycle_reports(self, start: datetime, end: datetime, force_refresh: bool = False) -> list[dict[str, Any]]:
+    def _fetch_round_cycle_reports_with_progress(
+        self,
+        start: datetime,
+        end: datetime,
+        force_refresh: bool,
+        progress: Callable[[dict[str, Any]], None] | None,
+    ) -> list[dict[str, Any]]:
+        try:
+            return self._fetch_round_cycle_reports(start, end, force_refresh, progress=progress)
+        except TypeError as exc:
+            if "progress" not in str(exc):
+                raise
+            return self._fetch_round_cycle_reports(start, end, force_refresh)
+
+    def _fetch_round_cycle_reports(
+        self,
+        start: datetime,
+        end: datetime,
+        force_refresh: bool = False,
+        progress: Callable[[dict[str, Any]], None] | None = None,
+    ) -> list[dict[str, Any]]:
         cycles: list[dict[str, Any]] | None = None
         try:
-            cycles = self._fetch_adobe_master_cycles()
+            try:
+                cycles = self._fetch_adobe_master_cycles(progress=progress)
+            except TypeError as exc:
+                if "progress" not in str(exc):
+                    raise
+                cycles = self._fetch_adobe_master_cycles()
         except (requests.Timeout, requests.ConnectionError):
             cycles = self._cached_adobe_master_cycles()
             if not cycles:
                 raise
+            if progress:
+                progress({
+                    "stage": "discoveringCycles",
+                    "message": "Jira cycle discovery timed out; using cached cycle list",
+                    "completedItems": len(cycles),
+                    "totalItems": len(cycles),
+                    "warning": "Jira cycle discovery timed out. Existing cached cycles were used for this refresh.",
+                })
             logger.info("QA refresh using cached cycle list after Jira cycle search failed: %s cycles", len(cycles))
         matching = [
             cycle
@@ -779,7 +871,7 @@ class QaTestingReportService:
         ]
         if force_refresh:
             logger.info("QA refresh fetching cycle details: %s cycles", len(matching))
-            details = self._fetch_cycle_details(matching)
+            details = self._fetch_cycle_details_with_progress(matching, progress)
             logger.info("QA refresh fetched cycle details: %s details", len(details))
             if self.cycle_repo is not None:
                 self._start_cycle_detail_upsert_thread(details)
@@ -793,13 +885,19 @@ class QaTestingReportService:
             end,
         )
 
-    def _fetch_adobe_master_cycles(self) -> list[dict[str, Any]]:
-        page_size = 100
+    def _fetch_adobe_master_cycles(
+        self,
+        progress: Callable[[dict[str, Any]], None] | None = None,
+    ) -> list[dict[str, Any]]:
+        page_size = CYCLE_SEARCH_PAGE_SIZE
         start_at = 0
         cycles: list[dict[str, Any]] = []
         seen_keys: set[str] = set()
+        page_number = 0
+        total_items: int | None = None
 
         while True:
+            page_number += 1
             params: dict[str, Any] = {
                 "query": f'projectKey = "{self.project_key}" AND folder = "{ADOBE_MASTER_FOLDER}"',
                 "maxResults": page_size,
@@ -807,6 +905,14 @@ class QaTestingReportService:
             if start_at:
                 params["startAt"] = start_at
 
+            if progress:
+                progress({
+                    "stage": "discoveringCycles",
+                    "message": f"Discovering Jira test cycles page {page_number}",
+                    "completedChunks": page_number - 1,
+                    "completedItems": len(cycles),
+                    "totalItems": total_items,
+                })
             data = self._get_json_with_timeout("/rest/atm/1.0/testrun/search", params, timeout=180)
             page = data if isinstance(data, list) else data.get("values") or data.get("results") or data.get("items") or []
             new_count = 0
@@ -832,8 +938,27 @@ class QaTestingReportService:
                     total = int(data.get("total"))
                 except (TypeError, ValueError):
                     total = None
+                total_items = total
                 if total is not None and next_start >= total:
+                    if progress:
+                        progress({
+                            "stage": "discoveringCycles",
+                            "message": f"Discovered {len(cycles)} Jira test cycles",
+                            "completedChunks": page_number,
+                            "totalChunks": page_number,
+                            "completedItems": len(cycles),
+                            "totalItems": total_items,
+                        })
                     break
+
+            if progress:
+                progress({
+                    "stage": "discoveringCycles",
+                    "message": f"Discovered {len(cycles)} Jira test cycles",
+                    "completedChunks": page_number,
+                    "completedItems": len(cycles),
+                    "totalItems": total_items,
+                })
 
             if next_start <= start_at:
                 break
@@ -882,22 +1007,57 @@ class QaTestingReportService:
         details = self.cycle_repo.get_cycle_details(cycle_keys)
         return self._build_reports_from_cycle_details(details, start, end)
 
-    def _fetch_cycle_details(self, cycles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _fetch_cycle_details_with_progress(
+        self,
+        cycles: list[dict[str, Any]],
+        progress: Callable[[dict[str, Any]], None] | None,
+    ) -> list[dict[str, Any]]:
+        try:
+            return self._fetch_cycle_details(cycles, progress=progress)
+        except TypeError as exc:
+            if "progress" not in str(exc):
+                raise
+            return self._fetch_cycle_details(cycles)
+
+    def _fetch_cycle_details(
+        self,
+        cycles: list[dict[str, Any]],
+        progress: Callable[[dict[str, Any]], None] | None = None,
+    ) -> list[dict[str, Any]]:
         details: list[dict[str, Any]] = []
         if not cycles:
             return details
-        with ThreadPoolExecutor(max_workers=6) as executor:
-            futures = {
-                executor.submit(self._get_json, f"/rest/atm/1.0/testrun/{cycle.get('key')}"): cycle
-                for cycle in cycles
-            }
-            for future in as_completed(futures):
-                detail = future.result()
-                cycle = futures[future]
-                for field in ("key", "name", "folder", "status", "projectKey", "createdOn", "updatedOn", "testCaseCount"):
-                    if not detail.get(field) and cycle.get(field):
-                        detail[field] = cycle.get(field)
-                details.append(detail)
+        total = len(cycles)
+        for batch_start in range(0, total, CYCLE_DETAIL_BATCH_SIZE):
+            batch = cycles[batch_start : batch_start + CYCLE_DETAIL_BATCH_SIZE]
+            if progress:
+                progress({
+                    "stage": "fetchingCycleDetails",
+                    "message": f"Fetching Jira cycle details {batch_start}/{total}",
+                    "completedChunks": batch_start // CYCLE_DETAIL_BATCH_SIZE,
+                    "completedItems": batch_start,
+                    "totalItems": total,
+                })
+            with ThreadPoolExecutor(max_workers=min(6, len(batch))) as executor:
+                futures = {
+                    executor.submit(self._get_json, f"/rest/atm/1.0/testrun/{cycle.get('key')}"): cycle
+                    for cycle in batch
+                }
+                for future in as_completed(futures):
+                    detail = future.result()
+                    cycle = futures[future]
+                    for field in ("key", "name", "folder", "status", "projectKey", "createdOn", "updatedOn", "testCaseCount"):
+                        if not detail.get(field) and cycle.get(field):
+                            detail[field] = cycle.get(field)
+                    details.append(detail)
+            if progress:
+                progress({
+                    "stage": "fetchingCycleDetails",
+                    "message": f"Fetched Jira cycle details {len(details)}/{total}",
+                    "completedChunks": (batch_start // CYCLE_DETAIL_BATCH_SIZE) + 1,
+                    "completedItems": len(details),
+                    "totalItems": total,
+                })
         return details
 
     def _start_cycle_detail_upsert_thread(self, details: list[dict[str, Any]]) -> None:
