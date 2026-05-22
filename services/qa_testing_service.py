@@ -807,7 +807,7 @@ class QaTestingReportService:
             if start_at:
                 params["startAt"] = start_at
 
-            data = self._get_json_with_timeout("/rest/atm/1.0/testrun/search", params, timeout=45)
+            data = self._get_json_with_timeout("/rest/atm/1.0/testrun/search", params, timeout=180)
             page = data if isinstance(data, list) else data.get("values") or data.get("results") or data.get("items") or []
             new_count = 0
             for cycle in page:

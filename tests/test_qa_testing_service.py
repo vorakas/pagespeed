@@ -1098,6 +1098,29 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(report["summary"]["cycleCount"], 2)
         self.assertEqual(report["summary"]["totalCases"], 2)
 
+    def test_master_cycle_search_allows_slow_zephyr_response(self):
+        class FakeService(QaTestingReportService):
+            def __init__(self):
+                super().__init__("token")
+                self.search_timeout = None
+
+            def _get_json(self, path, params=None, timeout=180):
+                if path.endswith("/testrun/search"):
+                    self.search_timeout = timeout
+                    return []
+                raise AssertionError(path)
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return []
+
+        service = FakeService()
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        service.build_report(start, end, force_refresh=True)
+
+        self.assertGreaterEqual(service.search_timeout, 180)
+
     def test_force_refresh_fetches_detail_even_when_cycle_updated_on_unchanged(self):
         class FakeCycleRepo:
             def __init__(self):
