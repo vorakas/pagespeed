@@ -765,19 +765,13 @@ class QaTestingReportService:
 
     def _fetch_round_cycle_reports(self, start: datetime, end: datetime, force_refresh: bool = False) -> list[dict[str, Any]]:
         cycles: list[dict[str, Any]] | None = None
-        if force_refresh:
-            cached_cycles = self._cached_adobe_master_cycles()
-            if cached_cycles:
-                logger.info("QA refresh using cached cycle list: %s cycles", len(cached_cycles))
-                cycles = cached_cycles
-
-        if cycles is None:
-            try:
-                cycles = self._fetch_adobe_master_cycles()
-            except (requests.Timeout, requests.ConnectionError):
-                cycles = self._cached_adobe_master_cycles()
-                if not cycles:
-                    raise
+        try:
+            cycles = self._fetch_adobe_master_cycles()
+        except (requests.Timeout, requests.ConnectionError):
+            cycles = self._cached_adobe_master_cycles()
+            if not cycles:
+                raise
+            logger.info("QA refresh using cached cycle list after Jira cycle search failed: %s cycles", len(cycles))
         matching = [
             cycle
             for cycle in cycles

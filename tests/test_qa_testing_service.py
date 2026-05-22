@@ -1031,6 +1031,73 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(report["summary"]["totalCases"], 1)
         self.assertEqual(cycle_repo.upserts, [])
 
+    def test_force_refresh_fetches_master_cycle_list_before_details(self):
+        class FakeCycleRepo:
+            def get_all_summaries(self):
+                return [
+                    {
+                        "cycle_key": "TC-C1",
+                        "name": "Cached Round 1",
+                        "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                        "status": "In Progress",
+                        "project_key": "TC",
+                        "created_on": "2026-05-14T00:00:00.000Z",
+                        "updated_on": "2026-05-14T12:00:00.000Z",
+                        "test_case_count": 1,
+                    }
+                ]
+
+            def upsert_cycle_detail(self, detail):
+                return None
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cycle_repo):
+                super().__init__("token", cycle_repo=cycle_repo)
+                self.cycle_searches = 0
+                self.detail_keys = []
+
+            def _get_json(self, path, params=None):
+                if path.endswith("/testrun/search"):
+                    self.cycle_searches += 1
+                    return [
+                        {
+                            "key": "TC-C1",
+                            "name": "Cached Round 1",
+                            "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                            "updatedOn": "2026-05-14T12:00:00.000Z",
+                        },
+                        {
+                            "key": "TC-C2",
+                            "name": "New Round 2",
+                            "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                            "updatedOn": "2026-05-15T12:00:00.000Z",
+                        },
+                    ]
+                if "/testrun/" in path:
+                    key = path.rsplit("/", 1)[-1]
+                    self.detail_keys.append(key)
+                    return {
+                        "key": key,
+                        "name": f"{key} Round",
+                        "folder": "/Adobe Commerce E2E Master Test Cycles/LP Features",
+                        "items": [{"testCaseKey": f"{key}-T1", "status": "Pass"}],
+                    }
+                raise AssertionError(path)
+
+            def _fetch_task_status_changes(self, start, end, task_window=TaskWindow.SINCE_YESTERDAY):
+                return []
+
+        service = FakeService(FakeCycleRepo())
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, force_refresh=True)
+
+        self.assertEqual(service.cycle_searches, 1)
+        self.assertCountEqual(service.detail_keys, ["TC-C1", "TC-C2"])
+        self.assertEqual(report["summary"]["cycleCount"], 2)
+        self.assertEqual(report["summary"]["totalCases"], 2)
+
     def test_force_refresh_fetches_detail_even_when_cycle_updated_on_unchanged(self):
         class FakeCycleRepo:
             def __init__(self):
