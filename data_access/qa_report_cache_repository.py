@@ -196,6 +196,15 @@ class QaReportCacheRepository:
         except Exception as exc:
             raise DatabaseError(f"Failed to mark QA report refresh failed: {exc}") from exc
 
+    def clear_all(self) -> int:
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM qa_report_cache")
+                return cursor.rowcount if cursor.rowcount is not None else 0
+        except Exception as exc:
+            raise DatabaseError(f"Failed to clear QA report cache: {exc}") from exc
+
 
 def _decode_report_row(row: dict[str, Any] | None) -> dict[str, Any] | None:
     if row is None:

@@ -328,6 +328,7 @@ class QaTestingReportService:
         task_window: TaskWindow = TaskWindow.SINCE_YESTERDAY,
         burndown_start: datetime | None = None,
         burndown_end: datetime | None = None,
+        clear_cache: bool = False,
     ) -> dict[str, Any]:
         if not self.jira_pat:
             raise ValueError("JIRA_PAT is not configured")
@@ -348,6 +349,7 @@ class QaTestingReportService:
                 task_window,
                 burndown_start,
                 burndown_end,
+                clear_cache=clear_cache,
             )
 
         cached = self._report_cache.get(cache_key)
@@ -418,7 +420,9 @@ class QaTestingReportService:
         task_window: TaskWindow,
         burndown_start: datetime,
         burndown_end: datetime,
+        clear_cache: bool = False,
     ) -> dict[str, Any]:
+        cleared_snapshots = self._clear_persistent_report_cache() if force_refresh and clear_cache else 0
         cached = self.report_cache_repo.get(cache_key)
         cached_report = deepcopy(cached.get("report")) if cached and cached.get("report") else None
 
@@ -496,6 +500,7 @@ class QaTestingReportService:
                 burndown_start,
                 burndown_end,
                 cached_report,
+                cleared_snapshots=cleared_snapshots,
             )
 
         try:
@@ -513,6 +518,11 @@ class QaTestingReportService:
             self.report_cache_repo.mark_refresh_failed(cache_key, str(exc))
             raise
 
+    def _clear_persistent_report_cache(self) -> int:
+        if self.report_cache_repo is None or not hasattr(self.report_cache_repo, "clear_all"):
+            return 0
+        return int(self.report_cache_repo.clear_all() or 0)
+
     def _report_during_refresh(
         self,
         cache_key: str,
@@ -522,11 +532,12 @@ class QaTestingReportService:
         burndown_start: datetime,
         burndown_end: datetime,
         cached_report: dict[str, Any] | None,
+        cleared_snapshots: int = 0,
     ) -> dict[str, Any]:
         cache_metadata = self.report_cache_repo.get(cache_key) or {}
         report = deepcopy(cached_report) if cached_report is not None else None
 
-        if report is None:
+        if report is None and cleared_snapshots == 0:
             latest = self.report_cache_repo.get_latest_successful()
             report = deepcopy(latest.get("report")) if latest and latest.get("report") else None
 
@@ -538,6 +549,7 @@ class QaTestingReportService:
                 hit=False,
                 stale=True,
                 refresh_in_progress=True,
+                cleared_snapshots=cleared_snapshots,
             )
 
         self._recalculate_cached_report_ranges(report, start, end, task_window, burndown_start, burndown_end)
@@ -548,6 +560,7 @@ class QaTestingReportService:
             hit=True,
             stale=True,
             refresh_in_progress=True,
+            cleared_snapshots=cleared_snapshots,
         )
 
     def _recalculate_cached_report_ranges(
@@ -733,6 +746,7 @@ class QaTestingReportService:
         hit: bool,
         stale: bool,
         refresh_in_progress: bool,
+        cleared_snapshots: int = 0,
     ) -> dict[str, Any]:
         report["cache"] = {
             "hit": hit,
@@ -744,6 +758,7 @@ class QaTestingReportService:
             "refreshStartedAt": cached.get("refreshStartedAt"),
             "refreshStatus": cached.get("refreshStatus") or "idle",
             "refreshError": cached.get("refreshError"),
+            "clearedSnapshots": cleared_snapshots,
             "shared": True,
         }
         return report

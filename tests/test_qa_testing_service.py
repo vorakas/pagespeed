@@ -773,6 +773,59 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertTrue(service.thread_started)
         self.assertTrue(service.thread_force_refresh)
 
+    def test_force_refresh_can_clear_persistent_snapshots_before_rebuild(self):
+        class FakeReportCache:
+            def __init__(self):
+                self.cleared = 0
+
+            def clear_all(self):
+                self.cleared += 1
+                return 3
+
+            def get(self, cache_key):
+                return None
+
+            def try_start_refresh(self, *args, **kwargs):
+                return True
+
+            def get_latest_successful(self):
+                raise AssertionError("Cleared refresh should not read latest shared snapshot")
+
+            def save_report(self, *args, **kwargs):
+                return None
+
+            def mark_refresh_failed(self, *args, **kwargs):
+                return None
+
+        class FakeService(QaTestingReportService):
+            def __init__(self, cache):
+                super().__init__("token", report_cache_repo=cache)
+                self.thread_started = False
+
+            def _start_report_refresh_thread(
+                self,
+                cache_key,
+                start,
+                end,
+                task_window,
+                burndown_start,
+                burndown_end,
+                force_refresh=False,
+            ):
+                self.thread_started = True
+
+        cache = FakeReportCache()
+        service = FakeService(cache)
+        start = datetime(2026, 5, 14, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 5, 15, 0, 0, tzinfo=timezone.utc)
+
+        report = service.build_report(start, end, force_refresh=True, clear_cache=True)
+
+        self.assertEqual(cache.cleared, 1)
+        self.assertTrue(service.thread_started)
+        self.assertEqual(report["cache"]["clearedSnapshots"], 3)
+        self.assertTrue(report["cache"]["refreshInProgress"])
+
     def test_persistent_cache_with_name_misses_still_returns_snapshot_without_refresh(self):
         class FakeReportCache:
             def __init__(self):

@@ -121,6 +121,28 @@ class QaReportCacheRepositoryTest(unittest.TestCase):
         self.assertEqual(row["cacheKey"], "newer-key")
         self.assertEqual(row["report"]["summary"]["totalCases"], 11)
 
+    def test_clear_all_deletes_cached_snapshots(self):
+        self.repo.save_report(
+            "older-key",
+            "2026-05-14T00:00Z",
+            "2026-05-15T00:00Z",
+            "sinceYesterday",
+            {"summary": {"totalCases": 7}},
+        )
+        self.repo.save_report(
+            "newer-key",
+            "2026-05-15T00:00Z",
+            "2026-05-16T00:00Z",
+            "sinceYesterday",
+            {"summary": {"totalCases": 11}},
+        )
+
+        removed = self.repo.clear_all()
+
+        self.assertEqual(removed, 2)
+        self.assertIsNone(self.repo.get("older-key"))
+        self.assertIsNone(self.repo.get_latest_successful())
+
 
 if __name__ == "__main__":
     unittest.main()

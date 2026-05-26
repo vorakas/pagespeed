@@ -582,18 +582,28 @@ export function QaTesting() {
   const [blockedDialogOpen, setBlockedDialogOpen] = useState(false)
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
 
-  async function loadReport(forceRefresh = false) {
+  async function loadReport(
+    forceRefresh = false,
+    options: {
+      start?: string
+      end?: string
+      burndownStart?: string
+      burndownEnd?: string
+      clearCache?: boolean
+    } = {},
+  ) {
     setLoading(true)
     setError(null)
     if (forceRefresh) setRefreshingFromJira(true)
     try {
       const nextReport = await api.getQaTestingReport(
-        fromLocalPickerValue(start),
-        fromLocalPickerValue(end),
+        fromLocalPickerValue(options.start ?? start),
+        fromLocalPickerValue(options.end ?? end),
         forceRefresh,
         "sinceYesterday",
-        fromLocalPickerValue(burndownStart),
-        fromLocalPickerValue(burndownEnd),
+        fromLocalPickerValue(options.burndownStart ?? burndownStart),
+        fromLocalPickerValue(options.burndownEnd ?? burndownEnd),
+        options.clearCache ?? false,
       )
       setReport(nextReport)
       if (!nextReport.cache?.refreshInProgress) {
@@ -673,6 +683,33 @@ export function QaTesting() {
   function applyBurndownRange() {
     setAppliedBurndownStart(burndownStart)
     setAppliedBurndownEnd(burndownEnd)
+  }
+
+  function handleRefreshFromJira() {
+    const nextRange = applyPreset("24h")
+    const nextBurndownRange = applyPreset("7d")
+    const nextStart = toLocalPickerValue(nextRange.start)
+    const nextEnd = toLocalPickerValue(nextRange.end)
+    const nextBurndownStart = toLocalPickerValue(nextBurndownRange.start)
+    const nextBurndownEnd = toLocalPickerValue(nextBurndownRange.end)
+
+    window.sessionStorage.clear()
+    setPreset("24h")
+    setStart(nextStart)
+    setEnd(nextEnd)
+    setCustomStart(nextStart)
+    setCustomEnd(nextEnd)
+    setBurndownStart(nextBurndownStart)
+    setBurndownEnd(nextBurndownEnd)
+    setAppliedBurndownStart(nextBurndownStart)
+    setAppliedBurndownEnd(nextBurndownEnd)
+    void loadReport(true, {
+      start: nextStart,
+      end: nextEnd,
+      burndownStart: nextBurndownStart,
+      burndownEnd: nextBurndownEnd,
+      clearCache: true,
+    })
   }
 
   const groupedCycles = useMemo(() => {
@@ -817,7 +854,7 @@ export function QaTesting() {
           >
             Set Range
           </Button>
-          <Button onClick={() => loadReport(true)} disabled={loading} className="!text-black">
+          <Button onClick={handleRefreshFromJira} disabled={loading} className="!text-black">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Refresh from Jira
           </Button>

@@ -59,6 +59,7 @@ def create_requirements_blueprint(
         if burndown_end < burndown_start:
             return jsonify({"error": "burndownEnd must be after burndownStart"}), 400
         force_refresh = request.args.get("forceRefresh", "").lower() in {"1", "true", "yes"}
+        clear_cache = request.args.get("clearCache", "").lower() in {"1", "true", "yes"}
         raw_task_window = request.args.get("taskWindow") or TaskWindow.SINCE_YESTERDAY.value
         try:
             task_window = TaskWindow(raw_task_window)
@@ -72,6 +73,7 @@ def create_requirements_blueprint(
                 task_window=task_window,
                 burndown_start=burndown_start,
                 burndown_end=burndown_end,
+                clear_cache=clear_cache,
             ))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
