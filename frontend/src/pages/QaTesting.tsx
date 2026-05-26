@@ -40,6 +40,7 @@ type RangeStatusModal = "failed" | "passed" | "blocked" | "inProgress"
 const CYCLE_SECTION_ORDER = ["Desktop or Tablet", "Mobile", "LP Sections & Pages", "LP Features"]
 const QA_RANGE_SESSION_KEY = "qaTestingRange"
 const QA_REPORT_SESSION_KEY = "qaTestingReportSnapshot"
+const STALE_CUSTOM_RANGE_HOURS = 12
 const SUMMARY_TONE_STYLES: Record<SummaryTone, { card: CSSProperties; value: CSSProperties }> = {
   failed: {
     card: { borderColor: "oklch(63.7% 0.237 25.331 / 0.45)", backgroundColor: "oklch(63.7% 0.237 25.331 / 0.10)" },
@@ -102,6 +103,16 @@ function formatDateTime(value?: string | null) {
   }).format(new Date(value))
 }
 
+function formatDateTimeRange(startValue: string, endValue: string) {
+  return `${formatDateTime(startValue)} - ${formatDateTime(endValue)}`
+}
+
+function isStaleCustomRange(end: Date) {
+  const endTimestamp = end.getTime()
+  if (Number.isNaN(endTimestamp)) return true
+  return Date.now() - endTimestamp > STALE_CUSTOM_RANGE_HOURS * 60 * 60 * 1000
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(`${value}T00:00:00`))
 }
@@ -161,7 +172,12 @@ function initialStoredRanges() {
   try {
     const stored = JSON.parse(window.sessionStorage.getItem(QA_RANGE_SESSION_KEY) || "{}")
     if (stored?.start && stored?.end && stored?.burndownStart && stored?.burndownEnd) {
-      const storedPreset = (stored.preset || "custom") as Preset
+      let storedPreset = (stored.preset || "custom") as Preset
+      const storedEnd = new Date(stored.end)
+      if (storedPreset === "custom" && isStaleCustomRange(storedEnd)) {
+        window.sessionStorage.removeItem(QA_RANGE_SESSION_KEY)
+        storedPreset = "24h"
+      }
       const activeRange = storedPreset === "custom"
         ? { start: new Date(stored.start), end: new Date(stored.end) }
         : applyPreset(storedPreset)
@@ -813,7 +829,7 @@ export function QaTesting() {
           {report.cache.lastRefreshedAt
             ? `Jira data refreshed ${formatDateTime(report.cache.lastRefreshedAt)}`
             : "Jira data refresh has started"}
-          {report.cache.hit ? " from cache" : ""}. Cached for {Math.round(report.cache.ttlSeconds / 60)} minutes.
+          {report.cache.hit ? " from cache" : ""}. Active range: {formatDateTimeRange(start, end)}. Cached for {Math.round(report.cache.ttlSeconds / 60)} minutes.
           {report.cache.refreshInProgress ? " Refreshing Jira data in the background." : ""}
           {report.cache.stale ? " Showing last available snapshot until refresh finishes." : ""}
           {report.nameCache ? (
