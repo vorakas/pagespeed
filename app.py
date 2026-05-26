@@ -593,6 +593,8 @@ def create_app() -> Flask:
             )
         if path and os.path.isfile(os.path.join(frontend_dist, path)):
             return send_from_directory(frontend_dist, path)
+        if path and os.path.splitext(path)[1]:
+            return Response('Static asset not found', status=404, mimetype='text/plain')
         return send_from_directory(frontend_dist, 'index.html')
 
     return flask_app
