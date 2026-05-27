@@ -74,7 +74,7 @@ export function ApmMetrics({ data }: ApmMetricsProps) {
                 <thead>
                   <tr>
                     <th>Transaction Name</th>
-                    <th>Avg Response Time</th>
+              <th>Avg Duration</th>
                     <th>Calls/Min</th>
                     <th>Total Time %</th>
                     <th>Status</th>
@@ -153,7 +153,7 @@ export function ApmMetrics({ data }: ApmMetricsProps) {
                 <thead>
                   <tr>
                     <th>External Service</th>
-                    <th>Avg Response Time</th>
+              <th>Avg Duration</th>
                     <th>Calls/Min</th>
                     <th>Total Time %</th>
                     <th>Status</th>
