@@ -41,8 +41,8 @@ interface VitalBarProps {
 }
 
 interface RadarAxisTickProps {
-  x?: number
-  y?: number
+  x?: string | number
+  y?: string | number
   payload?: {
     value?: string | number
   }
@@ -57,23 +57,19 @@ function MetricRow({ label, value1, value2, format, isScore }: MetricRowProps) {
 
   if (isScore) {
     return (
-      <div className="flex items-center justify-between py-1">
-        <span className="aurora-text-dim text-sm">{label}</span>
-        <div className="flex items-center gap-6">
-          <span className="w-20 flex justify-end"><ScoreBadge score={value1 as number | null} /></span>
-          <span className="w-20 flex justify-end"><ScoreBadge score={value2 as number | null} /></span>
-        </div>
+      <div className="grid grid-cols-[minmax(120px,1fr)_76px_76px] items-center gap-3 py-1.5">
+        <span className="aurora-text-dim truncate text-sm">{label}</span>
+        <span className="flex justify-end"><ScoreBadge score={value1 as number | null} /></span>
+        <span className="flex justify-end"><ScoreBadge score={value2 as number | null} /></span>
       </div>
     )
   }
 
   return (
-    <div className="flex items-center justify-between py-1">
-      <span className="aurora-text-dim text-sm">{label}</span>
-      <div className="flex items-center gap-6">
-        <span className="aurora-text aurora-num w-20 text-right text-sm">{formatted1}</span>
-        <span className="aurora-text aurora-num w-20 text-right text-sm">{formatted2}</span>
-      </div>
+    <div className="grid grid-cols-[minmax(120px,1fr)_76px_76px] items-center gap-3 py-1.5">
+      <span className="aurora-text-dim truncate text-sm">{label}</span>
+      <span className="aurora-text aurora-num text-right text-sm">{formatted1}</span>
+      <span className="aurora-text aurora-num text-right text-sm">{formatted2}</span>
     </div>
   )
 }
@@ -130,12 +126,12 @@ function VitalBarRow({
   const pct = numericValue === 0 ? 0 : Math.max(2, Math.min(100, (numericValue / benchmark) * 100))
   const overTarget = numericValue > benchmark
   return (
-    <div className="grid grid-cols-[72px_minmax(120px,360px)_56px] items-center gap-2">
+    <div className="grid grid-cols-[72px_minmax(0,1fr)_56px] items-center gap-2">
       <span className="aurora-text-faint truncate text-right text-[10px]" title={siteName}>
         {siteName}
       </span>
       <div
-        className="aurora-bar-track w-full max-w-[360px]"
+        className="aurora-bar-track w-full"
         data-over-target={overTarget ? "true" : undefined}
       >
         <div
@@ -155,6 +151,8 @@ function VitalBarRow({
 
 function renderRadarAxisTick({ x = 0, y = 0, payload }: RadarAxisTickProps) {
   const label = String(payload?.value ?? "")
+  const tickX = typeof x === "number" ? x : Number(x) || 0
+  const tickY = typeof y === "number" ? y : Number(y) || 0
   const isRightLabel = label === "Accessibility"
   const isLeftLabel = label === "SEO"
   const isTopLabel = label === "Performance"
@@ -162,8 +160,8 @@ function renderRadarAxisTick({ x = 0, y = 0, payload }: RadarAxisTickProps) {
 
   return (
     <text
-      x={isRightLabel ? x + 12 : isLeftLabel ? x - 12 : x}
-      y={isTopLabel ? y - 4 : isBottomLabel ? y + 8 : y}
+      x={isRightLabel ? tickX + 12 : isLeftLabel ? tickX - 12 : tickX}
+      y={isTopLabel ? tickY - 4 : isBottomLabel ? tickY + 8 : tickY}
       textAnchor={isRightLabel ? "start" : isLeftLabel ? "end" : "middle"}
       dominantBaseline="middle"
       fill="var(--lcc-text-dim)"
@@ -177,6 +175,8 @@ function renderRadarAxisTick({ x = 0, y = 0, payload }: RadarAxisTickProps) {
 
 function ComparisonResults({ data }: { data: ComparisonResult }) {
   const { url1, url2 } = data
+  const site1Name = url1.site_name || "Site 1"
+  const site2Name = url2.site_name || "Site 2"
 
   const scoreDiff = (url1.performance_score ?? 0) - (url2.performance_score ?? 0)
   const diffLabel = scoreDiff > 0 ? `+${scoreDiff}` : String(scoreDiff)
@@ -206,103 +206,111 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
   ]
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h4 className="aurora-text mb-2 text-sm font-semibold">Lighthouse Scores</h4>
-        <div className="grid gap-4 lg:grid-cols-[minmax(360px,1fr)_360px] xl:grid-cols-[minmax(360px,0.9fr)_360px_minmax(220px,0.55fr)]">
-          <div className="divide-y self-start" style={{ borderColor: "var(--glass-border)" }}>
-            <div className="flex items-center justify-between px-0 pb-1">
-              <div />
-              <div className="flex items-center gap-6">
-                <span className="aurora-text-faint w-20 truncate text-right text-xs font-medium" title={url1.site_name}>
-                  {url1.site_name}
-                </span>
-                <span className="aurora-text-faint w-20 truncate text-right text-xs font-medium" title={url2.site_name}>
-                  {url2.site_name}
-                </span>
-              </div>
-            </div>
+    <div className="grid gap-5 xl:grid-cols-[minmax(420px,0.9fr)_minmax(360px,0.8fr)]">
+      <div className="min-w-0 space-y-5">
+        <div>
+          <div className="mb-2 grid grid-cols-[minmax(120px,1fr)_76px_76px] items-end gap-3">
+            <h4 className="aurora-text text-sm font-semibold">Lighthouse Scores</h4>
+            <span className="aurora-text-faint truncate text-right text-xs font-medium" title={site1Name}>
+              {site1Name}
+            </span>
+            <span className="aurora-text-faint truncate text-right text-xs font-medium" title={site2Name}>
+              {site2Name}
+            </span>
+          </div>
+          <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
             <MetricRow label="Performance" value1={url1.performance_score} value2={url2.performance_score} isScore />
             <MetricRow label="Accessibility" value1={url1.accessibility_score} value2={url2.accessibility_score} isScore />
             <MetricRow label="Best Practices" value1={url1.best_practices_score} value2={url2.best_practices_score} isScore />
             <MetricRow label="SEO" value1={url1.seo_score} value2={url2.seo_score} isScore />
           </div>
-          <div className="min-w-0">
-            <ResponsiveContainer width="100%" height={176}>
-              <RadarChart data={radarData} margin={{ top: 12, right: 86, bottom: 18, left: 86 }}>
-                <PolarGrid stroke="var(--glass-border)" />
-                <PolarAngleAxis dataKey="metric" tick={renderRadarAxisTick} />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar name={url1.site_name} dataKey="site1" stroke={SITE1_COLOR} fill={SITE1_COLOR} fillOpacity={0.25} />
-                <Radar name={url2.site_name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.25} />
-              </RadarChart>
-            </ResponsiveContainer>
-            <div className="flex items-center justify-center gap-3 text-xs">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SITE1_COLOR }} />
-                <span className="aurora-text">{url1.site_name}</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: SITE2_COLOR }} />
-                <span className="aurora-text">{url2.site_name}</span>
-              </span>
-            </div>
-          </div>
-          <div className="aurora-callout flex flex-col justify-between gap-3 self-start p-3 text-left lg:col-span-2 xl:col-span-1">
-            <div>
-              <span className="aurora-label">Performance delta</span>
-              <div className="aurora-num mt-1 text-2xl font-semibold" style={{ color: diffColor }}>
-                {diffLabel} pts
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="min-w-0">
-                <span className="aurora-text-faint block truncate" title={`${url1.site_name} weight`}>
-                  {url1.site_name}
-                </span>
-                <span className="aurora-text aurora-num font-semibold">{formatBytes(url1.total_byte_weight)}</span>
-              </div>
-              <div className="min-w-0">
-                <span className="aurora-text-faint block truncate" title={`${url2.site_name} weight`}>
-                  {url2.site_name}
-                </span>
-                <span className="aurora-text aurora-num font-semibold">{formatBytes(url2.total_byte_weight)}</span>
-              </div>
-            </div>
-            <div className="aurora-text-faint text-xs">
-              Weight delta <span className="aurora-num aurora-text">{weightDiffLabel}</span>
-            </div>
-          </div>
         </div>
-      </div>
 
-      <div>
-        <h4 className="aurora-text mb-2 text-sm font-semibold">Core Web Vitals</h4>
-        <div className="grid gap-4 xl:grid-cols-[minmax(360px,0.85fr)_minmax(360px,1fr)]">
-          <div className="divide-y self-start" style={{ borderColor: "var(--glass-border)" }}>
+        <div>
+          <div className="mb-2 grid grid-cols-[minmax(120px,1fr)_76px_76px] items-end gap-3">
+            <h4 className="aurora-text text-sm font-semibold">Core Web Vitals</h4>
+            <span className="aurora-text-faint truncate text-right text-xs font-medium" title={site1Name}>
+              {site1Name}
+            </span>
+            <span className="aurora-text-faint truncate text-right text-xs font-medium" title={site2Name}>
+              {site2Name}
+            </span>
+          </div>
+          <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
             <MetricRow label="FCP" value1={url1.fcp} value2={url2.fcp} format={formatMilliseconds} />
             <MetricRow label="LCP" value1={url1.lcp} value2={url2.lcp} format={formatMilliseconds} />
             <MetricRow label="CLS" value1={url1.cls} value2={url2.cls} format={formatCls} />
             <MetricRow label="INP" value1={url1.inp} value2={url2.inp} format={formatMilliseconds} />
             <MetricRow label="TTFB" value1={url1.ttfb} value2={url2.ttfb} format={formatMilliseconds} />
           </div>
-          <div className="max-w-[492px] space-y-3 xl:ml-7">
-            {cwvData.map((item) => (
-              <VitalBar
-                key={item.metric}
-                metric={item.metric}
-                value1={item.site1}
-                value2={item.site2}
-                benchmark={item.benchmark}
-                format={item.format}
-                site1Name={url1.site_name}
-                site2Name={url2.site_name}
-              />
-            ))}
-          </div>
         </div>
       </div>
 
+      <div className="min-w-0 space-y-4">
+        <div>
+          <ResponsiveContainer width="100%" height={172}>
+            <RadarChart data={radarData} margin={{ top: 12, right: 72, bottom: 18, left: 72 }}>
+              <PolarGrid stroke="var(--glass-border)" />
+              <PolarAngleAxis dataKey="metric" tick={renderRadarAxisTick} />
+              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+              <Radar name={site1Name} dataKey="site1" stroke={SITE1_COLOR} fill={SITE1_COLOR} fillOpacity={0.25} />
+              <Radar name={site2Name} dataKey="site2" stroke={SITE2_COLOR} fill={SITE2_COLOR} fillOpacity={0.25} />
+            </RadarChart>
+          </ResponsiveContainer>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: SITE1_COLOR }} />
+              <span className="aurora-text truncate" title={site1Name}>{site1Name}</span>
+            </span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: SITE2_COLOR }} />
+              <span className="aurora-text truncate" title={site2Name}>{site2Name}</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="aurora-callout grid gap-3 p-3 text-left sm:grid-cols-[120px_1fr]">
+          <div>
+            <span className="aurora-label">Performance delta</span>
+            <div className="aurora-num mt-1 text-2xl font-semibold" style={{ color: diffColor }}>
+              {diffLabel} pts
+            </div>
+          </div>
+          <div className="grid gap-2 text-xs sm:grid-cols-[1fr_1fr_auto]">
+            <div className="min-w-0">
+              <span className="aurora-text-faint block truncate" title={`${site1Name} weight`}>
+                {site1Name}
+              </span>
+              <span className="aurora-text aurora-num font-semibold">{formatBytes(url1.total_byte_weight)}</span>
+            </div>
+            <div className="min-w-0">
+              <span className="aurora-text-faint block truncate" title={`${site2Name} weight`}>
+                {site2Name}
+              </span>
+              <span className="aurora-text aurora-num font-semibold">{formatBytes(url2.total_byte_weight)}</span>
+            </div>
+            <div className="min-w-0">
+              <span className="aurora-text-faint block truncate">Weight delta</span>
+              <span className="aurora-num aurora-text font-semibold">{weightDiffLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {cwvData.map((item) => (
+            <VitalBar
+              key={item.metric}
+              metric={item.metric}
+              value1={item.site1}
+              value2={item.site2}
+              benchmark={item.benchmark}
+              format={item.format}
+              site1Name={site1Name}
+              site2Name={site2Name}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
