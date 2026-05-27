@@ -149,6 +149,28 @@ function VitalBarRow({
   )
 }
 
+function SummaryTile({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: string
+  detail: string
+}) {
+  return (
+    <div className="aurora-callout min-w-0 p-3">
+      <span className="aurora-label block truncate">{label}</span>
+      <p className="aurora-text aurora-num mt-1 truncate text-sm font-semibold" title={value}>
+        {value}
+      </p>
+      <p className="aurora-text-faint mt-1 truncate text-xs" title={detail}>
+        {detail}
+      </p>
+    </div>
+  )
+}
+
 function renderRadarAxisTick({ x = 0, y = 0, payload }: RadarAxisTickProps) {
   const label = String(payload?.value ?? "")
   const tickX = typeof x === "number" ? x : Number(x) || 0
@@ -204,6 +226,30 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
     { metric: "INP", site1: url1.inp, site2: url2.inp, benchmark: 500, format: formatMilliseconds },
     { metric: "TTFB", site1: url1.ttfb, site2: url2.ttfb, benchmark: 1000, format: formatMilliseconds },
   ]
+  const availableVitals = cwvData.filter((item) => item.site1 !== null || item.site2 !== null)
+  const site1TargetsMet = cwvData.filter((item) => item.site1 !== null && item.site1 <= item.benchmark).length
+  const site2TargetsMet = cwvData.filter((item) => item.site2 !== null && item.site2 <= item.benchmark).length
+  const site1AvailableVitals = cwvData.filter((item) => item.site1 !== null).length
+  const site2AvailableVitals = cwvData.filter((item) => item.site2 !== null).length
+  const biggestVitalGap = cwvData
+    .filter((item) => item.site1 !== null && item.site2 !== null)
+    .map((item) => {
+      const delta = item.site1! - item.site2!
+      return {
+        ...item,
+        delta,
+        normalizedGap: Math.abs(delta) / item.benchmark,
+      }
+    })
+    .sort((a, b) => b.normalizedGap - a.normalizedGap)[0]
+  const biggestVitalGapLabel = biggestVitalGap
+    ? `${biggestVitalGap.metric}: ${biggestVitalGap.delta > 0 ? site1Name : site2Name}`
+    : "No comparable vitals"
+  const biggestVitalGapDetail = biggestVitalGap
+    ? `Higher by ${biggestVitalGap.format(Math.abs(biggestVitalGap.delta))}`
+    : "Load both sides to compare"
+  const lighterSiteName = weightDiff === 0 ? "Tie" : weightDiff < 0 ? site1Name : site2Name
+  const lighterPageDetail = weightDiff === 0 ? "Same page weight" : `${formatBytes(Math.abs(weightDiff))} lighter`
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(420px,0.9fr)_minmax(360px,0.8fr)]">
@@ -243,6 +289,23 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <MetricRow label="INP" value1={url1.inp} value2={url2.inp} format={formatMilliseconds} />
             <MetricRow label="TTFB" value1={url1.ttfb} value2={url2.ttfb} format={formatMilliseconds} />
           </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <SummaryTile
+              label="Targets met"
+              value={`${site1TargetsMet}/${site1AvailableVitals} vs ${site2TargetsMet}/${site2AvailableVitals}`}
+              detail={`${availableVitals.length} vitals checked`}
+            />
+            <SummaryTile
+              label="Largest vital gap"
+              value={biggestVitalGapLabel}
+              detail={biggestVitalGapDetail}
+            />
+            <SummaryTile
+              label="Lighter page"
+              value={lighterSiteName}
+              detail={lighterPageDetail}
+            />
+          </div>
         </div>
       </div>
 
@@ -269,14 +332,14 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
           </div>
         </div>
 
-        <div className="aurora-callout grid gap-3 p-3 text-left sm:grid-cols-[120px_1fr]">
-          <div>
-            <span className="aurora-label">Performance delta</span>
-            <div className="aurora-num mt-1 text-2xl font-semibold" style={{ color: diffColor }}>
-              {diffLabel} pts
+        <div className="aurora-callout p-3 text-left">
+          <div className="grid gap-2 text-xs sm:grid-cols-[112px_1fr_1fr_auto]">
+            <div className="min-w-0">
+              <span className="aurora-label block truncate">Performance delta</span>
+              <span className="aurora-num block text-sm font-semibold" style={{ color: diffColor }}>
+                {diffLabel} pts
+              </span>
             </div>
-          </div>
-          <div className="grid gap-2 text-xs sm:grid-cols-[1fr_1fr_auto]">
             <div className="min-w-0">
               <span className="aurora-text-faint block truncate" title={`${site1Name} weight`}>
                 {site1Name}
