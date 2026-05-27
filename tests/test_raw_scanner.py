@@ -54,6 +54,7 @@ class RawScannerNewBugsTest(unittest.TestCase):
                 "type: Task\n"
                 "status: Closed\n"
                 "labels: [\"AC-P1\", \"adobe-commerce\"]\n"
+                "components: [\"AC-PLP\", \"AC-Header & Footer\"]\n"
                 "---\n"
                 "body\n",
                 encoding="utf-8",
@@ -64,6 +65,8 @@ class RawScannerNewBugsTest(unittest.TestCase):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].labels, ["AC-P1", "adobe-commerce"])
         self.assertEqual(tasks[0].to_dict()["labels"], ["AC-P1", "adobe-commerce"])
+        self.assertEqual(tasks[0].components, ["AC-PLP", "AC-Header & Footer"])
+        self.assertEqual(tasks[0].to_dict()["components"], ["AC-PLP", "AC-Header & Footer"])
 
     def test_asana_implementation_items_without_type_count_as_new_bugs(self):
         today = date(2026, 5, 13)

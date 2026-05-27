@@ -13,6 +13,8 @@ def task(
     epic_link=None,
     parent_key=None,
     labels=None,
+    components=None,
+    resource_queue=None,
     spent=None,
     remaining=None,
 ):
@@ -27,6 +29,8 @@ def task(
         epic_link=epic_link,
         parent_key=parent_key,
         labels=labels or [],
+        components=components or [],
+        resource_queue=resource_queue,
         time_spent_seconds=spent,
         remaining_estimate_seconds=remaining,
     )
@@ -37,100 +41,89 @@ def row_by_name(report, section, name):
 
 
 class LaunchReportTest(unittest.TestCase):
-    def test_report_contains_fixed_canonical_row_counts(self):
+    def test_report_contains_area_rows_for_spreadsheet_sections(self):
         report = build_launch_report([])
 
-        self.assertEqual(len(report["lampsPlusDevelopment"]["rows"]), 25)
-        self.assertEqual(len(report["e2eTesting"]["rows"]), 32)
-        self.assertEqual(report["lampsPlusDevelopment"]["totals"]["rowCount"], 25)
-        self.assertEqual(report["e2eTesting"]["totals"]["rowCount"], 32)
+        self.assertEqual(len(report["lampsPlusDevelopment"]["rows"]), 28)
+        self.assertEqual(len(report["e2eTesting"]["rows"]), 28)
+        self.assertEqual(report["lampsPlusDevelopment"]["totals"]["rowCount"], 28)
+        self.assertEqual(report["e2eTesting"]["totals"]["rowCount"], 28)
 
     def test_empty_development_rows_use_numeric_pending_contract(self):
         report = build_launch_report([])
 
-        row = row_by_name(report, "lampsPlusDevelopment", "AC Implementation - Commerce Implementation")
+        row = row_by_name(report, "lampsPlusDevelopment", "PLP")
 
         self.assertEqual(row["status"], "Pending")
         self.assertEqual(row["progressPercent"], 0)
 
+    def test_lampsplus_development_matches_spreadsheet_non_qa_resource_queue_rollup(self):
+        report = build_launch_report([
+            task(
+                "WPM-1",
+                "Build PLP item",
+                labels=["AC-P1"],
+                components=["AC-PLP"],
+                resource_queue="Front End",
+                spent=7200,
+                remaining=3600,
+            ),
+            task(
+                "WPM-2",
+                "QA PLP item",
+                labels=["AC-P1"],
+                components=["AC-PLP"],
+                resource_queue="QA",
+                spent=36000,
+                remaining=36000,
+            ),
+            task(
+                "WPM-3",
+                "Future phase PLP item",
+                labels=["AC-P2"],
+                components=["AC-PLP"],
+                resource_queue="Back End",
+                spent=3600,
+                remaining=3600,
+            ),
+        ])
+
+        row = row_by_name(report, "lampsPlusDevelopment", "PLP")
+
+        self.assertEqual(row["phaseLabel"], "AC-P1")
+        self.assertEqual(row["completedHours"], 2)
+        self.assertEqual(row["remainingHours"], 1)
+        self.assertEqual(row["progressPercent"], 67)
+        self.assertEqual(row["issueKeys"], ["WPM-1"])
+        self.assertEqual(row["diagnostics"]["countedIssueCount"], 1)
+        self.assertEqual(row["diagnostics"]["missingPhaseLabelCount"], 1)
+        self.assertEqual(row["diagnostics"]["excludedIssueCount"], 1)
+
     def test_complete_development_rows_use_complete_status_contract(self):
         report = build_launch_report([
             task(
-                "WPM-5471",
-                "Build commerce item",
-                epic_link="AC Implementation - Commerce Implementation",
+                "WPM-1",
+                "Build PLP item",
                 labels=["AC-P1"],
+                components=["AC-PLP"],
+                resource_queue="Back End",
                 spent=3600,
                 remaining=0,
             ),
         ])
 
-        row = row_by_name(report, "lampsPlusDevelopment", "AC Implementation - Commerce Implementation")
+        row = row_by_name(report, "lampsPlusDevelopment", "PLP")
 
         self.assertEqual(row["status"], "Complete")
         self.assertEqual(row["progressPercent"], 100)
 
-    def test_development_rollup_resolves_epic_link_key_to_spreadsheet_grouping(self):
-        report = build_launch_report([
-            task("ACM-4", "AC Implementation - Commerce Implementation", task_type="Epic"),
-            task(
-                "WPM-5471",
-                "Build commerce item",
-                epic_link="ACM-4",
-                labels=["AC-P1"],
-                spent=7200,
-                remaining=3600,
-            ),
-            task(
-                "WPM-5470",
-                "Build second commerce item",
-                epic_link="ACM-4",
-                labels=["AC-P1"],
-                spent=3600,
-                remaining=0,
-            ),
-        ])
-
-        row = row_by_name(report, "lampsPlusDevelopment", "AC Implementation - Commerce Implementation")
-
-        self.assertEqual(row["epicKey"], "ACM-4")
-        self.assertEqual(row["phaseLabel"], "AC-P1")
-        self.assertEqual(row["completedHours"], 3)
-        self.assertEqual(row["remainingHours"], 1)
-        self.assertEqual(row["status"], "Pending")
-        self.assertEqual(row["progressPercent"], 75)
-        self.assertEqual(row["issueKeys"], ["WPM-5470", "WPM-5471"])
-        self.assertEqual(row["diagnostics"]["countedIssueCount"], 2)
-        self.assertEqual(row["diagnostics"]["missingPhaseLabelCount"], 0)
-
-    def test_development_rollup_accepts_display_name_epic_link(self):
-        report = build_launch_report([
-            task(
-                "WPM-5471",
-                "Build commerce item",
-                epic_link="AC Implementation - Commerce Implementation",
-                labels=["AC-P1"],
-                spent=7200,
-                remaining=3600,
-            ),
-        ])
-
-        row = row_by_name(report, "lampsPlusDevelopment", "AC Implementation - Commerce Implementation")
-
-        self.assertIsNone(row["epicKey"])
-        self.assertEqual(row["completedHours"], 2)
-        self.assertEqual(row["remainingHours"], 1)
-        self.assertEqual(row["issueKeys"], ["WPM-5471"])
-        self.assertEqual(report["lampsPlusDevelopment"]["diagnostics"]["unresolvedEpicNameCount"], 0)
-
     def test_excludes_missing_ac_p1_label_from_totals_and_flags_diagnostic(self):
         report = build_launch_report([
-            task("ACM-4", "AC Implementation - Commerce Implementation", task_type="Epic"),
-            task("WPM-5471", "Counted", epic_link="ACM-4", labels=["AC-P1"], spent=3600),
-            task("WPM-5472", "Excluded", epic_link="ACM-4", labels=["AC-P2"], spent=3600),
+            task("WPM-1", "Counted", labels=["AC-P1"], components=["AC-PLP"], spent=3600),
+            task("WPM-2", "Excluded", labels=["AC-P2"], components=["AC-PLP"], spent=3600),
         ])
 
-        row = row_by_name(report, "lampsPlusDevelopment", "AC Implementation - Commerce Implementation")
+        row = row_by_name(report, "lampsPlusDevelopment", "PLP")
 
         self.assertEqual(row["completedHours"], 1)
         self.assertEqual(row["diagnostics"]["missingPhaseLabelCount"], 1)
@@ -138,68 +131,59 @@ class LaunchReportTest(unittest.TestCase):
 
     def test_missing_estimates_increment_row_and_section_diagnostics(self):
         report = build_launch_report([
-            task("ACM-4", "AC Implementation - Commerce Implementation", task_type="Epic"),
-            task("WPM-5471", "No estimates", epic_link="ACM-4", labels=["AC-P1"]),
+            task("WPM-1", "No estimates", labels=["AC-P1"], components=["AC-PLP"]),
         ])
 
-        row = row_by_name(report, "lampsPlusDevelopment", "AC Implementation - Commerce Implementation")
+        row = row_by_name(report, "lampsPlusDevelopment", "PLP")
 
         self.assertEqual(row["diagnostics"]["missingEstimateCount"], 1)
         self.assertEqual(report["lampsPlusDevelopment"]["diagnostics"]["missingEstimateCount"], 1)
 
-    def test_unresolved_epic_link_increments_section_diagnostic(self):
+    def test_missing_reporting_area_increments_section_diagnostic(self):
         report = build_launch_report([
-            task("WPM-5471", "Orphaned commerce task", epic_link="NOPE-1", labels=["AC-P1"], spent=3600),
-        ])
-
-        diagnostics = report["lampsPlusDevelopment"]["diagnostics"]
-
-        self.assertEqual(diagnostics["unresolvedEpicNameCount"], 1)
-        self.assertEqual(diagnostics["countedIssueCount"], 0)
-
-    def test_missing_epic_link_increments_section_diagnostic(self):
-        report = build_launch_report([
-            task("WPM-5471", "No epic commerce task", labels=["AC-P1"], spent=3600),
+            task("WPM-1", "No mapped component", labels=["AC-P1"], components=["Nope"], spent=3600),
         ])
 
         diagnostics = report["lampsPlusDevelopment"]["diagnostics"]
 
         self.assertEqual(diagnostics["missingEpicLinkCount"], 1)
+        self.assertEqual(diagnostics["countedIssueCount"], 0)
 
-    def test_cyclic_parent_relationship_diagnoses_without_crashing(self):
+    def test_e2e_testing_matches_spreadsheet_qa_resource_queue_rollup(self):
         report = build_launch_report([
-            task("WPM-5471", "Cycle one", parent_key="WPM-5472", labels=["AC-P1"], spent=3600),
-            task("WPM-5472", "Cycle two", parent_key="WPM-5471", labels=["AC-P1"], spent=3600),
-        ])
-
-        diagnostics = report["lampsPlusDevelopment"]["diagnostics"]
-
-        self.assertEqual(diagnostics["missingEpicLinkCount"], 2)
-
-    def test_e2e_counts_closed_and_failed_qa_by_grouping(self):
-        report = build_launch_report([
-            task("ACE2E-33", "AC E2E - Account Management", task_type="Epic"),
             task(
-                "ACE2E-40",
-                "Passing account test",
+                "ACE2E-1",
+                "Passing PLP test",
                 status="closed",
-                epic_link="ACE2E-33",
                 labels=["AC-P1"],
+                components=["AC-PLP"],
+                resource_queue="QA",
                 spent=3600,
             ),
             task(
-                "ACE2E-41",
-                "Failing account test",
+                "ACE2E-2",
+                "Failing PLP test",
                 status="failed qa",
-                epic_link="ACE2E-33",
                 labels=["AC-P1"],
+                components=["AC-PLP"],
+                resource_queue="QA",
                 remaining=7200,
+            ),
+            task(
+                "ACE2E-3",
+                "Non-QA PLP work",
+                status="closed",
+                labels=["AC-P1"],
+                components=["AC-PLP"],
+                resource_queue="Front End",
+                spent=36000,
+                remaining=36000,
             ),
         ])
 
-        row = row_by_name(report, "e2eTesting", "AC E2E - Account Management")
+        row = row_by_name(report, "e2eTesting", "PLP")
 
-        self.assertEqual(row["epicKey"], "ACE2E-33")
+        self.assertIsNone(row["epicKey"])
         self.assertEqual(row["phaseLabel"], "AC-P1")
         self.assertIn("countedIssueCount", row["diagnostics"])
         self.assertIn("excludedIssueCount", row["diagnostics"])
@@ -209,6 +193,46 @@ class LaunchReportTest(unittest.TestCase):
         self.assertIn("missingEstimateCount", row["diagnostics"])
         self.assertEqual(row["passedTc"], 1)
         self.assertEqual(row["failedTc"], 1)
+        self.assertEqual(row["completedHours"], 1)
+        self.assertEqual(row["remainingHours"], 2)
+        self.assertEqual(row["issueKeys"], ["ACE2E-1", "ACE2E-2"])
+
+    def test_e2e_testing_prefers_qa_tc_summary_for_pass_fail_counts(self):
+        report = build_launch_report(
+            [
+                task(
+                    "ACE2E-1",
+                    "Closed Jira QA item",
+                    status="closed",
+                    labels=["AC-P1"],
+                    components=["AC-PLP"],
+                    resource_queue="QA",
+                    spent=3600,
+                ),
+                task(
+                    "ACE2E-2",
+                    "Failed Jira QA item",
+                    status="failed qa",
+                    labels=["AC-P1"],
+                    components=["AC-PLP"],
+                    resource_queue="QA",
+                    remaining=7200,
+                ),
+            ],
+            qa_tc_summary={
+                "PLP": {
+                    "passedTc": 12,
+                    "failedTc": 4,
+                    "totalTc": 20,
+                }
+            },
+        )
+
+        row = row_by_name(report, "e2eTesting", "PLP")
+
+        self.assertEqual(row["passedTc"], 12)
+        self.assertEqual(row["failedTc"], 4)
+        self.assertEqual(row["totalTc"], 20)
         self.assertEqual(row["completedHours"], 1)
         self.assertEqual(row["remainingHours"], 2)
 

@@ -307,13 +307,6 @@ def create_app() -> Flask:
     if vault_git is None:
         _seed_vault_wiki(OBSIDIAN_VAULT_ROOT)
 
-    migration_dashboard_service = MigrationDashboardService(
-        vault_root=OBSIDIAN_VAULT_ROOT,
-    )
-    from services.ai_config_service import AiConfigService
-
-    ai_config_service = AiConfigService(conn_mgr)
-    requirement_service = RequirementKbService(conn_mgr, OBSIDIAN_VAULT_ROOT)
     qa_testing_service = QaTestingReportService(
         jira_pat=JIRA_PAT or "",
         jira_base_url=JIRA_BASE_URL,
@@ -322,6 +315,14 @@ def create_app() -> Flask:
         report_cache_repo=QaReportCacheRepository(conn_mgr),
         cycle_repo=QaCycleRepository(conn_mgr),
     )
+    migration_dashboard_service = MigrationDashboardService(
+        vault_root=OBSIDIAN_VAULT_ROOT,
+        qa_testing_service=qa_testing_service,
+    )
+    from services.ai_config_service import AiConfigService
+
+    ai_config_service = AiConfigService(conn_mgr)
+    requirement_service = RequirementKbService(conn_mgr, OBSIDIAN_VAULT_ROOT)
 
     # ---- Migration status snapshots (history + what-changed-today) ----
     snapshot_repo = SnapshotRepository(conn_mgr)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import datetime, timezone
 from math import ceil
 from typing import Iterable, Optional
@@ -20,89 +19,94 @@ DIAGNOSTIC_KEYS = (
     "missingPhaseLabelCount",
     "missingEstimateCount",
 )
-MAX_PARENT_DEPTH = 20
 
-DEVELOPMENT_GROUPINGS = [
-    "AC Implementation - App Builder Integration",
-    "AC Implementation - Commerce Implementation",
-    "AC Implementation - Edge Delivery System (EDS) Implementation",
-    "AC Implementation - Misc",
-    "AC Implementation - ROUND 1 E2E Bugs",
-    "AC Implementation - Supporting Environment Setup",
-    "AC Implementation - Tealium Integration (Phase 1)",
-    "LP Implementation - Attribute Data Cleanup",
-    "LP Implementation - Bloomreach - Post MVP - Misc",
-    "LP Implementation - Dynamic Yield - Evaluators",
-    "LP Implementation - Misc",
-    "LP Implementation - Taxonomy - Batch B",
-    "WUP - Azure Private Linking - Default",
-    "WUP - Azure Private Linking - Ingestion",
-    "WUP - Azure Private Linking - Product Data",
-    "WUP - Azure Private Linking - Profile Data",
-    "WUP - Azure Private Linking - Relationships",
-    "WUP - Dashboard - Infrastructure",
-    "WUP - Dashboard - Monitoring API Microservices",
-    "WUP - Dashboard - Monitoring Near Real Time Data Syncing",
-    "WUP - Dashboard - Monitoring Private Link",
-    "WUP - Lighting Collections",
-    "WUP - Near Real Time Data Syncing",
-    "WUP - SSIS Optimization Effort for DBCLUST2",
-    "WUP - SSIS Optimization Effort for DBTEST",
+REPORTING_AREAS = [
+    "Accessibility",
+    "ATP",
+    "Financial Calculator",
+    "Cart",
+    "Static Pages",
+    "Cookie Consent",
+    "My Account / Account Management",
+    "Payment / Billing",
+    "Database Integration and Optimization",
+    "Dynamic Yield",
+    "Emails",
+    "Gift Card",
+    "Header & Footer",
+    "Homepage",
+    "MAO New Order and Order Updates",
+    "Order Confirmation",
+    "PDP",
+    "PLP",
+    "Resubmit Utility",
+    "SEO",
+    "Session Management",
+    "Shipping",
+    "Stores",
+    "System Support",
+    "Tealium Integration",
+    "Wish List",
+    "Wunderkind",
+    "WUP Dashboard",
 ]
 
-E2E_GROUPINGS = [
-    "AC E2E - Account Management",
-    "AC E2E - ATP",
-    "AC E2E - Billing",
-    "AC E2E - Card Reader",
-    "AC E2E - Cart Overview",
-    "AC E2E - Catalog Opt Out",
-    "AC E2E - Cookie Consent",
-    "AC E2E - Dynamic Yield",
-    "AC E2E - Easy Post Email Templates",
-    "AC E2E - Employee Tools",
-    "AC E2E - Exploratory Testing",
-    "AC E2E - Financial Calculators",
-    "AC E2E - Gift Card",
-    "AC E2E - Header & Footer",
-    "AC E2E - Homepage & Navigation",
-    "AC E2E - Incentivized Email",
-    "AC E2E - Inventory",
-    "AC E2E - Load Rules for PDP & PLA Product Panel",
-    "AC E2E - MAO New Order & Order Update",
-    "AC E2E - Marketing Parameters",
-    "AC E2E - Order Confirmation",
-    "AC E2E - Other Pages",
-    "AC E2E - PDP",
-    "AC E2E - Pixels",
-    "AC E2E - PLP",
-    "AC E2E - Resubmit Utility",
-    "AC E2E - Shipping",
-    "AC E2E - Stores",
-    "AC E2E - Turn To",
-    "AC E2E - Data Syncing",
-    "AC E2E - User Session Management",
-    "AC E2E - Wish List",
-]
-REPORT_GROUPINGS = frozenset(DEVELOPMENT_GROUPINGS + E2E_GROUPINGS)
+COMPONENT_TO_REPORTING_AREA = {
+    "AC-Accessibility": "Accessibility",
+    "AC-ATP": "ATP",
+    "AC-Avalara": "Financial Calculator",
+    "AC-Cart": "Cart",
+    "AC-Contact Us": "Static Pages",
+    "AC-Cookie Consent": "Cookie Consent",
+    "AC-Promotions": "Financial Calculator",
+    "AC-Customer Creation": "My Account / Account Management",
+    "AC-Cybersource": "Payment / Billing",
+    "AC-DB Integration": "Database Integration and Optimization",
+    "AC-Dynamic Yield": "Dynamic Yield",
+    "AC-Emails": "Emails",
+    "AC-Calculators": "Financial Calculator",
+    "AC-Gift Card": "Gift Card",
+    "AC-Header & Footer": "Header & Footer",
+    "AC-Homepage": "Homepage",
+    "AC-Log In & Create Account": "My Account / Account Management",
+    "AC-MAO": "MAO New Order and Order Updates",
+    "AC-Account": "My Account / Account Management",
+    "AC-Order Confirmation": "Order Confirmation",
+    "AC-Payment": "Payment / Billing",
+    "AC-PDP": "PDP",
+    "AC-PLA": "Dynamic Yield",
+    "AC-PLP": "PLP",
+    "AC-Resubmit Utility": "Resubmit Utility",
+    "AC-SEO": "SEO",
+    "AC-Session Management": "Session Management",
+    "AC-Shipping": "Shipping",
+    "AC-SKU on the Fly": "Cart",
+    "AC-Static Pages": "Static Pages",
+    "AC-Stores": "Stores",
+    "AC-System Support": "System Support",
+    "AC-Tealium": "Tealium Integration",
+    "AC-Wish List": "Wish List",
+    "AC-Wunderkind": "Wunderkind",
+    "AC-WUP Dashboard": "WUP Dashboard",
+}
 
 
 def build_launch_report(
     tasks: Iterable[RawTask],
     *,
     generated_at: Optional[datetime] = None,
+    qa_tc_summary: Optional[dict] = None,
 ) -> dict:
     rows = list(tasks)
-    by_key = {task.key: task for task in rows if task.key}
-    grouped, epic_keys, unassigned_diagnostics = _group_tasks_by_report_grouping(rows, by_key)
+    grouped, unassigned_diagnostics = _group_tasks_by_reporting_area(rows)
     generated = generated_at or datetime.now(timezone.utc)
     development_rows = [
-        _development_row(name, grouped.get(name, []), epic_keys.get(name))
-        for name in DEVELOPMENT_GROUPINGS
+        _development_row(name, grouped[SECTION_DEVELOPMENT].get(name, []))
+        for name in REPORTING_AREAS
     ]
     e2e_rows = [
-        _e2e_row(name, grouped.get(name, []), epic_keys.get(name))
-        for name in E2E_GROUPINGS
+        _e2e_row(name, grouped[SECTION_E2E].get(name, []), (qa_tc_summary or {}).get(name))
+        for name in REPORTING_AREAS
     ]
 
     return {
@@ -127,79 +131,39 @@ def build_launch_report(
     }
 
 
-def _group_tasks_by_report_grouping(
+def _group_tasks_by_reporting_area(
     tasks: list[RawTask],
-    by_key: dict[str, RawTask],
-) -> tuple[dict[str, list[RawTask]], dict[str, str], dict[str, dict]]:
-    grouped: dict[str, list[RawTask]] = defaultdict(list)
-    epic_keys: dict[str, str] = {}
+) -> tuple[dict[str, dict[str, list[RawTask]]], dict[str, dict]]:
+    grouped: dict[str, dict[str, list[RawTask]]] = {
+        SECTION_DEVELOPMENT: {area: [] for area in REPORTING_AREAS},
+        SECTION_E2E: {area: [] for area in REPORTING_AREAS},
+    }
     unassigned_diagnostics = {
         SECTION_DEVELOPMENT: _empty_diagnostics(),
         SECTION_E2E: _empty_diagnostics(),
     }
 
     for task in tasks:
-        grouping, epic_key, diagnostic_key = _report_grouping(task, by_key)
-        if grouping in REPORT_GROUPINGS:
-            grouped[grouping].append(task)
-            if epic_key:
-                epic_keys.setdefault(grouping, epic_key)
-        elif not _is_epic(task) and diagnostic_key:
-            section = _section_for_task(task)
-            unassigned_diagnostics[section][diagnostic_key] += 1
+        if _is_epic(task):
+            continue
+        section = _section_for_resource_queue(task)
+        area = _reporting_area(task)
+        if area:
+            grouped[section][area].append(task)
+        elif PHASE_LABEL in (task.labels or []):
+            unassigned_diagnostics[section]["missingEpicLinkCount"] += 1
 
-    return grouped, epic_keys, unassigned_diagnostics
-
-
-def _report_grouping(
-    task: RawTask,
-    by_key: dict[str, RawTask],
-    visited: Optional[set[str]] = None,
-    depth: int = 0,
-) -> tuple[Optional[str], Optional[str], Optional[str]]:
-    visited = visited or set()
-    task_key = task.key or ""
-    if task_key:
-        if task_key in visited:
-            return None, None, "missingEpicLinkCount"
-        visited.add(task_key)
-    if depth > MAX_PARENT_DEPTH:
-        return None, None, "missingEpicLinkCount"
-
-    if _is_epic(task):
-        return task.summary, task.key, None
-    if task.epic_link:
-        if task.epic_link in REPORT_GROUPINGS:
-            return task.epic_link, None, None
-        epic = by_key.get(task.epic_link)
-        if epic and epic.summary:
-            return epic.summary, epic.key, None
-        return None, None, "unresolvedEpicNameCount"
-    if task.parent_key:
-        parent = by_key.get(task.parent_key)
-        if parent:
-            parent_grouping, parent_epic_key, parent_diagnostic = _report_grouping(
-                parent,
-                by_key,
-                visited,
-                depth + 1,
-            )
-            if parent_grouping:
-                return parent_grouping, parent_epic_key, None
-            if parent_diagnostic:
-                return None, None, parent_diagnostic
-        return None, None, "missingEpicLinkCount"
-    return None, None, "missingEpicLinkCount"
+    return grouped, unassigned_diagnostics
 
 
-def _development_row(report_grouping: str, tasks: list[RawTask], epic_key: Optional[str]) -> dict:
+def _development_row(report_grouping: str, tasks: list[RawTask]) -> dict:
     counted, excluded = _partition_counted(tasks)
     completed_hours = _hours(sum(_seconds(task.time_spent_seconds) for task in counted))
     remaining_hours = _hours(sum(_seconds(task.remaining_estimate_seconds) for task in counted))
 
     return {
         "reportGrouping": report_grouping,
-        "epicKey": epic_key,
+        "epicKey": None,
         "phaseLabel": PHASE_LABEL,
         "completedHours": completed_hours,
         "remainingHours": remaining_hours,
@@ -210,17 +174,25 @@ def _development_row(report_grouping: str, tasks: list[RawTask], epic_key: Optio
     }
 
 
-def _e2e_row(report_grouping: str, tasks: list[RawTask], epic_key: Optional[str]) -> dict:
+def _e2e_row(report_grouping: str, tasks: list[RawTask], qa_tc: Optional[dict] = None) -> dict:
     counted, excluded = _partition_counted(tasks)
     completed_hours = _hours(sum(_seconds(task.time_spent_seconds) for task in counted))
     remaining_hours = _hours(sum(_seconds(task.remaining_estimate_seconds) for task in counted))
+    passed_tc = sum(1 for task in counted if _normalized_status(task) == "closed")
+    failed_tc = sum(1 for task in counted if _normalized_status(task) == "failed qa")
+    total_tc = None
+    if qa_tc:
+        passed_tc = int(qa_tc.get("passedTc") or 0)
+        failed_tc = int(qa_tc.get("failedTc") or 0)
+        total_tc = int(qa_tc.get("totalTc") or 0)
 
     return {
         "reportGrouping": report_grouping,
-        "epicKey": epic_key,
+        "epicKey": None,
         "phaseLabel": PHASE_LABEL,
-        "passedTc": sum(1 for task in counted if _normalized_status(task) == "closed"),
-        "failedTc": sum(1 for task in counted if _normalized_status(task) == "failed qa"),
+        "passedTc": passed_tc,
+        "failedTc": failed_tc,
+        "totalTc": total_tc,
         "cnxOk": None,
         "doneCount": None,
         "completedHours": completed_hours,
@@ -265,6 +237,7 @@ def _totals(rows: list[dict]) -> dict:
         "remainingHours": sum(row["remainingHours"] for row in rows),
         "passedTc": sum(row.get("passedTc") or 0 for row in rows),
         "failedTc": sum(row.get("failedTc") or 0 for row in rows),
+        "totalTc": sum(row.get("totalTc") or 0 for row in rows),
     }
 
 
@@ -292,14 +265,20 @@ def _normalized_status(task: RawTask) -> str:
     return (task.status or "").casefold()
 
 
-def _section_for_task(task: RawTask) -> str:
-    project = (task.project or "").upper()
-    key = (task.key or "").upper()
-    epic_link = (task.epic_link or "").upper()
-    parent_key = (task.parent_key or "").upper()
-    if project == "ACE2E" or key.startswith("ACE2E-") or epic_link.startswith("ACE2E-") or parent_key.startswith("ACE2E-"):
+def _section_for_resource_queue(task: RawTask) -> str:
+    if (task.resource_queue or "").casefold() == "qa":
         return SECTION_E2E
     return SECTION_DEVELOPMENT
+
+
+def _reporting_area(task: RawTask) -> Optional[str]:
+    for component in task.components or []:
+        if not component.startswith("AC-"):
+            continue
+        area = COMPONENT_TO_REPORTING_AREA.get(component)
+        if area:
+            return area
+    return None
 
 
 def _progress_percent(completed_hours: int, remaining_hours: int) -> int:

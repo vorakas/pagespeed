@@ -662,6 +662,49 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertEqual(current["cycles"][0]["snapshotDelta"]["progressPercent"], -13)
         self.assertEqual(current["cycles"][1]["snapshotDelta"]["totalCases"], 3)
 
+    def test_latest_launch_tc_summary_maps_cached_cycles_to_reporting_areas(self):
+        class FakeReportCache:
+            def get_latest_successful(self):
+                return {
+                    "cacheKey": "latest",
+                    "lastRefreshedAt": "2026-05-27T17:15:56Z",
+                    "report": {
+                        "cycles": [
+                            {
+                                "key": "TC-C1",
+                                "name": "PLP E2E Testing - Desktop - Round 1",
+                                "folder": "/Adobe Commerce E2E Master Test Cycles/Desktop or Tablet/PLP",
+                                "totalCases": 10,
+                                "statusCounts": {"Pass": 6, "Fail": 2, "Not Executed": 2},
+                            },
+                            {
+                                "key": "TC-C2",
+                                "name": "Search & Sort Page E2E Testing - Mobile - Round 1",
+                                "folder": "/Adobe Commerce E2E Master Test Cycles",
+                                "totalCases": 5,
+                                "statusCounts": {"Pass": 3, "Fail": 1, "Blocked": 1},
+                            },
+                            {
+                                "key": "TC-C3",
+                                "name": "Unknown Round 1",
+                                "folder": "/Adobe Commerce E2E Master Test Cycles/Misc",
+                                "totalCases": 99,
+                                "statusCounts": {"Pass": 99},
+                            },
+                        ]
+                    },
+                }
+
+        service = QaTestingReportService("token", report_cache_repo=FakeReportCache())
+
+        summary = service.latest_launch_tc_summary()
+
+        self.assertEqual(summary["source"]["cacheKey"], "latest")
+        self.assertEqual(summary["areas"]["PLP"]["passedTc"], 9)
+        self.assertEqual(summary["areas"]["PLP"]["failedTc"], 3)
+        self.assertEqual(summary["areas"]["PLP"]["totalTc"], 15)
+        self.assertEqual(summary["unmappedCycleCount"], 1)
+
     def test_initial_persistent_load_builds_once_then_reuses_snapshot(self):
         class FakeReportCache:
             def __init__(self):

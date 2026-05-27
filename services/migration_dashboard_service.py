@@ -123,9 +123,11 @@ class MigrationDashboardService:
         self,
         vault_root: str | Path,
         cache_ttl_seconds: int = 120,
+        qa_testing_service: Any | None = None,
     ) -> None:
         self._vault: VaultReader = VaultReader(str(vault_root))
         self._scanner: RawTaskScanner = RawTaskScanner(self._vault)
+        self._qa_testing_service = qa_testing_service
         self._cache_ttl: int = cache_ttl_seconds
         self._cache: Dict[str, _CacheEntry] = {}
         self._lock: threading.RLock = threading.RLock()
@@ -242,10 +244,28 @@ class MigrationDashboardService:
         return self._cached("epicProgress", self._compute_epic_progress)
 
     def get_launch_report(self) -> dict:
-        return self._cached("launch_report", lambda: build_launch_report(self._raw_tasks()))
+        return self._cached(
+            "launch_report",
+            lambda: build_launch_report(
+                self._raw_tasks(),
+                qa_tc_summary=self._latest_qa_tc_summary(),
+            ),
+        )
 
     def get_teams(self) -> List[dict]:
         return self._cached("teams", self._compute_teams)
+
+    def _latest_qa_tc_summary(self) -> dict | None:
+        if self._qa_testing_service is None:
+            return None
+        try:
+            summary = self._qa_testing_service.latest_launch_tc_summary()
+        except Exception:
+            logger.exception("Failed to load latest QA TC summary for launch report")
+            return None
+        if not summary:
+            return None
+        return summary.get("areas") or None
 
     def get_workstream_detail(self, workstream_id: str) -> Optional[dict]:
         key = f"ws:{workstream_id}"

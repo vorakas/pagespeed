@@ -689,6 +689,7 @@ export interface LaunchReportE2eRow {
   cnxOk: number | null
   passedTc: number
   failedTc: number
+  totalTc?: number | null
   completedHours: number
   remainingHours: number
   progressPercent: number
@@ -704,6 +705,7 @@ export interface LaunchReportSection<T> {
     remainingHours: number
     passedTc: number
     failedTc: number
+    totalTc?: number
     rowCount: number
   }
   diagnostics: LaunchReportDiagnostics

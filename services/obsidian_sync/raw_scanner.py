@@ -55,6 +55,7 @@ class RawTask:
     priority: Optional[str] = None
     launch_priority: Optional[str] = None
     labels: List[str] = field(default_factory=list)
+    components: List[str] = field(default_factory=list)
     assignee: Optional[str] = None
     created: Optional[str] = None
     updated: Optional[str] = None
@@ -87,6 +88,7 @@ class RawTask:
             "priority": self.priority,
             "launchPriority": self.launch_priority,
             "labels": self.labels,
+            "components": self.components,
             "assignee": self.assignee,
             "created": self.created,
             "updated": self.updated,
@@ -216,6 +218,7 @@ class RawTaskScanner:
             priority=_str(fm.get("priority") or fm.get("task_priority")),
             launch_priority=_str(fm.get("launch_priority") or fm.get("Launch Priority")),
             labels=_list(fm.get("labels")),
+            components=_list(fm.get("components")),
             assignee=_str(fm.get("assignee")),
             created=_str(fm.get("created")),
             updated=_str(fm.get("updated") or fm.get("modified")),

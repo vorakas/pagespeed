@@ -42,6 +42,44 @@ ROOT_CYCLE_SECTION_OVERRIDES = {
     "TC-C1570": "Desktop or Tablet",
     "TC-C1569": "Mobile",
 }
+LAUNCH_TC_AREA_ALIASES = (
+    ("my account", "My Account / Account Management"),
+    ("account management", "My Account / Account Management"),
+    ("customer creation", "My Account / Account Management"),
+    ("log in", "My Account / Account Management"),
+    ("payment", "Payment / Billing"),
+    ("billing", "Payment / Billing"),
+    ("cybersource", "Payment / Billing"),
+    ("search & sort", "PLP"),
+    ("search and sort", "PLP"),
+    ("product listing", "PLP"),
+    ("left nav", "PLP"),
+    ("plp", "PLP"),
+    ("product detail", "PDP"),
+    ("pdp", "PDP"),
+    ("financial calculator", "Financial Calculator"),
+    ("calculators", "Financial Calculator"),
+    ("calculator", "Financial Calculator"),
+    ("gift card", "Gift Card"),
+    ("header", "Header & Footer"),
+    ("footer", "Header & Footer"),
+    ("homepage", "Homepage"),
+    ("home page", "Homepage"),
+    ("mao", "MAO New Order and Order Updates"),
+    ("order update", "MAO New Order and Order Updates"),
+    ("order confirmation", "Order Confirmation"),
+    ("cookie consent", "Cookie Consent"),
+    ("dynamic yield", "Dynamic Yield"),
+    ("session", "Session Management"),
+    ("shipping", "Shipping"),
+    ("stores", "Stores"),
+    ("tealium", "Tealium Integration"),
+    ("wish list", "Wish List"),
+    ("wunderkind", "Wunderkind"),
+    ("atp", "ATP"),
+    ("cart", "Cart"),
+    ("seo", "SEO"),
+)
 logger = logging.getLogger(__name__)
 
 
@@ -110,6 +148,26 @@ def cycle_section(cycle: dict[str, Any], folder: str) -> str:
     if "mobile" in name:
         return "Mobile"
     return section
+
+
+def _launch_reporting_area_for_cycle(cycle: dict[str, Any]) -> str | None:
+    haystack = " ".join(
+        str(cycle.get(key) or "")
+        for key in ("folder", "name", "section")
+    ).casefold()
+    for needle, area in LAUNCH_TC_AREA_ALIASES:
+        if needle in haystack:
+            return area
+    return None
+
+
+def _status_count(status_counts: Counter[str], status: str) -> int:
+    wanted = status.casefold()
+    return sum(
+        int(count or 0)
+        for name, count in status_counts.items()
+        if str(name).casefold() == wanted
+    )
 
 
 def status_name(value: Any) -> str:
@@ -320,6 +378,37 @@ class QaTestingReportService:
         self._refresh_previous_reports: dict[str, tuple[dict[str, Any], str | None]] = {}
         self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
         self._last_user_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
+
+    def latest_launch_tc_summary(self) -> dict[str, Any] | None:
+        """Return latest cached QA test-case counts keyed by Launch reporting area."""
+        if self.report_cache_repo is None or not hasattr(self.report_cache_repo, "get_latest_successful"):
+            return None
+        latest = self.report_cache_repo.get_latest_successful()
+        report = latest.get("report") if latest else None
+        if not report:
+            return None
+
+        areas: dict[str, dict[str, int]] = {}
+        unmapped = 0
+        for cycle in report.get("cycles") or []:
+            area = _launch_reporting_area_for_cycle(cycle)
+            if area is None:
+                unmapped += 1
+                continue
+            status_counts = Counter(cycle.get("statusCounts") or {})
+            bucket = areas.setdefault(area, {"passedTc": 0, "failedTc": 0, "totalTc": 0})
+            bucket["passedTc"] += _status_count(status_counts, "pass")
+            bucket["failedTc"] += _status_count(status_counts, "fail")
+            bucket["totalTc"] += int(cycle.get("totalCases") or sum(status_counts.values()))
+
+        return {
+            "areas": areas,
+            "source": {
+                "cacheKey": latest.get("cacheKey"),
+                "lastRefreshedAt": latest.get("lastRefreshedAt"),
+            },
+            "unmappedCycleCount": unmapped,
+        }
 
     def build_report(
         self,

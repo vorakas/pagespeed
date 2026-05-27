@@ -100,6 +100,7 @@ export function LaunchReportSections({ data, error }: LaunchReportSectionsProps)
               <tr>
                 <Th>Grouping</Th>
                 <Th align="right">CNX OK</Th>
+                <Th align="right">Total TC</Th>
                 <Th align="right">Passed TC</Th>
                 <Th align="right">Failed TC</Th>
                 <Th align="right">Completed</Th>
@@ -115,7 +116,7 @@ export function LaunchReportSections({ data, error }: LaunchReportSectionsProps)
                 return (
                   <Fragment key={id}>
                     <E2eRow row={row} expanded={isExpanded} onToggle={() => toggle(id)} />
-                    {isExpanded && <DiagnosticRow colSpan={8} row={row} />}
+                    {isExpanded && <DiagnosticRow colSpan={9} row={row} />}
                   </Fragment>
                 )
               })}
@@ -184,6 +185,7 @@ function E2eRow({
         <ExpandButton expanded={expanded} onToggle={onToggle} label={row.reportGrouping} />
       </Td>
       <Td align="right">{formatCount(row.cnxOk)}</Td>
+      <Td align="right">{formatCount(row.totalTc ?? null)}</Td>
       <Td align="right">{formatCount(row.passedTc)}</Td>
       <Td align="right">{formatCount(row.failedTc)}</Td>
       <Td align="right">{formatHours(row.completedHours)}</Td>
