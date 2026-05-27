@@ -593,6 +593,75 @@ class QaTestingServiceTest(unittest.TestCase):
         self.assertFalse(report["cycles"][0]["testCases"][1]["inRange"])
         self.assertFalse(cache.started)
 
+    def test_report_delta_compares_against_previous_snapshot(self):
+        service = QaTestingReportService("token")
+        current = {
+            "summary": {
+                "cycleCount": 2,
+                "totalCases": 15,
+                "executedCases": 10,
+                "remainingCases": 5,
+                "progressPercent": 67,
+                "statusCounts": {"Pass": 8, "Fail": 2, "Not Executed": 5},
+            },
+            "cycles": [
+                {
+                    "key": "TC-C1",
+                    "name": "Checkout Round 2",
+                    "section": "LP Features",
+                    "totalCases": 12,
+                    "executedCases": 8,
+                    "remainingCases": 4,
+                    "progressPercent": 67,
+                    "statusCounts": {"Pass": 7, "Fail": 1, "Not Executed": 4},
+                },
+                {
+                    "key": "TC-C2",
+                    "name": "New LP Feature Round 1",
+                    "section": "LP Features",
+                    "totalCases": 3,
+                    "executedCases": 2,
+                    "remainingCases": 1,
+                    "progressPercent": 67,
+                    "statusCounts": {"Pass": 1, "Fail": 1, "Not Executed": 1},
+                },
+            ],
+        }
+        previous = {
+            "summary": {
+                "cycleCount": 1,
+                "totalCases": 10,
+                "executedCases": 8,
+                "remainingCases": 2,
+                "progressPercent": 80,
+                "statusCounts": {"Pass": 8, "Not Executed": 2},
+            },
+            "cycles": [
+                {
+                    "key": "TC-C1",
+                    "name": "Checkout Round 2",
+                    "section": "LP Features",
+                    "totalCases": 10,
+                    "executedCases": 8,
+                    "remainingCases": 2,
+                    "progressPercent": 80,
+                    "statusCounts": {"Pass": 8, "Not Executed": 2},
+                }
+            ],
+        }
+
+        service._attach_previous_snapshot_deltas(current, previous, "2026-05-26T16:30:00Z")
+
+        self.assertEqual(current["summary"]["snapshotDelta"]["previousSnapshotAt"], "2026-05-26T16:30:00Z")
+        self.assertEqual(current["summary"]["snapshotDelta"]["totalCases"], 5)
+        self.assertEqual(current["summary"]["snapshotDelta"]["executedCases"], 2)
+        self.assertEqual(current["summary"]["snapshotDelta"]["remainingCases"], 3)
+        self.assertEqual(current["summary"]["snapshotDelta"]["progressPercent"], -13)
+        self.assertEqual(current["sectionDeltas"]["LP Features"]["totalCases"], 5)
+        self.assertEqual(current["sectionDeltas"]["LP Features"]["remainingCases"], 3)
+        self.assertEqual(current["cycles"][0]["snapshotDelta"]["progressPercent"], -13)
+        self.assertEqual(current["cycles"][1]["snapshotDelta"]["totalCases"], 3)
+
     def test_initial_persistent_load_builds_once_then_reuses_snapshot(self):
         class FakeReportCache:
             def __init__(self):
@@ -777,6 +846,7 @@ class QaTestingServiceTest(unittest.TestCase):
         class FakeReportCache:
             def __init__(self):
                 self.cleared = 0
+                self.latest_reads = 0
 
             def clear_all(self):
                 self.cleared += 1
@@ -789,7 +859,12 @@ class QaTestingServiceTest(unittest.TestCase):
                 return True
 
             def get_latest_successful(self):
-                raise AssertionError("Cleared refresh should not read latest shared snapshot")
+                self.latest_reads += 1
+                return {
+                    "report": {"summary": {"totalCases": 7}, "cycles": [], "burndown": [], "taskMovement": {}},
+                    "lastRefreshedAt": "2026-05-14T12:00:00Z",
+                    "refreshStatus": "idle",
+                }
 
             def save_report(self, *args, **kwargs):
                 return None
@@ -822,6 +897,7 @@ class QaTestingServiceTest(unittest.TestCase):
         report = service.build_report(start, end, force_refresh=True, clear_cache=True)
 
         self.assertEqual(cache.cleared, 1)
+        self.assertEqual(cache.latest_reads, 1)
         self.assertTrue(service.thread_started)
         self.assertEqual(report["cache"]["clearedSnapshots"], 3)
         self.assertTrue(report["cache"]["refreshInProgress"])

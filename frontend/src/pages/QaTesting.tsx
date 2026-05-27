@@ -25,7 +25,7 @@ import { Progress } from "@/components/ui/progress"
 import { buildQaBurndown } from "@/lib/qaBurndown"
 import { normalizeQaCycleSection } from "@/lib/qaCycleSections"
 import { api } from "@/services/api"
-import type { QaTaskStatusChange, QaTestCase, QaTestCycle, QaTestingReport } from "@/types"
+import type { QaSnapshotDelta, QaTaskStatusChange, QaTestCase, QaTestCycle, QaTestingReport } from "@/types"
 
 type Preset = "24h" | "sinceYesterday" | "today" | "yesterday" | "7d" | "custom"
 type SummaryTone = "failed" | "passed" | "blocked" | "inProgress"
@@ -125,6 +125,59 @@ function statusClass(status: string) {
   if (normalized.includes("progress")) return "bg-blue-500/10 text-blue-700 dark:text-blue-300"
   if (normalized.includes("blocked")) return "bg-amber-500/10 text-amber-700 dark:text-amber-300"
   return "bg-muted text-muted-foreground"
+}
+
+function signedValue(value: number, suffix = "") {
+  return `${value > 0 ? "+" : ""}${value}${suffix}`
+}
+
+function DeltaBadge({
+  label,
+  value,
+  suffix = "",
+  lowerIsBetter = false,
+  neutral = false,
+}: {
+  label: string
+  value?: number
+  suffix?: string
+  lowerIsBetter?: boolean
+  neutral?: boolean
+}) {
+  if (!value) return null
+  const isGood = lowerIsBetter ? value < 0 : value > 0
+  const tone = neutral
+    ? "border-border bg-muted text-muted-foreground"
+    : isGood
+      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+      : "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+  return (
+    <Badge variant="outline" className={tone}>
+      {label} {signedValue(value, suffix)}
+    </Badge>
+  )
+}
+
+function hasSnapshotDelta(delta?: QaSnapshotDelta) {
+  return Boolean(delta && (
+    delta.progressPercent
+    || delta.executedCases
+    || delta.remainingCases
+    || delta.totalCases
+  ))
+}
+
+function SnapshotDeltaSummary({ delta, compact = false }: { delta?: QaSnapshotDelta; compact?: boolean }) {
+  if (!hasSnapshotDelta(delta)) return null
+  return (
+    <div className={compact ? "flex flex-wrap gap-1.5 text-xs" : "flex flex-wrap items-center gap-2 text-xs text-muted-foreground"}>
+      {!compact ? <span>Since previous snapshot:</span> : null}
+      <DeltaBadge label="progress" value={delta.progressPercent} suffix=" pts" />
+      <DeltaBadge label="executed" value={delta.executedCases} />
+      <DeltaBadge label="remaining" value={delta.remainingCases} lowerIsBetter />
+      <DeltaBadge label="total" value={delta.totalCases} neutral />
+    </div>
+  )
 }
 
 function applyPreset(preset: Preset) {
@@ -441,6 +494,7 @@ function CycleCard({ cycle }: { cycle: QaTestCycle }) {
           <div className="text-xs text-muted-foreground">
             {cycle.executedInRange} executed in range · {cycle.totalCases} total
           </div>
+          <SnapshotDeltaSummary delta={cycle.snapshotDelta} compact />
         </div>
         <ChevronDown className="mt-1 h-5 w-5 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
@@ -479,7 +533,15 @@ function CycleCard({ cycle }: { cycle: QaTestCycle }) {
   )
 }
 
-function CycleSectionGroup({ section, cycles }: { section: string; cycles: QaTestCycle[] }) {
+function CycleSectionGroup({
+  section,
+  cycles,
+  sectionDelta,
+}: {
+  section: string
+  cycles: QaTestCycle[]
+  sectionDelta?: QaSnapshotDelta
+}) {
   const totalCases = cycles.reduce((sum, cycle) => sum + cycle.totalCases, 0)
   const executedCases = cycles.reduce((sum, cycle) => sum + cycle.executedCases, 0)
   const progressPercent = totalCases > 0 ? Math.round((executedCases / totalCases) * 100) : 0
@@ -496,6 +558,7 @@ function CycleSectionGroup({ section, cycles }: { section: string; cycles: QaTes
           <div className="text-sm text-muted-foreground">
             {executedCases} executed · {Math.max(totalCases - executedCases, 0)} remaining
           </div>
+          <SnapshotDeltaSummary delta={sectionDelta} />
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
@@ -1077,7 +1140,14 @@ export function QaTesting() {
               <h2 className="font-heading text-xl font-semibold tracking-normal">Test Cycle Progress</h2>
               <p className="text-sm text-muted-foreground">Expand a cycle to inspect every included test case and its current status.</p>
             </div>
-            {groupedCycles.map(([section, cycles]) => <CycleSectionGroup key={section} section={section} cycles={cycles} />)}
+            {groupedCycles.map(([section, cycles]) => (
+              <CycleSectionGroup
+                key={section}
+                section={section}
+                cycles={cycles}
+                sectionDelta={report.sectionDeltas?.[section]}
+              />
+            ))}
           </section>
 
           <Card>

@@ -1450,6 +1450,15 @@ export interface QaTestCase {
   inRange: boolean
 }
 
+export interface QaSnapshotDelta {
+  previousSnapshotAt?: string | null
+  totalCases: number
+  executedCases: number
+  remainingCases: number
+  progressPercent: number
+  statusCounts?: Record<string, number>
+}
+
 export interface QaTestCycle {
   key: string
   name: string
@@ -1465,6 +1474,7 @@ export interface QaTestCycle {
   rangeStatusCounts: Record<string, number>
   testCases: QaTestCase[]
   updatedOn?: string | null
+  snapshotDelta?: QaSnapshotDelta
 }
 
 export interface QaBurndownPoint {
@@ -1505,8 +1515,10 @@ export interface QaTestingReport {
     statusCounts: Record<string, number>
     rangeStatusCounts: Record<string, number>
     taskStatusChanges: number
+    snapshotDelta?: QaSnapshotDelta
   }
   cycles: QaTestCycle[]
+  sectionDeltas?: Record<string, QaSnapshotDelta>
   burndown: QaBurndownPoint[]
   taskMovement: {
     jql: string

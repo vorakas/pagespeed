@@ -317,6 +317,7 @@ class QaTestingReportService:
         self._refresh_lock = threading.Lock()
         self._refreshing_test_case_keys: set[str] = set()
         self._refreshing_user_keys: set[str] = set()
+        self._refresh_previous_reports: dict[str, tuple[dict[str, Any], str | None]] = {}
         self._last_name_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
         self._last_user_cache = {"hitCount": 0, "missCount": 0, "refreshQueued": 0}
 
@@ -422,9 +423,24 @@ class QaTestingReportService:
         burndown_end: datetime,
         clear_cache: bool = False,
     ) -> dict[str, Any]:
+        previous_snapshot = self.report_cache_repo.get_latest_successful() if force_refresh and clear_cache else None
         cleared_snapshots = self._clear_persistent_report_cache() if force_refresh and clear_cache else 0
         cached = self.report_cache_repo.get(cache_key)
         cached_report = deepcopy(cached.get("report")) if cached and cached.get("report") else None
+        previous_report_for_refresh = None
+        previous_snapshot_at = None
+        if force_refresh:
+            if cached_report is not None:
+                previous_report_for_refresh = deepcopy(cached_report)
+                previous_snapshot_at = cached.get("lastRefreshedAt") if cached else None
+            elif previous_snapshot and previous_snapshot.get("report"):
+                previous_report_for_refresh = deepcopy(previous_snapshot.get("report"))
+                previous_snapshot_at = previous_snapshot.get("lastRefreshedAt")
+            elif not clear_cache:
+                latest_for_delta = self.report_cache_repo.get_latest_successful()
+                if latest_for_delta and latest_for_delta.get("report"):
+                    previous_report_for_refresh = deepcopy(latest_for_delta.get("report"))
+                    previous_snapshot_at = latest_for_delta.get("lastRefreshedAt")
 
         if not force_refresh:
             if cached_report is not None:
@@ -483,6 +499,7 @@ class QaTestingReportService:
             )
 
         if force_refresh:
+            self._remember_previous_snapshot(cache_key, previous_report_for_refresh, previous_snapshot_at)
             self._start_report_refresh_thread(
                 cache_key,
                 start,
@@ -575,6 +592,7 @@ class QaTestingReportService:
         cycles = report.get("cycles") or []
         if not cycles:
             return
+        summary_delta = (report.get("summary") or {}).get("snapshotDelta")
         for cycle in cycles:
             range_status_counts: Counter[str] = Counter()
             executed_in_range = 0
@@ -594,11 +612,29 @@ class QaTestingReportService:
         task_changes = (report.get("taskMovement") or {}).get("changes") or []
         report["range"] = {"start": to_iso(start), "end": to_iso(end)}
         report["burndownRange"] = {"start": to_iso(burndown_start), "end": to_iso(burndown_end)}
-        report["summary"] = self._summarize(cycles, task_changes)
+        summary = self._summarize(cycles, task_changes)
+        if summary_delta:
+            summary["snapshotDelta"] = summary_delta
+        report["summary"] = summary
         report["burndown"] = build_daily_burndown(cycles, burndown_start, burndown_end)
         if isinstance(report.get("taskMovement"), dict):
             report["taskMovement"]["jql"] = build_status_change_jql(start, end, task_window=task_window)
             report["taskMovement"]["totalChanges"] = len(task_changes)
+
+    def _remember_previous_snapshot(
+        self,
+        cache_key: str,
+        previous_report: dict[str, Any] | None,
+        previous_snapshot_at: str | None,
+    ) -> None:
+        if previous_report is None:
+            return
+        with self._refresh_lock:
+            self._refresh_previous_reports[cache_key] = (previous_report, previous_snapshot_at)
+
+    def _pop_previous_snapshot(self, cache_key: str) -> tuple[dict[str, Any] | None, str | None]:
+        with self._refresh_lock:
+            return self._refresh_previous_reports.pop(cache_key, (None, None))
 
     def _try_start_persistent_refresh(
         self,
@@ -693,6 +729,7 @@ class QaTestingReportService:
 
         try:
             logger.info("QA report refresh started: cache_key=%s force_refresh=%s", cache_key, force_refresh)
+            previous_report, previous_snapshot_at = self._pop_previous_snapshot(cache_key)
             publish({
                 "stage": "discoveringCycles",
                 "message": "Starting Jira cycle discovery",
@@ -707,6 +744,7 @@ class QaTestingReportService:
                 force_refresh,
                 progress=publish,
             )
+            self._attach_previous_snapshot_deltas(report, previous_report, previous_snapshot_at)
             logger.info(
                 "QA report refresh built: cache_key=%s cycles=%s total_cases=%s",
                 cache_key,
@@ -1308,4 +1346,103 @@ class QaTestingReportService:
             "statusCounts": dict(status_counts),
             "rangeStatusCounts": dict(range_status_counts),
             "taskStatusChanges": len(task_changes),
+        }
+
+    @staticmethod
+    def _metric_summary(source: dict[str, Any] | None) -> dict[str, Any]:
+        source = source or {}
+        total = int(source.get("totalCases") or 0)
+        executed = int(source.get("executedCases") or 0)
+        remaining = int(source.get("remainingCases") if source.get("remainingCases") is not None else max(total - executed, 0))
+        progress = int(source.get("progressPercent") or (round((executed / total) * 100) if total else 0))
+        status_counts = Counter(source.get("statusCounts") or {})
+        return {
+            "totalCases": total,
+            "executedCases": executed,
+            "remainingCases": remaining,
+            "progressPercent": progress,
+            "statusCounts": status_counts,
+        }
+
+    @classmethod
+    def _metric_delta(
+        cls,
+        current: dict[str, Any] | None,
+        previous: dict[str, Any] | None,
+        previous_snapshot_at: str | None,
+    ) -> dict[str, Any]:
+        current_metrics = cls._metric_summary(current)
+        previous_metrics = cls._metric_summary(previous)
+        statuses = set(current_metrics["statusCounts"]) | set(previous_metrics["statusCounts"])
+        return {
+            "previousSnapshotAt": previous_snapshot_at,
+            "totalCases": current_metrics["totalCases"] - previous_metrics["totalCases"],
+            "executedCases": current_metrics["executedCases"] - previous_metrics["executedCases"],
+            "remainingCases": current_metrics["remainingCases"] - previous_metrics["remainingCases"],
+            "progressPercent": current_metrics["progressPercent"] - previous_metrics["progressPercent"],
+            "statusCounts": {
+                status: int(current_metrics["statusCounts"].get(status, 0) - previous_metrics["statusCounts"].get(status, 0))
+                for status in sorted(statuses)
+            },
+        }
+
+    @staticmethod
+    def _aggregate_cycles_by_section(cycles: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        sections: dict[str, dict[str, Any]] = {}
+        for cycle in cycles:
+            section = str(cycle.get("section") or "Uncategorized")
+            bucket = sections.setdefault(section, {
+                "totalCases": 0,
+                "executedCases": 0,
+                "remainingCases": 0,
+                "statusCounts": Counter(),
+            })
+            total = int(cycle.get("totalCases") or 0)
+            executed = int(cycle.get("executedCases") or 0)
+            bucket["totalCases"] += total
+            bucket["executedCases"] += executed
+            bucket["remainingCases"] += int(cycle.get("remainingCases") if cycle.get("remainingCases") is not None else max(total - executed, 0))
+            bucket["statusCounts"].update(cycle.get("statusCounts") or {})
+        for bucket in sections.values():
+            total = int(bucket.get("totalCases") or 0)
+            executed = int(bucket.get("executedCases") or 0)
+            bucket["progressPercent"] = round((executed / total) * 100) if total else 0
+        return sections
+
+    def _attach_previous_snapshot_deltas(
+        self,
+        report: dict[str, Any],
+        previous_report: dict[str, Any] | None,
+        previous_snapshot_at: str | None,
+    ) -> None:
+        if not previous_report:
+            return
+
+        report.setdefault("summary", {})["snapshotDelta"] = self._metric_delta(
+            report.get("summary"),
+            previous_report.get("summary"),
+            previous_snapshot_at,
+        )
+
+        previous_cycles = {
+            str(cycle.get("key")): cycle
+            for cycle in previous_report.get("cycles") or []
+            if cycle.get("key")
+        }
+        for cycle in report.get("cycles") or []:
+            cycle["snapshotDelta"] = self._metric_delta(
+                cycle,
+                previous_cycles.get(str(cycle.get("key"))),
+                previous_snapshot_at,
+            )
+
+        current_sections = self._aggregate_cycles_by_section(report.get("cycles") or [])
+        previous_sections = self._aggregate_cycles_by_section(previous_report.get("cycles") or [])
+        report["sectionDeltas"] = {
+            section: self._metric_delta(
+                current_sections.get(section),
+                previous_sections.get(section),
+                previous_snapshot_at,
+            )
+            for section in sorted(set(current_sections) | set(previous_sections))
         }
