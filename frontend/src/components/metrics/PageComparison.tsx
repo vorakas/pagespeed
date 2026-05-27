@@ -291,9 +291,9 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <SummaryTile
-              label="Targets met"
+              label="Vitals on target"
               value={`${site1TargetsMet}/${site1AvailableVitals} vs ${site2TargetsMet}/${site2AvailableVitals}`}
-              detail={`${availableVitals.length} vitals checked`}
+              detail={`${site1Name} vs ${site2Name}`}
             />
             <SummaryTile
               label="Largest vital gap"
@@ -333,9 +333,9 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
         </div>
 
         <div className="aurora-callout p-3 text-left">
-          <div className="grid gap-2 text-xs sm:grid-cols-[112px_1fr_1fr_auto]">
+          <div className="grid gap-2 text-xs sm:grid-cols-[144px_1fr_1fr_auto]">
             <div className="min-w-0">
-              <span className="aurora-label block truncate">Performance delta</span>
+              <span className="aurora-label block whitespace-nowrap">Performance delta</span>
               <span className="aurora-num block text-sm font-semibold" style={{ color: diffColor }}>
                 {diffLabel} pts
               </span>
