@@ -36,6 +36,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
+import {
+  buildRequestStatGroups,
+  type BlazemeterRequestStatGroup,
+} from "@/lib/blazemeterRequestStats"
 import { api } from "@/services/api"
 import type { BlazemeterMasterReport } from "@/types"
 
@@ -74,39 +78,6 @@ function fmtDuration(seconds: number | null | undefined): string {
   if (h > 0) return `${h}h ${m}m ${s}s`
   if (m > 0) return `${m}m ${s}s`
   return `${s}s`
-}
-
-/**
- * Priority page labels the QA team cares about on the Request Stats tab.
- * Matched against the whole trimmed label (case-insensitive) — optionally
- * allowing a common JMeter step-number prefix like "01 - PDP" or "T03_PDP".
- * Substring match was too loose: short codes like "PDP" and "SFP" pulled
- * in every child sampler of the transaction.
- */
-const KEY_PAGE_LABELS = [
-  "Homepage",
-  "Search Result BR",
-  "Sort Page BR",
-  "SFP",
-  "PDP",
-  "Cart Overview",
-  "Shipping Page",
-  "Payment Page",
-]
-
-const KEY_PAGE_SET = new Set(KEY_PAGE_LABELS.map((l) => l.toLowerCase()))
-
-/** Strip a leading "NN ", "NN - ", "NN_", "TNN_", "TC-NN " etc. step prefix. */
-function stripStepPrefix(label: string): string {
-  return label.replace(/^\s*(?:T?C?-?\d{1,3})\s*[-_.:)]\s*/i, "").trim()
-}
-
-function matchesKeyPage(label: string | null): boolean {
-  if (!label) return false
-  const trimmed = label.trim().toLowerCase()
-  if (KEY_PAGE_SET.has(trimmed)) return true
-  const stripped = stripStepPrefix(label).toLowerCase()
-  return KEY_PAGE_SET.has(stripped)
 }
 
 function fmtDateTime(epoch: number | null | undefined): string {
@@ -274,6 +245,84 @@ function getReportBounds(
   return [start, end]
 }
 
+function RequestStatsTable({ rows }: { rows: BlazemeterRequestStatGroup[] }) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-border">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead>Group</TableHead>
+            <TableHead className="text-right"># Samples</TableHead>
+            <TableHead className="text-right">Avg. Response Time (ms)</TableHead>
+            <TableHead className="text-right">Avg. Hits/s</TableHead>
+            <TableHead className="text-right">90% line (ms)</TableHead>
+            <TableHead className="text-right">95% line (ms)</TableHead>
+            <TableHead className="text-right">99% line (ms)</TableHead>
+            <TableHead className="text-right">Min Response Time (ms)</TableHead>
+            <TableHead className="text-right">Max Response Time (ms)</TableHead>
+            <TableHead className="text-right">Avg. Bandwidth (KBytes/s)</TableHead>
+            <TableHead className="text-right">Error Percentage</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r) => {
+            const errPct =
+              r.errorRate != null ? (r.errorRate <= 1 ? r.errorRate * 100 : r.errorRate) : null
+            const kbPerSec = r.avgBytes
+            return (
+              <TableRow
+                key={r.groupName}
+                className="odd:bg-background even:bg-muted/30 hover:bg-muted/60"
+              >
+                <TableCell
+                  className="max-w-[340px] truncate text-xs font-medium"
+                  title={r.sourceLabels.join(", ")}
+                >
+                  {r.groupName}
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  {fmtNum(r.samples)}
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  {r.avgResponseTime != null ? fmtNum(Math.round(r.avgResponseTime)) : "—"}
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  {r.avgThroughput != null ? r.avgThroughput.toFixed(2) : "—"}
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  {r.p90 != null ? fmtNum(Math.round(r.p90)) : "—"}
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  {r.p95 != null ? fmtNum(Math.round(r.p95)) : "—"}
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  {r.p99 != null ? fmtNum(Math.round(r.p99)) : "—"}
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  {r.minResponseTime != null ? fmtNum(Math.round(r.minResponseTime)) : "—"}
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  {r.maxResponseTime != null ? fmtNum(Math.round(r.maxResponseTime)) : "—"}
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  {kbPerSec != null ? kbPerSec.toFixed(2) : "—"}
+                </TableCell>
+                <TableCell
+                  className={`text-right text-xs tabular-nums ${
+                    errPct != null && errPct > 0 ? "font-semibold text-destructive" : ""
+                  }`}
+                >
+                  {errPct != null ? `${errPct.toFixed(2)}%` : "—"}
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
 export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Props) {
   // `fullReport` is the unfiltered whole-run result — we fetch it once and keep
   // it around purely so the slider always knows the full time bounds, even
@@ -285,7 +334,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
   const [restoring, setRestoring] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
-  const [keyPagesOnly, setKeyPagesOnly] = useState(true)
+  const [selectedStatGroups, setSelectedStatGroups] = useState<Set<string>>(new Set())
   const [range, setRange] = useState<[number, number] | null>(null)
 
   const bounds = useMemo(() => getReportBounds(fullReport), [fullReport])
@@ -383,6 +432,15 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
     }
   }, [masterId])
 
+  const toggleStatGroup = useCallback((groupName: string) => {
+    setSelectedStatGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupName)) next.delete(groupName)
+      else next.add(groupName)
+      return next
+    })
+  }, [])
+
   const chartData = useMemo(() => {
     const points = report?.timeline?.points ?? []
     return points.map((p, i) => {
@@ -425,6 +483,16 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
   const errorRows = report?.errors ?? []
   const master = report?.master ?? null
   const fetchErrors = report?.fetchErrors ?? {}
+  const requestStatGroups = useMemo(() => buildRequestStatGroups(labelRows), [labelRows])
+  const displayedStatGroups = useMemo(() => {
+    return requestStatGroups.filter((group) => selectedStatGroups.has(group.groupName))
+  }, [requestStatGroups, selectedStatGroups])
+  const allStatGroupsSelected =
+    requestStatGroups.length > 0 && selectedStatGroups.size === requestStatGroups.length
+
+  useEffect(() => {
+    setSelectedStatGroups(new Set(requestStatGroups.map((group) => group.groupName)))
+  }, [requestStatGroups])
 
   const title = testName || master?.name || `Master ${masterId}`
   const startedEpoch = summary?.startTime ?? master?.created ?? null
@@ -1005,126 +1073,54 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
                 No per-label stats available.
               </p>
             ) : (
-              <>
-                {(() => {
-                  const filtered = keyPagesOnly
-                    ? labelRows.filter((r) => matchesKeyPage(r.labelName))
-                    : labelRows
-                  return (
-                    <>
-                      <div className="mb-3 flex items-center justify-between gap-3 text-xs">
-                        <span className="text-muted-foreground">
-                          Showing {filtered.length} of {labelRows.length} labels
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setKeyPagesOnly((v) => !v)}
-                        >
-                          {keyPagesOnly ? "Show all labels" : "Show key pages only"}
-                        </Button>
-                      </div>
-                      {filtered.length === 0 ? (
-                        <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                          No labels matched the key-page filter. Try "Show all labels".
-                        </p>
-                      ) : (
-                        <div className="overflow-x-auto rounded-md border border-border">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-muted/50">
-                                <TableHead>Label</TableHead>
-                                <TableHead className="text-right"># Samples</TableHead>
-                                <TableHead className="text-right">Avg. Response Time (ms)</TableHead>
-                                <TableHead className="text-right">Avg. Hits/s</TableHead>
-                                <TableHead className="text-right">90% line (ms)</TableHead>
-                                <TableHead className="text-right">95% line (ms)</TableHead>
-                                <TableHead className="text-right">99% line (ms)</TableHead>
-                                <TableHead className="text-right">Min Response Time (ms)</TableHead>
-                                <TableHead className="text-right">Max Response Time (ms)</TableHead>
-                                <TableHead className="text-right">
-                                  Avg. Bandwidth (KBytes/s)
-                                </TableHead>
-                                <TableHead className="text-right">Error Percentage</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filtered.map((r, i) => {
-                                const errPct =
-                                  r.errorRate != null
-                                    ? r.errorRate <= 1
-                                      ? r.errorRate * 100
-                                      : r.errorRate
-                                    : null
-                                // BM's aggregate `avgBytes` field is already in KB/s
-                                // (matches its "Avg. Bandwidth (KBytes/s)" column). Do not divide.
-                                const kbPerSec = r.avgBytes
-                                return (
-                                  <TableRow
-                                    key={r.labelId ?? i}
-                                    className="odd:bg-background even:bg-muted/30 hover:bg-muted/60"
-                                  >
-                                    <TableCell
-                                      className="max-w-[340px] truncate text-xs font-medium"
-                                      title={r.labelName ?? ""}
-                                    >
-                                      {r.labelName ?? "—"}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs tabular-nums">
-                                      {fmtNum(r.samples)}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs tabular-nums">
-                                      {r.avgResponseTime != null
-                                        ? fmtNum(Math.round(r.avgResponseTime))
-                                        : "—"}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs tabular-nums">
-                                      {r.avgThroughput != null
-                                        ? r.avgThroughput.toFixed(2)
-                                        : "—"}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs tabular-nums">
-                                      {r.p90 != null ? fmtNum(Math.round(r.p90)) : "—"}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs tabular-nums">
-                                      {r.p95 != null ? fmtNum(Math.round(r.p95)) : "—"}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs tabular-nums">
-                                      {r.p99 != null ? fmtNum(Math.round(r.p99)) : "—"}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs tabular-nums">
-                                      {r.minResponseTime != null
-                                        ? fmtNum(Math.round(r.minResponseTime))
-                                        : "—"}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs tabular-nums">
-                                      {r.maxResponseTime != null
-                                        ? fmtNum(Math.round(r.maxResponseTime))
-                                        : "—"}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs tabular-nums">
-                                      {kbPerSec != null ? kbPerSec.toFixed(2) : "—"}
-                                    </TableCell>
-                                    <TableCell
-                                      className={`text-right text-xs tabular-nums ${
-                                        errPct != null && errPct > 0
-                                          ? "font-semibold text-destructive"
-                                          : ""
-                                      }`}
-                                    >
-                                      {errPct != null ? `${errPct.toFixed(2)}%` : "—"}
-                                    </TableCell>
-                                  </TableRow>
-                                )
-                              })}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      )}
-                    </>
-                  )
-                })()}
-              </>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <span className="text-muted-foreground">
+                    Showing {displayedStatGroups.length} of {requestStatGroups.length} groups
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setSelectedStatGroups(
+                        allStatGroupsSelected
+                          ? new Set()
+                          : new Set(requestStatGroups.map((group) => group.groupName)),
+                      )
+                    }
+                  >
+                    {allStatGroupsSelected ? "Clear all" : "Select all"}
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {requestStatGroups.map((group) => {
+                    const selected = selectedStatGroups.has(group.groupName)
+                    return (
+                      <button
+                        key={group.groupName}
+                        type="button"
+                        onClick={() => toggleStatGroup(group.groupName)}
+                        className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          selected
+                            ? "border-primary/50 bg-primary/10 text-primary"
+                            : "border-border bg-background text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {group.groupName}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {displayedStatGroups.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                    Select one or more Request Stats groups.
+                  </p>
+                ) : (
+                  <RequestStatsTable rows={displayedStatGroups} />
+                )}
+              </div>
             )}
           </TabsContent>
 
