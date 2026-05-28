@@ -232,8 +232,6 @@ function MetaRow({
   )
 }
 
-const RAMPUP_SKIP_SECONDS = 60
-
 /** Pull start/end epoch (seconds) from a report, preferring the summary. */
 function getReportBounds(
   r: BlazemeterMasterReport | null,
@@ -339,7 +337,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
 
   const bounds = useMemo(() => getReportBounds(fullReport), [fullReport])
 
-  // Initial unfiltered fetch — establishes bounds and a default skip-rampup range.
+  // Initial unfiltered fetch — establishes bounds and defaults to the whole run.
   useEffect(() => {
     if (masterId === null) {
       setFullReport(null)
@@ -362,9 +360,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
         const b = getReportBounds(r)
         if (b) {
           const [s, e] = b
-          setRange(
-            e - s > RAMPUP_SKIP_SECONDS ? [s + RAMPUP_SKIP_SECONDS, e] : [s, e],
-          )
+          setRange([s, e])
         }
       })
       .catch((err) => {
@@ -411,9 +407,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
   const resetRange = useCallback(() => {
     if (!bounds) return
     const [s, e] = bounds
-    setRange(
-      e - s > RAMPUP_SKIP_SECONDS ? [s + RAMPUP_SKIP_SECONDS, e] : [s, e],
-    )
+    setRange([s, e])
   }, [bounds])
 
   const handleRestoreReports = useCallback(async () => {
@@ -556,41 +550,22 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
     fullAggregateSamples > 0 &&
     aggregateTotals.samples !== fullAggregateSamples
 
-  // Effective duration for rate KPIs — the slider window, not the whole run.
-  const effectiveDuration =
-    filterActive && range ? Math.max(1, range[1] - range[0]) : summary?.duration ?? null
-
-  // Prefer aggregate-derived totals when the aggregate honoured the filter
-  // but the summary endpoint didn't (a common BM asymmetry).
-  const displayHits = aggregateWasFiltered
-    ? aggregateTotals?.samples ?? null
-    : summary?.hits ?? null
-  const displayErrors = aggregateWasFiltered
-    ? aggregateTotals?.errors ?? null
-    : summary?.failed ?? null
-  const displayErrorRate = aggregateWasFiltered
-    ? aggregateTotals?.errorRate ?? null
-    : summary?.errorRate ?? null
-  const displayAvgRt = aggregateWasFiltered
-    ? aggregateTotals?.avgResponseTime ?? null
-    : summary?.avgResponseTime ?? null
+  // BlazeMeter's Summary cards remain whole-run even when the report time
+  // slider moves. Keep these KPIs pinned to summary values so Pharos matches.
+  const displayHits = summary?.hits ?? null
+  const displayErrors = summary?.failed ?? null
+  const displayErrorRate = summary?.errorRate ?? null
+  const displayAvgRt = summary?.avgResponseTime ?? null
 
   const maxUsers = summary?.maxUsers ?? master?.maxUsers ?? timelineMaxUsers
   const avgThroughput = (() => {
-    if (aggregateWasFiltered && aggregateTotals?.samples != null && effectiveDuration) {
-      return aggregateTotals.samples / effectiveDuration
-    }
     if (summary?.avgThroughput != null) return summary.avgThroughput
     if (summary?.hits != null && summary?.duration) return summary.hits / summary.duration
     return null
   })()
 
-  // Bandwidth: when the aggregate was filtered, its per-label KB/s sum is
-  // the most accurate. Otherwise fall back through summary fields.
+  // Match BlazeMeter Summary: bandwidth is whole-run, not slider-scoped.
   const avgBandwidth = (() => {
-    if (aggregateWasFiltered && aggregateTotals?.kbPerSec != null) {
-      return aggregateTotals.kbPerSec * 1024 // convert KB/s -> bytes/s for the MiB/s tile
-    }
     if (summary?.avgBandwidth != null) return summary.avgBandwidth
     if (summary?.totalBytes != null && summary?.duration) {
       return summary.totalBytes / summary.duration
@@ -812,15 +787,9 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
               />
               <Kpi
                 accent="amber"
-                value={
-                  aggregateWasFiltered
-                    ? "—"
-                    : summary?.p90 != null
-                      ? Math.round(summary.p90).toString()
-                      : "—"
-                }
-                unit={aggregateWasFiltered ? "" : "ms"}
-                label={aggregateWasFiltered ? "90% Response Time (whole run)" : "90% Response Time"}
+                value={summary?.p90 != null ? Math.round(summary.p90).toString() : "—"}
+                unit="ms"
+                label="90% Response Time"
               />
               <Kpi
                 accent="amber"
