@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { convertUtcTimesToPacific } from "@/lib/datetime"
 import { renderHeadlineSegments } from "./headlineWikilinks"
 import { TaskDetail } from "./SidePanel"
@@ -94,9 +95,7 @@ function PriorityBucket({ bucket }: { bucket: MigrationLaunchPriorityBucket }) {
           ))}
         </div>
       )}
-      {selectedTask && (
-        <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />
-      )}
+      <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />
     </div>
   )
 }
@@ -130,19 +129,21 @@ function TaskRow({
   )
 }
 
-function TaskModal({ task, onClose }: { task: RawTaskRecord; onClose: () => void }) {
+function TaskModal({ task, onClose }: { task: RawTaskRecord | null; onClose: () => void }) {
   return (
-    <div style={modalBackdropStyle} role="presentation" onClick={onClose}>
-      <div
-        style={modalStyle}
-        className="launch-dashboard-side-panel open"
-        role="dialog"
-        aria-modal="true"
-        onClick={(event) => event.stopPropagation()}
+    <Dialog open={Boolean(task)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="max-h-[85vh] overflow-hidden p-0 sm:max-w-[90rem]"
+        showCloseButton={false}
       >
-        <TaskDetail task={task} onClose={onClose} />
-      </div>
-    </div>
+        <div
+          style={taskDialogFrameStyle}
+          className="launch-dashboard-side-panel launch-dashboard-task-dialog-frame open"
+        >
+          {task && <TaskDetail task={task} onClose={onClose} />}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -285,23 +286,18 @@ const emptyStyle: React.CSSProperties = {
   fontSize: 12,
 }
 
-const modalBackdropStyle: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 80,
-  display: "grid",
-  placeItems: "center",
-  padding: 18,
-  background: "rgba(2, 6, 23, 0.62)",
-}
-
-const modalStyle: React.CSSProperties = {
+const taskDialogFrameStyle: React.CSSProperties = {
   position: "relative",
   top: "auto",
   right: "auto",
   bottom: "auto",
+  left: "auto",
   transform: "none",
-  width: "min(870px, 100%)",
-  maxHeight: "min(720px, calc(100vh - 36px))",
+  width: "100%",
+  height: "min(760px, 85vh)",
+  maxWidth: "none",
+  maxHeight: "85vh",
   minHeight: 0,
+  zIndex: "auto",
+  transition: "none",
 }
