@@ -17,6 +17,7 @@ import {
   Clock,
   ExternalLink,
   PlayCircle,
+  RotateCcw,
   StopCircle,
   Tag,
   X,
@@ -281,7 +282,9 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
   const [report, setReport] = useState<BlazemeterMasterReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
   const [keyPagesOnly, setKeyPagesOnly] = useState(true)
   const [range, setRange] = useState<[number, number] | null>(null)
 
@@ -293,12 +296,14 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
       setFullReport(null)
       setReport(null)
       setError(null)
+      setRestoreMessage(null)
       setRange(null)
       return
     }
     let cancelled = false
     setLoading(true)
     setError(null)
+    setRestoreMessage(null)
     api
       .getBlazemeterMasterReport(masterId)
       .then((r) => {
@@ -361,6 +366,22 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
       e - s > RAMPUP_SKIP_SECONDS ? [s + RAMPUP_SKIP_SECONDS, e] : [s, e],
     )
   }, [bounds])
+
+  const handleRestoreReports = useCallback(async () => {
+    if (masterId === null) return
+    setRestoring(true)
+    setError(null)
+    try {
+      await api.restoreBlazemeterMasterReports(masterId)
+      setRestoreMessage(
+        "Restore requested in BlazeMeter. Wait a few minutes, then reopen or refresh this report.",
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to restore archived report data")
+    } finally {
+      setRestoring(false)
+    }
+  }, [masterId])
 
   const chartData = useMemo(() => {
     const points = report?.timeline?.points ?? []
@@ -527,6 +548,14 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
     return null
   })()
 
+  const reportStatsMissing =
+    report != null &&
+    labelRows.length === 0 &&
+    chartData.length === 0 &&
+    errorRows.length === 0 &&
+    Object.keys(fetchErrors).length === 0 &&
+    (summary?.hits == null || summary.hits === 0)
+
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -574,6 +603,37 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
       {error && !loading && (
         <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {restoreMessage && !loading && (
+        <div className="mt-4 rounded-lg border border-green-600/30 bg-green-500/5 p-3 text-sm text-green-700 dark:text-green-400">
+          {restoreMessage}
+        </div>
+      )}
+
+      {reportStatsMissing && !loading && (
+        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800 dark:text-amber-300 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <div>
+              <p className="font-medium">BlazeMeter report stats are unavailable.</p>
+              <p className="mt-1 text-xs">
+                Pharos loaded the master metadata, but summary, request stats, timeline,
+                and errors are empty. BlazeMeter may have archived this report data.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRestoreReports}
+            disabled={restoring}
+            className="self-start"
+          >
+            <RotateCcw className="mr-1 h-3.5 w-3.5" />
+            {restoring ? "Requesting..." : "Restore stats"}
+          </Button>
         </div>
       )}
 

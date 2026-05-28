@@ -332,6 +332,12 @@ class BlazemeterClient:
             return []
         return [self._project_error_row(r) for r in results]
 
+    def restore_master_reports(self, master_id: int) -> dict:
+        """Request BlazeMeter to restore archived report data for a master."""
+        payload = self._request("POST", f"/masters/{master_id}/restore-reports")
+        result = payload.get("result", {}) if isinstance(payload, dict) else {}
+        return result if isinstance(result, dict) else {}
+
     def get_master_ci_status(self, master_id: int) -> dict:
         """Return CI pass/fail status (present only when CI gates were configured)."""
         payload = self._request("GET", f"/masters/{master_id}/ci-status")

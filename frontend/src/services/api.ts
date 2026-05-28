@@ -36,6 +36,7 @@ import type {
   BlazemeterPresetInput,
   BlazemeterMasterReport,
   BlazemeterRunsResponse,
+  BlazemeterTestMastersResponse,
   ObsidianCapabilities,
   ObsidianPendingOrchestration,
   ObsidianSyncJob,
@@ -702,6 +703,13 @@ class ApiClient {
     return this.request(`/api/blazemeter/tests?${qs.toString()}`)
   }
 
+  async listBlazemeterTestMasters(
+    testId: number,
+    limit: number = 10,
+  ): Promise<BlazemeterTestMastersResponse> {
+    return this.request(`/api/blazemeter/tests/${testId}/masters?limit=${limit}`)
+  }
+
   async getBlazemeterQueue(): Promise<BlazemeterQueueSnapshot> {
     return this.request<BlazemeterQueueSnapshot>("/api/blazemeter/queue")
   }
@@ -773,6 +781,14 @@ class ApiClient {
     return this.request(
       `/api/blazemeter/masters/${masterId}/report${query ? `?${query}` : ""}`,
     )
+  }
+
+  async restoreBlazemeterMasterReports(
+    masterId: number,
+  ): Promise<{ success: boolean; masterId: number; restore: Record<string, unknown> }> {
+    return this.request(`/api/blazemeter/masters/${masterId}/restore-reports`, {
+      method: "POST",
+    })
   }
 
   async listBlazemeterRuns(limit = 50, offset = 0): Promise<BlazemeterRunsResponse> {

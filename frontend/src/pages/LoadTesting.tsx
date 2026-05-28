@@ -50,6 +50,7 @@ import type {
   BlazemeterPersistedRun,
   BlazemeterPreset,
   BlazemeterProject,
+  BlazemeterMasterInfo,
   BlazemeterQueueItem,
   BlazemeterQueueSnapshot,
   BlazemeterQueueStatus,
@@ -141,6 +142,9 @@ export function LoadTesting() {
   const [persistedRuns, setPersistedRuns] = useState<BlazemeterPersistedRun[]>([])
   const [persistedRunsLoading, setPersistedRunsLoading] = useState(false)
   const [persistedRunsTotal, setPersistedRunsTotal] = useState(0)
+  const [reportTestId, setReportTestId] = useState<string>("")
+  const [testMasters, setTestMasters] = useState<BlazemeterMasterInfo[]>([])
+  const [testMastersLoading, setTestMastersLoading] = useState(false)
   const PERSISTED_RUNS_PAGE_SIZE = 50
 
   const togglePresetExpanded = useCallback((presetId: number) => {
@@ -233,6 +237,22 @@ export function LoadTesting() {
     }
   }, [])
 
+  const refreshTestMasters = useCallback(async (testId: string) => {
+    if (!testId) {
+      setTestMasters([])
+      return
+    }
+    setTestMastersLoading(true)
+    try {
+      const data = await api.listBlazemeterTestMasters(Number(testId), 10)
+      setTestMasters(data.masters ?? [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to list BlazeMeter reports")
+    } finally {
+      setTestMastersLoading(false)
+    }
+  }, [])
+
   // Initial load.
   useEffect(() => {
     void refreshConfig()
@@ -270,6 +290,11 @@ export function LoadTesting() {
     void refreshTests(selectedProjectId)
     window.localStorage.setItem(PROJECT_STORAGE_KEY, selectedProjectId)
   }, [config?.configured, selectedProjectId, refreshTests])
+
+  useEffect(() => {
+    setReportTestId("")
+    setTestMasters([])
+  }, [selectedProjectId])
 
   // Polling — faster when queue has activity.
   useEffect(() => {
@@ -1337,7 +1362,7 @@ export function LoadTesting() {
               <div>
                 <h2 className="text-base font-semibold text-foreground">Previous runs</h2>
                 <p className="text-xs text-muted-foreground">
-                  All BlazeMeter runs recorded by this app — persists across restarts.
+                  Pharos history plus the last 10 BlazeMeter reports for any test.
                   {persistedRunsTotal > 0 && ` ${persistedRunsTotal} total.`}
                 </p>
               </div>
@@ -1353,6 +1378,125 @@ export function LoadTesting() {
                 />
               </Button>
             </div>
+
+            <div className="mt-4 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <div className="space-y-1.5">
+                <Label htmlFor="blazemeter-report-test">BlazeMeter test reports</Label>
+                <Select
+                  value={reportTestId}
+                  onValueChange={(value) => {
+                    setReportTestId(value)
+                    void refreshTestMasters(value)
+                  }}
+                  disabled={testsLoading || tests.length === 0}
+                >
+                  <SelectTrigger id="blazemeter-report-test" className="w-full">
+                    <SelectValue
+                      placeholder={
+                        testsLoading
+                          ? "Loading tests..."
+                          : tests.length
+                            ? "Select a test to load last 10 reports"
+                            : "No tests for selected project"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tests.map((test) => (
+                      <SelectItem key={test.id} value={String(test.id)}>
+                        {test.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void refreshTestMasters(reportTestId)}
+                disabled={!reportTestId || testMastersLoading}
+              >
+                <RefreshCw
+                  className={`mr-1 h-3.5 w-3.5 ${testMastersLoading ? "animate-spin" : ""}`}
+                />
+                Load reports
+              </Button>
+            </div>
+
+            {reportTestId && (
+              <div className="mt-4">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    BlazeMeter reports
+                  </h3>
+                  <span className="text-xs text-muted-foreground">Last 10</span>
+                </div>
+                {testMastersLoading && testMasters.length === 0 ? (
+                  <LoadingSpinner />
+                ) : testMasters.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No BlazeMeter reports returned for this test.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Report</TableHead>
+                          <TableHead className="w-[100px]">Status</TableHead>
+                          <TableHead className="w-[140px]">Ended</TableHead>
+                          <TableHead className="w-[100px] text-right">Open</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {testMasters.map((m) => (
+                          <TableRow key={m.id ?? `${m.testId}-${m.created}`}>
+                            <TableCell className="text-sm">
+                              <div className="min-w-0">
+                                <div className="truncate" title={m.name ?? undefined}>
+                                  {m.name || "Untitled report"}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground">
+                                  Master <code className="rounded bg-muted px-1">{m.id}</code>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {m.status ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {m.ended ? new Date(m.ended * 1000).toLocaleString() : "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => {
+                                  if (m.id == null) return
+                                  setReportMasterId(m.id)
+                                  setReportTestName(m.name)
+                                }}
+                                disabled={m.id == null}
+                                aria-label="View BlazeMeter report"
+                              >
+                                <BarChart3 className="mr-1 h-3.5 w-3.5" />
+                                Report
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-5">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Pharos runs
+              </h3>
 
             {persistedRunsLoading && persistedRuns.length === 0 ? (
               <div className="mt-4"><LoadingSpinner /></div>
@@ -1429,6 +1573,7 @@ export function LoadTesting() {
                 </Table>
               </div>
             )}
+            </div>
           </section>
         )}
       </div>

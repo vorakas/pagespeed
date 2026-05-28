@@ -425,6 +425,12 @@ export interface BlazemeterMasterInfo {
   maxUsers: number | null
 }
 
+export interface BlazemeterTestMastersResponse {
+  success: boolean
+  testId: number
+  masters: BlazemeterMasterInfo[]
+}
+
 export interface BlazemeterRunSummary {
   hits: number | null
   failed: number | null

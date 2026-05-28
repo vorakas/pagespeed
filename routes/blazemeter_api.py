@@ -82,6 +82,21 @@ def create_blazemeter_blueprint(
         tests = cli.list_tests(project_id=project_id, limit=limit)
         return jsonify({"success": True, "tests": tests})
 
+    @bp.route("/api/blazemeter/tests/<int:test_id>/masters", methods=["GET"])
+    def list_test_masters(test_id: int):
+        cli = _require_configured()
+        try:
+            limit = int(request.args.get("limit", 10))
+        except (TypeError, ValueError):
+            raise ValidationError("limit must be an integer")
+        limit = max(1, min(limit, 10))
+        masters = cli.list_recent_masters(test_id, limit=limit)
+        return jsonify({
+            "success": True,
+            "testId": test_id,
+            "masters": masters,
+        })
+
     @bp.route("/api/blazemeter/queue", methods=["GET"])
     def get_queue():
         if queue_service is None:
@@ -278,6 +293,17 @@ def create_blazemeter_blueprint(
             "masterId": master_id,
             **sections,
             "fetchErrors": errors,
+        })
+
+    @bp.route("/api/blazemeter/masters/<int:master_id>/restore-reports", methods=["POST"])
+    def restore_master_reports(master_id: int):
+        _require_configured()
+        assert client is not None
+        restore = client.restore_master_reports(master_id)
+        return jsonify({
+            "success": True,
+            "masterId": master_id,
+            "restore": restore,
         })
 
     @bp.route("/api/blazemeter/presets/<int:preset_id>/queue", methods=["POST"])
