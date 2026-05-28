@@ -232,6 +232,13 @@ function MetaRow({
   )
 }
 
+const RAMPUP_SKIP_SECONDS = 60
+
+function defaultRequestStatsRange(bounds: [number, number]): [number, number] {
+  const [start, end] = bounds
+  return end - start > RAMPUP_SKIP_SECONDS ? [start + RAMPUP_SKIP_SECONDS, end] : [start, end]
+}
+
 /** Pull start/end epoch (seconds) from a report, preferring the summary. */
 function getReportBounds(
   r: BlazemeterMasterReport | null,
@@ -337,7 +344,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
 
   const bounds = useMemo(() => getReportBounds(fullReport), [fullReport])
 
-  // Initial unfiltered fetch — establishes bounds and defaults to the whole run.
+  // Initial unfiltered fetch establishes whole-run summary and request-stat bounds.
   useEffect(() => {
     if (masterId === null) {
       setFullReport(null)
@@ -359,8 +366,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
         setReport(r)
         const b = getReportBounds(r)
         if (b) {
-          const [s, e] = b
-          setRange([s, e])
+          setRange(defaultRequestStatsRange(b))
         }
       })
       .catch((err) => {
@@ -406,8 +412,7 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
 
   const resetRange = useCallback(() => {
     if (!bounds) return
-    const [s, e] = bounds
-    setRange([s, e])
+    setRange(defaultRequestStatsRange(bounds))
   }, [bounds])
 
   const handleRestoreReports = useCallback(async () => {
@@ -469,13 +474,13 @@ export function BlazemeterMasterReportPanel({ masterId, testName, onClose }: Pro
 
   if (masterId === null) return null
 
-  const summary = report?.summary ?? null
-  const ciPassed = report?.ciStatus?.passed
-  const ciFailures = report?.ciStatus?.failures ?? []
-  const thresholds = report?.thresholds ?? []
+  const summary = fullReport?.summary ?? report?.summary ?? null
+  const ciPassed = fullReport?.ciStatus?.passed ?? report?.ciStatus?.passed
+  const ciFailures = fullReport?.ciStatus?.failures ?? report?.ciStatus?.failures ?? []
+  const thresholds = fullReport?.thresholds ?? report?.thresholds ?? []
   const labelRows = report?.aggregate ?? []
   const errorRows = report?.errors ?? []
-  const master = report?.master ?? null
+  const master = fullReport?.master ?? report?.master ?? null
   const fetchErrors = report?.fetchErrors ?? {}
   const requestStatGroups = useMemo(() => buildRequestStatGroups(labelRows), [labelRows])
   const displayedStatGroups = useMemo(() => {
