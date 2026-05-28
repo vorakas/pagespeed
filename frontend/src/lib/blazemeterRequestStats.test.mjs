@@ -4,6 +4,147 @@ import { buildRequestStatGroups, requestStatGroupName } from "./blazemeterReques
 assert.equal(requestStatGroupName("SFP: 1905N"), "SFP")
 assert.equal(requestStatGroupName("MORE LIKE THIS: 61Y90"), "More Like This")
 assert.equal(requestStatGroupName("01 - PDP: 12345"), "PDP")
+assert.deepEqual(
+  buildRequestStatGroups([
+    {
+      labelId: "skip-1",
+      labelName: "Jsr223 Sampler",
+      samples: 1,
+      errors: 0,
+      errorRate: 0,
+      avgResponseTime: 1,
+      minResponseTime: 1,
+      maxResponseTime: 1,
+      p50: null,
+      p90: null,
+      p95: null,
+      p99: null,
+      avgLatency: null,
+      avgThroughput: 1,
+      avgBytes: null,
+    },
+    {
+      labelId: "skip-2",
+      labelName: "Aggregated Labels",
+      samples: 1,
+      errors: 0,
+      errorRate: 0,
+      avgResponseTime: 1,
+      minResponseTime: 1,
+      maxResponseTime: 1,
+      p50: null,
+      p90: null,
+      p95: null,
+      p99: null,
+      avgLatency: null,
+      avgThroughput: 1,
+      avgBytes: null,
+    },
+    {
+      labelId: "skip-3",
+      labelName: "HTTPS: connect",
+      samples: 1,
+      errors: 0,
+      errorRate: 0,
+      avgResponseTime: 1,
+      minResponseTime: 1,
+      maxResponseTime: 1,
+      p50: null,
+      p90: null,
+      p95: null,
+      p99: null,
+      avgLatency: null,
+      avgThroughput: 1,
+      avgBytes: null,
+    },
+    {
+      labelId: "skip-4",
+      labelName: "Search Sku to Pdp Api",
+      samples: 1,
+      errors: 0,
+      errorRate: 0,
+      avgResponseTime: 1,
+      minResponseTime: 1,
+      maxResponseTime: 1,
+      p50: null,
+      p90: null,
+      p95: null,
+      p99: null,
+      avgLatency: null,
+      avgThroughput: 1,
+      avgBytes: null,
+    },
+    {
+      labelId: "skip-5",
+      labelName: "Search SKU to Pdp Final",
+      samples: 1,
+      errors: 0,
+      errorRate: 0,
+      avgResponseTime: 1,
+      minResponseTime: 1,
+      maxResponseTime: 1,
+      p50: null,
+      p90: null,
+      p95: null,
+      p99: null,
+      avgLatency: null,
+      avgThroughput: 1,
+      avgBytes: null,
+    },
+    {
+      labelId: "skip-6",
+      labelName: "More Like This",
+      samples: 1,
+      errors: 0,
+      errorRate: 0,
+      avgResponseTime: 1,
+      minResponseTime: 1,
+      maxResponseTime: 1,
+      p50: null,
+      p90: null,
+      p95: null,
+      p99: null,
+      avgLatency: null,
+      avgThroughput: 1,
+      avgBytes: null,
+    },
+    {
+      labelId: "skip-7",
+      labelName: "Sort Br",
+      samples: 1,
+      errors: 0,
+      errorRate: 0,
+      avgResponseTime: 1,
+      minResponseTime: 1,
+      maxResponseTime: 1,
+      p50: null,
+      p90: null,
+      p95: null,
+      p99: null,
+      avgLatency: null,
+      avgThroughput: 1,
+      avgBytes: null,
+    },
+    {
+      labelId: "skip-8",
+      labelName: "Search Br",
+      samples: 1,
+      errors: 0,
+      errorRate: 0,
+      avgResponseTime: 1,
+      minResponseTime: 1,
+      maxResponseTime: 1,
+      p50: null,
+      p90: null,
+      p95: null,
+      p99: null,
+      avgLatency: null,
+      avgThroughput: 1,
+      avgBytes: null,
+    },
+  ]),
+  [],
+)
 
 const groups = buildRequestStatGroups([
   {
@@ -76,7 +217,7 @@ const groups = buildRequestStatGroups([
   },
 ])
 
-assert.equal(groups.length, 2)
+assert.equal(groups.length, 1)
 assert.equal(groups[0].groupName, "SFP")
 assert.equal(groups[0].samples, 7)
 assert.equal(groups[0].errors, 0)
@@ -86,7 +227,6 @@ assert.equal(groups[0].maxResponseTime, 110)
 assert.equal(groups[0].p90, 100)
 assert.equal(groups[0].avgThroughput, 4)
 assert.deepEqual(groups[0].sourceLabels, ["SFP"])
-assert.equal(groups[1].groupName, "More Like This")
 
 const rolled = buildRequestStatGroups(groups[0].sourceLabels.length ? [
   {

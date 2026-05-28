@@ -5,6 +5,17 @@ export interface BlazemeterRequestStatGroup extends BlazemeterLabelRow {
   sourceLabels: string[]
 }
 
+const EXCLUDED_GROUP_NAMES = new Set([
+  "Jsr223 Sampler",
+  "Aggregated Labels",
+  "HTTPS",
+  "Search Sku To Pdp Api",
+  "Search SKU To Pdp Final",
+  "More Like This",
+  "Sort Br",
+  "Search Br",
+].map((name) => name.toLowerCase()))
+
 function titleCaseGroup(value: string): string {
   if (!value) return value
   const upper = value.toUpperCase()
@@ -37,6 +48,7 @@ export function buildRequestStatGroups(rows: BlazemeterLabelRow[]): BlazemeterRe
   for (const row of rows) {
     const groupName = requestStatGroupName(row.labelName)
     if (!groupName) continue
+    if (EXCLUDED_GROUP_NAMES.has(groupName.toLowerCase())) continue
     const isExactGroup = row.labelName?.trim().toLowerCase() === groupName.toLowerCase()
     if (exactGroupNames.has(groupName) && !isExactGroup) continue
     if (!groups.has(groupName)) {
