@@ -592,7 +592,7 @@ function TaskMovementTable({ changes, constrained = false }: { changes: QaTaskSt
         <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
           <tr>
             <th className="px-4 py-3">Task</th>
-            <th className="w-72 px-4 py-3">Transition</th>
+            <th className="w-96 px-4 py-3">Transition</th>
             <th className="w-44 px-4 py-3">Assignee</th>
             <th className="w-56 px-4 py-3">Changed</th>
           </tr>
@@ -605,7 +605,7 @@ function TaskMovementTable({ changes, constrained = false }: { changes: QaTaskSt
                 <div className="text-muted-foreground">{change.summary}</div>
               </td>
               <td className="px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
                   <Badge variant="outline">{change.fromStatus}</Badge>
                   <span className="text-muted-foreground">to</span>
                   <Badge className={statusClass(change.toStatus)}>{change.toStatus}</Badge>
