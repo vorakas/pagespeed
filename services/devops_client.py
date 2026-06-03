@@ -1048,6 +1048,44 @@ class AzureDevOpsClient:
         response.raise_for_status()
         return response.content
 
+    def download_named_artifact(
+        self, build_id: int, artifact_name: str
+    ) -> bytes | None:
+        """Download a named build artifact as a zip, or ``None`` if absent.
+
+        Uses the Build Artifacts ``$format=zip`` download. A missing
+        artifact (the build produced no autofix report) returns ``None``
+        so callers can skip it rather than treating it as an error.
+
+        Args:
+            build_id:      The Azure DevOps build ID.
+            artifact_name: Published artifact name (e.g. ``"Autofix Report"``).
+
+        Returns:
+            The artifact zip bytes, or ``None`` when the build has no
+            artifact by that name.
+        """
+        url = (
+            f"https://dev.azure.com/{self._organization}/{self._project}"
+            f"/_apis/build/builds/{build_id}/artifacts"
+        )
+        headers = {"Authorization": self._auth_header}
+        # Artifact zips can be large; allow a longer timeout than the default.
+        response = requests.get(
+            url,
+            headers=headers,
+            params={
+                "artifactName": artifact_name,
+                "$format": "zip",
+                "api-version": AZDO_API_VERSION,
+            },
+            timeout=60,
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return response.content
+
     def get_screenshot_attachment_id(
         self, run_id: int, result_id: int
     ) -> int | None:
