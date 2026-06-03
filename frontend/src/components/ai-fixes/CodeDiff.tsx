@@ -20,6 +20,7 @@ function CodeBlock({
   const color = tone === "removed" ? "var(--beacon-fail)" : "var(--beacon-pass)"
   return (
     <pre
+      aria-label={tone === "removed" ? "Original code" : "Replacement code"}
       className="beacon-mono overflow-x-auto rounded border px-0 py-2 text-xs leading-relaxed"
       style={{ borderColor: color, background: "var(--beacon-ground)" }}
     >
@@ -59,6 +60,10 @@ export function CodeDiff({ oldCode, newCode, startLine, endLine }: CodeDiffProps
         </span>
       </div>
       <CodeBlock code={oldCode} startLineNumber={hasLines ? startLine : null} tone="removed" />
+      {/* Both blocks anchor their gutter at startLine. If newCode has a
+          different line count than oldCode, the new block's later numbers
+          are indicative only — this stacked diff favors simplicity over a
+          true side-by-side line map. */}
       <CodeBlock code={newCode} startLineNumber={hasLines ? startLine : null} tone="added" />
     </div>
   )
