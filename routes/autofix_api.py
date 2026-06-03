@@ -69,12 +69,12 @@ def create_autofix_blueprint(
     @bp.route("/api/autofix/builds", methods=["GET"])
     def list_builds():
         builds = repository.get_builds()
-        return jsonify({"success": True, "builds": [_present_build(b) for b in builds]})
+        return jsonify({"success": True, "builds": [_camelize(b) for b in builds]})
 
     @bp.route("/api/autofix/builds/<build_id>/fixes", methods=["GET"])
     def list_fixes(build_id: str):
         fixes = repository.get_fixes(build_id)
-        return jsonify({"success": True, "fixes": fixes})
+        return jsonify({"success": True, "fixes": [_camelize(f) for f in fixes]})
 
     @bp.route("/api/autofix/fixes/<build_id>/<fix_id>", methods=["PATCH"])
     def patch_fix(build_id: str, fix_id: str):
@@ -104,11 +104,12 @@ def create_autofix_blueprint(
     return bp
 
 
-def _present_build(row: dict) -> dict:
-    """Return a copy of the build row with camelCase rollup aliases for the frontend."""
-    return {
-        **row,
-        "todoCount": row.get("todo_count", 0),
-        "appliedCount": row.get("applied_count", 0),
-        "dismissedCount": row.get("dismissed_count", 0),
-    }
+def _to_camel(snake: str) -> str:
+    """Convert a snake_case key to camelCase (build_id -> buildId)."""
+    head, *rest = snake.split("_")
+    return head + "".join(word.capitalize() for word in rest)
+
+
+def _camelize(row: dict) -> dict:
+    """Return a copy of a DB row with all keys converted to camelCase."""
+    return {_to_camel(key): value for key, value in row.items()}

@@ -114,6 +114,23 @@ class AutofixIngestServiceTest(unittest.TestCase):
         self.assertEqual(len(builds), 1)
         self.assertEqual(builds[0]["todo_count"], 2)  # not doubled
 
+    def test_reingest_preserves_feedback_through_ingest_path(self):
+        client = FakeClient(
+            builds_by_def={"17": [{"id": 812, "definitionId": 17}]},
+            artifacts={812: _report_zip("812", 1)},
+        )
+
+        self.service.ingest(client, definition_ids=[17])
+        fix_id = self.repo.get_fixes("812")[0]["fix_id"]
+        self.repo.patch_fix("812", fix_id, status="applied", outcome="worked_as_is")
+
+        self.service.ingest(client, definition_ids=[17])  # re-ingest same build
+
+        fixes = self.repo.get_fixes("812")
+        self.assertEqual(len(fixes), 1)
+        self.assertEqual(fixes[0]["status"], "applied")
+        self.assertEqual(fixes[0]["outcome"], "worked_as_is")
+
     def test_failing_build_is_isolated_and_counted(self):
         class BoomClient(FakeClient):
             def download_named_artifact(self, build_id, artifact_name):

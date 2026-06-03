@@ -87,11 +87,11 @@ class AutofixApiTest(unittest.TestCase):
 
         builds = self.client.get("/api/autofix/builds").get_json()
         self.assertTrue(builds["success"])
-        self.assertEqual(builds["builds"][0]["build_id"], "812")
+        self.assertEqual(builds["builds"][0]["buildId"], "812")
         self.assertEqual(builds["builds"][0]["todoCount"], 1)
 
         fixes = self.client.get("/api/autofix/builds/812/fixes").get_json()
-        self.assertEqual(fixes["fixes"][0]["fix_id"], "f1")
+        self.assertEqual(fixes["fixes"][0]["fixId"], "f1")
 
     def test_patch_fix_updates_status(self):
         self.client.post("/api/autofix/refresh", json={})
