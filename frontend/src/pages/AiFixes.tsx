@@ -24,6 +24,7 @@ export function AiFixes() {
 
   const selectBuild = useCallback(async (buildId: string) => {
     setSelectedBuildId(buildId)
+    setError(null)
     setFixes([])
     setLoadingFixes(true)
     try {
@@ -59,12 +60,15 @@ export function AiFixes() {
     try {
       await api.refreshAutofix({})
       await loadBuilds()
+      if (selectedBuildId) {
+        await selectBuild(selectedBuildId)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Refresh failed")
     } finally {
       setRefreshing(false)
     }
-  }, [loadBuilds])
+  }, [loadBuilds, selectBuild, selectedBuildId])
 
   const visibleFixes = fixes.filter((fix) => {
     if (statusFilter !== "all" && fix.status !== statusFilter) return false
