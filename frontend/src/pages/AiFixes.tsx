@@ -6,6 +6,7 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { api } from "@/services/api"
 import { BuildList } from "@/components/ai-fixes/BuildList"
+import { FixCard } from "@/components/ai-fixes/FixCard"
 import type { AutofixBuild, AutofixFix } from "@/types"
 import { RefreshCw, Wand2 } from "lucide-react"
 
@@ -116,9 +117,7 @@ export function AiFixes() {
               ) : (
                 <div className="space-y-4">
                   {fixes.map((fix) => (
-                    <div key={fix.fixId} className="rounded border border-border bg-card p-3">
-                      <span className="beacon-mono text-sm">{fix.testName}</span>
-                    </div>
+                    <FixCard key={fix.fixId} fix={fix} />
                   ))}
                 </div>
               )}
