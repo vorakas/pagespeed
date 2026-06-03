@@ -85,7 +85,7 @@ export function AiFixes() {
           </div>
         )}
 
-        {loadingBuilds ? (
+        {loadingBuilds && builds.length === 0 ? (
           <LoadingSpinner message="Loading builds…" />
         ) : builds.length === 0 ? (
           <EmptyState
