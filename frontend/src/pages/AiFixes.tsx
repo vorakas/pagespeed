@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { api } from "@/services/api"
 import { BuildList } from "@/components/ai-fixes/BuildList"
 import { FixCard } from "@/components/ai-fixes/FixCard"
-import type { AutofixBuild, AutofixFix } from "@/types"
+import type { AutofixBuild, AutofixFix, AutofixStatus } from "@/types"
 import { RefreshCw, Wand2 } from "lucide-react"
 
 export function AiFixes() {
@@ -19,6 +19,8 @@ export function AiFixes() {
   const [selectedBuildId, setSelectedBuildId] = useState<string | null>(null)
   const [fixes, setFixes] = useState<AutofixFix[]>([])
   const [loadingFixes, setLoadingFixes] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<AutofixStatus | "all">("all")
+  const [confidenceFilter, setConfidenceFilter] = useState<string>("all")
 
   const selectBuild = useCallback(async (buildId: string) => {
     setSelectedBuildId(buildId)
@@ -64,16 +66,46 @@ export function AiFixes() {
     }
   }, [loadBuilds])
 
+  const visibleFixes = fixes.filter((fix) => {
+    if (statusFilter !== "all" && fix.status !== statusFilter) return false
+    if (confidenceFilter !== "all" && fix.confidence.toLowerCase() !== confidenceFilter) return false
+    return true
+  })
+
   return (
     <div className="beacon min-h-screen">
       <PageHeader
         title="AI Fixes"
         description="Triage AI-suggested fixes for failed automation tests, by build."
         actions={
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={refreshing ? "animate-spin" : ""} size={14} />
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </Button>
+          <>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as AutofixStatus | "all")}
+              className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground"
+              aria-label="Filter by status"
+            >
+              <option value="all">All statuses</option>
+              <option value="todo">To Do</option>
+              <option value="applied">Applied</option>
+              <option value="dismissed">Dismissed</option>
+            </select>
+            <select
+              value={confidenceFilter}
+              onChange={(e) => setConfidenceFilter(e.target.value)}
+              className="rounded border border-border bg-card px-2 py-1 text-xs text-foreground"
+              aria-label="Filter by confidence"
+            >
+              <option value="all">All confidence</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={refreshing ? "animate-spin" : ""} size={14} />
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </Button>
+          </>
         }
       />
 
@@ -114,9 +146,11 @@ export function AiFixes() {
                 <LoadingSpinner message="Loading fixes…" />
               ) : fixes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No fixes for this build.</p>
+              ) : visibleFixes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No fixes match the current filters.</p>
               ) : (
                 <div className="space-y-4">
-                  {fixes.map((fix) => (
+                  {visibleFixes.map((fix) => (
                     <FixCard key={fix.fixId} fix={fix} onPatched={loadBuilds} />
                   ))}
                 </div>
