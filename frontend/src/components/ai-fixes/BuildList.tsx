@@ -25,14 +25,13 @@ function progressLabel(build: AutofixBuild): string {
 
 export function BuildList({ builds, selectedBuildId, onSelect }: BuildListProps) {
   return (
-    <div className="flex flex-col gap-2" role="list">
+    <div className="flex flex-col gap-2">
       {builds.map((build) => {
         const isSelected = build.buildId === selectedBuildId
         return (
           <button
             key={build.buildId}
             type="button"
-            role="listitem"
             onClick={() => onSelect(build.buildId)}
             data-active={isSelected}
             className="w-full rounded border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-[var(--beacon-amber-line)] data-[active=true]:border-[var(--beacon-amber)] data-[active=true]:bg-[var(--beacon-amber-soft)]"
@@ -52,9 +51,11 @@ export function BuildList({ builds, selectedBuildId, onSelect }: BuildListProps)
                 className="beacon-status"
                 style={{
                   color:
-                    build.fixesCount > 0 && build.appliedCount === build.fixesCount
-                      ? "var(--beacon-pass)"
-                      : "var(--beacon-amber)",
+                    build.fixesCount === 0
+                      ? "var(--beacon-text-faint)"
+                      : build.appliedCount === build.fixesCount
+                        ? "var(--beacon-pass)"
+                        : "var(--beacon-amber)",
                 }}
               >
                 {progressLabel(build)}

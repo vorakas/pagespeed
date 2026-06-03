@@ -21,6 +21,7 @@ export function AiFixes() {
 
   const selectBuild = useCallback(async (buildId: string) => {
     setSelectedBuildId(buildId)
+    setFixes([])
     setLoadingFixes(true)
     try {
       const result = await api.getAutofixFixes(buildId)
