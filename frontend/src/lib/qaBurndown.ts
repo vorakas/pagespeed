@@ -31,12 +31,21 @@ export function buildQaBurndown(cycles: QaBurndownCycle[], startValue: string, e
 
   const totalCases = cycles.reduce((sum, cycle) => sum + Number(cycle.totalCases || 0), 0)
   const executedByDay = new Map<string, number>()
+  // Cases executed before the window already burned down — seed the running
+  // total with them so the line starts at the true remaining-at-window-start
+  // instead of the full totalCases (otherwise remaining is inflated by every
+  // case completed before `start`).
+  let executedBeforeStart = 0
 
   for (const cycle of cycles) {
     for (const testCase of cycle.testCases ?? []) {
       if (!testCase.executedAt) continue
       const executedAt = parseDate(testCase.executedAt)
-      if (!executedAt || executedAt < start || executedAt > end) continue
+      if (!executedAt || executedAt > end) continue
+      if (executedAt < start) {
+        executedBeforeStart += 1
+        continue
+      }
       const day = localDateKey(executedAt)
       executedByDay.set(day, (executedByDay.get(day) ?? 0) + 1)
     }
@@ -45,7 +54,7 @@ export function buildQaBurndown(cycles: QaBurndownCycle[], startValue: string, e
   const points: QaBurndownPoint[] = []
   let cursor = localDayStart(start)
   const last = localDayStart(end)
-  let cumulative = 0
+  let cumulative = executedBeforeStart
 
   while (cursor <= last) {
     const date = localDateKey(cursor)
