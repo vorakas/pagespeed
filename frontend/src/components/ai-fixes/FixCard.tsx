@@ -93,6 +93,15 @@ export function FixCard({ fix, onPatched }: FixCardProps) {
     return () => clearTimeout(id)
   }, [saved])
 
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setStatus(fix.status)
+    setOutcome(fix.outcome)
+    setActualFixCode(fix.actualFixCode ?? "")
+    setNote(fix.note ?? "")
+  }, [fix])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const patch = async (body: AutofixFixPatch) => {
     setPatchError(null)
     try {
@@ -106,14 +115,26 @@ export function FixCard({ fix, onPatched }: FixCardProps) {
   }
 
   const handleStatus = async (next: AutofixStatus) => {
+    if (next === status) return
+    const prevStatus = status
+    const prevOutcome = outcome
     setStatus(next)
     if (next === "todo") setOutcome(null)
-    await patch({ status: next })
+    const ok = await patch({ status: next })
+    if (!ok) {
+      setStatus(prevStatus)
+      setOutcome(prevOutcome)
+    }
   }
 
   const handleOutcome = async (next: AutofixOutcome) => {
+    if (next === outcome) return
+    const prevOutcome = outcome
     setOutcome(next)
-    await patch({ outcome: next })
+    const ok = await patch({ outcome: next })
+    if (!ok) {
+      setOutcome(prevOutcome)
+    }
   }
 
   const handleSaveFeedback = async () => {
@@ -193,6 +214,12 @@ export function FixCard({ fix, onPatched }: FixCardProps) {
           ))}
         </div>
 
+        {patchError && (
+          <p className="text-xs" style={{ color: "var(--beacon-fail)" }}>
+            {patchError}
+          </p>
+        )}
+
         {/* Outcome prompt */}
         {showOutcomePrompt && (
           <div className="flex flex-wrap items-center gap-2">
@@ -215,16 +242,18 @@ export function FixCard({ fix, onPatched }: FixCardProps) {
         {/* Feedback block */}
         {showFeedback && (
           <div className="space-y-2 rounded border border-[var(--beacon-amber-line)] bg-[var(--beacon-amber-soft)] p-3">
-            <label className="beacon-label block">WHAT ACTUALLY FIXED IT</label>
+            <label htmlFor={`actual-fix-${fix.fixId}`} className="beacon-label block">WHAT ACTUALLY FIXED IT</label>
             <textarea
+              id={`actual-fix-${fix.fixId}`}
               value={actualFixCode}
               onChange={(e) => setActualFixCode(e.target.value)}
               rows={4}
               placeholder="Paste the code that actually fixed the failure…"
               className="beacon-mono w-full rounded border border-border bg-[var(--beacon-ground)] p-2 text-xs text-foreground"
             />
-            <label className="beacon-label block">NOTE (OPTIONAL)</label>
+            <label htmlFor={`note-${fix.fixId}`} className="beacon-label block">NOTE (OPTIONAL)</label>
             <textarea
+              id={`note-${fix.fixId}`}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
@@ -235,11 +264,6 @@ export function FixCard({ fix, onPatched }: FixCardProps) {
               <Button size="sm" onClick={handleSaveFeedback} disabled={saving}>
                 {saving ? "Saving…" : saved ? "Saved" : "Save"}
               </Button>
-              {patchError && (
-                <span className="text-xs" style={{ color: "var(--beacon-fail)" }}>
-                  {patchError}
-                </span>
-              )}
             </div>
           </div>
         )}
