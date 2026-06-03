@@ -14,11 +14,8 @@ import {
   CircleHelp,
   ClipboardCheck,
   Settings,
-  Sun,
-  Moon,
   type LucideIcon,
 } from "lucide-react"
-import { useTheme } from "@/hooks/use-theme"
 
 interface NavItem {
   label: string
@@ -94,7 +91,6 @@ const BASE_URL = import.meta.env.BASE_URL
  * is gone and the component is now the singular sidebar for production.
  */
 export function AppSidebar({ activePath }: AppSidebarProps) {
-  const { theme, toggleTheme } = useTheme()
   return (
     <aside className="beacon-sidebar fixed left-0 top-0 bottom-0 z-40 flex w-[224px] flex-col">
       {/* Brand — static Pharos logo. The image carries the "Pharos"
@@ -150,19 +146,6 @@ export function AppSidebar({ activePath }: AppSidebarProps) {
           </div>
         ))}
       </nav>
-
-      {/* Footer — theme toggle */}
-      <div className="border-t border-border p-2">
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="beacon-sidebar-item w-full"
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-          <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-        </button>
-      </div>
     </aside>
   )
 }

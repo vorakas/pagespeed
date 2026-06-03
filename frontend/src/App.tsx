@@ -1,6 +1,5 @@
 import { Suspense } from "react"
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
-import { ThemeProvider } from "@/context/ThemeContext"
 
 import { SitesProvider } from "@/context/SitesContext"
 import { BatchTestProvider } from "@/context/BatchTestContext"
@@ -45,13 +44,12 @@ function RouteFallback() {
 export default function App() {
   return (
     <BrowserRouter>
-      <ThemeProvider>
-        <TooltipProvider>
-          <SitesProvider>
-            <BatchTestProvider>
-              <RouteErrorBoundary>
-                <Suspense fallback={<RouteFallback />}>
-                  <Routes>
+      <TooltipProvider>
+        <SitesProvider>
+          <BatchTestProvider>
+            <RouteErrorBoundary>
+              <Suspense fallback={<RouteFallback />}>
+                <Routes>
                     <Route element={<AppLayout />}>
                       <Route index element={<Dashboard />} />
                       <Route path="test" element={<TestUrls />} />
@@ -71,13 +69,12 @@ export default function App() {
                       <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>
-                  </Routes>
-                </Suspense>
-              </RouteErrorBoundary>
-            </BatchTestProvider>
-          </SitesProvider>
-        </TooltipProvider>
-      </ThemeProvider>
+                </Routes>
+              </Suspense>
+            </RouteErrorBoundary>
+          </BatchTestProvider>
+        </SitesProvider>
+      </TooltipProvider>
     </BrowserRouter>
   )
 }
