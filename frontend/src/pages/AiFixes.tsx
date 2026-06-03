@@ -117,7 +117,7 @@ export function AiFixes() {
               ) : (
                 <div className="space-y-4">
                   {fixes.map((fix) => (
-                    <FixCard key={fix.fixId} fix={fix} />
+                    <FixCard key={fix.fixId} fix={fix} onPatched={loadBuilds} />
                   ))}
                 </div>
               )}
