@@ -8,8 +8,9 @@ from typing import Callable, Sequence
 
 from flask import Flask
 
-from data_access import BlazemeterPresetRepository, BlazemeterRunRepository, TestResultRepository
+from data_access import AutofixRepository, BlazemeterPresetRepository, BlazemeterRunRepository, TestResultRepository
 from routes.ai_api import create_ai_blueprint
+from routes.autofix_api import create_autofix_blueprint
 from routes.applitools_api import create_applitools_blueprint
 from routes.azure_api import create_azure_blueprint
 from routes.blazemeter_api import create_blazemeter_blueprint
@@ -25,6 +26,7 @@ from routes.sites_api import create_sites_blueprint
 from routes.testing_api import create_testing_blueprint
 from routes.triggers_api import create_triggers_blueprint
 from services.applitools_storage import ApplitoolsBatchStore
+from services.autofix_ingest_service import AutofixIngestService
 from services.ai_config_service import AiConfigService
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
@@ -65,6 +67,9 @@ def register_blueprints(
     requirement_service: "RequirementKbService | None" = None,
     ai_config_service: "AiConfigService | None" = None,
     qa_testing_service: "QaTestingReportService | None" = None,
+    autofix_repository: "AutofixRepository | None" = None,
+    autofix_ingest_service: "AutofixIngestService | None" = None,
+    autofix_pipeline_ids: "list | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -96,6 +101,15 @@ def register_blueprints(
         server_orchestrator_pipeline_id=devops_orchestrator_pipeline_id,
         server_pipeline_map=devops_pipeline_map,
     ))
+    if autofix_repository is not None and autofix_ingest_service is not None:
+        app.register_blueprint(create_autofix_blueprint(
+            repository=autofix_repository,
+            ingest_service=autofix_ingest_service,
+            server_pat=devops_pat,
+            server_organization=devops_organization,
+            server_project=devops_project,
+            autofix_pipeline_ids=autofix_pipeline_ids,
+        ))
     app.register_blueprint(
         create_applitools_blueprint(
             applitools_store or ApplitoolsBatchStore(),
