@@ -334,6 +334,12 @@ export function Builds() {
       await api.triggerDevOpsPipeline(config, defId, effectiveBranch, {
         variables: { TargetInstance: effectiveInstance },
       })
+      // Azure may take longer than the single +2s fetch to register the
+      // queued build (busy self-hosted pool). Force polling for a few
+      // minutes so the card flips to QUEUED/RUNNING once it appears; once
+      // the build shows inProgress/notStarted, `anyRunning` sustains
+      // polling through completion regardless of this window.
+      setForcePollUntil(Date.now() + 10 * 60 * 1000)
       setTimeout(fetchBuilds, 2000)
     } catch (err) {
       setTriggerErrors((prev) => ({
