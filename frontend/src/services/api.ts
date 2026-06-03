@@ -71,6 +71,10 @@ import type {
   RequirementSource,
   QaTestingReport,
   AiUsageSummary,
+  AutofixBuild,
+  AutofixFix,
+  AutofixRefreshSummary,
+  AutofixFixPatch,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -425,6 +429,41 @@ class ApiClient {
       body: JSON.stringify({ ...config, ...data }),
     })
   }
+
+  // ---------- Autofix (AI Fixes) ----------
+
+  async refreshAutofix(
+    body: { definition_ids?: number[]; per_definition?: number; pat?: string } = {}
+  ): Promise<AutofixRefreshSummary> {
+    return this.request<AutofixRefreshSummary>("/api/autofix/refresh", {
+      method: "POST",
+      body: JSON.stringify(body),
+    })
+  }
+
+  async getAutofixBuilds(): Promise<{ success: boolean; builds: AutofixBuild[] }> {
+    return this.request<{ success: boolean; builds: AutofixBuild[] }>("/api/autofix/builds")
+  }
+
+  async getAutofixFixes(
+    buildId: string
+  ): Promise<{ success: boolean; fixes: AutofixFix[] }> {
+    return this.request<{ success: boolean; fixes: AutofixFix[] }>(
+      `/api/autofix/builds/${encodeURIComponent(buildId)}/fixes`
+    )
+  }
+
+  async patchAutofixFix(
+    buildId: string,
+    fixId: string,
+    patch: AutofixFixPatch
+  ): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(
+      `/api/autofix/fixes/${encodeURIComponent(buildId)}/${encodeURIComponent(fixId)}`,
+      { method: "PATCH", body: JSON.stringify(patch) }
+    )
+  }
+
   // ---------- Azure DevOps ----------
 
   async getDevOpsServerConfig(): Promise<{

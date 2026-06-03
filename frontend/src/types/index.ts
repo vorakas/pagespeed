@@ -1567,6 +1567,78 @@ export interface QaTestingReport {
   }
 }
 
+// ---------- Autofix (AI Fixes) ----------
+
+export type AutofixStatus = "todo" | "applied" | "dismissed"
+
+export type AutofixOutcome =
+  | "worked_as_is"
+  | "worked_with_edits"
+  | "didnt_work"
+  | "not_a_real_issue"
+
+/** One ingested Autofix build (camelCase — matches GET /api/autofix/builds). */
+export interface AutofixBuild {
+  buildId: string
+  pipelineId: number | null
+  pipelineName: string
+  branch: string
+  buildNumber: string
+  buildUrl: string
+  commitSha: string
+  generatedUtc: string | null
+  fetchedAt: string | null
+  failuresCount: number
+  groupsCount: number
+  fixesCount: number
+  todoCount: number
+  appliedCount: number
+  dismissedCount: number
+}
+
+/** One suggested fix (camelCase — matches GET .../fixes). Nullable fields
+ *  (startLine/endLine/outcome/actualFixCode/note/updatedAt) come back null
+ *  until set or when the AI could not locate the code. */
+export interface AutofixFix {
+  buildId: string
+  fixId: string
+  signature: string
+  testName: string
+  category: string
+  exceptionType: string
+  confidence: string
+  diagnosis: string
+  reasoning: string
+  filePath: string
+  startLine: number | null
+  endLine: number | null
+  fixType: string
+  oldCode: string
+  newCode: string
+  description: string
+  status: AutofixStatus
+  outcome: AutofixOutcome | null
+  actualFixCode: string | null
+  note: string | null
+  updatedAt: string | null
+}
+
+export interface AutofixRefreshSummary {
+  success: boolean
+  buildsScanned?: number
+  buildsIngested?: number
+  buildsFailed?: number
+  definitionsScanned?: number
+}
+
+/** PATCH body — snake_case (request bodies are snake across Pharos). */
+export interface AutofixFixPatch {
+  status?: AutofixStatus
+  outcome?: AutofixOutcome
+  actual_fix_code?: string
+  note?: string
+}
+
 // ---------- API Responses ----------
 
 export interface ApiError {
