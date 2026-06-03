@@ -16,6 +16,7 @@ const NewRelic = lazyWithReload(() => import("@/pages/NewRelic").then((module) =
 const IisLogs = lazyWithReload(() => import("@/pages/IisLogs").then((module) => ({ default: module.IisLogs })))
 const AiAnalysis = lazyWithReload(() => import("@/pages/AiAnalysis").then((module) => ({ default: module.AiAnalysis })))
 const Builds = lazyWithReload(() => import("@/pages/Builds").then((module) => ({ default: module.Builds })))
+const AiFixes = lazyWithReload(() => import("@/pages/AiFixes").then((module) => ({ default: module.AiFixes })))
 const LoadTesting = lazyWithReload(() => import("@/pages/LoadTesting").then((module) => ({ default: module.LoadTesting })))
 const Obsidian = lazyWithReload(() => import("@/pages/Obsidian").then((module) => ({ default: module.Obsidian })))
 const LaunchDashboard = lazyWithReload(() =>
@@ -59,6 +60,7 @@ export default function App() {
                       <Route path="iislogs" element={<IisLogs />} />
                       <Route path="ai-analysis" element={<AiAnalysis />} />
                       <Route path="builds" element={<Builds />} />
+                      <Route path="ai-fixes" element={<AiFixes />} />
                       <Route path="load-testing" element={<LoadTesting />} />
                       <Route path="obsidian" element={<Obsidian />} />
                       <Route path="dashboard" element={<LaunchDashboard />} />

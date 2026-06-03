@@ -448,6 +448,51 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS autofix_report (
+                build_id TEXT PRIMARY KEY,
+                pipeline_id INTEGER,
+                pipeline_name TEXT NOT NULL DEFAULT '',
+                branch TEXT NOT NULL DEFAULT '',
+                build_number TEXT NOT NULL DEFAULT '',
+                build_url TEXT NOT NULL DEFAULT '',
+                commit_sha TEXT NOT NULL DEFAULT '',
+                generated_utc TEXT,  -- ISO-8601 string from the report payload, stored verbatim
+                fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                failures_count INTEGER NOT NULL DEFAULT 0,
+                groups_count INTEGER NOT NULL DEFAULT 0,
+                fixes_count INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS autofix_fix (
+                build_id TEXT NOT NULL,
+                fix_id TEXT NOT NULL,
+                signature TEXT NOT NULL DEFAULT '',
+                test_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                exception_type TEXT NOT NULL DEFAULT '',
+                confidence TEXT NOT NULL DEFAULT '',
+                diagnosis TEXT NOT NULL DEFAULT '',
+                reasoning TEXT NOT NULL DEFAULT '',
+                file_path TEXT NOT NULL DEFAULT '',
+                start_line INTEGER,
+                end_line INTEGER,
+                fix_type TEXT NOT NULL DEFAULT '',
+                old_code TEXT NOT NULL DEFAULT '',
+                new_code TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'todo',
+                outcome TEXT,
+                actual_fix_code TEXT,
+                note TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (build_id) REFERENCES autofix_report (build_id),
+                PRIMARY KEY (build_id, fix_id)
+            )
+        """)
+
         self._create_postgres_requirement_tables(cursor)
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS mime_type TEXT")
@@ -665,6 +710,51 @@ class ConnectionManager:
                 raw_json TEXT,
                 synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (cycle_key, test_case_key)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS autofix_report (
+                build_id TEXT PRIMARY KEY,
+                pipeline_id INTEGER,
+                pipeline_name TEXT NOT NULL DEFAULT '',
+                branch TEXT NOT NULL DEFAULT '',
+                build_number TEXT NOT NULL DEFAULT '',
+                build_url TEXT NOT NULL DEFAULT '',
+                commit_sha TEXT NOT NULL DEFAULT '',
+                generated_utc TEXT,  -- ISO-8601 string from the report payload, stored verbatim
+                fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                failures_count INTEGER NOT NULL DEFAULT 0,
+                groups_count INTEGER NOT NULL DEFAULT 0,
+                fixes_count INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS autofix_fix (
+                build_id TEXT NOT NULL,
+                fix_id TEXT NOT NULL,
+                signature TEXT NOT NULL DEFAULT '',
+                test_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                exception_type TEXT NOT NULL DEFAULT '',
+                confidence TEXT NOT NULL DEFAULT '',
+                diagnosis TEXT NOT NULL DEFAULT '',
+                reasoning TEXT NOT NULL DEFAULT '',
+                file_path TEXT NOT NULL DEFAULT '',
+                start_line INTEGER,
+                end_line INTEGER,
+                fix_type TEXT NOT NULL DEFAULT '',
+                old_code TEXT NOT NULL DEFAULT '',
+                new_code TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'todo',
+                outcome TEXT,
+                actual_fix_code TEXT,
+                note TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (build_id) REFERENCES autofix_report (build_id),
+                PRIMARY KEY (build_id, fix_id)
             )
         """)
 
@@ -984,6 +1074,14 @@ class ConnectionManager:
             CREATE INDEX IF NOT EXISTS idx_requirement_common_questions_kb
             ON requirement_common_questions (kb_id, usage_count DESC, last_asked_at DESC)
             """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_autofix_report_fetched_at
+            ON autofix_report (fetched_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_autofix_fix_build_id
+            ON autofix_fix (build_id)
+            """,
         ]
         for statement in index_statements:
             cursor.execute(statement)
@@ -1058,6 +1156,14 @@ class ConnectionManager:
             """
             CREATE INDEX IF NOT EXISTS idx_requirement_common_questions_kb
             ON requirement_common_questions (kb_id, usage_count DESC, last_asked_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_autofix_report_fetched_at
+            ON autofix_report (fetched_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_autofix_fix_build_id
+            ON autofix_fix (build_id)
             """,
         ]
         for statement in index_statements:

@@ -193,6 +193,35 @@ DEVOPS_PIPELINE_MAP: dict[str, int] = _parse_pipeline_map(os.getenv('DEVOPS_PIPE
 """Map of role key (e.g. ``Windows_Functional``) → pipeline definition id."""
 
 # ---------------------------------------------------------------------------
+# Autofix report ingest
+# ---------------------------------------------------------------------------
+
+AUTOFIX_ARTIFACT_NAME: str = os.getenv('AUTOFIX_ARTIFACT_NAME', 'Autofix Report')
+"""Name of the published build artifact that contains ``autofix-report.json``."""
+
+
+def _parse_int_list(raw: str | None) -> list[int]:
+    """Parse a comma-separated list of integers, skipping invalid tokens."""
+    if not raw:
+        return []
+    out: list[int] = []
+    for token in raw.split(','):
+        token = token.strip()
+        if not token:
+            continue
+        try:
+            out.append(int(token))
+        except ValueError:
+            logging.warning('AUTOFIX_PIPELINE_IDS token %r is not an integer; skipping', token)
+    return out
+
+
+AUTOFIX_PIPELINE_IDS: list[int] = _parse_int_list(os.getenv('AUTOFIX_PIPELINE_IDS'))
+"""Pipeline definition ids whose recent builds the autofix refresh scans by default.
+
+The refresh endpoint also accepts a ``definition_ids`` override in the request body."""
+
+# ---------------------------------------------------------------------------
 # Applitools helper-upload token
 # ---------------------------------------------------------------------------
 

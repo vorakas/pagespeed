@@ -38,6 +38,7 @@ from config import (
     BLAZEMETER_API_KEY_ID,
     BLAZEMETER_API_SECRET,
     BLAZEMETER_WORKSPACE_ID,
+    AUTOFIX_PIPELINE_IDS,
     DEVOPS_ORCHESTRATOR_PIPELINE_ID,
     DEVOPS_ORGANIZATION,
     DEVOPS_PAT,
@@ -61,6 +62,7 @@ from config import (
 )
 from data_access import (
     ApplitoolsBatchRepository,
+    AutofixRepository,
     BlazemeterPresetRepository,
     BlazemeterRunRepository,
     ConnectionManager,
@@ -89,6 +91,7 @@ from services.blazemeter_queue import BlazemeterQueueService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService, SyncAlreadyRunning
 from services.obsidian_sync.vault_reader import VaultReader
+from services.autofix_ingest_service import AutofixIngestService
 from services.qa_testing_service import QaTestingReportService
 from services.requirement_kb_service import RequirementKbService
 from services.scheduling_window import ActiveHoursWindow
@@ -211,6 +214,8 @@ def create_app() -> Flask:
     blazemeter_preset_repo = BlazemeterPresetRepository(conn_mgr)
     blazemeter_run_repo = BlazemeterRunRepository(conn_mgr)
     applitools_batch_repo = ApplitoolsBatchRepository(conn_mgr, ttl_seconds=24 * 60 * 60)
+    autofix_repo = AutofixRepository(conn_mgr)
+    autofix_ingest_service = AutofixIngestService(autofix_repo)
 
     pagespeed = PageSpeedClient(api_key=PAGESPEED_API_KEY)
 
@@ -540,6 +545,9 @@ def create_app() -> Flask:
         requirement_service=requirement_service,
         ai_config_service=ai_config_service,
         qa_testing_service=qa_testing_service,
+        autofix_repository=autofix_repo,
+        autofix_ingest_service=autofix_ingest_service,
+        autofix_pipeline_ids=AUTOFIX_PIPELINE_IDS,
     )
 
     # ---- Centralized error handlers ----
