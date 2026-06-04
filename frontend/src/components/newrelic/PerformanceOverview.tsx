@@ -71,12 +71,12 @@ function StatCard({
   }
 
   return (
-    <div className="aurora-panel p-4">
+    <div className="aurora-panel min-w-0 p-4">
       <div className="flex items-start gap-3">
         <div className="aurora-text-faint shrink-0">{icon}</div>
         <div className="min-w-0">
           <p className="aurora-stat-label">{label}</p>
-          <p className="aurora-stat-value">{value}</p>
+          <p className="aurora-stat-value break-words">{value}</p>
           {changeText && <p className="text-xs leading-snug" style={{ color: changeColor }}>{changeText}</p>}
         </div>
       </div>

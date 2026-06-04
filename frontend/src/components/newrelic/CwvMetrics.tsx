@@ -29,6 +29,9 @@ function formatValue(value: number | null, decimals: number = 0): string {
   return Number(value).toFixed(decimals)
 }
 
+const percentileValueClass =
+  "aurora-text text-base font-semibold leading-tight tabular-nums"
+
 function PercentileCard({
   title,
   subtitle,
@@ -53,26 +56,26 @@ function PercentileCard({
   const thresholdLabel = getThresholdLabel(p75Value, goodThreshold, poorThreshold)
 
   return (
-    <div className="aurora-panel p-4">
+    <div className="aurora-panel min-w-0 p-3">
       <div className="mb-3">
         <h3 className="aurora-text text-base font-semibold">{title}</h3>
         <p className="aurora-text-faint text-xs">{subtitle}</p>
         <p className="aurora-text-faint text-xs">{idealText}</p>
       </div>
-      <div className="flex items-end gap-6">
-        <div className="text-center">
+      <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1 text-center">
+        <div className="min-w-0">
           <p className="aurora-eyebrow">P50</p>
-          <p className="aurora-stat-value">{formatValue(metric?.p50 ?? null, decimals)}</p>
+          <p className={percentileValueClass}>{formatValue(metric?.p50 ?? null, decimals)}</p>
           <p className="aurora-text-faint text-[10px]">{unit}</p>
         </div>
-        <div className="text-center">
+        <div className="min-w-0">
           <p className="aurora-eyebrow">P75</p>
-          <p className="aurora-stat-value">{formatValue(metric?.p75 ?? null, decimals)}</p>
+          <p className={percentileValueClass}>{formatValue(metric?.p75 ?? null, decimals)}</p>
           <p className="aurora-text-faint text-[10px]">{unit}</p>
         </div>
-        <div className="text-center">
+        <div className="min-w-0">
           <p className="aurora-eyebrow">P90</p>
-          <p className="aurora-stat-value">{formatValue(metric?.p90 ?? null, decimals)}</p>
+          <p className={percentileValueClass}>{formatValue(metric?.p90 ?? null, decimals)}</p>
           <p className="aurora-text-faint text-[10px]">{unit}</p>
         </div>
       </div>
@@ -95,19 +98,19 @@ function BreakdownCard({
   metric: PercentileMetric | undefined
 }) {
   return (
-    <div className="aurora-panel p-3">
+    <div className="aurora-panel min-w-0 p-3">
       <h4 className="aurora-text text-sm font-medium">{title}</h4>
       <p className="aurora-text-faint mb-2 text-[10px]">{idealText}</p>
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <div>
+      <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1 text-center">
+        <div className="min-w-0">
           <p className="aurora-text text-sm font-semibold tabular-nums">{formatValue(metric?.p50 ?? null)} ms</p>
           <p className="aurora-eyebrow">P50</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="aurora-text text-sm font-semibold tabular-nums">{formatValue(metric?.p75 ?? null)} ms</p>
           <p className="aurora-eyebrow">P75</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="aurora-text text-sm font-semibold tabular-nums">{formatValue(metric?.p90 ?? null)} ms</p>
           <p className="aurora-eyebrow">P90</p>
         </div>
