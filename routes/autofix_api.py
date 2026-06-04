@@ -76,6 +76,12 @@ def create_autofix_blueprint(
         fixes = repository.get_fixes(build_id)
         return jsonify({"success": True, "fixes": [_camelize(f) for f in fixes]})
 
+    @bp.route("/api/autofix/corrections", methods=["GET"])
+    def list_corrections():
+        corrections = repository.get_corrections()
+        return jsonify({"success": True,
+                        "corrections": [_camelize(c) for c in corrections]})
+
     @bp.route("/api/autofix/fixes/<build_id>/<fix_id>", methods=["PATCH"])
     def patch_fix(build_id: str, fix_id: str):
         data = request.get_json() or {}

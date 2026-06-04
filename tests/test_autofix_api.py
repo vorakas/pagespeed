@@ -111,6 +111,34 @@ class AutofixApiTest(unittest.TestCase):
         resp = self.client.patch("/api/autofix/fixes/000/zzz", json={"status": "applied"})
         self.assertEqual(resp.status_code, 404)
 
+    def test_corrections_returns_camelcase_feedback_rows(self):
+        # Seed a build + fix, then attach human feedback.
+        self.client.post("/api/autofix/refresh", json={})
+        patch = self.client.patch(
+            "/api/autofix/fixes/812/f1",
+            json={"outcome": "worked_with_edits",
+                  "actual_fix_code": "FindByCss();", "note": "real fix"},
+        )
+        self.assertEqual(patch.status_code, 200)
+
+        resp = self.client.get("/api/autofix/corrections")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.get_json()
+        self.assertTrue(body["success"])
+        self.assertEqual(len(body["corrections"]), 1)
+        row = body["corrections"][0]
+        # camelCase keys produced by _camelize
+        self.assertEqual(row["outcome"], "worked_with_edits")
+        self.assertEqual(row["actualFixCode"], "FindByCss();")
+        self.assertEqual(row["filePath"], "p")
+        self.assertEqual(row["testName"], "T")
+
+    def test_corrections_empty_when_no_feedback(self):
+        self.client.post("/api/autofix/refresh", json={})
+        resp = self.client.get("/api/autofix/corrections")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["corrections"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
