@@ -123,6 +123,29 @@ class AutofixRepository:
             )
             return self._cm.rows_to_dicts(cursor)
 
+    def get_corrections(self) -> list[dict[str, Any]]:
+        """Return fixes carrying meaningful human feedback, for export to the
+        Autofix knowledge base. Includes corrective signals
+        (worked_with_edits / didnt_work / not_a_real_issue / dismissed) and
+        worked_as_is confirmations; excludes untriaged rows.
+        """
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT build_id, fix_id, signature, outcome, status, note,
+                       actual_fix_code, test_name, category, exception_type,
+                       file_path, old_code, new_code, description, updated_at
+                FROM autofix_fix
+                WHERE outcome IN
+                        ('worked_as_is', 'worked_with_edits',
+                         'didnt_work', 'not_a_real_issue')
+                   OR status = 'dismissed'
+                ORDER BY updated_at DESC
+                """
+            )
+            return self._cm.rows_to_dicts(cursor)
+
     def patch_fix(
         self,
         build_id: str,

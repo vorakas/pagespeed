@@ -105,6 +105,38 @@ class AutofixRepositoryTest(unittest.TestCase):
         self.repo.upsert_report(_report_row(), [_fix_row("f1")])
         self.assertFalse(self.repo.patch_fix("812", "f1"))
 
+    def test_get_corrections_includes_outcome_rows(self):
+        self.repo.upsert_report(_report_row(), [_fix_row("f1")])
+        self.repo.patch_fix("812", "f1", outcome="worked_with_edits",
+                            actual_fix_code="FindByCss();", note="real fix")
+        corrections = self.repo.get_corrections()
+        self.assertEqual(len(corrections), 1)
+        self.assertEqual(corrections[0]["signature"],
+                         "Locator|ElementNotFound|Cart.cs:88|a1b2")
+        self.assertEqual(corrections[0]["outcome"], "worked_with_edits")
+        self.assertEqual(corrections[0]["actual_fix_code"], "FindByCss();")
+
+    def test_get_corrections_includes_worked_as_is(self):
+        self.repo.upsert_report(_report_row(), [_fix_row("f1")])
+        self.repo.patch_fix("812", "f1", status="applied", outcome="worked_as_is")
+        corrections = self.repo.get_corrections()
+        self.assertEqual(len(corrections), 1)
+        self.assertEqual(corrections[0]["outcome"], "worked_as_is")
+
+    def test_get_corrections_includes_dismissed_without_outcome(self):
+        self.repo.upsert_report(_report_row(), [_fix_row("f1")])
+        self.repo.patch_fix("812", "f1", status="dismissed")
+        corrections = self.repo.get_corrections()
+        self.assertEqual(len(corrections), 1)
+        self.assertEqual(corrections[0]["status"], "dismissed")
+
+    def test_get_corrections_excludes_untriaged_rows(self):
+        # f1 has feedback, f2 is left at default (status=todo, no outcome)
+        self.repo.upsert_report(_report_row(), [_fix_row("f1"), _fix_row("f2")])
+        self.repo.patch_fix("812", "f1", outcome="didnt_work")
+        corrections = self.repo.get_corrections()
+        self.assertEqual({c["fix_id"] for c in corrections}, {"f1"})
+
 
 if __name__ == "__main__":
     unittest.main()
