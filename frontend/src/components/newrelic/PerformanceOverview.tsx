@@ -41,6 +41,7 @@ function StatCard({
   change,
   direction,
   comparisonLabel,
+  description,
 }: {
   icon: ReactNode
   label: string
@@ -48,6 +49,7 @@ function StatCard({
   change: { current: number | null; previous: number | null } | null
   direction: "lower-better" | "higher-better"
   comparisonLabel: string
+  description?: string
 }) {
   let changeText = ""
   let changeColor: string = "var(--lcc-text-faint)"
@@ -78,6 +80,9 @@ function StatCard({
           <p className="aurora-stat-label">{label}</p>
           <p className="aurora-stat-value break-words">{value}</p>
           {changeText && <p className="text-xs leading-snug" style={{ color: changeColor }}>{changeText}</p>}
+          {description && (
+            <p className="mt-2 text-xs leading-snug aurora-text-faint">{description}</p>
+          )}
         </div>
       </div>
     </div>
@@ -145,6 +150,7 @@ export function PerformanceOverview({ data }: PerformanceOverviewProps) {
         change={{ current: current.apdex ?? null, previous: previous.apdex ?? null }}
         direction="higher-better"
         comparisonLabel={comparisonLabel}
+        description="User satisfaction score from response time: 1.00 is best, 0.85+ good, 0.70-0.84 watch, below 0.70 poor."
       />
     </div>
   )
