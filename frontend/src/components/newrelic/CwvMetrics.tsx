@@ -97,9 +97,14 @@ function BreakdownCard({
   idealText: string
   metric: PercentileMetric | undefined
 }) {
+  const titleClassName =
+    title.length > 22
+      ? "aurora-text whitespace-nowrap text-[12px] font-medium leading-tight"
+      : "aurora-text text-sm font-medium"
+
   return (
     <div className="aurora-panel min-w-0 p-3">
-      <h4 className="aurora-text text-sm font-medium">{title}</h4>
+      <h4 className={titleClassName}>{title}</h4>
       <p className="aurora-text-faint mb-2 text-[10px]">{idealText}</p>
       <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1 text-center">
         <div className="min-w-0">
