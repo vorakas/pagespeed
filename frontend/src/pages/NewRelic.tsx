@@ -9,9 +9,16 @@ import { ApmMetrics } from "@/components/newrelic/ApmMetrics"
 import { CustomQuery } from "@/components/newrelic/CustomQuery"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { useLocalConfig } from "@/hooks/use-local-config"
+import {
+  buildRelativeTimeRange,
+  formatRelativeTimeRangeLabel,
+  normalizeRelativeTimeRange,
+  type RelativeTimeRange,
+  type RelativeTimeUnit,
+} from "@/lib/newRelicTimeRange"
 import { api } from "@/services/api"
 import type { NewRelicConfig } from "@/types"
-import { Loader2, Settings } from "lucide-react"
+import { CalendarDays, Loader2, Settings } from "lucide-react"
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -32,9 +39,14 @@ const TIME_RANGES = [
   { value: "6 hours ago", label: "Last 6 hours" },
   { value: "12 hours ago", label: "Last 12 hours" },
   { value: "24 hours ago", label: "Last 24 hours" },
+  { value: "3 days ago", label: "Last 3 days" },
+  { value: "5 days ago", label: "Last 5 days" },
+  { value: "7 days ago", label: "Last 7 days" },
 ]
 
 const DEFAULT_CONFIG: NewRelicConfig = { apiKey: "", accountId: "", appName: "" }
+const DEFAULT_CUSTOM_RANGE: RelativeTimeRange = { value: 5, unit: "days" }
+const RELATIVE_UNITS: RelativeTimeUnit[] = ["minutes", "hours", "days", "weeks"]
 
 interface SiteData {
   cwv: Record<string, unknown> | null
@@ -103,6 +115,99 @@ function ViewModeToggle({
           {label}
         </button>
       ))}
+    </div>
+  )
+}
+
+function TimeRangePicker({
+  value,
+  customRange,
+  onChange,
+  onCustomRangeChange,
+}: {
+  value: string
+  customRange: RelativeTimeRange
+  onChange: (value: string) => void
+  onCustomRangeChange: (value: RelativeTimeRange) => void
+}) {
+  const isCustomActive = !TIME_RANGES.some((range) => range.value === value)
+  const normalizedCustomRange = normalizeRelativeTimeRange(customRange)
+  const customLabel = formatRelativeTimeRangeLabel(normalizedCustomRange)
+
+  const applyCustomRange = (nextRange: RelativeTimeRange) => {
+    const normalized = normalizeRelativeTimeRange(nextRange)
+    onCustomRangeChange(normalized)
+    onChange(buildRelativeTimeRange(normalized.value, normalized.unit))
+  }
+
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="aurora-text-faint flex items-center gap-1.5 text-xs font-medium">
+        <CalendarDays className="h-3.5 w-3.5" />
+        Time frame
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {TIME_RANGES.map((range) => {
+          const active = value === range.value
+          return (
+            <button
+              key={range.value}
+              type="button"
+              className="rounded-full px-2.5 py-1 text-xs font-medium transition-colors"
+              style={{
+                border: `1px solid ${active ? "var(--lcc-amber)" : "var(--lcc-border)"}`,
+                backgroundColor: active ? "var(--lcc-amber)" : "transparent",
+                color: active ? "#000" : "var(--lcc-text-dim)",
+              }}
+              onClick={() => onChange(range.value)}
+            >
+              {range.label.replace("Last ", "")}
+            </button>
+          )
+        })}
+      </div>
+      <div
+        className="flex items-center gap-1.5 rounded-full px-2 py-1"
+        style={{
+          border: `1px solid ${isCustomActive ? "var(--lcc-amber)" : "var(--lcc-border)"}`,
+          backgroundColor: isCustomActive ? "color-mix(in oklch, var(--lcc-amber) 14%, transparent)" : "transparent",
+        }}
+      >
+        <span className="aurora-text-faint text-xs">Last</span>
+        <input
+          aria-label="Custom New Relic time range value"
+          className="aurora-input h-7 w-16 px-2 py-0 text-xs tabular-nums"
+          type="number"
+          min={1}
+          value={normalizedCustomRange.value}
+          onChange={(e) => {
+            const nextValue = Number(e.target.value)
+            if (Number.isFinite(nextValue) && nextValue > 0) {
+              applyCustomRange({ ...normalizedCustomRange, value: nextValue })
+            }
+          }}
+          onFocus={() => onChange(buildRelativeTimeRange(normalizedCustomRange.value, normalizedCustomRange.unit))}
+        />
+        <select
+          aria-label="Custom New Relic time range unit"
+          className="aurora-select h-7 w-24 px-2 py-0 text-xs"
+          value={normalizedCustomRange.unit}
+          onChange={(e) => {
+            applyCustomRange({
+              ...normalizedCustomRange,
+              unit: e.target.value as RelativeTimeUnit,
+            })
+          }}
+          onFocus={() => onChange(buildRelativeTimeRange(normalizedCustomRange.value, normalizedCustomRange.unit))}
+        >
+          {RELATIVE_UNITS.map((unit) => (
+            <option key={unit} value={unit}>
+              {unit}
+            </option>
+          ))}
+        </select>
+        <span className="aurora-text-faint max-w-28 truncate text-xs">{customLabel}</span>
+      </div>
     </div>
   )
 }
@@ -190,7 +295,11 @@ export function NewRelic() {
 
   // View state
   const [viewMode, setViewMode] = useLocalConfig<ViewMode>("nrViewMode", "comparison")
-  const [timeRange, setTimeRange] = useState("30 minutes ago")
+  const [timeRange, setTimeRange] = useLocalConfig<string>("nrTimeRange", "30 minutes ago")
+  const [customRange, setCustomRange] = useLocalConfig<RelativeTimeRange>(
+    "nrCustomTimeRange",
+    DEFAULT_CUSTOM_RANGE,
+  )
   const [configOpen, setConfigOpen] = useState(
     () => !isConfigured(lpConfig) || !isConfigured(adobeConfig),
   )
@@ -338,18 +447,13 @@ export function NewRelic() {
           <div className="flex flex-wrap items-center gap-3">
             <ViewModeToggle value={viewMode} onChange={setViewMode} />
 
-            <div className="flex items-center gap-3 ml-auto">
-              <select
-                className="aurora-select"
+            <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
+              <TimeRangePicker
                 value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-              >
-                {TIME_RANGES.map((tr) => (
-                  <option key={tr.value} value={tr.value}>
-                    {tr.label}
-                  </option>
-                ))}
-              </select>
+                customRange={customRange}
+                onChange={setTimeRange}
+                onCustomRangeChange={setCustomRange}
+              />
               <Button onClick={loadAllMetrics} disabled={anyLoading} style={{ color: "#000" }}>
                 {anyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {anyLoading ? "Loading..." : "Load Metrics"}
