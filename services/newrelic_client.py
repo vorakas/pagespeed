@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
@@ -149,6 +150,8 @@ class NewRelicClient:
         self, account_id: int, app_name: str, page_url: str, time_range: str,
     ) -> str:
         """Build the NerdGraph query for Core Web Vitals."""
+        browser_interactions_where = self._build_browser_interactions_where(app_name, page_url)
+
         return f"""
         {{
           actor {{
@@ -161,12 +164,58 @@ class NewRelicClient:
               ttfbLike: nrql(query: "FROM PageView SELECT percentile(queueDuration + networkDuration, 50, 75, 90) AS TTFB_like_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               domProcessing: nrql(query: "FROM PageView SELECT percentile(domProcessingDuration, 50, 75, 90) AS DomProcessing_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               inp: nrql(query: "FROM PageViewTiming SELECT percentile(interactionToNextPaint, 50, 75, 90) AS INP WHERE appName = '{app_name}' AND pageUrl = '{page_url}' AND timingName = 'interactionToNextPaint' SINCE {time_range}") {{ results }}
-              inpCollectionCheck: nrql(query: "FROM BrowserInteraction SELECT count(*) AS interactions WHERE appName = '{app_name}' SINCE {time_range}") {{ results }}
-              inpAnyInteractions: nrql(query: "FROM BrowserInteraction SELECT count(*) WHERE appName = '{app_name}' SINCE {time_range}") {{ results }}
+              inpCollectionCheck: nrql(query: "FROM BrowserInteraction SELECT count(*) AS interactions WHERE {browser_interactions_where} SINCE {time_range}") {{ results }}
+              inpAnyInteractions: nrql(query: "FROM BrowserInteraction SELECT count(*) WHERE {browser_interactions_where} SINCE {time_range}") {{ results }}
             }}
           }}
         }}
         """
+
+    def _build_browser_interactions_where(self, app_name: str, page_url: str) -> str:
+        """Build a page-scoped BrowserInteraction filter for homepage rollups."""
+        app_name_value = self._quote_nrql_string(app_name)
+        url_conditions = self._browser_interaction_url_conditions(page_url)
+        return f"appName = '{app_name_value}' AND ({' OR '.join(url_conditions)})"
+
+    def _browser_interaction_url_conditions(self, page_url: str) -> list[str]:
+        raw = (page_url or "").strip()
+        if not raw:
+            return ["targetUrl IS NULL"]
+
+        variants = self._browser_interaction_url_variants(raw)
+        conditions: list[str] = []
+        for field in ("targetUrl", "targetGroupedUrl"):
+            for value in variants["exact"]:
+                conditions.append(f"{field} = '{self._quote_nrql_string(value)}'")
+            for value in variants["query_prefix"]:
+                conditions.append(f"{field} LIKE '{self._quote_nrql_string(value)}%'")
+        return conditions
+
+    def _browser_interaction_url_variants(self, page_url: str) -> dict[str, list[str]]:
+        url_for_parsing = page_url if "://" in page_url else f"https://{page_url}"
+        parsed = urlsplit(url_for_parsing)
+        is_root_url = parsed.netloc and parsed.path in ("", "/") and not parsed.query and not parsed.fragment
+
+        exact = [page_url]
+        query_prefix: list[str] = []
+        if is_root_url:
+            no_slash = urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+            with_slash = urlunsplit((parsed.scheme, parsed.netloc, "/", "", ""))
+            exact.extend([no_slash, with_slash])
+            query_prefix.extend([f"{no_slash}?", f"{with_slash}?"])
+            if "://" not in page_url:
+                exact.extend([parsed.netloc, f"{parsed.netloc}/"])
+                query_prefix.extend([f"{parsed.netloc}?", f"{parsed.netloc}/?"])
+
+        return {
+            "exact": list(dict.fromkeys(exact)),
+            "query_prefix": list(dict.fromkeys(query_prefix)),
+        }
+
+    @staticmethod
+    def _quote_nrql_string(value: str) -> str:
+        """Escape a value for a single-quoted NRQL string."""
+        return value.replace("\\", "\\\\").replace("'", "\\'")
 
     def _parse_cwv_response(
         self,

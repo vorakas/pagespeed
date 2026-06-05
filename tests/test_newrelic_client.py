@@ -15,7 +15,7 @@ class NewRelicClientApmMetricsTest(unittest.TestCase):
 
 
 class NewRelicClientCwvQueryTest(unittest.TestCase):
-    def test_browser_interactions_count_is_app_wide_not_page_filtered(self):
+    def test_browser_interactions_count_is_homepage_scoped_with_query_variants(self):
         client = NewRelicClient(api_key="x")
 
         query = client._build_cwv_query(
@@ -27,17 +27,32 @@ class NewRelicClientCwvQueryTest(unittest.TestCase):
 
         self.assertIn(
             "FROM BrowserInteraction SELECT count(*) AS interactions "
-            "WHERE appName = 'LampsPlus' SINCE 7 days ago",
+            "WHERE appName = 'LampsPlus' AND (targetUrl = 'https://www.lampsplus.com'",
             query,
         )
-        self.assertNotIn(
-            "FROM BrowserInteraction SELECT count(*) AS interactions WHERE appName = "
-            "'LampsPlus' AND pageUrl",
-            query,
+        self.assertIn("targetUrl = 'https://www.lampsplus.com/'", query)
+        self.assertIn("targetUrl LIKE 'https://www.lampsplus.com?%'", query)
+        self.assertIn("targetUrl LIKE 'https://www.lampsplus.com/?%'", query)
+        self.assertIn("targetGroupedUrl = 'https://www.lampsplus.com/'", query)
+        self.assertIn("targetGroupedUrl LIKE 'https://www.lampsplus.com/?%'", query)
+        self.assertNotIn("WHERE appName = 'LampsPlus' SINCE 7 days ago", query)
+        self.assertNotIn("targetUrl LIKE 'https://www.lampsplus.com/%'", query)
+
+    def test_browser_interactions_count_normalizes_bare_homepage_host(self):
+        client = NewRelicClient(api_key="x")
+
+        query = client._build_cwv_query(
+            account_id=123,
+            app_name="LampsPlus",
+            page_url="www.lampsplus.com",
+            time_range="7 days ago",
         )
-        self.assertNotIn(
-            "FROM BrowserInteraction SELECT count(*) AS interactions WHERE appName = "
-            "'LampsPlus' AND targetUrl",
+
+        self.assertIn("targetUrl = 'www.lampsplus.com'", query)
+        self.assertIn("targetUrl = 'https://www.lampsplus.com/'", query)
+        self.assertIn("targetUrl LIKE 'www.lampsplus.com/?%'", query)
+        self.assertIn(
+            "targetGroupedUrl LIKE 'https://www.lampsplus.com/?%'",
             query,
         )
 
