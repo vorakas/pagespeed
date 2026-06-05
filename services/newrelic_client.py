@@ -335,14 +335,17 @@ class NewRelicClient:
         query = self._build_apm_query(account_id, app_name, time_range)
         response = self.execute_query(query)
 
-        logger.debug(
-            "APM response keys: %s",
-            list(response.get("data", {}).get("actor", {}).get("account", {}).keys())
-            if "data" in response else "error",
-        )
-
         try:
-            account_data = response.get("data", {}).get("actor", {}).get("account", {})
+            data = response.get("data") or {}
+            actor_data = data.get("actor") or {}
+            account_data = actor_data.get("account")
+            if not isinstance(account_data, dict):
+                raise NewRelicError(
+                    "New Relic APM account data was not returned. "
+                    "Check the account ID, app name, and API key access."
+                )
+
+            logger.debug("APM response keys: %s", list(account_data.keys()))
 
             total_time = self._extract_total_time(account_data)
 
@@ -368,7 +371,9 @@ class NewRelicClient:
                     "time_range": time_range,
                 },
             }
-        except (KeyError, IndexError, TypeError) as exc:
+        except NewRelicError:
+            raise
+        except (KeyError, IndexError, TypeError, AttributeError) as exc:
             raise NewRelicError(f"Error parsing APM response: {exc}") from exc
 
     def _build_apm_query(self, account_id: int, app_name: str, time_range: str) -> str:
