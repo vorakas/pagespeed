@@ -31,6 +31,9 @@ function formatValue(value: number | null, decimals: number = 0): string {
 
 const percentileValueClass =
   "aurora-text text-base font-semibold leading-tight tabular-nums"
+const percentileUnitClass = "aurora-text-faint min-h-3 text-[10px]"
+const breakdownValueClass =
+  "aurora-text whitespace-nowrap text-[13px] font-semibold tabular-nums"
 
 function PercentileCard({
   title,
@@ -66,17 +69,17 @@ function PercentileCard({
         <div className="min-w-0">
           <p className="aurora-eyebrow">P50</p>
           <p className={percentileValueClass}>{formatValue(metric?.p50 ?? null, decimals)}</p>
-          <p className="aurora-text-faint text-[10px]">{unit}</p>
+          <p className={percentileUnitClass}>{unit}</p>
         </div>
         <div className="min-w-0">
           <p className="aurora-eyebrow">P75</p>
           <p className={percentileValueClass}>{formatValue(metric?.p75 ?? null, decimals)}</p>
-          <p className="aurora-text-faint text-[10px]">{unit}</p>
+          <p className={percentileUnitClass}>{unit}</p>
         </div>
         <div className="min-w-0">
           <p className="aurora-eyebrow">P90</p>
           <p className={percentileValueClass}>{formatValue(metric?.p90 ?? null, decimals)}</p>
-          <p className="aurora-text-faint text-[10px]">{unit}</p>
+          <p className={percentileUnitClass}>{unit}</p>
         </div>
       </div>
       {thresholdLabel && (
@@ -108,15 +111,15 @@ function BreakdownCard({
       <p className="aurora-text-faint mb-2 text-[10px]">{idealText}</p>
       <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1 text-center">
         <div className="min-w-0">
-          <p className="aurora-text text-sm font-semibold tabular-nums">{formatValue(metric?.p50 ?? null)} ms</p>
+          <p className={breakdownValueClass}>{formatValue(metric?.p50 ?? null)} ms</p>
           <p className="aurora-eyebrow">P50</p>
         </div>
         <div className="min-w-0">
-          <p className="aurora-text text-sm font-semibold tabular-nums">{formatValue(metric?.p75 ?? null)} ms</p>
+          <p className={breakdownValueClass}>{formatValue(metric?.p75 ?? null)} ms</p>
           <p className="aurora-eyebrow">P75</p>
         </div>
         <div className="min-w-0">
-          <p className="aurora-text text-sm font-semibold tabular-nums">{formatValue(metric?.p90 ?? null)} ms</p>
+          <p className={breakdownValueClass}>{formatValue(metric?.p90 ?? null)} ms</p>
           <p className="aurora-eyebrow">P90</p>
         </div>
       </div>
