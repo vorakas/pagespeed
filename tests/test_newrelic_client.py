@@ -14,5 +14,39 @@ class NewRelicClientApmMetricsTest(unittest.TestCase):
             client.get_apm_metrics(account_id=123, app_name="Missing App")
 
 
+class NewRelicClientCwvQueryTest(unittest.TestCase):
+    def test_browser_interaction_count_includes_homepage_url_variants(self):
+        client = NewRelicClient(api_key="x")
+
+        query = client._build_cwv_query(
+            account_id=123,
+            app_name="LampsPlus",
+            page_url="https://www.lampsplus.com",
+            time_range="7 days ago",
+        )
+
+        self.assertIn("targetUrl IN ('https://www.lampsplus.com', 'https://www.lampsplus.com/')", query)
+        self.assertIn(
+            "targetGroupedUrl IN ('https://www.lampsplus.com', 'https://www.lampsplus.com/')",
+            query,
+        )
+
+    def test_browser_interaction_count_normalizes_bare_homepage_host(self):
+        client = NewRelicClient(api_key="x")
+
+        query = client._build_cwv_query(
+            account_id=123,
+            app_name="LampsPlus",
+            page_url="www.lampsplus.com",
+            time_range="7 days ago",
+        )
+
+        self.assertIn(
+            "targetUrl IN ('www.lampsplus.com', 'https://www.lampsplus.com', "
+            "'https://www.lampsplus.com/', 'www.lampsplus.com/')",
+            query,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

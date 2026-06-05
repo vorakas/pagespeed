@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
@@ -149,6 +150,8 @@ class NewRelicClient:
         self, account_id: int, app_name: str, page_url: str, time_range: str,
     ) -> str:
         """Build the NerdGraph query for Core Web Vitals."""
+        browser_interactions_where = self._build_browser_interactions_where(app_name, page_url)
+
         return f"""
         {{
           actor {{
@@ -161,12 +164,47 @@ class NewRelicClient:
               ttfbLike: nrql(query: "FROM PageView SELECT percentile(queueDuration + networkDuration, 50, 75, 90) AS TTFB_like_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               domProcessing: nrql(query: "FROM PageView SELECT percentile(domProcessingDuration, 50, 75, 90) AS DomProcessing_ms WHERE appName = '{app_name}' AND pageUrl = '{page_url}' SINCE {time_range}") {{ results }}
               inp: nrql(query: "FROM PageViewTiming SELECT percentile(interactionToNextPaint, 50, 75, 90) AS INP WHERE appName = '{app_name}' AND pageUrl = '{page_url}' AND timingName = 'interactionToNextPaint' SINCE {time_range}") {{ results }}
-              inpCollectionCheck: nrql(query: "FROM BrowserInteraction SELECT count(*) AS interactions WHERE appName = '{app_name}' AND targetUrl = '{page_url}' SINCE {time_range}") {{ results }}
-              inpAnyInteractions: nrql(query: "FROM BrowserInteraction SELECT count(*) WHERE appName = '{app_name}' AND targetUrl = '{page_url}' SINCE {time_range}") {{ results }}
+              inpCollectionCheck: nrql(query: "FROM BrowserInteraction SELECT count(*) AS interactions WHERE {browser_interactions_where} SINCE {time_range}") {{ results }}
+              inpAnyInteractions: nrql(query: "FROM BrowserInteraction SELECT count(*) WHERE {browser_interactions_where} SINCE {time_range}") {{ results }}
             }}
           }}
         }}
         """
+
+    def _build_browser_interactions_where(self, app_name: str, page_url: str) -> str:
+        """Build BrowserInteraction filters matching New Relic's grouped URL rollups."""
+        app_name_value = self._quote_nrql_string(app_name)
+        url_values = ", ".join(
+            f"'{self._quote_nrql_string(value)}'"
+            for value in self._browser_interaction_url_variants(page_url)
+        )
+        url_filter = f"(targetUrl IN ({url_values}) OR targetGroupedUrl IN ({url_values}))"
+        return f"appName = '{app_name_value}' AND {url_filter}"
+
+    def _browser_interaction_url_variants(self, page_url: str) -> list[str]:
+        """Return canonical targetUrl forms New Relic may store for a homepage."""
+        raw = (page_url or "").strip()
+        if not raw:
+            return []
+
+        variants = [raw]
+        url_for_parsing = raw if "://" in raw else f"https://{raw}"
+        parsed = urlsplit(url_for_parsing)
+
+        is_root_url = parsed.netloc and parsed.path in ("", "/") and not parsed.query and not parsed.fragment
+        if is_root_url:
+            variants.append(urlunsplit((parsed.scheme, parsed.netloc, "", "", "")))
+            variants.append(urlunsplit((parsed.scheme, parsed.netloc, "/", "", "")))
+            if "://" not in raw:
+                variants.append(parsed.netloc)
+                variants.append(f"{parsed.netloc}/")
+
+        return list(dict.fromkeys(variants))
+
+    @staticmethod
+    def _quote_nrql_string(value: str) -> str:
+        """Escape a value for a single-quoted NRQL string."""
+        return value.replace("\\", "\\\\").replace("'", "\\'")
 
     def _parse_cwv_response(
         self,
