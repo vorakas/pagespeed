@@ -77,6 +77,57 @@ class NewRelicClient:
         except json.JSONDecodeError as exc:
             raise NewRelicError("Invalid JSON response from New Relic") from exc
 
+    def run_nrql(self, account_id: int, nrql: str) -> dict:
+        """Execute a raw NRQL query via NerdGraph and return its results.
+
+        The Custom Query feature receives bare NRQL (``SELECT ... FROM ...``).
+        NerdGraph's HTTP endpoint expects a GraphQL document, so the NRQL must
+        be wrapped in an ``actor.account.nrql`` envelope before sending — sending
+        raw NRQL makes the GraphQL parser reject every query.
+
+        Args:
+            account_id: New Relic account id to run the query against.
+            nrql:       Raw NRQL query string.
+
+        Returns:
+            Dict with ``results`` (list) on success, or ``errors`` (list) when
+            New Relic rejects the NRQL.
+        """
+        envelope = self._build_nrql_envelope(account_id, nrql)
+        response = self.execute_query(envelope)
+
+        if response.get("errors"):
+            return {"errors": response["errors"]}
+
+        nrql_data = (
+            response.get("data", {})
+            .get("actor", {})
+            .get("account", {})
+            .get("nrql", {})
+        )
+        return {"results": nrql_data.get("results", [])}
+
+    def _build_nrql_envelope(self, account_id: int, nrql: str) -> str:
+        """Wrap a raw NRQL string in a NerdGraph GraphQL query."""
+        escaped = self._escape_for_graphql(nrql)
+        return f"""
+        {{
+          actor {{
+            account(id: {account_id}) {{
+              nrql(query: "{escaped}") {{
+                results
+              }}
+            }}
+          }}
+        }}
+        """
+
+    @staticmethod
+    def _escape_for_graphql(value: str) -> str:
+        """Escape a NRQL string for embedding in a GraphQL double-quoted string."""
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        return escaped.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+
     # ------------------------------------------------------------------
     # Connection test
     # ------------------------------------------------------------------

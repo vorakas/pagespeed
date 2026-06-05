@@ -2565,6 +2565,10 @@
   background: var(--glass-bg-strong);
 }
 
+/* Syntax-highlighted NRQL editor (textarea overlaid on a colored <pre>) */
+.aurora-nrql-editor:hover { border-color: var(--glass-border-strong); }
+.aurora-nrql-editor:focus-within { border-color: var(--lcc-violet); }
+
 /* Code block / preformatted output — JSON results, log dumps, etc. */
 .aurora-pre {
   font-family: var(--aurora-font-mono);

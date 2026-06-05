@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Play } from "lucide-react"
+import { NrqlEditor } from "@/components/newrelic/NrqlEditor"
 import { api } from "@/services/api"
 import type { NewRelicConfig } from "@/types"
 
@@ -88,14 +89,11 @@ export function CustomQuery({ configs, activeSite }: CustomQueryProps) {
         </Button>
       </div>
       <div className="space-y-1.5">
-        <label htmlFor="nrqlQuery" className="aurora-label block">NRQL Query</label>
-        <textarea
-          id="nrqlQuery"
-          className="aurora-textarea"
+        <label className="aurora-label block">NRQL Query</label>
+        <NrqlEditor
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={setQuery}
           placeholder="SELECT ... FROM ... SINCE ..."
-          rows={3}
         />
       </div>
       <Button onClick={handleRun} disabled={running || !query.trim()} style={{ color: "#000" }}>

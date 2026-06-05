@@ -69,9 +69,9 @@ def create_newrelic_blueprint() -> Blueprint:
     @bp.route("/api/newrelic/custom-query", methods=["POST"])
     def custom_query():
         data = request.get_json()
-        validate_required_fields(data, ["api_key", "query"])
+        validate_required_fields(data, ["api_key", "account_id", "query"])
         client = _make_client(data)
-        result = client.execute_query(data["query"])
+        result = client.run_nrql(data["account_id"], data["query"])
         return jsonify({"success": True, "data": result})
 
     return bp
