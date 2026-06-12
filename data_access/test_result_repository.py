@@ -193,6 +193,7 @@ class TestResultRepository:
                 tr.performance_score, tr.accessibility_score,
                 tr.best_practices_score, tr.seo_score,
                 tr.fcp, tr.lcp, tr.cls, tr.inp, tr.ttfb,
+                tr.tbt, tr.speed_index,
                 tr.total_byte_weight, tr.tested_at
             FROM urls u
             JOIN sites s ON u.site_id = s.id

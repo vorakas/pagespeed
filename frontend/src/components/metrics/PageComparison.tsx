@@ -225,6 +225,8 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
     { metric: "CLS", site1: url1.cls, site2: url2.cls, benchmark: 0.25, format: formatCls },
     { metric: "INP", site1: url1.inp, site2: url2.inp, benchmark: 500, format: formatMilliseconds },
     { metric: "TTFB", site1: url1.ttfb, site2: url2.ttfb, benchmark: 1000, format: formatMilliseconds },
+    { metric: "TBT", site1: url1.tbt, site2: url2.tbt, benchmark: 600, format: formatMilliseconds },
+    { metric: "Speed Index", site1: url1.speed_index, site2: url2.speed_index, benchmark: 5800, format: formatMilliseconds },
   ]
   const availableVitals = cwvData.filter((item) => item.site1 !== null || item.site2 !== null)
   const site1TargetsMet = cwvData.filter((item) => item.site1 !== null && item.site1 <= item.benchmark).length
@@ -244,7 +246,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
     .sort((a, b) => b.normalizedGap - a.normalizedGap)[0]
   const biggestVitalGapLabel = biggestVitalGap
     ? `${biggestVitalGap.metric}: ${biggestVitalGap.delta > 0 ? site1Name : site2Name}`
-    : "No comparable vitals"
+    : "No comparable metrics"
   const biggestVitalGapDetail = biggestVitalGap
     ? `Higher by ${biggestVitalGap.format(Math.abs(biggestVitalGap.delta))}`
     : "Load both sides to compare"
@@ -268,17 +270,17 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
   }
   if (site1AvailableVitals > 0 && site2AvailableVitals > 0) {
     if (site1TargetsMet === site1AvailableVitals && site2TargetsMet === site2AvailableVitals) {
-      summarySentences.push("Both pages meet every measured Core Web Vitals target.")
+      summarySentences.push("Both pages meet every measured performance target.")
     } else {
       summarySentences.push(
-        `${site1Name} meets ${site1TargetsMet}/${site1AvailableVitals} Core Web Vitals targets vs ${site2TargetsMet}/${site2AvailableVitals} for ${site2Name}.`
+        `${site1Name} meets ${site1TargetsMet}/${site1AvailableVitals} performance targets vs ${site2TargetsMet}/${site2AvailableVitals} for ${site2Name}.`
       )
     }
   }
   if (biggestVitalGap) {
     const slowerName = biggestVitalGap.delta > 0 ? site1Name : site2Name
     summarySentences.push(
-      `The widest vitals gap is ${biggestVitalGap.metric}, where ${slowerName} is higher by ${biggestVitalGap.format(Math.abs(biggestVitalGap.delta))}.`
+      `The widest metric gap is ${biggestVitalGap.metric}, where ${slowerName} is higher by ${biggestVitalGap.format(Math.abs(biggestVitalGap.delta))}.`
     )
   }
   if (url1.total_byte_weight !== null && url2.total_byte_weight !== null) {
@@ -316,7 +318,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
 
         <div>
           <div className="mb-2 grid grid-cols-[minmax(120px,1fr)_76px_76px] items-end gap-3">
-            <h4 className="aurora-text text-sm font-semibold">Core Web Vitals</h4>
+            <h4 className="aurora-text text-sm font-semibold">Performance Metrics</h4>
             <span className="aurora-text-faint truncate text-right text-xs font-medium" title={site1Name}>
               {site1Name}
             </span>
@@ -330,15 +332,17 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             <MetricRow label="CLS" value1={url1.cls} value2={url2.cls} format={formatCls} />
             <MetricRow label="INP" value1={url1.inp} value2={url2.inp} format={formatMilliseconds} />
             <MetricRow label="TTFB" value1={url1.ttfb} value2={url2.ttfb} format={formatMilliseconds} />
+            <MetricRow label="TBT" value1={url1.tbt} value2={url2.tbt} format={formatMilliseconds} />
+            <MetricRow label="Speed Index" value1={url1.speed_index} value2={url2.speed_index} format={formatMilliseconds} />
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <SummaryTile
-              label="Vitals on target"
+              label="Metrics on target"
               value={`${site1TargetsMet}/${site1AvailableVitals} vs ${site2TargetsMet}/${site2AvailableVitals}`}
               detail={`${site1Name} vs ${site2Name}`}
             />
             <SummaryTile
-              label="Largest vital gap"
+              label="Largest metric gap"
               value={biggestVitalGapLabel}
               detail={biggestVitalGapDetail}
             />
