@@ -10,6 +10,7 @@ A unified operations hub for Lamps Plus, branded **Pharos**. Covers web performa
 - **PageSpeed Testing** -- Run Google PageSpeed Insights tests (mobile & desktop) on demand or via user-configurable scheduled triggers
 - **Core Web Vitals Reference** -- Built-in reference guide for LCP, FID, CLS thresholds
 - **Historical Performance** -- Track Lighthouse scores and metrics over time with comparison charts
+- **Page Comparison** -- Side-by-side comparison of the same page across sites with radar chart, vitals bars, and an auto-generated executive summary
 - **Dark/Light Mode** -- Full theme support across all pages
 
 ### New Relic Integration

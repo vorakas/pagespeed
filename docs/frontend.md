@@ -54,7 +54,7 @@ All pages render under `<div class="beacon beacon-shell dark aurora">` + `<AppSi
 
 **Dashboard (`/`)** — Worst performers per site (sortable TanStack tables), CWV reference guide, Lighthouse explanation. Desktop/Mobile strategy toggle.
 
-**Metrics (`/metrics`)** — Historical performance area chart (Recharts AreaChart, natural curve, gradient fills, shadcn dark tooltip). Date range dropdown (7/14/30/60/90 days, default 30), multiple tests per day averaged. Page Comparison (side-by-side URL with Lighthouse scores, CWV, size, diff summary).
+**Metrics (`/metrics`)** — Historical performance area chart (Recharts AreaChart, natural curve, gradient fills, shadcn dark tooltip). Date range dropdown (7/14/30/60/90 days, default 30), multiple tests per day averaged. Page Comparison (side-by-side URL with Lighthouse scores, CWV, size, diff summary, plain-English executive summary callout below the insight tiles).
 
 **Test URLs (`/test`)** — Desktop/Mobile toggle, "Test All URLs" batch testing with progress panel, site tabs, sortable 13-column results table, retest/delete per URL, performance detail dialog (score breakdown, metric weights, opportunities, failed audits).
 

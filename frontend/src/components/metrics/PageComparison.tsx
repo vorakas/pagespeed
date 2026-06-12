@@ -251,6 +251,48 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
   const lighterSiteName = weightDiff === 0 ? "Tie" : weightDiff < 0 ? site1Name : site2Name
   const lighterPageDetail = weightDiff === 0 ? "Same page weight" : `${formatBytes(Math.abs(weightDiff))} lighter`
 
+  const summarySentences: string[] = []
+  const performance1 = url1.performance_score
+  const performance2 = url2.performance_score
+  if (performance1 !== null && performance2 !== null) {
+    const rounded1 = Math.round(performance1)
+    const rounded2 = Math.round(performance2)
+    if (rounded1 === rounded2) {
+      summarySentences.push(`Both pages score ${rounded1} on Lighthouse performance.`)
+    } else {
+      const leaderName = rounded1 > rounded2 ? site1Name : site2Name
+      summarySentences.push(
+        `${leaderName} leads on Lighthouse performance, ${Math.max(rounded1, rounded2)} vs ${Math.min(rounded1, rounded2)} (${Math.abs(rounded1 - rounded2)} pts).`
+      )
+    }
+  }
+  if (site1AvailableVitals > 0 && site2AvailableVitals > 0) {
+    if (site1TargetsMet === site1AvailableVitals && site2TargetsMet === site2AvailableVitals) {
+      summarySentences.push("Both pages meet every measured Core Web Vitals target.")
+    } else {
+      summarySentences.push(
+        `${site1Name} meets ${site1TargetsMet}/${site1AvailableVitals} Core Web Vitals targets vs ${site2TargetsMet}/${site2AvailableVitals} for ${site2Name}.`
+      )
+    }
+  }
+  if (biggestVitalGap) {
+    const slowerName = biggestVitalGap.delta > 0 ? site1Name : site2Name
+    summarySentences.push(
+      `The widest vitals gap is ${biggestVitalGap.metric}, where ${slowerName} is higher by ${biggestVitalGap.format(Math.abs(biggestVitalGap.delta))}.`
+    )
+  }
+  if (url1.total_byte_weight !== null && url2.total_byte_weight !== null) {
+    if (weightDiff === 0) {
+      summarySentences.push("Page weight is identical on both sides.")
+    } else {
+      const lighterWeight = Math.min(url1.total_byte_weight, url2.total_byte_weight)
+      const heavierWeight = Math.max(url1.total_byte_weight, url2.total_byte_weight)
+      summarySentences.push(
+        `${lighterSiteName} delivers the lighter page at ${formatBytes(lighterWeight)} vs ${formatBytes(heavierWeight)} (${formatBytes(Math.abs(weightDiff))} lighter).`
+      )
+    }
+  }
+
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(420px,0.9fr)_minmax(360px,0.8fr)]">
       <div className="min-w-0 space-y-5">
@@ -306,6 +348,14 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
               detail={lighterPageDetail}
             />
           </div>
+          {summarySentences.length > 0 && (
+            <div className="aurora-callout mt-3 p-3">
+              <span className="aurora-label block">Executive summary</span>
+              <p className="aurora-text-dim mt-1.5 text-sm leading-relaxed">
+                {summarySentences.join(" ")}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
