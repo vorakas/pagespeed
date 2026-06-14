@@ -96,9 +96,10 @@ class SkuValidationService:
         }
         with self._lock:
             self._runs[run_id] = state
+            view = self._public_view(state)
 
         threading.Thread(target=self._run, args=(run_id, plan), daemon=True).start()
-        return self._public_view(state)
+        return view
 
     def get(self, run_id: str) -> dict | None:
         with self._lock:
@@ -172,7 +173,7 @@ class SkuValidationService:
     def _apply_trim(self, group: GroupDef, group_state: dict, entries: list[dict]) -> None:
         passing = [e["value"] for e in entries if e["ok"]]
         kept = passing[: group.max_passing]
-        group_state["trimmed_csv"] = "\n".join(kept) + ("\n" if kept else "")
+        group_state["trimmed_csv"] = ("\n".join(kept) + "\n") if kept else None
         if len(kept) < group.max_passing:
             group_state["note"] = (
                 f"Only {len(kept)} of {len(entries)} passed — cannot reach "
