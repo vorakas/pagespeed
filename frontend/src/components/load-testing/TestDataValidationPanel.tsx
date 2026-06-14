@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Upload, ExternalLink, Download, Loader2 } from "lucide-react"
+import { Upload, ExternalLink, Download, Loader2, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { api } from "@/services/api"
 import type { TestDataGroupListing, TestDataListing, ValidationSiteKey } from "@/types"
@@ -11,6 +11,7 @@ export function TestDataValidationPanel() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fileCount, setFileCount] = useState(0)
+  const [open, setOpen] = useState(true)
 
   const handleFiles = async (files: File[]) => {
     setFileCount(files.length)
@@ -30,43 +31,60 @@ export function TestDataValidationPanel() {
 
   return (
     <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">TestData SKU links</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Upload the BlazeMeter <code>TestData/*.csv</code> files. Pharos builds each entry's mcprod
-          and www URL so you can open and check every SKU before a load test. MoreLikeThis is capped
-          to 5.
-        </p>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          {fileCount > 0 ? `${fileCount} file(s) selected` : "Choose CSV files"}
-          <input
-            type="file"
-            multiple
-            accept=".csv"
-            className="hidden"
-            onChange={(e) => void handleFiles(Array.from(e.target.files ?? []))}
-          />
-        </label>
-      </div>
-
-      {error ? <p className="mt-3 text-sm text-red-500">{error}</p> : null}
-
-      {listing && listing.unrecognized.length > 0 ? (
-        <p className="mt-3 text-sm text-amber-500">
-          Unrecognized files (skipped): {listing.unrecognized.join(", ")}
-        </p>
-      ) : null}
-
-      {groups.length > 0 ? (
-        <div className="mt-4 space-y-3">
-          {groups.map((g) => (
-            <GroupCard key={g.key} group={g} />
-          ))}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start justify-between gap-3 text-left"
+      >
+        <div>
+          <h2 className="text-base font-semibold text-foreground">TestData SKU links</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Upload the BlazeMeter <code>TestData/*.csv</code> files. Pharos builds each entry's
+            mcprod and www URL so you can open and check every SKU before a load test. MoreLikeThis
+            is capped to 5.
+          </p>
         </div>
+        <ChevronDown
+          className={`mt-1 h-5 w-5 shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`}
+        />
+      </button>
+
+      {open ? (
+        <>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted">
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              {fileCount > 0 ? `${fileCount} file(s) selected` : "Choose CSV files"}
+              <input
+                type="file"
+                multiple
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => void handleFiles(Array.from(e.target.files ?? []))}
+              />
+            </label>
+          </div>
+
+          {error ? <p className="mt-3 text-sm text-red-500">{error}</p> : null}
+
+          {listing && listing.unrecognized.length > 0 ? (
+            <p className="mt-3 text-sm text-amber-500">
+              Unrecognized files (skipped): {listing.unrecognized.join(", ")}
+            </p>
+          ) : null}
+
+          {groups.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              {groups.map((g) => (
+                <GroupCard key={g.key} group={g} />
+              ))}
+            </div>
+          ) : null}
+        </>
       ) : null}
     </section>
   )
@@ -105,7 +123,12 @@ function GroupCard({ group }: { group: TestDataGroupListing }) {
         ) : null}
       </div>
 
-      <table className="mt-2 w-full text-left text-xs">
+      <table className="mt-2 w-full table-fixed text-left text-xs">
+        <colgroup>
+          <col />
+          <col className="w-24" />
+          <col className="w-24" />
+        </colgroup>
         <thead className="text-muted-foreground">
           <tr>
             <th className="py-1 pr-3">Value</th>
