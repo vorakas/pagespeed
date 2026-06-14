@@ -44,6 +44,7 @@ import { Label } from "@/components/ui/label"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { BlazemeterMasterReportPanel } from "@/components/load-testing/BlazemeterMasterReportPanel"
+import { TestDataValidationPanel } from "@/components/load-testing/TestDataValidationPanel"
 import { api } from "@/services/api"
 import type {
   BlazemeterConfigStatus,
@@ -594,6 +595,8 @@ export function LoadTesting() {
       />
       <div className="pb-8">
       <div className="mx-3 mt-3 space-y-3">
+        <TestDataValidationPanel />
+
         {/* ---------- Config status ---------- */}
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-start justify-between gap-4">

@@ -24,6 +24,7 @@ from routes.pages import create_pages_blueprint
 from routes.requirements_api import create_requirements_blueprint
 from routes.sites_api import create_sites_blueprint
 from routes.testing_api import create_testing_blueprint
+from routes.testdata_validation_api import create_testdata_validation_blueprint
 from routes.triggers_api import create_triggers_blueprint
 from services.applitools_storage import ApplitoolsBatchStore
 from services.autofix_ingest_service import AutofixIngestService
@@ -37,6 +38,7 @@ from services.requirement_kb_service import RequirementKbService
 from services.site_service import SiteService
 from services.snapshot_service import SnapshotService
 from services.testing_service import TestingService
+from services.sku_validation_service import SkuValidationService
 from services.trigger_service import TriggerService
 from services.vault_git_service import VaultGitService
 
@@ -70,6 +72,7 @@ def register_blueprints(
     autofix_repository: "AutofixRepository | None" = None,
     autofix_ingest_service: "AutofixIngestService | None" = None,
     autofix_pipeline_ids: "list | None" = None,
+    sku_validation_service: "SkuValidationService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -143,4 +146,8 @@ def register_blueprints(
                 webhook_secret=github_webhook_secret,
                 on_vault_refreshed=on_vault_refreshed,
             )
+        )
+    if sku_validation_service is not None:
+        app.register_blueprint(
+            create_testdata_validation_blueprint(sku_validation_service)
         )
