@@ -1,17 +1,15 @@
-"""TestData group registry for SKU/page validation.
+"""TestData group registry for SKU/page URL listing.
 
-Maps each canonical BlazeMeter TestData CSV to the URL it produces and the
-site-specific CSS readiness selector that proves the page rendered a usable
-product/listing.  Derived directly from the JMeter load-test assertions, so a
-"pass" here means the corresponding JMeter readiness assertion will pass.
+Maps each canonical BlazeMeter TestData CSV to the browser-openable URL it
+produces, plus the site-specific CSS readiness selector the JMeter load test
+asserts on (kept as reference for what "loaded correctly" means per group).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from urllib.parse import quote
 
-# Base origins for the two environments we validate against.
+# Base origins for the two environments.
 SITES: dict[str, str] = {
     "mcprod": "https://mcprod.lampsplus.com",
     "www": "https://www.lampsplus.com",
@@ -26,9 +24,9 @@ class GroupDef:
     label: str
     csv_filename: str
     path_template: str           # e.g. "/p/{v}"; {v} = column-A value
-    selectors: dict[str, str]    # site key -> CSS readiness selector
+    selectors: dict[str, str]    # site key -> CSS readiness selector (JMeter reference)
     is_search_to_pdp: bool = False
-    max_passing: int | None = None   # cap of passing rows to keep (MoreLikeThis = 5)
+    max_rows: int | None = None   # cap of rows to keep/show (MoreLikeThis = 5)
 
 
 # Add-to-cart proves a PDP/SFP rendered a buyable product.
@@ -59,7 +57,7 @@ GROUPS: dict[str, GroupDef] = {
             "mcprod": ".more-like-this-page-header",
             "www": "body#bdMoreLikeThis .jsMainContainer.moreLikeThis .sortResultContainer",
         },
-        max_passing=5,
+        max_rows=5,
     ),
     "SearchBR": GroupDef(
         key="SearchBR", label="SearchBR", csv_filename="SearchBR.csv",
@@ -75,7 +73,7 @@ GROUPS: dict[str, GroupDef] = {
     ),
     "SearchToPDP": GroupDef(
         key="SearchToPDP", label="SearchToPDP", csv_filename="SearchToPDP.csv",
-        path_template="",  # special-cased via search_to_pdp_api_url()
+        path_template="",  # no static page; see open_url()
         selectors=dict(_PDP_SELECTORS), is_search_to_pdp=True,
     ),
 }
@@ -90,19 +88,14 @@ def group_for_filename(filename: str) -> GroupDef | None:
     return None
 
 
-def build_url(group: GroupDef, site_key: str, value: str) -> str:
-    """Build the full URL for a column-A value (non-SearchToPDP groups)."""
+def open_url(group: GroupDef, site_key: str, value: str) -> str:
+    """Browser-openable URL for a column-A value.
+
+    For most groups this is the URL the load test hits.  SearchToPDP has no
+    single static page (the load test resolves the SKU via the EDS search API),
+    so we point at the search-results URL for that SKU, which redirects to the
+    PDP in a browser.
+    """
+    if group.is_search_to_pdp:
+        return f"{SITES[site_key]}/s/s_{value}/?s=1"
     return f"{SITES[site_key]}{group.path_template.format(v=value)}"
-
-
-def selector_for(group: GroupDef, site_key: str) -> str:
-    """Return the readiness CSS selector for a group on a given site."""
-    return group.selectors[site_key]
-
-
-def search_to_pdp_api_url(site_key: str, sku: str) -> str:
-    """Build the EDS search-request API URL that redirects a SKU to its PDP."""
-    host = SITES[site_key].replace("https://", "")
-    u = quote(f"https://{host}/s/s_{sku}/?s=1", safe="")
-    r = quote(f"https://{host}/", safe="")
-    return f"{SITES[site_key]}/api/v1/web/eds/search-request?u={u}&g=guest&r={r}"

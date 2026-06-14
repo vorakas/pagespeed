@@ -1,48 +1,30 @@
-"""TestData SKU validation blueprint.
+"""TestData URL listing blueprint.
 
-Thin route layer: accepts CSV uploads, kicks off validation, exposes run
-status, and serves the trimmed CSV download.
+Thin route layer: accepts CSV uploads and returns the per-site openable URLs
+grouped by CSV.  No server-side validation — the user opens the links to check
+each SKU in their own browser.
 """
 
 from __future__ import annotations
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, jsonify, request
 
 from exceptions import ValidationError
-from services.sku_validation_service import SkuValidationService
+from services.testdata_url_service import TestDataUrlService
 
 
 def create_testdata_validation_blueprint(
-    service: SkuValidationService,
+    service: TestDataUrlService,
 ) -> Blueprint:
     bp = Blueprint("testdata_validation_api", __name__)
 
-    @bp.post("/api/testdata/validate")
-    def validate():
+    @bp.post("/api/testdata/urls")
+    def build_urls():
         files = request.files.getlist("files")
         if not files:
             raise ValidationError("At least one CSV file is required")
         sites = request.form.getlist("sites") or ["mcprod", "www"]
         parsed = [(f.filename or "upload.csv", f.read()) for f in files]
-        state = service.start(parsed, sites)
-        return jsonify(state), 202
-
-    @bp.get("/api/testdata/validate/<run_id>")
-    def status(run_id: str):
-        state = service.get(run_id)
-        if state is None:
-            raise ValidationError("Unknown validation run")
-        return jsonify(state)
-
-    @bp.get("/api/testdata/validate/<run_id>/trimmed/<group_key>")
-    def trimmed(run_id: str, group_key: str):
-        csv_text = service.get_trimmed_csv(run_id, group_key)
-        if csv_text is None:
-            raise ValidationError("No trimmed CSV available for this group")
-        return Response(
-            csv_text,
-            mimetype="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="{group_key}.csv"'},
-        )
+        return jsonify(service.build_listing(parsed, sites))
 
     return bp

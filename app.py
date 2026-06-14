@@ -222,11 +222,10 @@ def create_app() -> Flask:
     site_service = SiteService(site_repo, url_repo, test_result_repo)
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
 
-    # ---- TestData SKU validation (no external creds; validates public sites) ----
-    from services.page_validator import PageValidator
-    from services.sku_validation_service import SkuValidationService
+    # ---- TestData URL listing (builds openable URLs from uploaded CSVs) ----
+    from services.testdata_url_service import TestDataUrlService
 
-    sku_validation_service = SkuValidationService(PageValidator())
+    testdata_url_service = TestDataUrlService()
 
     # Persist Applitools batches uploaded by the desktop helper so QA
     # uploads survive restarts, redeploys, and future worker scaling.
@@ -554,7 +553,7 @@ def create_app() -> Flask:
         autofix_repository=autofix_repo,
         autofix_ingest_service=autofix_ingest_service,
         autofix_pipeline_ids=AUTOFIX_PIPELINE_IDS,
-        sku_validation_service=sku_validation_service,
+        testdata_url_service=testdata_url_service,
     )
 
     # ---- Centralized error handlers ----

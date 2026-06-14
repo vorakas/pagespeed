@@ -38,7 +38,7 @@ from services.requirement_kb_service import RequirementKbService
 from services.site_service import SiteService
 from services.snapshot_service import SnapshotService
 from services.testing_service import TestingService
-from services.sku_validation_service import SkuValidationService
+from services.testdata_url_service import TestDataUrlService
 from services.trigger_service import TriggerService
 from services.vault_git_service import VaultGitService
 
@@ -72,7 +72,7 @@ def register_blueprints(
     autofix_repository: "AutofixRepository | None" = None,
     autofix_ingest_service: "AutofixIngestService | None" = None,
     autofix_pipeline_ids: "list | None" = None,
-    sku_validation_service: "SkuValidationService | None" = None,
+    testdata_url_service: "TestDataUrlService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -147,7 +147,7 @@ def register_blueprints(
                 on_vault_refreshed=on_vault_refreshed,
             )
         )
-    if sku_validation_service is not None:
+    if testdata_url_service is not None:
         app.register_blueprint(
-            create_testdata_validation_blueprint(sku_validation_service)
+            create_testdata_validation_blueprint(testdata_url_service)
         )

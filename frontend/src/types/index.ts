@@ -1656,40 +1656,28 @@ export interface ComparisonUrl {
   site_name: string
 }
 
-// ---------- TestData SKU Validation ----------
+// ---------- TestData URL listing ----------
 
 export type ValidationSiteKey = "mcprod" | "www"
 
-export interface TestDataSiteResult {
-  ok: boolean
-  reason: string
-  final_url: string
-}
-
-export interface TestDataEntry {
+export interface TestDataUrlEntry {
   value: string
-  ok: boolean
-  sites: Partial<Record<ValidationSiteKey, TestDataSiteResult>>
+  urls: Partial<Record<ValidationSiteKey, string>>
 }
 
-export interface TestDataGroupResult {
+export interface TestDataGroupListing {
   key: string
   label: string
   filename: string
   totalRows: number
-  entries: TestDataEntry[]
-  note: string | null
-  hasTrimmed: boolean
-  allPassed: boolean | null
+  shownRows: number
+  capped: boolean
+  maxRows: number | null
+  entries: TestDataUrlEntry[]
+  trimmedCsv: string | null
 }
 
-export interface TestDataValidationRun {
-  runId: string
-  status: "running" | "complete" | "error"
-  siteKeys: ValidationSiteKey[]
-  total: number
-  completed: number
-  groups: Record<string, TestDataGroupResult>
+export interface TestDataListing {
+  groups: Record<string, TestDataGroupListing>
   unrecognized: string[]
-  error: string | null
 }

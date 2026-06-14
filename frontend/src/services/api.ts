@@ -75,7 +75,7 @@ import type {
   AutofixFix,
   AutofixRefreshSummary,
   AutofixFixPatch,
-  TestDataValidationRun,
+  TestDataListing,
   ValidationSiteKey,
 } from "@/types"
 
@@ -1107,16 +1107,16 @@ class ApiClient {
     return this.request("/api/requirements/ai-usage")
   }
 
-  // ---------- TestData SKU validation ----------
+  // ---------- TestData URL listing ----------
 
-  async startTestDataValidation(
+  async buildTestDataUrls(
     files: File[],
     sites: ValidationSiteKey[],
-  ): Promise<TestDataValidationRun> {
+  ): Promise<TestDataListing> {
     const formData = new FormData()
     files.forEach((file) => formData.append("files", file))
     sites.forEach((site) => formData.append("sites", site))
-    const response = await fetch(`${this.baseUrl}/api/testdata/validate`, {
+    const response = await fetch(`${this.baseUrl}/api/testdata/urls`, {
       method: "POST",
       body: formData,
     })
@@ -1125,14 +1125,6 @@ class ApiClient {
       throw new Error(errorData.error || `Request failed: ${response.status}`)
     }
     return response.json()
-  }
-
-  async getTestDataValidation(runId: string): Promise<TestDataValidationRun> {
-    return this.request<TestDataValidationRun>(`/api/testdata/validate/${runId}`)
-  }
-
-  testDataTrimmedUrl(runId: string, groupKey: string): string {
-    return `${this.baseUrl}/api/testdata/validate/${runId}/trimmed/${groupKey}`
   }
 }
 
