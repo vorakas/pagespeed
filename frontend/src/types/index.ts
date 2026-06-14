@@ -1655,3 +1655,41 @@ export interface ComparisonUrl {
   url: string
   site_name: string
 }
+
+// ---------- TestData SKU Validation ----------
+
+export type ValidationSiteKey = "mcprod" | "www"
+
+export interface TestDataSiteResult {
+  ok: boolean
+  reason: string
+  final_url: string
+}
+
+export interface TestDataEntry {
+  value: string
+  ok: boolean
+  sites: Partial<Record<ValidationSiteKey, TestDataSiteResult>>
+}
+
+export interface TestDataGroupResult {
+  key: string
+  label: string
+  filename: string
+  totalRows: number
+  entries: TestDataEntry[]
+  note: string | null
+  hasTrimmed: boolean
+  allPassed: boolean | null
+}
+
+export interface TestDataValidationRun {
+  runId: string
+  status: "running" | "complete" | "error"
+  siteKeys: ValidationSiteKey[]
+  total: number
+  completed: number
+  groups: Record<string, TestDataGroupResult>
+  unrecognized: string[]
+  error: string | null
+}

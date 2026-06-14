@@ -75,6 +75,8 @@ import type {
   AutofixFix,
   AutofixRefreshSummary,
   AutofixFixPatch,
+  TestDataValidationRun,
+  ValidationSiteKey,
 } from "@/types"
 
 export class RateLimitError extends Error {
@@ -1103,6 +1105,34 @@ class ApiClient {
 
   async getAiUsageSummary(): Promise<AiUsageSummary> {
     return this.request("/api/requirements/ai-usage")
+  }
+
+  // ---------- TestData SKU validation ----------
+
+  async startTestDataValidation(
+    files: File[],
+    sites: ValidationSiteKey[],
+  ): Promise<TestDataValidationRun> {
+    const formData = new FormData()
+    files.forEach((file) => formData.append("files", file))
+    sites.forEach((site) => formData.append("sites", site))
+    const response = await fetch(`${this.baseUrl}/api/testdata/validate`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(errorData.error || `Request failed: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async getTestDataValidation(runId: string): Promise<TestDataValidationRun> {
+    return this.request<TestDataValidationRun>(`/api/testdata/validate/${runId}`)
+  }
+
+  testDataTrimmedUrl(runId: string, groupKey: string): string {
+    return `${this.baseUrl}/api/testdata/validate/${runId}/trimmed/${groupKey}`
   }
 }
 
