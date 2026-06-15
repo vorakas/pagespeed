@@ -190,7 +190,7 @@ export function TestUrls() {
       <div className="space-y-6 p-6">
         {/* Test Controls */}
         <div className="flex items-center gap-3">
-          <Button onClick={handleTestAll} disabled={testing || !hasUrls} style={{ color: "#000" }}>
+          <Button onClick={handleTestAll} disabled={testing || !hasUrls}>
             <Rocket className="h-4 w-4" />
             Test All URLs
           </Button>
