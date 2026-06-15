@@ -14,6 +14,7 @@ from routes.autofix_api import create_autofix_blueprint
 from routes.applitools_api import create_applitools_blueprint
 from routes.azure_api import create_azure_blueprint
 from routes.blazemeter_api import create_blazemeter_blueprint
+from routes.csv_lighthouse_api import create_csv_lighthouse_blueprint
 from routes.dashboard_api import create_dashboard_blueprint
 from routes.devops_api import create_devops_blueprint
 from routes.github_webhook_api import create_github_webhook_blueprint
@@ -31,6 +32,7 @@ from services.autofix_ingest_service import AutofixIngestService
 from services.ai_config_service import AiConfigService
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
+from services.csv_lighthouse_service import CsvLighthouseService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService
 from services.qa_testing_service import QaTestingReportService
@@ -51,6 +53,7 @@ def register_blueprints(
     trigger_service: TriggerService,
     blazemeter_preset_repo: BlazemeterPresetRepository,
     blazemeter_run_repo: BlazemeterRunRepository,
+    csv_lighthouse_service: CsvLighthouseService,
     blazemeter_client: "BlazemeterClient | None" = None,
     blazemeter_queue: "BlazemeterQueueService | None" = None,
     obsidian_sync_service: "ObsidianSyncService | None" = None,
@@ -88,6 +91,7 @@ def register_blueprints(
     app.register_blueprint(create_testing_blueprint(testing_service))
     app.register_blueprint(create_metrics_blueprint(test_result_repo))
     app.register_blueprint(create_triggers_blueprint(trigger_service))
+    app.register_blueprint(create_csv_lighthouse_blueprint(csv_lighthouse_service))
     app.register_blueprint(create_newrelic_blueprint())
     app.register_blueprint(create_azure_blueprint())
     app.register_blueprint(create_ai_blueprint(ai_config_service))
