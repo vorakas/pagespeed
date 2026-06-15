@@ -114,7 +114,8 @@ class CsvLighthouseService:
     ) -> dict:
         strategy = self._validate_strategy(strategy)
         site_keys = self._validate_site_keys(site_keys)
-        items = self._build_items(files, site_keys, strategy)
+        file_records = self._read_file_records(files)
+        items = self._build_items_from_file_records(file_records, site_keys, strategy)
         if not items:
             raise ValidationError("Upload did not contain any recognized CSV rows")
         if len(items) > CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN:
@@ -131,13 +132,16 @@ class CsvLighthouseService:
             target_budget_seconds=TARGET_BUDGET_SECONDS,
             total_items=len(items),
         )
+        for file_record in file_records:
+            self.repository.create_file(
+                run_id,
+                file_record["filename"],
+                file_record["group_key"],
+                file_record["csv_text"],
+                file_record["row_count"],
+            )
         if items:
             self.repository.create_items(run_id, items)
-        if self.start_background:
-            thread = threading.Thread(
-                target=self.run_pending_items, args=(run_id,), daemon=False
-            )
-            thread.start()
         return {
             "run_id": run_id,
             "worker_count": worker_count,
@@ -149,6 +153,63 @@ class CsvLighthouseService:
 
     def get_run(self, run_id: int):
         return self.repository.get_run_detail(run_id)
+
+    def start_run(self, run_id: int):
+        detail = self.repository.get_run_detail(run_id)
+        run = detail["run"]
+        if not run:
+            raise ValidationError("CSV Lighthouse run not found")
+        if run["status"] != "pending":
+            raise ValidationError("CSV Lighthouse run can only be started while pending")
+
+        self.repository.mark_run_running(run_id)
+        if self.start_background:
+            thread = threading.Thread(
+                target=self.run_pending_items, args=(run_id,), daemon=False
+            )
+            thread.start()
+            return self.repository.get_run_detail(run_id)
+
+        self.run_pending_items(run_id)
+        return self.repository.get_run_detail(run_id)
+
+    def list_files(self, run_id: int) -> list[dict]:
+        return self.repository.list_files(run_id)
+
+    def get_file(self, file_id: int) -> dict | None:
+        return self.repository.get_file(file_id)
+
+    def update_file(self, file_id: int, csv_text: str) -> dict:
+        file = self.repository.get_file(file_id)
+        if not file:
+            raise ValidationError("CSV file not found")
+        run_id = file["run_id"]
+        if not self.repository.run_is_editable(run_id):
+            raise ValidationError("CSV files can only be edited before the run starts")
+        group = group_for_filename(file["filename"])
+        if group is None:
+            raise ValidationError("CSV file has an unrecognized filename")
+        values = parse_column_a(
+            csv_text.encode("utf-8"),
+            group,
+            filename=file["filename"],
+        )
+        if group.max_rows is not None:
+            values = values[: group.max_rows]
+        normalized_text = self._csv_text_from_values(values)
+        self.repository.update_file(file_id, normalized_text, len(values))
+        self._rebuild_pending_items_from_files(run_id)
+        return self.repository.get_file(file_id)
+
+    def delete_file(self, file_id: int) -> None:
+        file = self.repository.get_file(file_id)
+        if not file:
+            raise ValidationError("CSV file not found")
+        run_id = file["run_id"]
+        if not self.repository.run_is_editable(run_id):
+            raise ValidationError("CSV files can only be deleted before the run starts")
+        self.repository.delete_file(file_id)
+        self._rebuild_pending_items_from_files(run_id)
 
     def cancel_run(self, run_id: int):
         self.repository.request_cancel(run_id)
@@ -250,17 +311,76 @@ class CsvLighthouseService:
             )
         return output.getvalue()
 
-    def _build_items(self, files, site_keys: list[str], strategy: str) -> list[dict]:
-        items = []
-        seen = set()
+    def _read_file_records(self, files) -> list[dict]:
+        records = []
         for filename, handle in files:
             group = group_for_filename(filename)
             if group is None:
                 continue
             file_bytes = self._read_limited_file(filename, handle)
-            rows = parse_column_a(file_bytes, group, filename=filename)
-            max_rows = group.max_rows if group.max_rows is not None else len(rows)
-            for original_value in rows[:max_rows]:
+            rows = parse_column_a(
+                file_bytes,
+                group,
+                filename=filename,
+            )
+            if group.max_rows is not None:
+                rows = rows[: group.max_rows]
+            records.append(
+                {
+                    "filename": filename,
+                    "group_key": group.key,
+                    "csv_text": self._csv_text_from_values(rows),
+                    "row_count": len(rows),
+                    "values": rows,
+                }
+            )
+        return records
+
+    def _rebuild_pending_items_from_files(self, run_id: int) -> None:
+        detail = self.repository.get_run_detail(run_id)
+        run = detail["run"]
+        if not run:
+            raise ValidationError("CSV Lighthouse run not found")
+        file_records = []
+        for file in self.repository.list_files(run_id):
+            values = [
+                str(value).strip()
+                for value in file["csv_text"].splitlines()
+                if str(value).strip()
+            ]
+            file_records.append(
+                {
+                    "filename": file["filename"],
+                    "group_key": file["group_key"],
+                    "values": values,
+                }
+            )
+        items = self._build_items_from_file_records(
+            file_records,
+            run["site_keys"],
+            run["strategy"],
+        )
+        if len(items) > CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN:
+            raise ValidationError(
+                "CSV Lighthouse run would create "
+                f"{len(items)} items; maximum is {CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN}"
+            )
+        self.repository.replace_pending_items(run_id, items)
+
+    def _build_items_from_file_records(
+        self,
+        file_records: list[dict],
+        site_keys: list[str],
+        strategy: str,
+    ) -> list[dict]:
+        items = []
+        seen = set()
+        for file_record in file_records:
+            filename = file_record["filename"]
+            group = group_for_filename(filename)
+            if group is None:
+                continue
+            for original_value in file_record["values"]:
                 for site_key in site_keys:
                     generated_url = open_url(group, site_key, original_value)
                     dedupe_key = (site_key, generated_url, strategy)
@@ -278,6 +398,17 @@ class CsvLighthouseService:
                         }
                     )
         return items
+
+    def _build_items(self, files, site_keys: list[str], strategy: str) -> list[dict]:
+        return self._build_items_from_file_records(
+            self._read_file_records(files),
+            site_keys,
+            strategy,
+        )
+
+    @staticmethod
+    def _csv_text_from_values(values: list[str]) -> str:
+        return "\n".join(values) + ("\n" if values else "")
 
     def recover_interrupted_runs(self) -> int:
         return self.repository.recover_interrupted_runs(

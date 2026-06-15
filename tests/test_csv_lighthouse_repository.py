@@ -339,6 +339,91 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
                 ],
             )
 
+    def test_run_files_round_trip(self):
+        run_id = self.repo.create_run("Files", "desktop", ["www"], 1, 540, 0)
+
+        file_id = self.repo.create_file(
+            run_id,
+            filename="PDP.csv",
+            group_key="PDP",
+            csv_text="brass-lamp/\nfloor-lamp/\n",
+            row_count=2,
+        )
+        files = self.repo.list_files(run_id)
+
+        self.assertEqual(files[0]["id"], file_id)
+        self.assertEqual(files[0]["filename"], "PDP.csv")
+        self.assertEqual(files[0]["group_key"], "PDP")
+        self.assertEqual(files[0]["row_count"], 2)
+        self.assertEqual(files[0]["csv_text"], "brass-lamp/\nfloor-lamp/\n")
+
+    def test_update_file_replaces_text_and_row_count(self):
+        run_id = self.repo.create_run("Files", "desktop", ["www"], 1, 540, 0)
+        file_id = self.repo.create_file(run_id, "PDP.csv", "PDP", "old/\n", 1)
+
+        self.repo.update_file(file_id, "new/\nother/\n", 2)
+        saved = self.repo.get_file(file_id)
+
+        self.assertEqual(saved["csv_text"], "new/\nother/\n")
+        self.assertEqual(saved["row_count"], 2)
+
+    def test_delete_file_removes_saved_file(self):
+        run_id = self.repo.create_run("Files", "desktop", ["www"], 1, 540, 0)
+        file_id = self.repo.create_file(run_id, "PDP.csv", "PDP", "old/\n", 1)
+
+        self.repo.delete_file(file_id)
+
+        self.assertEqual(self.repo.list_files(run_id), [])
+
+    def test_replace_pending_items_rebuilds_total_items(self):
+        run_id = self.repo.create_run("Files", "desktop", ["www"], 1, 540, 1)
+        self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "old/",
+                    "generated_url": "https://www.lampsplus.com/p/old/",
+                    "strategy": "desktop",
+                }
+            ],
+        )
+
+        item_ids = self.repo.replace_pending_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "new/",
+                    "generated_url": "https://www.lampsplus.com/p/new/",
+                    "strategy": "desktop",
+                },
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "other/",
+                    "generated_url": "https://www.lampsplus.com/p/other/",
+                    "strategy": "desktop",
+                },
+            ],
+        )
+        detail = self.repo.get_run_detail(run_id)
+
+        self.assertEqual(len(item_ids), 2)
+        self.assertEqual(detail["run"]["total_items"], 2)
+        self.assertEqual(
+            [item["generated_url"] for item in detail["items"]],
+            [
+                "https://www.lampsplus.com/p/new/",
+                "https://www.lampsplus.com/p/other/",
+            ],
+        )
+
     def test_raw_sqlite_connection_enforces_csv_item_foreign_key(self):
         with self.conn_mgr.get_connection() as conn:
             cursor = conn.cursor()

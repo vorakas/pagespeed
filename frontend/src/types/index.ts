@@ -1716,6 +1716,17 @@ export interface CsvLighthouseItem {
   created_at?: string
 }
 
+export interface CsvLighthouseFile {
+  id: number
+  run_id: number
+  filename: string
+  group_key: string
+  csv_text: string
+  row_count: number
+  created_at: string
+  updated_at: string
+}
+
 export interface CsvLighthouseRunDetail {
   run: CsvLighthouseRun
   items: CsvLighthouseItem[]

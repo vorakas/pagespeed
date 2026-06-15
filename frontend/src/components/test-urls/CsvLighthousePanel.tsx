@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Download, FileText, Loader2, Play, Square } from "lucide-react"
+import { Download, FileText, Loader2, Play, Square, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
+import { CsvLighthouseFilesPanel } from "@/components/test-urls/CsvLighthouseFilesPanel"
 import { CsvLighthouseResultsTable } from "@/components/test-urls/CsvLighthouseResultsTable"
 import { api } from "@/services/api"
 import type {
@@ -74,6 +75,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
   const [selectedDetail, setSelectedDetail] = useState<CsvLighthouseRunDetail | null>(null)
   const [activeRunId, setActiveRunId] = useState<number | null>(null)
   const [starting, setStarting] = useState(false)
+  const [launching, setLaunching] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [loadingRuns, setLoadingRuns] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
@@ -86,7 +88,8 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
     : 0
   const progress = selectedRun?.total_items ? Math.round((processedItems / selectedRun.total_items) * 100) : 0
   const canStart = files.length > 0 && selectedTargets.length > 0 && !starting
-  const canCancel = Boolean(activeRun && !cancelling)
+  const canRunSelected = Boolean(selectedRun?.status === "pending" && !launching)
+  const canCancel = Boolean(activeRun?.status === "running" && !cancelling)
   const canDownload = Boolean(selectedRun && exportableStatuses.includes(selectedRun.status))
   const largeRunWarning = files.length >= 3 || (selectedRun?.total_items ?? 0) >= 100
 
@@ -174,7 +177,6 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
         strategy,
         label,
       })
-      setActiveRunId(response.run_id)
       setFiles([])
       setFileInputKey((current) => current + 1)
       await loadRuns()
@@ -183,6 +185,24 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
       setError(err instanceof Error ? err.message : "Unable to start CSV Lighthouse run")
     } finally {
       setStarting(false)
+    }
+  }
+
+  const handleRunSelected = async () => {
+    if (!selectedRun || !canRunSelected) return
+
+    setLaunching(true)
+    setError(null)
+    try {
+      const response = await api.startCsvLighthouseRun(selectedRun.id)
+      setSelectedDetail({ run: response.run, items: response.items })
+      setActiveRunId(response.run.id)
+      await loadRuns()
+      await loadRunDetail(response.run.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to run CSV Lighthouse")
+    } finally {
+      setLaunching(false)
     }
   }
 
@@ -239,6 +259,10 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRunSelected} disabled={!canRunSelected}>
+              {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              Run Lighthouse
+            </Button>
             <Button variant="outline" size="sm" onClick={handleCancel} disabled={!canCancel}>
               {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
               Cancel
@@ -281,8 +305,8 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
               />
             </div>
             <Button onClick={handleStart} disabled={!canStart} className="h-9">
-              {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              Start
+              {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Save CSVs
             </Button>
           </div>
 
@@ -327,6 +351,17 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                 <p className="text-sm text-[color:var(--lcc-red)]">{selectedRun.error_message}</p>
               )}
             </div>
+          )}
+
+          {selectedRun && (
+            <CsvLighthouseFilesPanel
+              runId={selectedRun.id}
+              editable={selectedRun.status === "pending"}
+              onFilesChanged={async () => {
+                await loadRunDetail(selectedRun.id)
+                await loadRuns()
+              }}
+            />
           )}
 
           {loadingDetail ? (

@@ -83,6 +83,137 @@ class CsvLighthouseRepository:
         except Exception as exc:
             raise DatabaseError(f"Failed to create CSV Lighthouse items: {exc}") from exc
 
+    def create_file(
+        self,
+        run_id: int,
+        filename: str,
+        group_key: str,
+        csv_text: str,
+        row_count: int,
+    ) -> int:
+        ph = self._cm.placeholder()
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                if not self._run_exists(cursor, run_id):
+                    raise DatabaseError(f"CSV Lighthouse run {run_id} does not exist")
+                cursor.execute(
+                    f"""
+                    INSERT INTO csv_lighthouse_files (
+                        run_id, filename, group_key, csv_text, row_count
+                    )
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph})
+                    {self._cm.returning_id()}
+                    """,
+                    (run_id, filename, group_key, csv_text, row_count),
+                )
+                return self._cm.last_insert_id(cursor)
+        except DatabaseError:
+            raise
+        except Exception as exc:
+            raise DatabaseError(f"Failed to create CSV Lighthouse file: {exc}") from exc
+
+    def list_files(self, run_id: int) -> list[dict]:
+        ph = self._cm.placeholder()
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT *
+                FROM csv_lighthouse_files
+                WHERE run_id = {ph}
+                ORDER BY filename, id
+                """,
+                (run_id,),
+            )
+            return self._cm.rows_to_dicts(cursor)
+
+    def get_file(self, file_id: int) -> dict | None:
+        ph = self._cm.placeholder()
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT * FROM csv_lighthouse_files WHERE id = {ph}", (file_id,))
+            return self._cm.row_to_dict(cursor)
+
+    def update_file(self, file_id: int, csv_text: str, row_count: int) -> None:
+        ph = self._cm.placeholder()
+        try:
+            with self._cm.get_connection() as conn:
+                conn.cursor().execute(
+                    f"""
+                    UPDATE csv_lighthouse_files
+                    SET csv_text = {ph},
+                        row_count = {ph},
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = {ph}
+                    """,
+                    (csv_text, row_count, file_id),
+                )
+        except Exception as exc:
+            raise DatabaseError(f"Failed to update CSV Lighthouse file {file_id}: {exc}") from exc
+
+    def delete_file(self, file_id: int) -> None:
+        ph = self._cm.placeholder()
+        try:
+            with self._cm.get_connection() as conn:
+                conn.cursor().execute(
+                    f"DELETE FROM csv_lighthouse_files WHERE id = {ph}",
+                    (file_id,),
+                )
+        except Exception as exc:
+            raise DatabaseError(f"Failed to delete CSV Lighthouse file {file_id}: {exc}") from exc
+
+    def replace_pending_items(self, run_id: int, items: list[dict]) -> list[int]:
+        ph = self._cm.placeholder()
+        item_ids: list[int] = []
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                if not self._run_exists(cursor, run_id):
+                    raise DatabaseError(f"CSV Lighthouse run {run_id} does not exist")
+                cursor.execute(
+                    f"DELETE FROM csv_lighthouse_items WHERE run_id = {ph} AND status = 'pending'",
+                    (run_id,),
+                )
+                for item in items:
+                    cursor.execute(
+                        f"""
+                        INSERT INTO csv_lighthouse_items (
+                            run_id, source_filename, group_key, site_key,
+                            original_value, generated_url, strategy
+                        )
+                        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                        {self._cm.returning_id()}
+                        """,
+                        (
+                            run_id,
+                            item["source_filename"],
+                            item.get("group_key"),
+                            item["site_key"],
+                            item["original_value"],
+                            item["generated_url"],
+                            item["strategy"],
+                        ),
+                    )
+                    item_ids.append(self._cm.last_insert_id(cursor))
+                cursor.execute(
+                    f"""
+                    UPDATE csv_lighthouse_runs
+                    SET total_items = {ph},
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = {ph}
+                    """,
+                    (len(item_ids), run_id),
+                )
+                self._refresh_run_progress(cursor, run_id)
+            return item_ids
+        except DatabaseError:
+            raise
+        except Exception as exc:
+            raise DatabaseError(
+                f"Failed to replace pending CSV Lighthouse items for run {run_id}: {exc}"
+            ) from exc
+
     def list_runs(self, limit: int = 20) -> list[dict]:
         ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
@@ -116,6 +247,11 @@ class CsvLighthouseRepository:
             items = self._cm.rows_to_dicts(cursor)
 
         return {"run": self._normalize_run(run) if run else None, "items": items}
+
+    def run_is_editable(self, run_id: int) -> bool:
+        detail = self.get_run_detail(run_id)
+        run = detail["run"]
+        return bool(run and run["status"] == "pending")
 
     def mark_run_running(self, run_id: int) -> None:
         ph = self._cm.placeholder()

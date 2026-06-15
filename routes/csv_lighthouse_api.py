@@ -66,6 +66,45 @@ def create_csv_lighthouse_blueprint(service):
             return not_found
         return jsonify({"success": True, **detail})
 
+    @blueprint.route("/runs/<int:run_id>/files", methods=["GET"])
+    def list_files(run_id):
+        detail = service.get_run(run_id)
+        not_found = _not_found_response(run_id, detail)
+        if not_found:
+            return not_found
+        return jsonify({"success": True, "files": service.list_files(run_id)})
+
+    @blueprint.route("/files/<int:file_id>", methods=["GET"])
+    def get_file(file_id):
+        file = service.get_file(file_id)
+        if not file:
+            return jsonify({"success": False, "error": "CSV file not found"}), 404
+        return jsonify({"success": True, "file": file})
+
+    @blueprint.route("/files/<int:file_id>", methods=["PUT"])
+    def update_file(file_id):
+        data = request.get_json() or {}
+        csv_text = data.get("csv_text")
+        if not isinstance(csv_text, str):
+            raise ValidationError("csv_text is required")
+        return jsonify({"success": True, "file": service.update_file(file_id, csv_text)})
+
+    @blueprint.route("/files/<int:file_id>", methods=["DELETE"])
+    def delete_file(file_id):
+        file = service.get_file(file_id)
+        if not file:
+            return jsonify({"success": False, "error": "CSV file not found"}), 404
+        service.delete_file(file_id)
+        return jsonify({"success": True})
+
+    @blueprint.route("/runs/<int:run_id>/start", methods=["POST"])
+    def start_run(run_id):
+        detail = service.get_run(run_id)
+        not_found = _not_found_response(run_id, detail)
+        if not_found:
+            return not_found
+        return jsonify({"success": True, **service.start_run(run_id)})
+
     @blueprint.route("/runs/<int:run_id>/cancel", methods=["POST"])
     def cancel_run(run_id):
         detail = service.get_run(run_id)

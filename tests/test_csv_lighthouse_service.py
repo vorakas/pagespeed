@@ -114,6 +114,119 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             ],
         )
 
+    def test_create_run_saves_uploaded_file_records(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\nfloor-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            label="Editable",
+        )
+
+        files = self.service.list_files(result["run_id"])
+
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]["filename"], "PDP.csv")
+        self.assertEqual(files[0]["row_count"], 2)
+        self.assertEqual(files[0]["csv_text"], "brass-lamp/\nfloor-lamp/\n")
+
+    def test_create_run_allows_duplicate_uploaded_filenames(self):
+        result = self.service.create_run(
+            [
+                ("PDP.csv", io.BytesIO(b"brass-lamp/\n")),
+                ("PDP.csv", io.BytesIO(b"floor-lamp/\n")),
+            ],
+            site_keys=["www"],
+            strategy="desktop",
+            label="Duplicate filenames",
+        )
+
+        files = self.service.list_files(result["run_id"])
+        detail = self.service.get_run(result["run_id"])
+
+        self.assertEqual(len(files), 2)
+        self.assertEqual([file["filename"] for file in files], ["PDP.csv", "PDP.csv"])
+        self.assertEqual(detail["run"]["total_items"], 2)
+
+    def test_create_run_leaves_run_pending_for_file_edits(self):
+        service = CsvLighthouseService(self.repo, self.pagespeed, start_background=True)
+
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+        detail = self.repo.get_run_detail(result["run_id"])
+
+        self.assertEqual(detail["run"]["status"], "pending")
+        self.assertEqual(self.pagespeed.calls, [])
+
+    def test_start_run_processes_pending_run(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+
+        detail = self.service.start_run(result["run_id"])
+
+        self.assertEqual(detail["run"]["status"], "completed")
+        self.assertEqual(len(self.pagespeed.calls), 1)
+
+    def test_update_file_rebuilds_pending_items(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"old-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            label="Editable",
+        )
+        file_id = self.service.list_files(result["run_id"])[0]["id"]
+
+        self.service.update_file(file_id, "new-lamp/\nother-lamp/\n")
+        detail = self.service.get_run(result["run_id"])
+        urls = [item["generated_url"] for item in detail["items"]]
+
+        self.assertEqual(
+            urls,
+            [
+                "https://www.lampsplus.com/p/new-lamp/",
+                "https://www.lampsplus.com/p/other-lamp/",
+            ],
+        )
+
+    def test_update_file_is_rejected_after_run_starts(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"old-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            label="Locked",
+        )
+        file_id = self.service.list_files(result["run_id"])[0]["id"]
+        self.repo.mark_run_running(result["run_id"])
+
+        with self.assertRaises(ValidationError):
+            self.service.update_file(file_id, "new-lamp/\n")
+
+    def test_delete_file_rebuilds_pending_items(self):
+        result = self.service.create_run(
+            [
+                ("PDP.csv", io.BytesIO(b"old-lamp/\n")),
+                ("SFP.csv", io.BytesIO(b"swing-arm/\n")),
+            ],
+            site_keys=["www"],
+            strategy="desktop",
+            label="Editable",
+        )
+        file_id = next(
+            file["id"]
+            for file in self.service.list_files(result["run_id"])
+            if file["filename"] == "PDP.csv"
+        )
+
+        self.service.delete_file(file_id)
+        detail = self.service.get_run(result["run_id"])
+
+        self.assertEqual([item["source_filename"] for item in detail["items"]], ["SFP.csv"])
+
     def test_create_run_dedupes_duplicate_rows_by_site_url_strategy(self):
         result = self.service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\nbrass-lamp/\n/p/brass-lamp/\n"))],
@@ -412,14 +525,27 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
         service = CsvLighthouseService(self.repo, self.pagespeed, start_background=True)
 
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+
         with patch("services.csv_lighthouse_service.threading.Thread", RecordingThread):
-            service.create_run(
-                [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
-                site_keys=["www"],
-                strategy="desktop",
-            )
+            service.start_run(result["run_id"])
 
         self.assertEqual(created_threads[0].kwargs.get("daemon"), False)
+
+    def test_start_run_rejects_non_pending_run(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+        self.repo.mark_run_running(result["run_id"])
+
+        with self.assertRaises(ValidationError):
+            self.service.start_run(result["run_id"])
 
     def test_page_speed_failure_retries_once_and_saves_passing_metrics(self):
         pagespeed = FailsOncePageSpeedClient()

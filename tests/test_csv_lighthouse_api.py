@@ -14,6 +14,9 @@ class FakeCsvLighthouseService:
     def __init__(self):
         self.create_calls = []
         self.cancelled_run_ids = []
+        self.started_run_ids = []
+        self.updated_files = []
+        self.deleted_file_ids = []
 
     def create_run(self, files, site_keys, strategy, label=None):
         self.create_calls.append(
@@ -50,8 +53,46 @@ class FakeCsvLighthouseService:
             return {"run": None, "items": []}
         return {"run": {"id": run_id, "status": "cancelled"}, "items": []}
 
+    def start_run(self, run_id):
+        self.started_run_ids.append(run_id)
+        return {"run": {"id": run_id, "status": "running"}, "items": []}
+
     def export_csv(self, run_id):
         return f"run_id,label\n{run_id},Regression batch\n"
+
+    def list_files(self, run_id):
+        return [
+            {
+                "id": 3,
+                "run_id": run_id,
+                "filename": "PDP.csv",
+                "group_key": "PDP",
+                "csv_text": "brass-lamp/\n",
+                "row_count": 1,
+            }
+        ]
+
+    def get_file(self, file_id):
+        if file_id == 999:
+            return None
+        return {
+            "id": file_id,
+            "run_id": 42,
+            "filename": "PDP.csv",
+            "group_key": "PDP",
+            "csv_text": "brass-lamp/\n",
+            "row_count": 1,
+        }
+
+    def update_file(self, file_id, csv_text):
+        self.updated_files.append((file_id, csv_text))
+        file = self.get_file(file_id)
+        file["csv_text"] = csv_text
+        file["row_count"] = len([row for row in csv_text.splitlines() if row.strip()])
+        return file
+
+    def delete_file(self, file_id):
+        self.deleted_file_ids.append(file_id)
 
 
 @pytest.fixture()
@@ -233,6 +274,83 @@ def test_get_run_returns_404_for_missing_run(client):
         "success": False,
         "error": "CSV Lighthouse run 999 not found",
     }
+
+
+def test_list_files_route_returns_files(client):
+    response = client.get("/api/csv-lighthouse/runs/42/files")
+
+    assert response.status_code == 200
+    assert response.get_json()["files"][0]["filename"] == "PDP.csv"
+
+
+def test_list_files_route_returns_404_for_missing_run(client):
+    response = client.get("/api/csv-lighthouse/runs/999/files")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "success": False,
+        "error": "CSV Lighthouse run 999 not found",
+    }
+
+
+def test_get_file_route_returns_csv_text(client):
+    response = client.get("/api/csv-lighthouse/files/3")
+
+    assert response.status_code == 200
+    assert response.get_json()["file"]["csv_text"] == "brass-lamp/\n"
+
+
+def test_get_file_route_returns_404_for_missing_file(client):
+    response = client.get("/api/csv-lighthouse/files/999")
+
+    assert response.status_code == 404
+    assert response.get_json() == {"success": False, "error": "CSV file not found"}
+
+
+def test_update_file_route_saves_csv_text(client, service):
+    response = client.put("/api/csv-lighthouse/files/3", json={"csv_text": "new-lamp/\n"})
+
+    assert response.status_code == 200
+    assert response.get_json()["file"]["csv_text"] == "new-lamp/\n"
+    assert service.updated_files == [(3, "new-lamp/\n")]
+
+
+def test_update_file_route_requires_csv_text(client):
+    response = client.put("/api/csv-lighthouse/files/3", json={})
+
+    assert response.status_code == 400
+    assert response.get_json() == {"success": False, "error": "csv_text is required"}
+
+
+def test_delete_file_route_deletes_file(client, service):
+    response = client.delete("/api/csv-lighthouse/files/3")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True}
+    assert service.deleted_file_ids == [3]
+
+
+def test_start_run_calls_service(client, service):
+    response = client.post("/api/csv-lighthouse/runs/42/start")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "success": True,
+        "run": {"id": 42, "status": "running"},
+        "items": [],
+    }
+    assert service.started_run_ids == [42]
+
+
+def test_start_run_returns_404_for_missing_run(client, service):
+    response = client.post("/api/csv-lighthouse/runs/999/start")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "success": False,
+        "error": "CSV Lighthouse run 999 not found",
+    }
+    assert service.started_run_ids == []
 
 
 def test_cancel_run_calls_service(client, service):

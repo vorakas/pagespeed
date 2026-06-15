@@ -75,6 +75,7 @@ import type {
   AutofixFix,
   AutofixRefreshSummary,
   AutofixFixPatch,
+  CsvLighthouseFile,
   CsvLighthouseRun,
   CsvLighthouseRunDetail,
   CsvLighthouseSiteKey,
@@ -1144,6 +1145,29 @@ class ApiClient {
 
   async getCsvLighthouseRun(runId: number): Promise<{ success: boolean } & CsvLighthouseRunDetail> {
     return this.request(`/api/csv-lighthouse/runs/${runId}`)
+  }
+
+  async listCsvLighthouseFiles(runId: number): Promise<{ success: boolean; files: CsvLighthouseFile[] }> {
+    return this.request(`/api/csv-lighthouse/runs/${runId}/files`)
+  }
+
+  async getCsvLighthouseFile(fileId: number): Promise<{ success: boolean; file: CsvLighthouseFile }> {
+    return this.request(`/api/csv-lighthouse/files/${fileId}`)
+  }
+
+  async updateCsvLighthouseFile(fileId: number, csvText: string): Promise<{ success: boolean; file: CsvLighthouseFile }> {
+    return this.request(`/api/csv-lighthouse/files/${fileId}`, {
+      method: "PUT",
+      body: JSON.stringify({ csv_text: csvText }),
+    })
+  }
+
+  async deleteCsvLighthouseFile(fileId: number): Promise<{ success: boolean }> {
+    return this.request(`/api/csv-lighthouse/files/${fileId}`, { method: "DELETE" })
+  }
+
+  async startCsvLighthouseRun(runId: number): Promise<{ success: boolean } & CsvLighthouseRunDetail> {
+    return this.request(`/api/csv-lighthouse/runs/${runId}/start`, { method: "POST" })
   }
 
   async cancelCsvLighthouseRun(runId: number): Promise<{ success: boolean }> {
