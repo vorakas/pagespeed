@@ -1656,6 +1656,68 @@ export interface ComparisonUrl {
   site_name: string
 }
 
+// ---------- CSV Lighthouse runs ----------
+
+export type CsvLighthouseRunStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "completed_with_failures"
+  | "cancelled"
+  | "failed"
+  | "interrupted"
+
+export type CsvLighthouseItemStatus = "pending" | "running" | "passed" | "failed" | "cancelled"
+
+export type CsvLighthouseSiteKey = "www" | "mcprod"
+
+export interface CsvLighthouseRun {
+  id: number
+  label: string | null
+  strategy: Strategy
+  site_keys: CsvLighthouseSiteKey[]
+  status: CsvLighthouseRunStatus
+  worker_count: number
+  target_budget_seconds: number | null
+  total_items: number
+  completed_items: number
+  failed_items: number
+  average_item_duration_ms: number | null
+  cancel_requested?: boolean
+  error_message?: string | null
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+  updated_at?: string | null
+}
+
+export interface CsvLighthouseItem {
+  id: number
+  run_id: number
+  source_filename: string
+  group_key: string
+  site_key: CsvLighthouseSiteKey
+  original_value: string | number
+  generated_url: string
+  strategy: Strategy
+  status: CsvLighthouseItemStatus
+  error_message: string | null
+  fcp: number | null
+  speed_index: number | null
+  lcp: number | null
+  tbt: number | null
+  cls: number | null
+  started_at?: string | null
+  finished_at?: string | null
+  duration_ms?: number | null
+  created_at?: string
+}
+
+export interface CsvLighthouseRunDetail {
+  run: CsvLighthouseRun
+  items: CsvLighthouseItem[]
+}
+
 // ---------- TestData URL listing ----------
 
 export type ValidationSiteKey = "mcprod" | "www"
