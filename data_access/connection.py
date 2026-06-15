@@ -391,6 +391,7 @@ class ConnectionManager:
                 lcp REAL,
                 tbt REAL,
                 cls REAL,
+                attempts INTEGER NOT NULL DEFAULT 1,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
                 duration_ms INTEGER,
@@ -404,6 +405,7 @@ class ConnectionManager:
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP")
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_status TEXT")
         cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS cancelled_items INTEGER NOT NULL DEFAULT 0")
+        cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 1")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS migration_snapshots (
@@ -709,6 +711,7 @@ class ConnectionManager:
                 lcp REAL,
                 tbt REAL,
                 cls REAL,
+                attempts INTEGER NOT NULL DEFAULT 1,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
                 duration_ms INTEGER,
@@ -868,6 +871,7 @@ class ConnectionManager:
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_at TIMESTAMP",
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_status TEXT",
             "ALTER TABLE csv_lighthouse_runs ADD COLUMN cancelled_items INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE csv_lighthouse_items ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_id INTEGER",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_name TEXT",
             "ALTER TABLE requirement_sources ADD COLUMN original_filename TEXT",

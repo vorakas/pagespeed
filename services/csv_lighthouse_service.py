@@ -21,6 +21,7 @@ from services.testdata_registry import SITES, group_for_filename, open_url
 TARGET_BUDGET_SECONDS = 540
 DEFAULT_AVERAGE_SECONDS = 90
 MAX_WORKERS_PER_TARGET = 4
+MAX_LIGHTHOUSE_ATTEMPTS = 2
 
 _KNOWN_ROUTE_PREFIXES = ("/p/", "/sfp/", "/more-like-this/", "/s/")
 _SEARCH_GROUP_KEYS = {"SearchToSort", "SearchToPDP"}
@@ -222,6 +223,7 @@ class CsvLighthouseService:
                 "lcp",
                 "tbt",
                 "cls",
+                "attempts",
                 "error_message",
             ]
         )
@@ -242,6 +244,7 @@ class CsvLighthouseService:
                     self._csv_value(item.get("lcp")),
                     self._csv_value(item.get("tbt")),
                     self._csv_value(item.get("cls")),
+                    item.get("attempts"),
                     item.get("error_message"),
                 ]
             )
@@ -294,14 +297,22 @@ class CsvLighthouseService:
         if not self.repository.mark_item_running(item["id"]):
             return
         started = time.monotonic()
-        try:
-            metrics = self.pagespeed_client.test_url(
-                item["generated_url"], item["strategy"]
-            )
-            metrics["duration_ms"] = int((time.monotonic() - started) * 1000)
-            self.repository.mark_item_passed(item["id"], metrics)
-        except Exception as exc:
-            self.repository.mark_item_failed(item["id"], str(exc))
+        last_error: Exception | None = None
+        for attempt in range(1, MAX_LIGHTHOUSE_ATTEMPTS + 1):
+            try:
+                metrics = self.pagespeed_client.test_url(
+                    item["generated_url"], item["strategy"]
+                )
+                metrics["attempts"] = attempt
+                metrics["duration_ms"] = int((time.monotonic() - started) * 1000)
+                self.repository.mark_item_passed(item["id"], metrics)
+                return
+            except Exception as exc:
+                last_error = exc
+
+        self.repository.mark_item_failed(
+            item["id"], str(last_error or "PageSpeed failed"), attempts=MAX_LIGHTHOUSE_ATTEMPTS
+        )
 
     def _csv_value(self, value):
         if isinstance(value, float) and value.is_integer():

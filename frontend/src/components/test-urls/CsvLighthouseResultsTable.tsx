@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import { ExternalLink } from "lucide-react"
 
 import {
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/table"
 import type { CsvLighthouseItem } from "@/types"
 import { formatCls, formatMilliseconds } from "@/lib/utils"
+import { buildCsvLighthouseResultSections } from "@/components/test-urls/csv-lighthouse-results"
 
 interface CsvLighthouseResultsTableProps {
   items: CsvLighthouseItem[]
@@ -50,6 +52,8 @@ function StatusPill({ status }: { status: CsvLighthouseItem["status"] }) {
 }
 
 export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTableProps) {
+  const sections = buildCsvLighthouseResultSections(items)
+
   if (items.length === 0) {
     return (
       <div className="aurora-panel p-4">
@@ -74,43 +78,63 @@ export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTablePr
             <TableHead className="text-right">LCP</TableHead>
             <TableHead className="text-right">TBT</TableHead>
             <TableHead className="text-right">CLS</TableHead>
+            <TableHead className="text-right">Attempts</TableHead>
             <TableHead>Error</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((item) => (
-            <TableRow key={item.id}>
-              <TableCell className="font-medium">{targetLabels[item.site_key]}</TableCell>
-              <TableCell>
-                <TruncatedText value={item.group_key} className="max-w-[8rem]" />
-              </TableCell>
-              <TableCell>
-                <TruncatedText value={item.original_value} />
-              </TableCell>
-              <TableCell>
-                <a
-                  href={item.generated_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="aurora-text inline-flex max-w-[18rem] items-center gap-1 truncate hover:text-primary"
-                  title={item.generated_url}
-                >
-                  <span className="truncate">{item.generated_url}</span>
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                </a>
-              </TableCell>
-              <TableCell>
-                <StatusPill status={item.status} />
-              </TableCell>
-              <TableCell className="aurora-num text-right">{formatMilliseconds(item.fcp)}</TableCell>
-              <TableCell className="aurora-num text-right">{formatMilliseconds(item.speed_index)}</TableCell>
-              <TableCell className="aurora-num text-right">{formatMilliseconds(item.lcp)}</TableCell>
-              <TableCell className="aurora-num text-right">{formatMilliseconds(item.tbt)}</TableCell>
-              <TableCell className="aurora-num text-right">{formatCls(item.cls)}</TableCell>
-              <TableCell>
-                <TruncatedText value={item.error_message} className="max-w-[16rem]" />
-              </TableCell>
-            </TableRow>
+          {sections.map((section) => (
+            <Fragment key={section.key}>
+              {section.items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">{targetLabels[item.site_key]}</TableCell>
+                  <TableCell>
+                    <TruncatedText value={item.group_key} className="max-w-[8rem]" />
+                  </TableCell>
+                  <TableCell>
+                    <TruncatedText value={item.original_value} />
+                  </TableCell>
+                  <TableCell>
+                    <a
+                      href={item.generated_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="aurora-text inline-flex max-w-[18rem] items-center gap-1 truncate hover:text-primary"
+                      title={item.generated_url}
+                    >
+                      <span className="truncate">{item.generated_url}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                    </a>
+                  </TableCell>
+                  <TableCell>
+                    <StatusPill status={item.status} />
+                  </TableCell>
+                  <TableCell className="aurora-num text-right">{formatMilliseconds(item.fcp)}</TableCell>
+                  <TableCell className="aurora-num text-right">{formatMilliseconds(item.speed_index)}</TableCell>
+                  <TableCell className="aurora-num text-right">{formatMilliseconds(item.lcp)}</TableCell>
+                  <TableCell className="aurora-num text-right">{formatMilliseconds(item.tbt)}</TableCell>
+                  <TableCell className="aurora-num text-right">{formatCls(item.cls)}</TableCell>
+                  <TableCell className="aurora-num text-right">{item.attempts}</TableCell>
+                  <TableCell>
+                    <TruncatedText value={item.error_message} className="max-w-[16rem]" />
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow key={`${section.key}::average`} className="bg-muted/50 font-semibold">
+                <TableCell>{targetLabels[section.target]}</TableCell>
+                <TableCell>{section.group}</TableCell>
+                <TableCell>Averages</TableCell>
+                <TableCell className="aurora-text-dim">{section.average.passedCount} passed</TableCell>
+                <TableCell>-</TableCell>
+                <TableCell className="aurora-num text-right">{formatMilliseconds(section.average.fcp)}</TableCell>
+                <TableCell className="aurora-num text-right">{formatMilliseconds(section.average.speed_index)}</TableCell>
+                <TableCell className="aurora-num text-right">{formatMilliseconds(section.average.lcp)}</TableCell>
+                <TableCell className="aurora-num text-right">{formatMilliseconds(section.average.tbt)}</TableCell>
+                <TableCell className="aurora-num text-right">{formatCls(section.average.cls)}</TableCell>
+                <TableCell>-</TableCell>
+                <TableCell>-</TableCell>
+              </TableRow>
+            </Fragment>
           ))}
         </TableBody>
         </Table>

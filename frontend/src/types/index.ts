@@ -1709,6 +1709,7 @@ export interface CsvLighthouseItem {
   lcp: number | null
   tbt: number | null
   cls: number | null
+  attempts: number
   started_at?: string | null
   completed_at?: string | null
   duration_ms?: number | null

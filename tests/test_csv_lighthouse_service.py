@@ -32,6 +32,31 @@ class FakePageSpeedClient:
         }
 
 
+class FailsOncePageSpeedClient(FakePageSpeedClient):
+    def __init__(self):
+        super().__init__()
+        self.failures = 0
+
+    def test_url(self, url, strategy):
+        self.calls.append((url, strategy))
+        if self.failures == 0:
+            self.failures += 1
+            raise RuntimeError("temporary PageSpeed failure")
+        return {
+            "fcp": 700,
+            "speed_index": 1100,
+            "lcp": 1600,
+            "tbt": 40,
+            "cls": 0.01,
+        }
+
+
+class AlwaysFailsPageSpeedClient(FakePageSpeedClient):
+    def test_url(self, url, strategy):
+        self.calls.append((url, strategy))
+        raise RuntimeError("permanent PageSpeed failure")
+
+
 class CancellingPageSpeedClient(FakePageSpeedClient):
     def __init__(self, repository, run_id_getter):
         super().__init__()
@@ -156,6 +181,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                 "lcp",
                 "tbt",
                 "cls",
+                "attempts",
                 "error_message",
             ],
         )
@@ -164,6 +190,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(rows[1][6], "https://www.lampsplus.com/p/brass-lamp/")
         self.assertEqual(rows[1][8], "passed")
         self.assertEqual(rows[1][9:14], ["900", "1200", "1800", "50", "0.02"])
+        self.assertEqual(rows[1][14], "1")
 
     def test_create_run_normalizes_search_to_sort_full_url_without_double_prefix(self):
         result = self.service.create_run(
@@ -393,3 +420,39 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             )
 
         self.assertEqual(created_threads[0].kwargs.get("daemon"), False)
+
+    def test_page_speed_failure_retries_once_and_saves_passing_metrics(self):
+        pagespeed = FailsOncePageSpeedClient()
+        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+
+        service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        item = detail["items"][0]
+
+        self.assertEqual(len(pagespeed.calls), 2)
+        self.assertEqual(item["status"], "passed")
+        self.assertEqual(item["attempts"], 2)
+        self.assertEqual(item["fcp"], 700)
+
+    def test_page_speed_failure_retries_once_and_saves_final_failure(self):
+        pagespeed = AlwaysFailsPageSpeedClient()
+        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+
+        service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        item = detail["items"][0]
+
+        self.assertEqual(len(pagespeed.calls), 2)
+        self.assertEqual(item["status"], "failed")
+        self.assertEqual(item["attempts"], 2)
+        self.assertIn("permanent PageSpeed failure", item["error_message"])

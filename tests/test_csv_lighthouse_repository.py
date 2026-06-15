@@ -146,6 +146,49 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(finished["average_item_duration_ms"], 1500)
         self.assertIsNotNone(finished["finished_at"])
 
+    def test_item_attempts_are_saved_with_final_status(self):
+        run_id = self.repo.create_run(
+            label="Retry test",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=540,
+            total_items=2,
+        )
+        first_id, second_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                },
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "floor-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/floor-lamp/",
+                    "strategy": "desktop",
+                },
+            ],
+        )
+
+        self.repo.mark_run_running(run_id)
+        self.repo.mark_item_running(first_id)
+        self.repo.mark_item_passed(first_id, {"fcp": 100, "attempts": 2})
+        self.repo.mark_item_running(second_id)
+        self.repo.mark_item_failed(second_id, "PageSpeed timeout", attempts=2)
+
+        detail = self.repo.get_run_detail(run_id)
+        items_by_id = {item["id"]: item for item in detail["items"]}
+
+        self.assertEqual(items_by_id[first_id]["attempts"], 2)
+        self.assertEqual(items_by_id[second_id]["attempts"], 2)
+
     def test_mark_item_running_claims_pending_item_once(self):
         run_id = self.repo.create_run(
             label="Claim once",

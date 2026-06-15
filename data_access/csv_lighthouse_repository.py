@@ -180,6 +180,7 @@ class CsvLighthouseRepository:
                         lcp = {ph},
                         tbt = {ph},
                         cls = {ph},
+                        attempts = {ph},
                         duration_ms = {ph},
                         completed_at = CURRENT_TIMESTAMP
                     WHERE id = {ph} AND status = 'running'
@@ -190,6 +191,7 @@ class CsvLighthouseRepository:
                         metrics.get("lcp"),
                         metrics.get("tbt"),
                         metrics.get("cls"),
+                        metrics.get("attempts", 1),
                         metrics.get("duration_ms"),
                         item_id,
                     ),
@@ -203,7 +205,7 @@ class CsvLighthouseRepository:
         except Exception as exc:
             raise DatabaseError(f"Failed to mark CSV Lighthouse item {item_id} passed: {exc}") from exc
 
-    def mark_item_failed(self, item_id: int, error_message: str) -> bool:
+    def mark_item_failed(self, item_id: int, error_message: str, attempts: int = 1) -> bool:
         ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
@@ -213,10 +215,11 @@ class CsvLighthouseRepository:
                     UPDATE csv_lighthouse_items
                     SET status = 'failed',
                         error_message = {ph},
+                        attempts = {ph},
                         completed_at = CURRENT_TIMESTAMP
                     WHERE id = {ph} AND status = 'running'
                     """,
-                    (error_message, item_id),
+                    (error_message, attempts, item_id),
                 )
                 if cursor.rowcount == 0:
                     return False
