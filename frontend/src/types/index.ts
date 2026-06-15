@@ -1660,6 +1660,7 @@ export interface ComparisonUrl {
 
 export type CsvLighthouseRunStatus =
   | "pending"
+  | "queued"
   | "running"
   | "completed"
   | "completed_with_failures"
@@ -1673,12 +1674,12 @@ export type CsvLighthouseSiteKey = "www" | "mcprod"
 
 export interface CsvLighthouseRun {
   id: number
-  label: string | null
+  label: string
   strategy: Strategy
   site_keys: CsvLighthouseSiteKey[]
   status: CsvLighthouseRunStatus
   worker_count: number
-  target_budget_seconds: number | null
+  target_budget_seconds: number
   total_items: number
   completed_items: number
   failed_items: number
@@ -1697,7 +1698,7 @@ export interface CsvLighthouseItem {
   source_filename: string
   group_key: string
   site_key: CsvLighthouseSiteKey
-  original_value: string | number
+  original_value: string
   generated_url: string
   strategy: Strategy
   status: CsvLighthouseItemStatus
