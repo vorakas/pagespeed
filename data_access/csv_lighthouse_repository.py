@@ -222,6 +222,55 @@ class CsvLighthouseRepository:
         except Exception as exc:
             raise DatabaseError(f"Failed to mark CSV Lighthouse item {item_id} failed: {exc}") from exc
 
+    def mark_pending_items_cancelled(self, run_id: int) -> None:
+        ph = self._cm.placeholder()
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE csv_lighthouse_items
+                    SET status = 'cancelled',
+                        error_message = 'Cancelled',
+                        completed_at = CURRENT_TIMESTAMP
+                    WHERE run_id = {ph} AND status = 'pending'
+                    """,
+                    (run_id,),
+                )
+                self._refresh_run_progress(cursor, run_id)
+        except Exception as exc:
+            raise DatabaseError(f"Failed to cancel pending CSV Lighthouse items for run {run_id}: {exc}") from exc
+
+    def mark_run_failed(self, run_id: int, error_message: str) -> None:
+        ph = self._cm.placeholder()
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE csv_lighthouse_items
+                    SET status = 'failed',
+                        error_message = {ph},
+                        completed_at = CURRENT_TIMESTAMP
+                    WHERE run_id = {ph} AND status IN ('pending', 'running')
+                    """,
+                    (error_message, run_id),
+                )
+                self._refresh_run_progress(cursor, run_id)
+                cursor.execute(
+                    f"""
+                    UPDATE csv_lighthouse_runs
+                    SET status = 'failed',
+                        error_message = {ph},
+                        finished_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = {ph} AND status != 'cancelled'
+                    """,
+                    (error_message, run_id),
+                )
+        except Exception as exc:
+            raise DatabaseError(f"Failed to mark CSV Lighthouse run {run_id} failed: {exc}") from exc
+
     def finish_run_if_complete(self, run_id: int) -> None:
         ph = self._cm.placeholder()
         try:

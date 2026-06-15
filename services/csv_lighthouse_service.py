@@ -16,15 +16,11 @@ TARGET_BUDGET_SECONDS = 540
 DEFAULT_AVERAGE_SECONDS = 90
 MAX_WORKERS_PER_TARGET = 4
 
-_KNOWN_ROUTE_PREFIXES = (
-    "/p/",
-    "/sfp/",
-    "/more-like-this/",
-    "/s/",
-)
+_KNOWN_ROUTE_PREFIXES = ("/p/", "/sfp/", "/more-like-this/", "/s/")
+_SEARCH_GROUP_KEYS = {"SearchToSort", "SearchToPDP"}
 
 
-def normalize_csv_value(value) -> str:
+def normalize_csv_value(value, group=None) -> str:
     normalized = str(value or "").strip()
     if not normalized:
         return ""
@@ -38,6 +34,14 @@ def normalize_csv_value(value) -> str:
     while normalized.startswith("/"):
         normalized = normalized[1:]
 
+    if group and group.key in _SEARCH_GROUP_KEYS:
+        normalized = normalized.split("?", 1)[0].rstrip("/")
+        if normalized.lower().startswith("s/"):
+            normalized = normalized[2:]
+        if normalized.lower().startswith("s_"):
+            normalized = normalized[2:]
+        return normalized
+
     lower = normalized.lower()
     for prefix in _KNOWN_ROUTE_PREFIXES:
         prefix_without_slash = prefix.lstrip("/")
@@ -50,15 +54,22 @@ def normalize_csv_value(value) -> str:
     return normalized
 
 
-def parse_column_a(file_bytes: bytes) -> list[str]:
-    decoded = file_bytes.decode("utf-8-sig")
+def parse_column_a(file_bytes: bytes, group=None) -> list[str]:
+    try:
+        decoded = file_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValidationError(f"Unable to decode CSV as UTF-8: {exc}") from exc
+
     values: list[str] = []
-    for row in csv.reader(io.StringIO(decoded)):
-        if not row:
-            continue
-        normalized = normalize_csv_value(row[0])
-        if normalized:
-            values.append(normalized)
+    try:
+        for row in csv.reader(io.StringIO(decoded), strict=True):
+            if not row:
+                continue
+            normalized = normalize_csv_value(row[0], group)
+            if normalized:
+                values.append(normalized)
+    except csv.Error as exc:
+        raise ValidationError(f"Unable to parse CSV: {exc}") from exc
     return values
 
 
@@ -89,6 +100,8 @@ class CsvLighthouseService:
         strategy = self._validate_strategy(strategy)
         site_keys = self._validate_site_keys(site_keys)
         items = self._build_items(files, site_keys, strategy)
+        if not items:
+            raise ValidationError("Upload did not contain any recognized CSV rows")
         worker_count = calculate_worker_count(len(items))
         run_id = self.repository.create_run(
             label=label or "CSV Lighthouse run",
@@ -102,7 +115,7 @@ class CsvLighthouseService:
             self.repository.create_items(run_id, items)
         if self.start_background:
             thread = threading.Thread(
-                target=self.run_pending_items, args=(run_id,), daemon=True
+                target=self.run_pending_items, args=(run_id,), daemon=False
             )
             thread.start()
         return {
@@ -122,22 +135,48 @@ class CsvLighthouseService:
         return self.repository.get_run_detail(run_id)
 
     def run_pending_items(self, run_id: int) -> None:
+        try:
+            self._run_pending_items(run_id)
+        except Exception as exc:
+            self.repository.mark_run_failed(run_id, str(exc))
+
+    def _run_pending_items(self, run_id: int) -> None:
         detail = self.repository.get_run_detail(run_id)
         run = detail["run"]
         max_workers = max(1, int(run.get("worker_count") or 1))
         self.repository.mark_run_running(run_id)
+        pending_items = self.repository.pending_items(run_id)
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = []
-            for item in self.repository.pending_items(run_id):
-                if self.repository.should_cancel(run_id):
-                    break
-                futures.append(executor.submit(self._process_item, item))
+            futures = set()
+            next_index = 0
 
-            for future in as_completed(futures):
-                future.result()
+            def submit_available() -> int:
+                nonlocal next_index
+                submitted = 0
+                while (
+                    next_index < len(pending_items)
+                    and len(futures) < max_workers
+                    and not self.repository.should_cancel(run_id)
+                ):
+                    futures.add(
+                        executor.submit(self._process_item, pending_items[next_index])
+                    )
+                    next_index += 1
+                    submitted += 1
+                return submitted
+
+            submit_available()
+            while futures:
+                for future in as_completed(futures):
+                    futures.remove(future)
+                    future.result()
+                    if not self.repository.should_cancel(run_id):
+                        submit_available()
+                    break
 
         if self.repository.should_cancel(run_id):
+            self.repository.mark_pending_items_cancelled(run_id)
             self.repository.mark_run_cancelled(run_id)
             return
         self.repository.finish_run_if_complete(run_id)
@@ -195,7 +234,7 @@ class CsvLighthouseService:
             group = group_for_filename(filename)
             if group is None:
                 continue
-            rows = parse_column_a(handle.read())
+            rows = parse_column_a(handle.read(), group)
             max_rows = group.max_rows if group.max_rows is not None else len(rows)
             for original_value in rows[:max_rows]:
                 for site_key in site_keys:

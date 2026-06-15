@@ -318,6 +318,87 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
                     ),
                 )
 
+    def test_mark_pending_items_cancelled_keeps_terminal_rows_as_is(self):
+        run_id = self.repo.create_run(
+            label="Cancel pending",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=2,
+        )
+        first_id, second_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                },
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "floor-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/floor-lamp/",
+                    "strategy": "desktop",
+                },
+            ],
+        )
+        self.repo.mark_item_running(first_id)
+        self.repo.mark_item_passed(first_id, {"duration_ms": 100})
+
+        self.repo.mark_pending_items_cancelled(run_id)
+        self.repo.mark_run_cancelled(run_id)
+        detail = self.repo.get_run_detail(run_id)
+
+        self.assertEqual(detail["run"]["status"], "cancelled")
+        self.assertEqual(
+            [item["status"] for item in detail["items"]], ["passed", "cancelled"]
+        )
+
+    def test_mark_run_failed_marks_unfinished_items_failed(self):
+        run_id = self.repo.create_run(
+            label="Interrupted",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=2,
+        )
+        self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                },
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "floor-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/floor-lamp/",
+                    "strategy": "desktop",
+                },
+            ],
+        )
+
+        self.repo.mark_run_failed(run_id, "worker crashed")
+        detail = self.repo.get_run_detail(run_id)
+
+        self.assertEqual(detail["run"]["status"], "failed")
+        self.assertEqual(detail["run"]["failed_items"], 2)
+        self.assertIn("worker crashed", detail["run"]["error_message"])
+        self.assertEqual([item["status"] for item in detail["items"]], ["failed", "failed"])
+
 
 if __name__ == "__main__":
     unittest.main()

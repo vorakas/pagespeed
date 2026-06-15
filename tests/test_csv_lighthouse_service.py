@@ -3,9 +3,11 @@ import io
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from data_access.connection import ConnectionManager
 from data_access.csv_lighthouse_repository import CsvLighthouseRepository
+from exceptions import ValidationError
 from services.csv_lighthouse_service import (
     DEFAULT_AVERAGE_SECONDS,
     CsvLighthouseService,
@@ -27,6 +29,18 @@ class FakePageSpeedClient:
             "tbt": 50,
             "cls": 0.02,
         }
+
+
+class CancellingPageSpeedClient(FakePageSpeedClient):
+    def __init__(self, repository, run_id_getter):
+        super().__init__()
+        self.repository = repository
+        self.run_id_getter = run_id_getter
+
+    def test_url(self, url, strategy):
+        result = super().test_url(url, strategy)
+        self.repository.request_cancel(self.run_id_getter())
+        return result
 
 
 class CsvLighthouseServiceTest(unittest.TestCase):
@@ -150,3 +164,133 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(rows[1][8], "passed")
         self.assertEqual(rows[1][9:14], ["900", "1200", "1800", "50", "0.02"])
 
+    def test_create_run_normalizes_search_to_sort_full_url_without_double_prefix(self):
+        result = self.service.create_run(
+            [
+                (
+                    "SearchToSort.csv",
+                    io.BytesIO(b"https://www.lampsplus.com/s/s_chandelier/?s=1\n"),
+                )
+            ],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+
+        item = self.repo.get_run_detail(result["run_id"])["items"][0]
+
+        self.assertEqual(item["original_value"], "chandelier")
+        self.assertEqual(
+            item["generated_url"], "https://www.lampsplus.com/s/s_chandelier/?s=1"
+        )
+
+    def test_create_run_normalizes_search_to_pdp_full_url_without_double_prefix(self):
+        result = self.service.create_run(
+            [
+                (
+                    "SearchToPDP.csv",
+                    io.BytesIO(b"https://mcprod.lampsplus.com/s/s_chandelier/?s=1\n"),
+                )
+            ],
+            site_keys=["mcprod"],
+            strategy="mobile",
+        )
+
+        item = self.repo.get_run_detail(result["run_id"])["items"][0]
+
+        self.assertEqual(item["original_value"], "chandelier")
+        self.assertEqual(
+            item["generated_url"],
+            "https://mcprod.lampsplus.com/s/s_chandelier/?s=1",
+        )
+
+    def test_create_run_raises_validation_error_for_bad_csv_encoding(self):
+        with self.assertRaisesRegex(ValidationError, "Unable to decode"):
+            self.service.create_run(
+                [("PDP.csv", io.BytesIO(b"\xff\xfe\xfa"))],
+                site_keys=["www"],
+                strategy="desktop",
+            )
+
+        self.assertEqual(self.repo.list_runs(), [])
+
+    def test_create_run_raises_validation_error_for_unknown_only_uploads(self):
+        with self.assertRaisesRegex(ValidationError, "recognized CSV rows"):
+            self.service.create_run(
+                [("Unknown.csv", io.BytesIO(b"brass-lamp/\n"))],
+                site_keys=["www"],
+                strategy="desktop",
+            )
+
+        self.assertEqual(self.repo.list_runs(), [])
+
+    def test_create_run_raises_validation_error_for_empty_uploads(self):
+        with self.assertRaisesRegex(ValidationError, "recognized CSV rows"):
+            self.service.create_run(
+                [("PDP.csv", io.BytesIO(b"\n  \n"))],
+                site_keys=["www"],
+                strategy="desktop",
+            )
+
+        self.assertEqual(self.repo.list_runs(), [])
+
+    def test_cancel_stops_scheduling_new_items_and_marks_pending_cancelled(self):
+        run_id_holder = {}
+        service = CsvLighthouseService(
+            self.repo,
+            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"]),
+            start_background=False,
+        )
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\nfloor-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+        run_id_holder["run_id"] = result["run_id"]
+
+        service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        statuses = [item["status"] for item in detail["items"]]
+
+        self.assertEqual(detail["run"]["status"], "cancelled")
+        self.assertEqual(statuses, ["passed", "cancelled"])
+
+    def test_worker_exception_marks_run_failed_and_clears_pending_rows(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\nfloor-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+        self.repo.mark_item_running = lambda item_id: (_ for _ in ()).throw(
+            RuntimeError("claim failed")
+        )
+
+        self.service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        statuses = [item["status"] for item in detail["items"]]
+
+        self.assertEqual(detail["run"]["status"], "failed")
+        self.assertIn("claim failed", detail["run"]["error_message"])
+        self.assertEqual(statuses, ["failed", "failed"])
+
+    def test_background_thread_is_not_daemon(self):
+        created_threads = []
+
+        class RecordingThread:
+            def __init__(self, *args, **kwargs):
+                self.args = args
+                self.kwargs = kwargs
+                created_threads.append(self)
+
+            def start(self):
+                return None
+
+        service = CsvLighthouseService(self.repo, self.pagespeed, start_background=True)
+
+        with patch("services.csv_lighthouse_service.threading.Thread", RecordingThread):
+            service.create_run(
+                [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+                site_keys=["www"],
+                strategy="desktop",
+            )
+
+        self.assertEqual(created_threads[0].kwargs.get("daemon"), False)
