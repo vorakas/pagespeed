@@ -350,6 +350,54 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS csv_lighthouse_runs (
+                id SERIAL PRIMARY KEY,
+                label TEXT NOT NULL,
+                strategy TEXT NOT NULL,
+                site_keys TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                worker_count INTEGER NOT NULL DEFAULT 1,
+                target_budget_seconds INTEGER,
+                total_items INTEGER NOT NULL DEFAULT 0,
+                completed_items INTEGER NOT NULL DEFAULT 0,
+                failed_items INTEGER NOT NULL DEFAULT 0,
+                cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
+                average_item_duration_ms INTEGER,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMP,
+                finished_at TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS csv_lighthouse_items (
+                id SERIAL PRIMARY KEY,
+                run_id INTEGER NOT NULL,
+                source_filename TEXT NOT NULL,
+                group_key TEXT,
+                site_key TEXT NOT NULL,
+                original_value TEXT NOT NULL,
+                generated_url TEXT NOT NULL,
+                strategy TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                error_message TEXT,
+                fcp REAL,
+                speed_index REAL,
+                lcp REAL,
+                tbt REAL,
+                cls REAL,
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                duration_ms INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (run_id) REFERENCES csv_lighthouse_runs (id) ON DELETE CASCADE,
+                UNIQUE(run_id, site_key, generated_url, strategy)
+            )
+        """)
+
         # Migration: add trigger execution tracking columns
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP")
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_status TEXT")
@@ -616,6 +664,54 @@ class ConnectionManager:
                 started_at TIMESTAMP,
                 ended_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS csv_lighthouse_runs (
+                id INTEGER PRIMARY KEY,
+                label TEXT NOT NULL,
+                strategy TEXT NOT NULL,
+                site_keys TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                worker_count INTEGER NOT NULL DEFAULT 1,
+                target_budget_seconds INTEGER,
+                total_items INTEGER NOT NULL DEFAULT 0,
+                completed_items INTEGER NOT NULL DEFAULT 0,
+                failed_items INTEGER NOT NULL DEFAULT 0,
+                cancel_requested INTEGER NOT NULL DEFAULT 0,
+                average_item_duration_ms INTEGER,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMP,
+                finished_at TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS csv_lighthouse_items (
+                id INTEGER PRIMARY KEY,
+                run_id INTEGER NOT NULL,
+                source_filename TEXT NOT NULL,
+                group_key TEXT,
+                site_key TEXT NOT NULL,
+                original_value TEXT NOT NULL,
+                generated_url TEXT NOT NULL,
+                strategy TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                error_message TEXT,
+                fcp REAL,
+                speed_index REAL,
+                lcp REAL,
+                tbt REAL,
+                cls REAL,
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                duration_ms INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (run_id) REFERENCES csv_lighthouse_runs (id) ON DELETE CASCADE,
+                UNIQUE(run_id, site_key, generated_url, strategy)
             )
         """)
 
