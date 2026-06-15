@@ -15,6 +15,7 @@ import type {
   Strategy,
 } from "@/types"
 import { formatDateTime } from "@/lib/utils"
+import { formatRunDuration } from "@/components/test-urls/csv-lighthouse-duration"
 
 interface CsvLighthousePanelProps {
   strategy: Strategy
@@ -367,7 +368,9 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                         <FileText className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{run.label || `Run #${run.id}`}</span>
                       </div>
-                      <p className="aurora-text-faint mt-1 text-xs">{formatDateTime(run.created_at)}</p>
+                      <p className="aurora-text-faint mt-1 text-xs">
+                        {formatDateTime(run.created_at)} · {formatRunDuration(run.started_at, run.finished_at, run.status)}
+                      </p>
                     </div>
                     <RunStatusBadge status={run.status} />
                   </div>
