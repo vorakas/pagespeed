@@ -1,0 +1,364 @@
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Download, FileText, Loader2, Play, Square } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { Progress } from "@/components/ui/progress"
+import { CsvLighthouseResultsTable } from "@/components/test-urls/CsvLighthouseResultsTable"
+import { api } from "@/services/api"
+import type {
+  CsvLighthouseRun,
+  CsvLighthouseRunDetail,
+  CsvLighthouseRunStatus,
+  CsvLighthouseSiteKey,
+  Strategy,
+} from "@/types"
+import { formatDateTime } from "@/lib/utils"
+
+interface CsvLighthousePanelProps {
+  strategy: Strategy
+}
+
+const terminalStatuses: CsvLighthouseRunStatus[] = [
+  "completed",
+  "completed_with_failures",
+  "cancelled",
+  "failed",
+  "interrupted",
+]
+
+const exportableStatuses: CsvLighthouseRunStatus[] = ["completed", "completed_with_failures"]
+
+const targetOptions: Array<{ key: CsvLighthouseSiteKey; label: string; shortLabel: string }> = [
+  { key: "mcprod", label: "Adobe Commerce", shortLabel: "mcprod" },
+  { key: "www", label: "LampsPlus", shortLabel: "www" },
+]
+
+function isTerminalStatus(status: CsvLighthouseRunStatus) {
+  return terminalStatuses.includes(status)
+}
+
+function formatStatus(status: CsvLighthouseRunStatus) {
+  return status.replaceAll("_", " ")
+}
+
+function statusClassName(status: CsvLighthouseRunStatus) {
+  if (status === "completed") {
+    return "border-[color:var(--lcc-green)]/40 bg-[color:var(--lcc-green)]/10 text-[color:var(--lcc-green)]"
+  }
+  if (status === "completed_with_failures" || status === "failed" || status === "interrupted") {
+    return "border-[color:var(--lcc-red)]/40 bg-[color:var(--lcc-red)]/10 text-[color:var(--lcc-red)]"
+  }
+  if (status === "cancelled") {
+    return "border-border bg-muted text-muted-foreground"
+  }
+  return "border-[color:var(--lcc-blue)]/40 bg-[color:var(--lcc-blue)]/10 text-[color:var(--lcc-blue)]"
+}
+
+function RunStatusBadge({ status }: { status: CsvLighthouseRunStatus }) {
+  return (
+    <span className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${statusClassName(status)}`}>
+      {formatStatus(status)}
+    </span>
+  )
+}
+
+export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
+  const [files, setFiles] = useState<File[]>([])
+  const [fileInputKey, setFileInputKey] = useState(0)
+  const [label, setLabel] = useState("")
+  const [selectedTargets, setSelectedTargets] = useState<CsvLighthouseSiteKey[]>(["mcprod", "www"])
+  const [runs, setRuns] = useState<CsvLighthouseRun[]>([])
+  const [selectedDetail, setSelectedDetail] = useState<CsvLighthouseRunDetail | null>(null)
+  const [activeRunId, setActiveRunId] = useState<number | null>(null)
+  const [starting, setStarting] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [loadingRuns, setLoadingRuns] = useState(false)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const selectedRun = selectedDetail?.run ?? null
+  const activeRun = selectedRun && !isTerminalStatus(selectedRun.status) ? selectedRun : null
+  const progress = selectedRun?.total_items
+    ? Math.round((selectedRun.completed_items / selectedRun.total_items) * 100)
+    : 0
+  const canStart = files.length > 0 && selectedTargets.length > 0 && !starting
+  const canCancel = Boolean(activeRun && !cancelling)
+  const canDownload = Boolean(selectedRun && exportableStatuses.includes(selectedRun.status))
+  const largeRunWarning = files.length >= 3 || (selectedRun?.total_items ?? 0) >= 100
+
+  const selectedTargetText = useMemo(() => {
+    return selectedTargets
+      .map((target) => targetOptions.find((option) => option.key === target)?.shortLabel)
+      .filter(Boolean)
+      .join(", ")
+  }, [selectedTargets])
+
+  const loadRuns = useCallback(async () => {
+    setLoadingRuns(true)
+    try {
+      const response = await api.listCsvLighthouseRuns()
+      setRuns(response.runs)
+      setActiveRunId((current) => current ?? response.runs.find((run) => !isTerminalStatus(run.status))?.id ?? null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load CSV Lighthouse runs")
+    } finally {
+      setLoadingRuns(false)
+    }
+  }, [])
+
+  const loadRunDetail = useCallback(async (runId: number, options?: { quiet?: boolean }) => {
+    if (!options?.quiet) {
+      setLoadingDetail(true)
+    }
+    try {
+      const response = await api.getCsvLighthouseRun(runId)
+      setSelectedDetail({ run: response.run, items: response.items })
+      setActiveRunId((current) => {
+        if (!isTerminalStatus(response.run.status)) {
+          return response.run.id
+        }
+        return current === response.run.id ? null : current
+      })
+      setRuns((current) => current.map((run) => (run.id === response.run.id ? response.run : run)))
+      return response.run
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load CSV Lighthouse run")
+      return null
+    } finally {
+      if (!options?.quiet) {
+        setLoadingDetail(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    loadRuns()
+  }, [loadRuns])
+
+  useEffect(() => {
+    if (!activeRunId) return
+
+    const intervalId = window.setInterval(() => {
+      loadRunDetail(activeRunId, { quiet: true }).then((run) => {
+        if (run && isTerminalStatus(run.status)) {
+          loadRuns()
+        }
+      })
+    }, 5000)
+
+    return () => window.clearInterval(intervalId)
+  }, [activeRunId, loadRunDetail, loadRuns])
+
+  const handleTargetToggle = (target: CsvLighthouseSiteKey, checked: boolean) => {
+    setSelectedTargets((current) => {
+      if (checked) {
+        return current.includes(target) ? current : [...current, target]
+      }
+      return current.filter((item) => item !== target)
+    })
+  }
+
+  const handleStart = async () => {
+    if (!canStart) return
+
+    setStarting(true)
+    setError(null)
+    try {
+      const response = await api.createCsvLighthouseRun({
+        files,
+        siteKeys: selectedTargets,
+        strategy,
+        label,
+      })
+      setActiveRunId(response.run_id)
+      setFiles([])
+      setFileInputKey((current) => current + 1)
+      await loadRuns()
+      await loadRunDetail(response.run_id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to start CSV Lighthouse run")
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!activeRun) return
+
+    setCancelling(true)
+    setError(null)
+    try {
+      await api.cancelCsvLighthouseRun(activeRun.id)
+      await loadRunDetail(activeRun.id)
+      await loadRuns()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to cancel CSV Lighthouse run")
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  const handleDownload = () => {
+    if (!selectedRun || !canDownload) return
+
+    window.open(api.getCsvLighthouseExportUrl(selectedRun.id), "_blank", "noopener,noreferrer")
+  }
+
+  return (
+    <section className="aurora-panel overflow-hidden">
+      <div className="border-b border-border/60 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="aurora-text text-sm font-semibold">CSV Lighthouse Runs</h2>
+            <p className="aurora-text-dim mt-1 text-xs">
+              {strategy === "mobile" ? "Mobile" : "Desktop"} strategy
+              {selectedTargetText ? ` · ${selectedTargetText}` : ""}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleCancel} disabled={!canCancel}>
+              {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+              Cancel
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDownload} disabled={!canDownload}>
+              <Download className="h-4 w-4" />
+              Download CSV
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="space-y-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1.3fr)_minmax(12rem,0.8fr)_auto] lg:items-end">
+            <div className="space-y-1.5">
+              <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-lighthouse-files">
+                CSV files
+              </label>
+              <Input
+                key={fileInputKey}
+                id="csv-lighthouse-files"
+                type="file"
+                accept=".csv,text/csv"
+                multiple
+                onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-lighthouse-label">
+                Run label
+              </label>
+              <Input
+                id="csv-lighthouse-label"
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder="Optional"
+                className="h-9"
+              />
+            </div>
+            <Button onClick={handleStart} disabled={!canStart} className="h-9" style={{ color: "#000" }}>
+              {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              Start
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
+            {targetOptions.map((target) => (
+              <label key={target.key} className="aurora-text flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={selectedTargets.includes(target.key)}
+                  onCheckedChange={(checked) => handleTargetToggle(target.key, checked === true)}
+                />
+                {target.label}
+                <span className="aurora-text-faint text-xs">({target.shortLabel})</span>
+              </label>
+            ))}
+            {largeRunWarning && (
+              <span className="aurora-text-faint text-xs">Large runs can take several minutes.</span>
+            )}
+          </div>
+
+          {error && (
+            <div className="rounded border border-[color:var(--lcc-red)]/40 bg-[color:var(--lcc-red)]/10 px-3 py-2 text-sm text-[color:var(--lcc-red)]">
+              {error}
+            </div>
+          )}
+
+          {selectedRun && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <RunStatusBadge status={selectedRun.status} />
+                  <span className="aurora-text text-sm font-medium">
+                    {selectedRun.label || `Run #${selectedRun.id}`}
+                  </span>
+                </div>
+                <span className="aurora-text-dim text-xs tabular-nums">
+                  {selectedRun.completed_items} / {selectedRun.total_items} complete · {selectedRun.failed_items} failed
+                </span>
+              </div>
+              <Progress value={progress} className="aurora-progress" />
+              {selectedRun.error_message && (
+                <p className="text-sm text-[color:var(--lcc-red)]">{selectedRun.error_message}</p>
+              )}
+            </div>
+          )}
+
+          {loadingDetail ? (
+            <div className="aurora-panel p-4">
+              <div className="aurora-text-dim flex items-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading run detail...
+              </div>
+            </div>
+          ) : selectedDetail ? (
+            <CsvLighthouseResultsTable items={selectedDetail.items} />
+          ) : null}
+        </div>
+
+        <aside className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="aurora-text text-xs font-semibold uppercase tracking-[0.12em]">Recent Runs</h3>
+            {loadingRuns && <Loader2 className="aurora-text-faint h-3.5 w-3.5 animate-spin" />}
+          </div>
+          <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
+            {runs.length === 0 && !loadingRuns ? (
+              <p className="aurora-text-dim text-sm">No saved runs.</p>
+            ) : (
+              runs.map((run) => (
+                <button
+                  key={run.id}
+                  type="button"
+                  onClick={() => {
+                    setError(null)
+                    loadRunDetail(run.id)
+                  }}
+                  className={`w-full rounded border p-3 text-left transition-colors hover:bg-muted/50 ${
+                    selectedRun?.id === run.id ? "border-primary/60 bg-primary/5" : "border-border/60"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="aurora-text flex items-center gap-1.5 text-sm font-medium">
+                        <FileText className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{run.label || `Run #${run.id}`}</span>
+                      </div>
+                      <p className="aurora-text-faint mt-1 text-xs">{formatDateTime(run.created_at)}</p>
+                    </div>
+                    <RunStatusBadge status={run.status} />
+                  </div>
+                  <div className="aurora-text-dim mt-2 text-xs tabular-nums">
+                    {run.completed_items}/{run.total_items} complete · {run.failed_items} failed
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </aside>
+      </div>
+    </section>
+  )
+}

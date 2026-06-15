@@ -8,6 +8,7 @@ import { TestResultsTable } from "@/components/test-urls/TestResultsTable"
 import { TestProgressPanel } from "@/components/test-urls/TestProgressPanel"
 import { BatchResultsLog } from "@/components/test-urls/BatchResultsLog"
 import { TestDetailDialog } from "@/components/test-urls/TestDetailDialog"
+import { CsvLighthousePanel } from "@/components/test-urls/CsvLighthousePanel"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { useSites } from "@/hooks/use-sites"
@@ -220,6 +221,8 @@ export function TestUrls() {
           onDeleteRun={deleteRun}
           onClearHistory={clearHistory}
         />
+
+        <CsvLighthousePanel strategy={strategy} />
 
         {/* Site Tabs + Results */}
         {sites.length === 0 ? (
