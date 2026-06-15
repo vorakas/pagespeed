@@ -1659,7 +1659,7 @@ export interface ComparisonUrl {
 // ---------- CSV Lighthouse runs ----------
 
 export type CsvLighthouseRunStatus =
-  | "queued"
+  | "pending"
   | "running"
   | "completed"
   | "completed_with_failures"
@@ -1708,7 +1708,7 @@ export interface CsvLighthouseItem {
   tbt: number | null
   cls: number | null
   started_at?: string | null
-  finished_at?: string | null
+  completed_at?: string | null
   duration_ms?: number | null
   created_at?: string
 }

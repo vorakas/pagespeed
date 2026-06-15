@@ -1117,7 +1117,7 @@ class ApiClient {
     siteKeys: CsvLighthouseSiteKey[]
     strategy: Strategy
     label?: string
-  }): Promise<{ success: boolean; run: CsvLighthouseRun; item_count: number }> {
+  }): Promise<{ success: boolean; run_id: number; worker_count: number; total_items: number }> {
     const formData = new FormData()
     input.files.forEach((file) => formData.append("files", file))
     input.siteKeys.forEach((siteKey) => formData.append("site_keys", siteKey))
