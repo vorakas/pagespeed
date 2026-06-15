@@ -25,6 +25,7 @@ The run focuses only on Lighthouse performance timing metrics:
 7. Pharos immediately creates a persisted run and returns a run id.
 8. Pharos tests the generated URLs one at a time and writes each result as it finishes.
 9. QA watches progress while BlazeMeter is running and can leave/reopen the page without losing completed results.
+10. QA can reopen saved run results later and download a CSV summary of the Lighthouse metrics.
 
 ## URL Construction
 
@@ -44,6 +45,39 @@ Generated URLs use the existing site keys:
 
 - `mcprod`: `https://mcprod.lampsplus.com`
 - `www`: `https://www.lampsplus.com`
+
+The CSV column-A value is not a full URL. It is the value inserted into the group route template after the site origin.
+
+For example, a `PDP.csv` row with:
+
+```text
+maxim-paramount-16-inchw-natural-aged-brass-led-ceiling-light__0000e/
+```
+
+must become:
+
+```text
+https://www.lampsplus.com/p/maxim-paramount-16-inchw-natural-aged-brass-led-ceiling-light__0000e/
+https://mcprod.lampsplus.com/p/maxim-paramount-16-inchw-natural-aged-brass-led-ceiling-light__0000e/
+```
+
+Construction rules:
+
+- `PDP.csv`: `{origin}/p/{column_a_value}`
+- `SFP.csv`: `{origin}/sfp/{column_a_value}`
+- `MoreLikeThis.csv`: `{origin}/more-like-this/{column_a_value}/`
+- `SearchBR.csv`: `{origin}/s/{column_a_value}`
+- `SortBR.csv`: `{origin}/s/{column_a_value}`
+- `SearchToSort.csv`: `{origin}/s/s_{column_a_value}/?s=1`
+- `SearchToPDP.csv`: `{origin}/s/s_{column_a_value}/?s=1`
+
+Normalize column-A values before building URLs:
+
+- trim whitespace
+- ignore empty rows
+- strip any accidental full origin if a row already contains `https://www.lampsplus.com` or `https://mcprod.lampsplus.com`
+- strip one accidental leading slash so templates do not produce double slashes
+- preserve meaningful trailing slashes from the CSV value
 
 Unrecognized files are skipped and shown in the UI.
 
@@ -105,6 +139,7 @@ Item statuses:
 Persist enough item metadata to explain results:
 
 - run id
+- run label
 - source CSV filename
 - group key
 - site key
@@ -122,6 +157,15 @@ Persist enough item metadata to explain results:
 
 Deduplicate by run, site key, generated URL, and strategy so duplicate CSV rows do not waste Lighthouse quota.
 
+Saved result requirements:
+
+- Every run is saved automatically when it is created.
+- A user-entered run label is optional; if omitted, use timestamp plus selected targets.
+- Recent saved runs remain available from the Test URLs page.
+- Run detail endpoint returns all item rows so a saved run can be reopened without rerunning Lighthouse.
+- Add a CSV download endpoint or browser-side export for the saved run table.
+- Export columns should include run label, run timestamp, target, CSV file, group, original value, generated URL, status, FCP, Speed Index, LCP, TBT, CLS, and error.
+
 ## Frontend Design
 
 Add a new section to `frontend/src/pages/TestUrls.tsx`, below the existing site URL batch controls.
@@ -135,12 +179,14 @@ Create focused components under `frontend/src/components/test-urls/`:
 UI controls:
 
 - File input accepting `.csv`, multiple files.
+- Optional run label input for saving the run under a human-readable name.
 - Target checkboxes for Adobe Commerce and LampsPlus, both selected by default.
 - Desktop/mobile strategy selector using the existing `Strategy` type.
 - Start button with disabled/loading states.
 - Cancel button for active run.
 - Recent runs list.
 - Results table grouped by target and CSV group.
+- Download CSV button for a saved or completed run.
 
 UI columns:
 
