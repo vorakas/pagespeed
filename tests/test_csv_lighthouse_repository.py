@@ -4,6 +4,7 @@ import unittest
 
 from data_access.connection import ConnectionManager
 from data_access.csv_lighthouse_repository import CsvLighthouseRepository
+from exceptions import DatabaseError
 
 
 class CsvLighthouseRepositoryTest(unittest.TestCase):
@@ -142,6 +143,156 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(finished["failed_items"], 1)
         self.assertEqual(finished["average_item_duration_ms"], 1500)
         self.assertIsNotNone(finished["finished_at"])
+
+    def test_mark_item_running_claims_pending_item_once(self):
+        run_id = self.repo.create_run(
+            label="Claim once",
+            strategy="desktop",
+            site_keys=["production"],
+            worker_count=2,
+            target_budget_seconds=60,
+            total_items=1,
+        )
+        item_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "Urls.csv",
+                    "group_key": "home",
+                    "site_key": "production",
+                    "original_value": "/",
+                    "generated_url": "https://www.lampsplus.com/",
+                    "strategy": "desktop",
+                }
+            ],
+        )[0]
+
+        self.assertTrue(self.repo.mark_item_running(item_id))
+        self.assertFalse(self.repo.mark_item_running(item_id))
+
+    def test_late_terminal_update_cannot_overwrite_passed_metrics(self):
+        run_id = self.repo.create_run(
+            label="Guard terminal",
+            strategy="desktop",
+            site_keys=["production"],
+            worker_count=2,
+            target_budget_seconds=60,
+            total_items=1,
+        )
+        item_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "Urls.csv",
+                    "group_key": "home",
+                    "site_key": "production",
+                    "original_value": "/",
+                    "generated_url": "https://www.lampsplus.com/",
+                    "strategy": "desktop",
+                }
+            ],
+        )[0]
+
+        self.assertTrue(self.repo.mark_item_running(item_id))
+        self.repo.mark_item_passed(
+            item_id,
+            {
+                "fcp": 900,
+                "speed_index": 1200,
+                "lcp": 1800,
+                "tbt": 50,
+                "cls": 0.02,
+                "duration_ms": 1500,
+            },
+        )
+        self.repo.mark_item_failed(item_id, "late timeout")
+        self.repo.mark_item_passed(
+            item_id,
+            {
+                "fcp": 9999,
+                "speed_index": 9999,
+                "lcp": 9999,
+                "tbt": 9999,
+                "cls": 9.99,
+                "duration_ms": 9999,
+            },
+        )
+
+        item = self.repo.get_run_detail(run_id)["items"][0]
+        self.assertEqual(item["status"], "passed")
+        self.assertIsNone(item["error_message"])
+        self.assertEqual(item["fcp"], 900)
+        self.assertEqual(item["speed_index"], 1200)
+        self.assertEqual(item["lcp"], 1800)
+        self.assertEqual(item["tbt"], 50)
+        self.assertEqual(item["cls"], 0.02)
+        self.assertEqual(item["duration_ms"], 1500)
+
+    def test_finish_run_if_complete_does_not_overwrite_cancel_requested_run(self):
+        run_id = self.repo.create_run(
+            label="Cancel requested",
+            strategy="desktop",
+            site_keys=["production"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=1,
+        )
+        item_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "Urls.csv",
+                    "group_key": "home",
+                    "site_key": "production",
+                    "original_value": "/",
+                    "generated_url": "https://www.lampsplus.com/",
+                    "strategy": "desktop",
+                }
+            ],
+        )[0]
+
+        self.repo.mark_run_running(run_id)
+        self.repo.request_cancel(run_id)
+        self.repo.mark_item_running(item_id)
+        self.repo.mark_item_passed(item_id, {"duration_ms": 100})
+        self.repo.finish_run_if_complete(run_id)
+
+        run = self.repo.get_run_detail(run_id)["run"]
+        self.assertEqual(run["status"], "running")
+        self.assertTrue(run["cancel_requested"])
+        self.assertIsNone(run["finished_at"])
+
+    def test_finish_run_if_complete_does_not_overwrite_cancelled_run(self):
+        run_id = self.repo.create_run(
+            label="Cancelled",
+            strategy="desktop",
+            site_keys=["production"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=0,
+        )
+
+        self.repo.mark_run_cancelled(run_id)
+        self.repo.finish_run_if_complete(run_id)
+
+        run = self.repo.get_run_detail(run_id)["run"]
+        self.assertEqual(run["status"], "cancelled")
+
+    def test_create_items_rejects_missing_run(self):
+        with self.assertRaises(DatabaseError):
+            self.repo.create_items(
+                999,
+                [
+                    {
+                        "source_filename": "Urls.csv",
+                        "group_key": "home",
+                        "site_key": "production",
+                        "original_value": "/",
+                        "generated_url": "https://www.lampsplus.com/",
+                        "strategy": "desktop",
+                    }
+                ],
+            )
 
 
 if __name__ == "__main__":

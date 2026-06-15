@@ -54,6 +54,8 @@ class CsvLighthouseRepository:
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
+                if not self._run_exists(cursor, run_id):
+                    raise DatabaseError(f"CSV Lighthouse run {run_id} does not exist")
                 for item in items:
                     cursor.execute(
                         f"""
@@ -76,6 +78,8 @@ class CsvLighthouseRepository:
                     )
                     item_ids.append(self._cm.last_insert_id(cursor))
             return item_ids
+        except DatabaseError:
+            raise
         except Exception as exc:
             raise DatabaseError(f"Failed to create CSV Lighthouse items: {exc}") from exc
 
@@ -141,7 +145,7 @@ class CsvLighthouseRepository:
                 (self._true_value(), run_id),
             )
 
-    def mark_item_running(self, item_id: int) -> None:
+    def mark_item_running(self, item_id: int) -> bool:
         ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
@@ -150,12 +154,13 @@ class CsvLighthouseRepository:
                 UPDATE csv_lighthouse_items
                 SET status = 'running',
                     started_at = COALESCE(started_at, CURRENT_TIMESTAMP)
-                WHERE id = {ph}
+                WHERE id = {ph} AND status = 'pending'
                 """,
                 (item_id,),
             )
+            return cursor.rowcount > 0
 
-    def mark_item_passed(self, item_id: int, metrics: dict) -> None:
+    def mark_item_passed(self, item_id: int, metrics: dict) -> bool:
         ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
@@ -172,7 +177,7 @@ class CsvLighthouseRepository:
                         cls = {ph},
                         duration_ms = {ph},
                         completed_at = CURRENT_TIMESTAMP
-                    WHERE id = {ph}
+                    WHERE id = {ph} AND status = 'running'
                     """,
                     (
                         metrics.get("fcp"),
@@ -184,13 +189,16 @@ class CsvLighthouseRepository:
                         item_id,
                     ),
                 )
+                if cursor.rowcount == 0:
+                    return False
                 run_id = self._item_run_id(cursor, item_id)
                 if run_id is not None:
                     self._refresh_run_progress(cursor, run_id)
+                return True
         except Exception as exc:
             raise DatabaseError(f"Failed to mark CSV Lighthouse item {item_id} passed: {exc}") from exc
 
-    def mark_item_failed(self, item_id: int, error_message: str) -> None:
+    def mark_item_failed(self, item_id: int, error_message: str) -> bool:
         ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
@@ -201,13 +209,16 @@ class CsvLighthouseRepository:
                     SET status = 'failed',
                         error_message = {ph},
                         completed_at = CURRENT_TIMESTAMP
-                    WHERE id = {ph}
+                    WHERE id = {ph} AND status = 'running'
                     """,
                     (error_message, item_id),
                 )
+                if cursor.rowcount == 0:
+                    return False
                 run_id = self._item_run_id(cursor, item_id)
                 if run_id is not None:
                     self._refresh_run_progress(cursor, run_id)
+                return True
         except Exception as exc:
             raise DatabaseError(f"Failed to mark CSV Lighthouse item {item_id} failed: {exc}") from exc
 
@@ -219,7 +230,12 @@ class CsvLighthouseRepository:
                 self._refresh_run_progress(cursor, run_id)
                 cursor.execute(
                     f"""
-                    SELECT total_items, completed_items, failed_items
+                    SELECT
+                        total_items,
+                        completed_items,
+                        failed_items,
+                        status,
+                        cancel_requested
                     FROM csv_lighthouse_runs
                     WHERE id = {ph}
                     """,
@@ -227,6 +243,8 @@ class CsvLighthouseRepository:
                 )
                 run = self._cm.row_to_dict(cursor)
                 if not run:
+                    return
+                if run["status"] == "cancelled" or bool(run["cancel_requested"]):
                     return
                 terminal_items = int(run["completed_items"] or 0) + int(run["failed_items"] or 0)
                 if terminal_items < int(run["total_items"] or 0):
@@ -323,6 +341,11 @@ class CsvLighthouseRepository:
         cursor.execute(f"SELECT run_id FROM csv_lighthouse_items WHERE id = {ph}", (item_id,))
         row = self._cm.row_to_dict(cursor)
         return int(row["run_id"]) if row else None
+
+    def _run_exists(self, cursor: Any, run_id: int) -> bool:
+        ph = self._cm.placeholder()
+        cursor.execute(f"SELECT 1 FROM csv_lighthouse_runs WHERE id = {ph}", (run_id,))
+        return self._cm.row_to_dict(cursor) is not None
 
     def _normalize_run(self, run: dict) -> dict:
         normalized = dict(run)
