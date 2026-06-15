@@ -120,17 +120,26 @@ export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTablePr
                   </TableCell>
                 </TableRow>
               ))}
-              <TableRow key={`${section.key}::average`} className="bg-muted/50 font-semibold">
-                <TableCell>{targetLabels[section.target]}</TableCell>
+              <TableRow
+                key={`${section.key}::average`}
+                className="border-y border-[color:var(--lcc-blue)]/30 bg-[color:var(--lcc-blue)]/10 font-semibold hover:bg-[color:var(--lcc-blue)]/15"
+              >
+                <TableCell className="border-l-4 border-l-[color:var(--lcc-blue)] text-[color:var(--lcc-blue)]">
+                  {targetLabels[section.target]}
+                </TableCell>
                 <TableCell>{section.group}</TableCell>
-                <TableCell>Averages</TableCell>
+                <TableCell>
+                  <span className="rounded border border-[color:var(--lcc-blue)]/35 bg-background/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--lcc-blue)]">
+                    Averages
+                  </span>
+                </TableCell>
                 <TableCell className="aurora-text-dim">{section.average.passedCount} passed</TableCell>
                 <TableCell>-</TableCell>
-                <TableCell className="aurora-num text-right">{formatMilliseconds(section.average.fcp)}</TableCell>
-                <TableCell className="aurora-num text-right">{formatMilliseconds(section.average.speed_index)}</TableCell>
-                <TableCell className="aurora-num text-right">{formatMilliseconds(section.average.lcp)}</TableCell>
-                <TableCell className="aurora-num text-right">{formatMilliseconds(section.average.tbt)}</TableCell>
-                <TableCell className="aurora-num text-right">{formatCls(section.average.cls)}</TableCell>
+                <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatMilliseconds(section.average.fcp)}</TableCell>
+                <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatMilliseconds(section.average.speed_index)}</TableCell>
+                <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatMilliseconds(section.average.lcp)}</TableCell>
+                <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatMilliseconds(section.average.tbt)}</TableCell>
+                <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatCls(section.average.cls)}</TableCell>
                 <TableCell>-</TableCell>
                 <TableCell>-</TableCell>
               </TableRow>
