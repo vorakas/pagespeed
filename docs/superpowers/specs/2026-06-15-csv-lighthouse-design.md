@@ -4,6 +4,8 @@
 
 Add a Test URLs section that lets QA upload the current hand-maintained BlazeMeter TestData CSV files and run Lighthouse checks against the exact pages those CSVs produce. The feature must support LampsPlus production and Adobe Commerce migration targets, default both targets on, and allow one target at a time because BlazeMeter runs are effectively sequential with one available engine.
 
+All URLs for the domain under active BlazeMeter load must finish Lighthouse collection inside the normal BlazeMeter run window, which is 8-9 minutes.
+
 The run focuses only on Lighthouse performance timing metrics:
 
 - First Contentful Paint
@@ -23,7 +25,7 @@ The run focuses only on Lighthouse performance timing metrics:
 5. QA can uncheck either target to run one environment at a time.
 6. QA starts the run.
 7. Pharos immediately creates a persisted run and returns a run id.
-8. Pharos tests the generated URLs one at a time and writes each result as it finishes.
+8. Pharos tests the generated URLs for each target domain with bounded backend concurrency and writes each result as it finishes.
 9. QA watches progress while BlazeMeter is running and can leave/reopen the page without losing completed results.
 10. QA can reopen saved run results later and download a CSV summary of the Lighthouse metrics.
 
@@ -88,13 +90,24 @@ The feature must not run a large Lighthouse batch inside one browser-held HTTP r
 Implementation should use a persisted backend run:
 
 - Upload/start endpoint parses files, creates a run row and item rows, starts background execution, then returns immediately.
-- Background execution tests one URL at a time by default.
+- Background execution uses bounded worker concurrency per target domain, not browser-held requests.
 - Each item is saved after completion or failure.
 - Frontend polls a run-status endpoint.
 - Failed URLs store error text and do not stop the run.
 - Runs can be cancelled.
 
 This avoids the current Test URLs batch weakness where the browser holds long synchronous PageSpeed requests and large batches can time out.
+
+Runtime requirements:
+
+- Treat 9 minutes as the default target-domain budget.
+- Selected targets should be tracked as separate target phases so Adobe Commerce and LampsPlus can be started or reviewed independently.
+- Default worker count should be enough to finish the selected domain inside the budget, capped by a conservative maximum.
+- Suggested initial cap: 4 concurrent PageSpeed requests per target domain.
+- The UI should show estimated duration before start based on URL count, worker count, and recent average PageSpeed duration.
+- If the URL count cannot plausibly finish within 9 minutes at the configured cap, warn before start and show the worker count needed.
+- Persist `worker_count`, target budget seconds, started timestamp, finished timestamp, and average item duration on each run or target phase.
+- Keep worker concurrency configurable in code or config so it can be tuned after real runs.
 
 ## Backend Design
 
@@ -242,6 +255,8 @@ Backend tests should cover:
 - dedupe behavior.
 - run creation with both targets.
 - run creation with one target.
+- worker-count calculation for the 9-minute target-domain budget.
+- bounded concurrency never exceeds the configured cap.
 - per-item failure does not stop the run.
 - cancel request stops after current item.
 
@@ -262,4 +277,3 @@ Manual verification should run a tiny CSV sample before any large batch.
 - Integrating directly with BlazeMeter execution state.
 - Comparing Lighthouse results against thresholds.
 - Exporting results to spreadsheet.
-- Running multiple Lighthouse URLs concurrently.
