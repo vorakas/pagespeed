@@ -1122,8 +1122,9 @@ class ApiClient {
     input.files.forEach((file) => formData.append("files", file))
     input.siteKeys.forEach((siteKey) => formData.append("site_keys", siteKey))
     formData.append("strategy", input.strategy)
-    if (input.label) {
-      formData.append("label", input.label)
+    const label = input.label?.trim()
+    if (label) {
+      formData.append("label", label)
     }
 
     const response = await fetch(`${this.baseUrl}/api/csv-lighthouse/runs`, {
