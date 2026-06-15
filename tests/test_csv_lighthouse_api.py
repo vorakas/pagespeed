@@ -34,6 +34,8 @@ class FakeCsvLighthouseService:
         ]
 
     def get_run(self, run_id):
+        if run_id == 999:
+            return {"run": None, "items": []}
         return {
             "run": {"id": run_id, "label": "Regression batch"},
             "items": [{"id": 7, "status": "pending"}],
@@ -41,6 +43,8 @@ class FakeCsvLighthouseService:
 
     def cancel_run(self, run_id):
         self.cancelled_run_ids.append(run_id)
+        if run_id == 999:
+            return {"run": None, "items": []}
         return {"run": {"id": run_id, "status": "cancelled"}, "items": []}
 
     def export_csv(self, run_id):
@@ -157,6 +161,16 @@ def test_get_run_returns_run_and_items_detail(client):
     }
 
 
+def test_get_run_returns_404_for_missing_run(client):
+    response = client.get("/api/csv-lighthouse/runs/999")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "success": False,
+        "error": "CSV Lighthouse run 999 not found",
+    }
+
+
 def test_cancel_run_calls_service(client, service):
     response = client.post("/api/csv-lighthouse/runs/42/cancel")
 
@@ -169,6 +183,17 @@ def test_cancel_run_calls_service(client, service):
     assert service.cancelled_run_ids == [42]
 
 
+def test_cancel_run_returns_404_for_missing_run(client, service):
+    response = client.post("/api/csv-lighthouse/runs/999/cancel")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "success": False,
+        "error": "CSV Lighthouse run 999 not found",
+    }
+    assert service.cancelled_run_ids == []
+
+
 def test_export_run_returns_csv_attachment(client):
     response = client.get("/api/csv-lighthouse/runs/42/export")
 
@@ -179,3 +204,13 @@ def test_export_run_returns_csv_attachment(client):
         == 'attachment; filename="csv-lighthouse-run-42.csv"'
     )
     assert response.get_data(as_text=True) == "run_id,label\n42,Regression batch\n"
+
+
+def test_export_run_returns_404_for_missing_run(client):
+    response = client.get("/api/csv-lighthouse/runs/999/export")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "success": False,
+        "error": "CSV Lighthouse run 999 not found",
+    }

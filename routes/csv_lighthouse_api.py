@@ -37,14 +37,26 @@ def create_csv_lighthouse_blueprint(service):
 
     @blueprint.route("/runs/<int:run_id>", methods=["GET"])
     def get_run(run_id):
-        return jsonify({"success": True, **service.get_run(run_id)})
+        detail = service.get_run(run_id)
+        not_found = _not_found_response(run_id, detail)
+        if not_found:
+            return not_found
+        return jsonify({"success": True, **detail})
 
     @blueprint.route("/runs/<int:run_id>/cancel", methods=["POST"])
     def cancel_run(run_id):
+        detail = service.get_run(run_id)
+        not_found = _not_found_response(run_id, detail)
+        if not_found:
+            return not_found
         return jsonify({"success": True, **service.cancel_run(run_id)})
 
     @blueprint.route("/runs/<int:run_id>/export", methods=["GET"])
     def export_run(run_id):
+        detail = service.get_run(run_id)
+        not_found = _not_found_response(run_id, detail)
+        if not_found:
+            return not_found
         csv_text = service.export_csv(run_id)
         return Response(
             csv_text,
@@ -64,3 +76,11 @@ def _parse_site_keys() -> list[str]:
     if len(raw_values) == 1 and "," in raw_values[0]:
         raw_values = raw_values[0].split(",")
     return [value.strip() for value in raw_values if value.strip()]
+
+
+def _not_found_response(run_id: int, detail):
+    if not detail or not detail.get("run"):
+        return jsonify(
+            {"success": False, "error": f"CSV Lighthouse run {run_id} not found"}
+        ), 404
+    return None
