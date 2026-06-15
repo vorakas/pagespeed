@@ -8,6 +8,7 @@ import { TestResultsTable } from "@/components/test-urls/TestResultsTable"
 import { TestProgressPanel } from "@/components/test-urls/TestProgressPanel"
 import { BatchResultsLog } from "@/components/test-urls/BatchResultsLog"
 import { TestDetailDialog } from "@/components/test-urls/TestDetailDialog"
+import { CsvLighthousePanel } from "@/components/test-urls/CsvLighthousePanel"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { useSites } from "@/hooks/use-sites"
@@ -189,7 +190,7 @@ export function TestUrls() {
       <div className="space-y-6 p-6">
         {/* Test Controls */}
         <div className="flex items-center gap-3">
-          <Button onClick={handleTestAll} disabled={testing || !hasUrls} style={{ color: "#000" }}>
+          <Button onClick={handleTestAll} disabled={testing || !hasUrls}>
             <Rocket className="h-4 w-4" />
             Test All URLs
           </Button>
@@ -220,6 +221,8 @@ export function TestUrls() {
           onDeleteRun={deleteRun}
           onClearHistory={clearHistory}
         />
+
+        <CsvLighthousePanel strategy={strategy} />
 
         {/* Site Tabs + Results */}
         {sites.length === 0 ? (

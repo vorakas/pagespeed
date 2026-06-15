@@ -12,6 +12,7 @@ from data_access.trigger_repository import TriggerRepository
 from data_access.preset_repository import PresetRepository
 from data_access.blazemeter_preset_repository import BlazemeterPresetRepository
 from data_access.blazemeter_run_repository import BlazemeterRunRepository
+from data_access.csv_lighthouse_repository import CsvLighthouseRepository
 from data_access.applitools_batch_repository import ApplitoolsBatchRepository
 from data_access.jira_user_cache_repository import JiraUserCacheRepository
 from data_access.qa_cycle_repository import QaCycleRepository
@@ -29,6 +30,7 @@ __all__ = [
     "PresetRepository",
     "BlazemeterPresetRepository",
     "BlazemeterRunRepository",
+    "CsvLighthouseRepository",
     "ApplitoolsBatchRepository",
     "JiraUserCacheRepository",
     "QaCycleRepository",

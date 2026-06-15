@@ -66,6 +66,7 @@ from data_access import (
     BlazemeterPresetRepository,
     BlazemeterRunRepository,
     ConnectionManager,
+    CsvLighthouseRepository,
     JiraUserCacheRepository,
     QaCycleRepository,
     QaReportCacheRepository,
@@ -88,6 +89,7 @@ from exceptions import (
 from services.applitools_storage import ApplitoolsBatchStore
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
+from services.csv_lighthouse_service import CsvLighthouseService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService, SyncAlreadyRunning
 from services.obsidian_sync.vault_reader import VaultReader
@@ -213,6 +215,7 @@ def create_app() -> Flask:
     preset_repo = PresetRepository(conn_mgr)
     blazemeter_preset_repo = BlazemeterPresetRepository(conn_mgr)
     blazemeter_run_repo = BlazemeterRunRepository(conn_mgr)
+    csv_lighthouse_repo = CsvLighthouseRepository(conn_mgr)
     applitools_batch_repo = ApplitoolsBatchRepository(conn_mgr, ttl_seconds=24 * 60 * 60)
     autofix_repo = AutofixRepository(conn_mgr)
     autofix_ingest_service = AutofixIngestService(autofix_repo)
@@ -221,6 +224,8 @@ def create_app() -> Flask:
 
     site_service = SiteService(site_repo, url_repo, test_result_repo)
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
+    csv_lighthouse_service = CsvLighthouseService(csv_lighthouse_repo, pagespeed)
+    csv_lighthouse_service.recover_interrupted_runs()
 
     # ---- TestData URL listing (builds openable URLs from uploaded CSVs) ----
     from services.testdata_url_service import TestDataUrlService
@@ -532,6 +537,7 @@ def create_app() -> Flask:
         flask_app, site_service, testing_service, test_result_repo, trigger_service,
         blazemeter_preset_repo=blazemeter_preset_repo,
         blazemeter_run_repo=blazemeter_run_repo,
+        csv_lighthouse_service=csv_lighthouse_service,
         blazemeter_client=blazemeter_client,
         blazemeter_queue=blazemeter_queue,
         obsidian_sync_service=obsidian_sync_service,

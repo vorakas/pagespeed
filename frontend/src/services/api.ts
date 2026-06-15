@@ -75,6 +75,9 @@ import type {
   AutofixFix,
   AutofixRefreshSummary,
   AutofixFixPatch,
+  CsvLighthouseRun,
+  CsvLighthouseRunDetail,
+  CsvLighthouseSiteKey,
   TestDataListing,
   ValidationSiteKey,
 } from "@/types"
@@ -1105,6 +1108,50 @@ class ApiClient {
 
   async getAiUsageSummary(): Promise<AiUsageSummary> {
     return this.request("/api/requirements/ai-usage")
+  }
+
+  // ---------- CSV Lighthouse runs ----------
+
+  async createCsvLighthouseRun(input: {
+    files: File[]
+    siteKeys: CsvLighthouseSiteKey[]
+    strategy: Strategy
+    label?: string
+  }): Promise<{ success: boolean; run_id: number; worker_count: number; total_items: number }> {
+    const formData = new FormData()
+    input.files.forEach((file) => formData.append("files", file))
+    input.siteKeys.forEach((siteKey) => formData.append("site_keys", siteKey))
+    formData.append("strategy", input.strategy)
+    const label = input.label?.trim()
+    if (label) {
+      formData.append("label", label)
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/csv-lighthouse/runs`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(errorData.error || `Request failed: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async listCsvLighthouseRuns(): Promise<{ success: boolean; runs: CsvLighthouseRun[] }> {
+    return this.request("/api/csv-lighthouse/runs")
+  }
+
+  async getCsvLighthouseRun(runId: number): Promise<{ success: boolean } & CsvLighthouseRunDetail> {
+    return this.request(`/api/csv-lighthouse/runs/${runId}`)
+  }
+
+  async cancelCsvLighthouseRun(runId: number): Promise<{ success: boolean }> {
+    return this.request(`/api/csv-lighthouse/runs/${runId}/cancel`, { method: "POST" })
+  }
+
+  getCsvLighthouseExportUrl(runId: number): string {
+    return `${this.baseUrl}/api/csv-lighthouse/runs/${runId}/export`
   }
 
   // ---------- TestData URL listing ----------
