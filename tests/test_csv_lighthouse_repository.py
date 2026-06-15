@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import tempfile
 import unittest
 
@@ -293,6 +294,29 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
                     }
                 ],
             )
+
+    def test_raw_sqlite_connection_enforces_csv_item_foreign_key(self):
+        with self.conn_mgr.get_connection() as conn:
+            cursor = conn.cursor()
+            with self.assertRaises(sqlite3.IntegrityError):
+                cursor.execute(
+                    """
+                    INSERT INTO csv_lighthouse_items (
+                        run_id, source_filename, group_key, site_key,
+                        original_value, generated_url, strategy
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        999,
+                        "Urls.csv",
+                        "home",
+                        "production",
+                        "/",
+                        "https://www.lampsplus.com/",
+                        "desktop",
+                    ),
+                )
 
 
 if __name__ == "__main__":

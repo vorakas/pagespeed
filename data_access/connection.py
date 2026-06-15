@@ -65,6 +65,7 @@ class ConnectionManager:
         if self.is_postgres:
             return self._get_pool().getconn()
         conn = sqlite3.connect(_SQLITE_PATH)
+        conn.execute("PRAGMA foreign_keys = ON")
         conn.row_factory = sqlite3.Row
         return conn
 
