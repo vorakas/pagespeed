@@ -80,9 +80,8 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
 
   const selectedRun = selectedDetail?.run ?? null
   const activeRun = selectedRun && !isTerminalStatus(selectedRun.status) ? selectedRun : null
-  const progress = selectedRun?.total_items
-    ? Math.round((selectedRun.completed_items / selectedRun.total_items) * 100)
-    : 0
+  const processedItems = selectedRun ? selectedRun.completed_items + selectedRun.failed_items : 0
+  const progress = selectedRun?.total_items ? Math.round((processedItems / selectedRun.total_items) * 100) : 0
   const canStart = files.length > 0 && selectedTargets.length > 0 && !starting
   const canCancel = Boolean(activeRun && !cancelling)
   const canDownload = Boolean(selectedRun && exportableStatuses.includes(selectedRun.status))
@@ -200,10 +199,29 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
     }
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!selectedRun || !canDownload) return
 
-    window.open(api.getCsvLighthouseExportUrl(selectedRun.id), "_blank", "noopener,noreferrer")
+    setError(null)
+    try {
+      const response = await fetch(api.getCsvLighthouseExportUrl(selectedRun.id))
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "")
+        throw new Error(errorText || `CSV download failed: ${response.status}`)
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `csv-lighthouse-run-${selectedRun.id}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to download CSV export")
+    }
   }
 
   return (
@@ -259,7 +277,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                 className="h-9"
               />
             </div>
-            <Button onClick={handleStart} disabled={!canStart} className="h-9" style={{ color: "#000" }}>
+            <Button onClick={handleStart} disabled={!canStart} className="h-9">
               {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               Start
             </Button>
@@ -297,7 +315,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                   </span>
                 </div>
                 <span className="aurora-text-dim text-xs tabular-nums">
-                  {selectedRun.completed_items} / {selectedRun.total_items} complete · {selectedRun.failed_items} failed
+                  {processedItems} / {selectedRun.total_items} processed · {selectedRun.failed_items} failed
                 </span>
               </div>
               <Progress value={progress} className="aurora-progress" />
@@ -351,7 +369,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                     <RunStatusBadge status={run.status} />
                   </div>
                   <div className="aurora-text-dim mt-2 text-xs tabular-nums">
-                    {run.completed_items}/{run.total_items} complete · {run.failed_items} failed
+                    {run.completed_items + run.failed_items}/{run.total_items} processed · {run.failed_items} failed
                   </div>
                 </button>
               ))

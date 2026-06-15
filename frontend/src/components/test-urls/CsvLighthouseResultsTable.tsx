@@ -60,7 +60,8 @@ export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTablePr
 
   return (
     <div className="aurora-panel overflow-hidden">
-      <Table className="aurora-table text-xs">
+      <div className="overflow-x-auto">
+        <Table className="aurora-table min-w-max text-xs">
         <TableHeader>
           <TableRow>
             <TableHead>Target</TableHead>
@@ -112,7 +113,8 @@ export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTablePr
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </div>
   )
 }
