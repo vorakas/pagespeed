@@ -1,8 +1,10 @@
 import io
+from pathlib import Path
 
 import pytest
 from flask import Flask, jsonify
 
+from config import CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH
 from exceptions import ValidationError
 import routes.csv_lighthouse_api as csv_lighthouse_api
 from routes.csv_lighthouse_api import create_csv_lighthouse_blueprint
@@ -168,6 +170,31 @@ def test_create_run_rejects_file_larger_than_limit_before_service_call(client, s
     assert response.status_code == 400
     assert response.get_json()["error"] == "CSV file PDP.csv exceeds 4 bytes"
     assert service.create_calls == []
+
+
+def test_create_run_rejects_request_body_larger_than_csv_limit(client, service, monkeypatch):
+    monkeypatch.setattr(csv_lighthouse_api, "CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH", 10, raising=False)
+
+    response = client.post(
+        "/api/csv-lighthouse/runs",
+        data={
+            "files": [(io.BytesIO(b"/p/brass-lamp\n"), "PDP.csv")],
+            "site_keys": "www",
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "CSV Lighthouse upload exceeds 10 bytes"
+    assert service.create_calls == []
+
+
+def test_app_factory_does_not_set_global_max_content_length_to_csv_limit():
+    app_source = Path(__file__).resolve().parents[1].joinpath("app.py").read_text()
+
+    assert "MAX_CONTENT_LENGTH'] = CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH" not in app_source
+    assert 'MAX_CONTENT_LENGTH"] = CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH' not in app_source
+    assert CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH == 8_000_000
 
 
 def test_list_runs_returns_saved_runs(client):

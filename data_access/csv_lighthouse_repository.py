@@ -158,7 +158,12 @@ class CsvLighthouseRepository:
                 """,
                 (item_id,),
             )
-            return cursor.rowcount > 0
+            claimed = cursor.rowcount > 0
+            if claimed:
+                run_id = self._item_run_id(cursor, item_id)
+                if run_id is not None:
+                    self._touch_run(cursor, run_id)
+            return claimed
 
     def mark_item_passed(self, item_id: int, metrics: dict) -> bool:
         ph = self._cm.placeholder()
@@ -320,18 +325,31 @@ class CsvLighthouseRepository:
         except Exception as exc:
             raise DatabaseError(f"Failed to finish CSV Lighthouse run {run_id}: {exc}") from exc
 
-    def recover_interrupted_runs(self, error_message: str) -> int:
+    def recover_interrupted_runs(self, error_message: str, stale_seconds: int) -> int:
         ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    SELECT id
-                    FROM csv_lighthouse_runs
-                    WHERE status IN ('pending', 'running')
-                    """
-                )
+                if self._cm.is_postgres:
+                    cursor.execute(
+                        f"""
+                        SELECT id
+                        FROM csv_lighthouse_runs
+                        WHERE status IN ('pending', 'running')
+                          AND updated_at < CURRENT_TIMESTAMP - ({ph} * INTERVAL '1 second')
+                        """,
+                        (stale_seconds,),
+                    )
+                else:
+                    cursor.execute(
+                        f"""
+                        SELECT id
+                        FROM csv_lighthouse_runs
+                        WHERE status IN ('pending', 'running')
+                          AND updated_at < datetime('now', {ph})
+                        """,
+                        (f"-{stale_seconds} seconds",),
+                    )
                 run_ids = [int(row["id"]) for row in self._cm.rows_to_dicts(cursor)]
                 for run_id in run_ids:
                     cursor.execute(
@@ -440,6 +458,17 @@ class CsvLighthouseRepository:
         cursor.execute(f"SELECT run_id FROM csv_lighthouse_items WHERE id = {ph}", (item_id,))
         row = self._cm.row_to_dict(cursor)
         return int(row["run_id"]) if row else None
+
+    def _touch_run(self, cursor: Any, run_id: int) -> None:
+        ph = self._cm.placeholder()
+        cursor.execute(
+            f"""
+            UPDATE csv_lighthouse_runs
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = {ph}
+            """,
+            (run_id,),
+        )
 
     def _run_exists(self, cursor: Any, run_id: int) -> bool:
         ph = self._cm.placeholder()

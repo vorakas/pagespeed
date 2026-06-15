@@ -4,7 +4,11 @@ import io
 
 from flask import Blueprint, Response, jsonify, request
 
-from config import CSV_LIGHTHOUSE_MAX_FILE_BYTES, CSV_LIGHTHOUSE_MAX_FILES
+from config import (
+    CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH,
+    CSV_LIGHTHOUSE_MAX_FILE_BYTES,
+    CSV_LIGHTHOUSE_MAX_FILES,
+)
 from exceptions import ValidationError
 
 
@@ -14,6 +18,14 @@ def create_csv_lighthouse_blueprint(service):
 
     @blueprint.route("/runs", methods=["POST"])
     def create_run():
+        if (
+            request.content_length is not None
+            and request.content_length > CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH
+        ):
+            raise ValidationError(
+                f"CSV Lighthouse upload exceeds {CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH} bytes"
+            )
+
         files = [file for file in request.files.getlist("files") if file.filename]
         if not files:
             raise ValidationError("At least one CSV file is required")

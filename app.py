@@ -50,7 +50,6 @@ from config import (
     JIRA_JQL_QUERIES,
     JIRA_PAT,
     OBSIDIAN_VAULT_ROOT,
-    CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH,
     PAGESPEED_API_KEY,
     PORT,
     VAULT_ACTIVE_HOURS_END,
@@ -203,7 +202,6 @@ def _seed_vault_wiki(vault_root: str) -> None:
 def create_app() -> Flask:
     """Application factory — builds a fully-configured Flask app."""
     flask_app = Flask(__name__)
-    flask_app.config['MAX_CONTENT_LENGTH'] = CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH
 
     # ---- Dependency wiring ----
     conn_mgr = ConnectionManager()

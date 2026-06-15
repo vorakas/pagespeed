@@ -60,6 +60,9 @@ CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_ITEMS_
 CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH', '8000000'))
 """Maximum request body size for CSV Lighthouse uploads."""
 
+CSV_LIGHTHOUSE_STALE_RUN_SECONDS: int = int(os.getenv('CSV_LIGHTHOUSE_STALE_RUN_SECONDS', '1800'))
+"""Age after which pending/running CSV Lighthouse runs are recovered after restart."""
+
 # ---------------------------------------------------------------------------
 # AI service defaults
 # ---------------------------------------------------------------------------

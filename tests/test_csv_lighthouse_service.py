@@ -335,6 +335,15 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         )
         self.repo.mark_run_running(run_id)
         self.repo.mark_item_running(first_id)
+        with self.conn_mgr.get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE csv_lighthouse_runs
+                SET updated_at = datetime('now', '-31 minutes')
+                WHERE id = ?
+                """,
+                (run_id,),
+            )
 
         recovered = self.service.recover_interrupted_runs()
         detail = self.repo.get_run_detail(run_id)

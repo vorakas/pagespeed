@@ -435,8 +435,19 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         )
         self.repo.mark_run_running(run_id)
         self.repo.mark_item_running(first_id)
+        with self.conn_mgr.get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE csv_lighthouse_runs
+                SET updated_at = datetime('now', '-31 minutes')
+                WHERE id = ?
+                """,
+                (run_id,),
+            )
 
-        recovered = self.repo.recover_interrupted_runs("Run interrupted by server restart")
+        recovered = self.repo.recover_interrupted_runs(
+            "Run interrupted by server restart", stale_seconds=1800
+        )
         detail = self.repo.get_run_detail(run_id)
 
         self.assertEqual(recovered, 1)
@@ -445,6 +456,115 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(detail["run"]["cancelled_items"], 0)
         self.assertIn("server restart", detail["run"]["error_message"])
         self.assertEqual([item["status"] for item in detail["items"]], ["failed", "failed"])
+
+    def test_recover_interrupted_runs_skips_fresh_pending_and_running_runs(self):
+        pending_id = self.repo.create_run(
+            label="Fresh pending",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=0,
+        )
+        running_id = self.repo.create_run(
+            label="Fresh running",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=0,
+        )
+        self.repo.mark_run_running(running_id)
+
+        recovered = self.repo.recover_interrupted_runs(
+            "Run interrupted by server restart", stale_seconds=1800
+        )
+
+        self.assertEqual(recovered, 0)
+        self.assertEqual(self.repo.get_run_detail(pending_id)["run"]["status"], "pending")
+        self.assertEqual(self.repo.get_run_detail(running_id)["run"]["status"], "running")
+
+    def test_recover_interrupted_runs_recovers_only_stale_runs(self):
+        fresh_id = self.repo.create_run(
+            label="Fresh running",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=0,
+        )
+        stale_id = self.repo.create_run(
+            label="Stale running",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=0,
+        )
+        self.repo.mark_run_running(fresh_id)
+        self.repo.mark_run_running(stale_id)
+        with self.conn_mgr.get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE csv_lighthouse_runs
+                SET updated_at = datetime('now', '-31 minutes')
+                WHERE id = ?
+                """,
+                (stale_id,),
+            )
+
+        recovered = self.repo.recover_interrupted_runs(
+            "Run interrupted by server restart", stale_seconds=1800
+        )
+
+        self.assertEqual(recovered, 1)
+        self.assertEqual(self.repo.get_run_detail(fresh_id)["run"]["status"], "running")
+        stale = self.repo.get_run_detail(stale_id)["run"]
+        self.assertEqual(stale["status"], "interrupted")
+        self.assertIn("server restart", stale["error_message"])
+
+    def test_mark_item_running_refreshes_stale_run_activity(self):
+        run_id = self.repo.create_run(
+            label="Active worker",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=1,
+        )
+        item_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                }
+            ],
+        )[0]
+        self.repo.mark_run_running(run_id)
+        with self.conn_mgr.get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE csv_lighthouse_runs
+                SET updated_at = datetime('now', '-31 minutes')
+                WHERE id = ?
+                """,
+                (run_id,),
+            )
+
+        self.assertTrue(self.repo.mark_item_running(item_id))
+        recovered = self.repo.recover_interrupted_runs(
+            "Run interrupted by server restart", stale_seconds=1800
+        )
+
+        detail = self.repo.get_run_detail(run_id)
+        self.assertEqual(recovered, 0)
+        self.assertEqual(detail["run"]["status"], "running")
+        self.assertEqual(detail["items"][0]["status"], "running")
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from config import (
     CSV_LIGHTHOUSE_MAX_FILE_BYTES,
     CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN,
     CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE,
+    CSV_LIGHTHOUSE_STALE_RUN_SECONDS,
 )
 from exceptions import ValidationError
 from services.testdata_registry import SITES, group_for_filename, open_url
@@ -276,7 +277,10 @@ class CsvLighthouseService:
         return items
 
     def recover_interrupted_runs(self) -> int:
-        return self.repository.recover_interrupted_runs("Run interrupted by server restart")
+        return self.repository.recover_interrupted_runs(
+            "Run interrupted by server restart",
+            stale_seconds=CSV_LIGHTHOUSE_STALE_RUN_SECONDS,
+        )
 
     def _read_limited_file(self, filename: str, handle: BinaryIO) -> bytes:
         size = self._stream_size_bytes(handle)
