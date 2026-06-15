@@ -288,28 +288,63 @@ class CsvLighthouseService:
                 "error_message",
             ]
         )
+        sections: dict[tuple[str, str], list[dict]] = {}
         for item in detail["items"]:
+            key = (item["site_key"], item["group_key"])
+            sections.setdefault(key, []).append(item)
+
+        for (site_key, group_key), items in sections.items():
+            for item in items:
+                writer.writerow(
+                    [
+                        run["id"],
+                        run["label"],
+                        item["source_filename"],
+                        item["group_key"],
+                        item["site_key"],
+                        item["original_value"],
+                        item["generated_url"],
+                        item["strategy"],
+                        item["status"],
+                        self._csv_value(item.get("fcp")),
+                        self._csv_value(item.get("speed_index")),
+                        self._csv_value(item.get("lcp")),
+                        self._csv_value(item.get("tbt")),
+                        self._csv_value(item.get("cls")),
+                        item.get("attempts"),
+                        item.get("error_message"),
+                    ]
+                )
+
+            passed_items = [item for item in items if item["status"] == "passed"]
             writer.writerow(
                 [
                     run["id"],
                     run["label"],
-                    item["source_filename"],
-                    item["group_key"],
-                    item["site_key"],
-                    item["original_value"],
-                    item["generated_url"],
-                    item["strategy"],
-                    item["status"],
-                    self._csv_value(item.get("fcp")),
-                    self._csv_value(item.get("speed_index")),
-                    self._csv_value(item.get("lcp")),
-                    self._csv_value(item.get("tbt")),
-                    self._csv_value(item.get("cls")),
-                    item.get("attempts"),
-                    item.get("error_message"),
+                    "Averages",
+                    group_key,
+                    site_key,
+                    "Averages",
+                    f"{len(passed_items)} passed",
+                    run["strategy"],
+                    "average",
+                    self._csv_value(self._average_metric(passed_items, "fcp")),
+                    self._csv_value(self._average_metric(passed_items, "speed_index")),
+                    self._csv_value(self._average_metric(passed_items, "lcp")),
+                    self._csv_value(self._average_metric(passed_items, "tbt")),
+                    self._csv_value(self._average_metric(passed_items, "cls")),
+                    "",
+                    "",
                 ]
             )
         return output.getvalue()
+
+    @staticmethod
+    def _average_metric(items: list[dict], key: str):
+        values = [item.get(key) for item in items if isinstance(item.get(key), (int, float))]
+        if not values:
+            return None
+        return sum(values) / len(values)
 
     def _read_file_records(self, files) -> list[dict]:
         records = []

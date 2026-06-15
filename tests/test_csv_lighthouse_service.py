@@ -304,6 +304,11 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(rows[1][8], "passed")
         self.assertEqual(rows[1][9:14], ["900", "1200", "1800", "50", "0.02"])
         self.assertEqual(rows[1][14], "1")
+        self.assertEqual(rows[2][2], "Averages")
+        self.assertEqual(rows[2][3], "PDP")
+        self.assertEqual(rows[2][4], "www")
+        self.assertEqual(rows[2][8], "average")
+        self.assertEqual(rows[2][9:14], ["900", "1200", "1800", "50", "0.02"])
 
     def test_create_run_normalizes_search_to_sort_full_url_without_double_prefix(self):
         result = self.service.create_run(
