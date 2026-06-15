@@ -1683,6 +1683,7 @@ export interface CsvLighthouseRun {
   total_items: number
   completed_items: number
   failed_items: number
+  cancelled_items: number
   average_item_duration_ms: number | null
   cancel_requested?: boolean
   error_message?: string | null

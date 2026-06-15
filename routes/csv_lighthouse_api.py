@@ -1,7 +1,10 @@
 """API routes for CSV-driven Lighthouse runs."""
 
+import io
+
 from flask import Blueprint, Response, jsonify, request
 
+from config import CSV_LIGHTHOUSE_MAX_FILE_BYTES, CSV_LIGHTHOUSE_MAX_FILES
 from exceptions import ValidationError
 
 
@@ -14,13 +17,21 @@ def create_csv_lighthouse_blueprint(service):
         files = [file for file in request.files.getlist("files") if file.filename]
         if not files:
             raise ValidationError("At least one CSV file is required")
+        if len(files) > CSV_LIGHTHOUSE_MAX_FILES:
+            raise ValidationError(
+                f"CSV Lighthouse upload accepts at most {CSV_LIGHTHOUSE_MAX_FILES} files"
+            )
 
         site_keys = _parse_site_keys()
         strategy = request.form.get("strategy") or "desktop"
         label = request.form.get("label") or None
         uploaded_files = []
         for file in files:
-            file.stream.seek(0)
+            size = _stream_size_bytes(file.stream)
+            if size > CSV_LIGHTHOUSE_MAX_FILE_BYTES:
+                raise ValidationError(
+                    f"CSV file {file.filename} exceeds {CSV_LIGHTHOUSE_MAX_FILE_BYTES} bytes"
+                )
             uploaded_files.append((file.filename, file.stream))
 
         result = service.create_run(
@@ -76,6 +87,15 @@ def _parse_site_keys() -> list[str]:
     if len(raw_values) == 1 and "," in raw_values[0]:
         raw_values = raw_values[0].split(",")
     return [value.strip() for value in raw_values if value.strip()]
+
+
+def _stream_size_bytes(stream) -> int:
+    try:
+        stream.seek(0, io.SEEK_END)
+        size = stream.tell()
+    finally:
+        stream.seek(0)
+    return int(size)
 
 
 def _not_found_response(run_id: int, detail):

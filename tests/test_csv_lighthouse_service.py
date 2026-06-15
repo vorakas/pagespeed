@@ -8,6 +8,7 @@ from unittest.mock import patch
 from data_access.connection import ConnectionManager
 from data_access.csv_lighthouse_repository import CsvLighthouseRepository
 from exceptions import ValidationError
+import services.csv_lighthouse_service as csv_lighthouse_service
 from services.csv_lighthouse_service import (
     DEFAULT_AVERAGE_SECONDS,
     CsvLighthouseService,
@@ -233,6 +234,30 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
         self.assertEqual(self.repo.list_runs(), [])
 
+    def test_create_run_rejects_csv_with_too_many_rows(self):
+        with patch.object(csv_lighthouse_service, "CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE", 1):
+            with self.assertRaisesRegex(ValidationError, "PDP.csv exceeds 1 rows"):
+                self.service.create_run(
+                    [("PDP.csv", io.BytesIO(b"brass-lamp/\nfloor-lamp/\n"))],
+                    site_keys=["www"],
+                    strategy="desktop",
+                )
+
+        self.assertEqual(self.repo.list_runs(), [])
+
+    def test_create_run_rejects_too_many_generated_items(self):
+        with patch.object(csv_lighthouse_service, "CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN", 1):
+            with self.assertRaisesRegex(
+                ValidationError, "CSV Lighthouse run would create 2 items; maximum is 1"
+            ):
+                self.service.create_run(
+                    [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+                    site_keys=["www", "mcprod"],
+                    strategy="desktop",
+                )
+
+        self.assertEqual(self.repo.list_runs(), [])
+
     def test_cancel_stops_scheduling_new_items_and_marks_pending_cancelled(self):
         run_id_holder = {}
         service = CsvLighthouseService(
@@ -253,6 +278,71 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
         self.assertEqual(detail["run"]["status"], "cancelled")
         self.assertEqual(statuses, ["passed", "cancelled"])
+
+    def test_late_cancel_after_all_items_passed_finishes_completed_and_exports(self):
+        run_id_holder = {}
+        service = CsvLighthouseService(
+            self.repo,
+            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"]),
+            start_background=False,
+        )
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            label="Late cancel",
+        )
+        run_id_holder["run_id"] = result["run_id"]
+
+        service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        exported = service.export_csv(result["run_id"])
+
+        self.assertEqual(detail["run"]["status"], "completed")
+        self.assertTrue(detail["run"]["cancel_requested"])
+        self.assertEqual(detail["items"][0]["status"], "passed")
+        self.assertIn("Late cancel", exported)
+
+    def test_recover_interrupted_runs_marks_running_work_interrupted(self):
+        run_id = self.repo.create_run(
+            label="Restarted",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=2,
+        )
+        first_id, _second_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                },
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "floor-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/floor-lamp/",
+                    "strategy": "desktop",
+                },
+            ],
+        )
+        self.repo.mark_run_running(run_id)
+        self.repo.mark_item_running(first_id)
+
+        recovered = self.service.recover_interrupted_runs()
+        detail = self.repo.get_run_detail(run_id)
+
+        self.assertEqual(recovered, 1)
+        self.assertEqual(detail["run"]["status"], "interrupted")
+        self.assertIn("server restart", detail["run"]["error_message"])
+        self.assertEqual([item["status"] for item in detail["items"]], ["failed", "failed"])
 
     def test_worker_exception_marks_run_failed_and_clears_pending_rows(self):
         result = self.service.create_run(

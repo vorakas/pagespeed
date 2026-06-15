@@ -50,6 +50,7 @@ from config import (
     JIRA_JQL_QUERIES,
     JIRA_PAT,
     OBSIDIAN_VAULT_ROOT,
+    CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH,
     PAGESPEED_API_KEY,
     PORT,
     VAULT_ACTIVE_HOURS_END,
@@ -202,6 +203,7 @@ def _seed_vault_wiki(vault_root: str) -> None:
 def create_app() -> Flask:
     """Application factory — builds a fully-configured Flask app."""
     flask_app = Flask(__name__)
+    flask_app.config['MAX_CONTENT_LENGTH'] = CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH
 
     # ---- Dependency wiring ----
     conn_mgr = ConnectionManager()
@@ -225,6 +227,7 @@ def create_app() -> Flask:
     site_service = SiteService(site_repo, url_repo, test_result_repo)
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
     csv_lighthouse_service = CsvLighthouseService(csv_lighthouse_repo, pagespeed)
+    csv_lighthouse_service.recover_interrupted_runs()
 
     # ---- TestData URL listing (builds openable URLs from uploaded CSVs) ----
     from services.testdata_url_service import TestDataUrlService

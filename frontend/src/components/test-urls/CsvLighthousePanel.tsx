@@ -80,7 +80,9 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
 
   const selectedRun = selectedDetail?.run ?? null
   const activeRun = selectedRun && !isTerminalStatus(selectedRun.status) ? selectedRun : null
-  const processedItems = selectedRun ? selectedRun.completed_items + selectedRun.failed_items : 0
+  const processedItems = selectedRun
+    ? selectedRun.completed_items + selectedRun.failed_items + selectedRun.cancelled_items
+    : 0
   const progress = selectedRun?.total_items ? Math.round((processedItems / selectedRun.total_items) * 100) : 0
   const canStart = files.length > 0 && selectedTargets.length > 0 && !starting
   const canCancel = Boolean(activeRun && !cancelling)
@@ -316,6 +318,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                 </div>
                 <span className="aurora-text-dim text-xs tabular-nums">
                   {processedItems} / {selectedRun.total_items} processed · {selectedRun.failed_items} failed
+                  {selectedRun.cancelled_items ? ` · ${selectedRun.cancelled_items} cancelled` : ""}
                 </span>
               </div>
               <Progress value={progress} className="aurora-progress" />
@@ -369,7 +372,8 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                     <RunStatusBadge status={run.status} />
                   </div>
                   <div className="aurora-text-dim mt-2 text-xs tabular-nums">
-                    {run.completed_items + run.failed_items}/{run.total_items} processed · {run.failed_items} failed
+                    {run.completed_items + run.failed_items + run.cancelled_items}/{run.total_items} processed · {run.failed_items} failed
+                    {run.cancelled_items ? ` · ${run.cancelled_items} cancelled` : ""}
                   </div>
                 </button>
               ))

@@ -9,6 +9,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import BinaryIO
 from urllib.parse import urlparse
 
+from config import (
+    CSV_LIGHTHOUSE_MAX_FILE_BYTES,
+    CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN,
+    CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE,
+)
 from exceptions import ValidationError
 from services.testdata_registry import SITES, group_for_filename, open_url
 
@@ -54,15 +59,23 @@ def normalize_csv_value(value, group=None) -> str:
     return normalized
 
 
-def parse_column_a(file_bytes: bytes, group=None) -> list[str]:
+def parse_column_a(
+    file_bytes: bytes,
+    group=None,
+    max_rows: int | None = None,
+    filename: str = "CSV file",
+) -> list[str]:
     try:
         decoded = file_bytes.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
         raise ValidationError(f"Unable to decode CSV as UTF-8: {exc}") from exc
 
     values: list[str] = []
+    row_limit = CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE if max_rows is None else max_rows
     try:
-        for row in csv.reader(io.StringIO(decoded), strict=True):
+        for row_index, row in enumerate(csv.reader(io.StringIO(decoded), strict=True), start=1):
+            if row_index > row_limit:
+                raise ValidationError(f"{filename} exceeds {row_limit} rows")
             if not row:
                 continue
             normalized = normalize_csv_value(row[0], group)
@@ -102,6 +115,11 @@ class CsvLighthouseService:
         items = self._build_items(files, site_keys, strategy)
         if not items:
             raise ValidationError("Upload did not contain any recognized CSV rows")
+        if len(items) > CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN:
+            raise ValidationError(
+                "CSV Lighthouse run would create "
+                f"{len(items)} items; maximum is {CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN}"
+            )
         worker_count = calculate_worker_count(len(items))
         run_id = self.repository.create_run(
             label=label or "CSV Lighthouse run",
@@ -176,9 +194,10 @@ class CsvLighthouseService:
                     break
 
         if self.repository.should_cancel(run_id):
-            self.repository.mark_pending_items_cancelled(run_id)
-            self.repository.mark_run_cancelled(run_id)
-            return
+            cancelled_items = self.repository.mark_pending_items_cancelled(run_id)
+            if cancelled_items:
+                self.repository.mark_run_cancelled(run_id)
+                return
         self.repository.finish_run_if_complete(run_id)
 
     def export_csv(self, run_id: int) -> str:
@@ -234,7 +253,8 @@ class CsvLighthouseService:
             group = group_for_filename(filename)
             if group is None:
                 continue
-            rows = parse_column_a(handle.read(), group)
+            file_bytes = self._read_limited_file(filename, handle)
+            rows = parse_column_a(file_bytes, group, filename=filename)
             max_rows = group.max_rows if group.max_rows is not None else len(rows)
             for original_value in rows[:max_rows]:
                 for site_key in site_keys:
@@ -255,6 +275,17 @@ class CsvLighthouseService:
                     )
         return items
 
+    def recover_interrupted_runs(self) -> int:
+        return self.repository.recover_interrupted_runs("Run interrupted by server restart")
+
+    def _read_limited_file(self, filename: str, handle: BinaryIO) -> bytes:
+        size = self._stream_size_bytes(handle)
+        if size > CSV_LIGHTHOUSE_MAX_FILE_BYTES:
+            raise ValidationError(
+                f"CSV file {filename} exceeds {CSV_LIGHTHOUSE_MAX_FILE_BYTES} bytes"
+            )
+        return handle.read()
+
     def _process_item(self, item: dict) -> None:
         if not self.repository.mark_item_running(item["id"]):
             return
@@ -272,6 +303,14 @@ class CsvLighthouseService:
         if isinstance(value, float) and value.is_integer():
             return int(value)
         return value
+
+    def _stream_size_bytes(self, stream: BinaryIO) -> int:
+        try:
+            stream.seek(0, io.SEEK_END)
+            size = stream.tell()
+        finally:
+            stream.seek(0)
+        return int(size)
 
     def _validate_strategy(self, strategy: str) -> str:
         if strategy not in {"desktop", "mobile"}:

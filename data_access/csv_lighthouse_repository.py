@@ -222,7 +222,7 @@ class CsvLighthouseRepository:
         except Exception as exc:
             raise DatabaseError(f"Failed to mark CSV Lighthouse item {item_id} failed: {exc}") from exc
 
-    def mark_pending_items_cancelled(self, run_id: int) -> None:
+    def mark_pending_items_cancelled(self, run_id: int) -> int:
         ph = self._cm.placeholder()
         try:
             with self._cm.get_connection() as conn:
@@ -237,7 +237,9 @@ class CsvLighthouseRepository:
                     """,
                     (run_id,),
                 )
+                cancelled_items = cursor.rowcount
                 self._refresh_run_progress(cursor, run_id)
+                return cancelled_items
         except Exception as exc:
             raise DatabaseError(f"Failed to cancel pending CSV Lighthouse items for run {run_id}: {exc}") from exc
 
@@ -283,6 +285,7 @@ class CsvLighthouseRepository:
                         total_items,
                         completed_items,
                         failed_items,
+                        cancelled_items,
                         status,
                         cancel_requested
                     FROM csv_lighthouse_runs
@@ -293,9 +296,13 @@ class CsvLighthouseRepository:
                 run = self._cm.row_to_dict(cursor)
                 if not run:
                     return
-                if run["status"] == "cancelled" or bool(run["cancel_requested"]):
+                if run["status"] == "cancelled":
                     return
-                terminal_items = int(run["completed_items"] or 0) + int(run["failed_items"] or 0)
+                terminal_items = (
+                    int(run["completed_items"] or 0)
+                    + int(run["failed_items"] or 0)
+                    + int(run["cancelled_items"] or 0)
+                )
                 if terminal_items < int(run["total_items"] or 0):
                     return
 
@@ -312,6 +319,46 @@ class CsvLighthouseRepository:
                 )
         except Exception as exc:
             raise DatabaseError(f"Failed to finish CSV Lighthouse run {run_id}: {exc}") from exc
+
+    def recover_interrupted_runs(self, error_message: str) -> int:
+        ph = self._cm.placeholder()
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM csv_lighthouse_runs
+                    WHERE status IN ('pending', 'running')
+                    """
+                )
+                run_ids = [int(row["id"]) for row in self._cm.rows_to_dicts(cursor)]
+                for run_id in run_ids:
+                    cursor.execute(
+                        f"""
+                        UPDATE csv_lighthouse_items
+                        SET status = 'failed',
+                            error_message = {ph},
+                            completed_at = CURRENT_TIMESTAMP
+                        WHERE run_id = {ph} AND status IN ('pending', 'running')
+                        """,
+                        (error_message, run_id),
+                    )
+                    self._refresh_run_progress(cursor, run_id)
+                    cursor.execute(
+                        f"""
+                        UPDATE csv_lighthouse_runs
+                        SET status = 'interrupted',
+                            error_message = {ph},
+                            finished_at = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = {ph}
+                        """,
+                        (error_message, run_id),
+                    )
+                return len(run_ids)
+        except Exception as exc:
+            raise DatabaseError(f"Failed to recover interrupted CSV Lighthouse runs: {exc}") from exc
 
     def pending_items(self, run_id: int) -> list[dict]:
         ph = self._cm.placeholder()
@@ -361,6 +408,7 @@ class CsvLighthouseRepository:
             SELECT
                 SUM(CASE WHEN status = 'passed' THEN 1 ELSE 0 END) AS completed_items,
                 SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed_items,
+                SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_items,
                 AVG(CASE WHEN status IN ('passed', 'failed') THEN duration_ms END) AS average_item_duration_ms
             FROM csv_lighthouse_items
             WHERE run_id = {ph}
@@ -373,6 +421,7 @@ class CsvLighthouseRepository:
             UPDATE csv_lighthouse_runs
             SET completed_items = {ph},
                 failed_items = {ph},
+                cancelled_items = {ph},
                 average_item_duration_ms = {ph},
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = {ph}
@@ -380,6 +429,7 @@ class CsvLighthouseRepository:
             (
                 int(progress.get("completed_items") or 0),
                 int(progress.get("failed_items") or 0),
+                int(progress.get("cancelled_items") or 0),
                 self._int_or_none(progress.get("average_item_duration_ms")),
                 run_id,
             ),
@@ -400,6 +450,7 @@ class CsvLighthouseRepository:
         normalized = dict(run)
         normalized["site_keys"] = self._load_site_keys(normalized.get("site_keys"))
         normalized["cancel_requested"] = bool(normalized.get("cancel_requested"))
+        normalized["cancelled_items"] = int(normalized.get("cancelled_items") or 0)
         return normalized
 
     @staticmethod

@@ -363,6 +363,7 @@ class ConnectionManager:
                 total_items INTEGER NOT NULL DEFAULT 0,
                 completed_items INTEGER NOT NULL DEFAULT 0,
                 failed_items INTEGER NOT NULL DEFAULT 0,
+                cancelled_items INTEGER NOT NULL DEFAULT 0,
                 cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
                 average_item_duration_ms INTEGER,
                 error_message TEXT,
@@ -402,6 +403,7 @@ class ConnectionManager:
         # Migration: add trigger execution tracking columns
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP")
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_status TEXT")
+        cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS cancelled_items INTEGER NOT NULL DEFAULT 0")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS migration_snapshots (
@@ -865,6 +867,7 @@ class ConnectionManager:
             "ALTER TABLE test_results ADD COLUMN strategy TEXT DEFAULT 'desktop'",
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_at TIMESTAMP",
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_status TEXT",
+            "ALTER TABLE csv_lighthouse_runs ADD COLUMN cancelled_items INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_id INTEGER",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_name TEXT",
             "ALTER TABLE requirement_sources ADD COLUMN original_filename TEXT",

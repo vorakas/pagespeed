@@ -45,6 +45,21 @@ PAGESPEED_TIMEOUT_SECONDS: int = 90
 REQUEST_DELAY_SECONDS: int = 2
 """Delay between consecutive PageSpeed API calls to respect rate limits."""
 
+CSV_LIGHTHOUSE_MAX_FILES: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_FILES', '12'))
+"""Maximum CSV files accepted for one Lighthouse run upload."""
+
+CSV_LIGHTHOUSE_MAX_FILE_BYTES: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_FILE_BYTES', '1000000'))
+"""Maximum size for each uploaded CSV Lighthouse file."""
+
+CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE', '500'))
+"""Maximum CSV rows parsed from each uploaded CSV Lighthouse file."""
+
+CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN', '200'))
+"""Maximum generated Lighthouse URL checks in one CSV run."""
+
+CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH', '8000000'))
+"""Maximum request body size for CSV Lighthouse uploads."""
+
 # ---------------------------------------------------------------------------
 # AI service defaults
 # ---------------------------------------------------------------------------

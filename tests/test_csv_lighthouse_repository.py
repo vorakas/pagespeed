@@ -59,6 +59,7 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(detail["run"]["total_items"], 1)
         self.assertEqual(detail["run"]["completed_items"], 0)
         self.assertEqual(detail["run"]["failed_items"], 0)
+        self.assertEqual(detail["run"]["cancelled_items"], 0)
         self.assertFalse(detail["run"]["cancel_requested"])
 
         self.assertEqual(len(detail["items"]), 1)
@@ -229,7 +230,7 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(item["cls"], 0.02)
         self.assertEqual(item["duration_ms"], 1500)
 
-    def test_finish_run_if_complete_does_not_overwrite_cancel_requested_run(self):
+    def test_finish_run_if_complete_allows_late_cancel_when_all_items_are_terminal(self):
         run_id = self.repo.create_run(
             label="Cancel requested",
             strategy="desktop",
@@ -259,9 +260,9 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.repo.finish_run_if_complete(run_id)
 
         run = self.repo.get_run_detail(run_id)["run"]
-        self.assertEqual(run["status"], "running")
+        self.assertEqual(run["status"], "completed")
         self.assertTrue(run["cancel_requested"])
-        self.assertIsNone(run["finished_at"])
+        self.assertIsNotNone(run["finished_at"])
 
     def test_finish_run_if_complete_does_not_overwrite_cancelled_run(self):
         run_id = self.repo.create_run(
@@ -356,6 +357,9 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         detail = self.repo.get_run_detail(run_id)
 
         self.assertEqual(detail["run"]["status"], "cancelled")
+        self.assertEqual(detail["run"]["completed_items"], 1)
+        self.assertEqual(detail["run"]["failed_items"], 0)
+        self.assertEqual(detail["run"]["cancelled_items"], 1)
         self.assertEqual(
             [item["status"] for item in detail["items"]], ["passed", "cancelled"]
         )
@@ -397,6 +401,49 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(detail["run"]["status"], "failed")
         self.assertEqual(detail["run"]["failed_items"], 2)
         self.assertIn("worker crashed", detail["run"]["error_message"])
+        self.assertEqual([item["status"] for item in detail["items"]], ["failed", "failed"])
+
+    def test_recover_interrupted_runs_marks_running_run_and_items_terminal(self):
+        run_id = self.repo.create_run(
+            label="Recover running",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=60,
+            total_items=2,
+        )
+        first_id, _second_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                },
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "floor-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/floor-lamp/",
+                    "strategy": "desktop",
+                },
+            ],
+        )
+        self.repo.mark_run_running(run_id)
+        self.repo.mark_item_running(first_id)
+
+        recovered = self.repo.recover_interrupted_runs("Run interrupted by server restart")
+        detail = self.repo.get_run_detail(run_id)
+
+        self.assertEqual(recovered, 1)
+        self.assertEqual(detail["run"]["status"], "interrupted")
+        self.assertEqual(detail["run"]["failed_items"], 2)
+        self.assertEqual(detail["run"]["cancelled_items"], 0)
+        self.assertIn("server restart", detail["run"]["error_message"])
         self.assertEqual([item["status"] for item in detail["items"]], ["failed", "failed"])
 
 

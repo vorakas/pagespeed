@@ -4,6 +4,7 @@ import pytest
 from flask import Flask, jsonify
 
 from exceptions import ValidationError
+import routes.csv_lighthouse_api as csv_lighthouse_api
 from routes.csv_lighthouse_api import create_csv_lighthouse_blueprint
 
 
@@ -131,6 +132,42 @@ def test_create_run_requires_at_least_one_file(client):
         "success": False,
         "error": "At least one CSV file is required",
     }
+
+
+def test_create_run_rejects_too_many_files(client, monkeypatch):
+    monkeypatch.setattr(csv_lighthouse_api, "CSV_LIGHTHOUSE_MAX_FILES", 1, raising=False)
+
+    response = client.post(
+        "/api/csv-lighthouse/runs",
+        data={
+            "files": [
+                (io.BytesIO(b"/p/brass-lamp\n"), "PDP.csv"),
+                (io.BytesIO(b"/p/floor-lamp\n"), "PDP2.csv"),
+            ],
+            "site_keys": "www",
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "CSV Lighthouse upload accepts at most 1 files"
+
+
+def test_create_run_rejects_file_larger_than_limit_before_service_call(client, service, monkeypatch):
+    monkeypatch.setattr(csv_lighthouse_api, "CSV_LIGHTHOUSE_MAX_FILE_BYTES", 4, raising=False)
+
+    response = client.post(
+        "/api/csv-lighthouse/runs",
+        data={
+            "files": [(io.BytesIO(b"12345"), "PDP.csv")],
+            "site_keys": "www",
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "CSV file PDP.csv exceeds 4 bytes"
+    assert service.create_calls == []
 
 
 def test_list_runs_returns_saved_runs(client):
