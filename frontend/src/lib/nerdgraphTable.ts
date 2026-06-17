@@ -1,6 +1,43 @@
 export type ResultRow = Record<string, unknown>
 
-/** Ordered union of keys across all rows (first-seen order); `facet` first if present. */
+/**
+ * The real faceted-attribute keys when NerdGraph's `facet` field merely
+ * duplicates them. NerdGraph returns a convenience `facet` value alongside the
+ * actual attribute column(s) (e.g. `request.uri`); the New Relic UI hides the
+ * duplicate. Returns the attribute key(s) only when the `facet` value is
+ * reproduced by other column(s) in every faceted row — otherwise empty, so the
+ * `facet` column is kept (e.g. `FACET` on a function, where nothing reproduces it).
+ */
+function redundantFacetAttributeKeys(results: ResultRow[]): string[] {
+  const faceted = results.filter((row) => "facet" in row)
+  if (faceted.length === 0) return []
+
+  const first = faceted[0]
+  const firstValues = Array.isArray(first.facet) ? first.facet : [first.facet]
+  const candidates: string[] = []
+  for (const value of firstValues) {
+    const key = Object.keys(first).find(
+      (candidate) =>
+        candidate !== "facet" && !candidates.includes(candidate) && first[candidate] === value,
+    )
+    if (!key) return [] // facet value not reproduced — keep the facet column
+    candidates.push(key)
+  }
+
+  for (const row of faceted) {
+    const values = Array.isArray(row.facet) ? row.facet : [row.facet]
+    if (values.length !== candidates.length) return []
+    if (!candidates.every((key, index) => row[key] === values[index])) return []
+  }
+  return candidates
+}
+
+/**
+ * Ordered union of keys across all rows (first-seen order). When NerdGraph's
+ * `facet` field duplicates the real attribute column(s), the `facet` column is
+ * dropped and those attribute(s) lead, matching the New Relic UI. Otherwise a
+ * lone `facet` column is placed first.
+ */
 export function deriveColumns(results: ResultRow[]): string[] {
   const seen = new Set<string>()
   const columns: string[] = []
@@ -12,6 +49,13 @@ export function deriveColumns(results: ResultRow[]): string[] {
       }
     }
   }
+
+  const facetAttrs = redundantFacetAttributeKeys(results)
+  if (facetAttrs.length > 0) {
+    const rest = columns.filter((column) => column !== "facet" && !facetAttrs.includes(column))
+    return [...facetAttrs, ...rest]
+  }
+
   if (seen.has("facet")) {
     return ["facet", ...columns.filter((column) => column !== "facet")]
   }

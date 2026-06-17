@@ -27,6 +27,24 @@ describe("deriveColumns", () => {
     const rows = [{ a: 1, b: 2 }, { a: 3 }]
     expect(deriveColumns(rows)).toEqual(["a", "b"])
   })
+
+  it("hides the redundant facet column and leads with the faceted attribute", () => {
+    const rows = [
+      { facet: "/a", count: 1, "request.uri": "/a" },
+      { facet: "/b", count: 2, "request.uri": "/b" },
+    ]
+    expect(deriveColumns(rows)).toEqual(["request.uri", "count"])
+  })
+
+  it("hides the redundant facet column for a multi-facet query", () => {
+    const rows = [{ facet: ["x", "y"], a: "x", b: "y", count: 3 }]
+    expect(deriveColumns(rows)).toEqual(["a", "b", "count"])
+  })
+
+  it("keeps the facet column when no attribute reproduces the facet value", () => {
+    const rows = [{ facet: "home", count: 9 }]
+    expect(deriveColumns(rows)).toEqual(["facet", "count"])
+  })
 })
 
 describe("formatCellValue", () => {
