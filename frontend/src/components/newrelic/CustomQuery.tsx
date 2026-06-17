@@ -77,8 +77,9 @@ export function CustomQuery({ configs, activeSite }: CustomQueryProps) {
     if (!name || !query.trim()) return
     const next = upsertQuery(savedQueries, name, query)
     saveSavedQueries(next)
-    setSavedQueries(loadSavedQueries())
+    setSavedQueries(next)
     setSelected(`saved:${name}`)
+    setQueryName("")
   }
 
   const handleDeleteQuery = () => {
@@ -86,7 +87,7 @@ export function CustomQuery({ configs, activeSite }: CustomQueryProps) {
     const name = selected.slice("saved:".length)
     const next = removeQuery(savedQueries, name)
     saveSavedQueries(next)
-    setSavedQueries(loadSavedQueries())
+    setSavedQueries(next)
     setSelected("")
   }
 
