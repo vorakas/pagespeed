@@ -11,7 +11,7 @@ interface NerdGraphResultsTableProps {
 
 export function NerdGraphResultsTable({ results }: NerdGraphResultsTableProps) {
   const columns = deriveColumns(results)
-  const columnKey = columns.join("|")
+  const columnKey = JSON.stringify(columns)
   const [widths, setWidths] = useState<Record<string, number>>({})
   const dragState = useRef<{ column: string; startX: number; startWidth: number } | null>(null)
 
@@ -65,7 +65,16 @@ export function NerdGraphResultsTable({ results }: NerdGraphResultsTableProps) {
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column} className="relative" style={{ overflow: "hidden" }}>
+              <th
+                key={column}
+                className="relative"
+                style={{
+                  overflow: "hidden",
+                  position: "sticky",
+                  top: 0,
+                  background: "var(--glass-bg-strong)",
+                }}
+              >
                 <span className="block truncate pr-2" title={column}>
                   {column}
                 </span>
