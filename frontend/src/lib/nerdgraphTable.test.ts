@@ -22,6 +22,11 @@ describe("deriveColumns", () => {
   it("returns an empty array for no rows", () => {
     expect(deriveColumns([])).toEqual([])
   })
+
+  it("does not duplicate a column missing from a later row", () => {
+    const rows = [{ a: 1, b: 2 }, { a: 3 }]
+    expect(deriveColumns(rows)).toEqual(["a", "b"])
+  })
 })
 
 describe("formatCellValue", () => {
@@ -48,6 +53,12 @@ describe("formatCsvValue", () => {
     expect(formatCsvValue(undefined)).toBe("")
   })
 
+  it("renders primitives as strings", () => {
+    expect(formatCsvValue(42)).toBe("42")
+    expect(formatCsvValue("plain")).toBe("plain")
+    expect(formatCsvValue(true)).toBe("true")
+  })
+
   it("stringifies nested values like cells do", () => {
     expect(formatCsvValue({ a: 1 })).toBe('{"a":1}')
   })
@@ -64,6 +75,10 @@ describe("buildCsv", () => {
     const rows = [{ a: 'x,y', b: 'he said "hi"', c: "line1\nline2" }]
     const csv = buildCsv(rows, ["a", "b", "c"])
     expect(csv).toBe('a,b,c\r\n"x,y","he said ""hi""","line1\nline2"')
+  })
+
+  it("returns only the header row when results is empty", () => {
+    expect(buildCsv([], ["a", "b"])).toBe("a,b")
   })
 })
 
