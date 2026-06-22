@@ -310,11 +310,18 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(rows[2][8], "average")
         self.assertEqual(rows[2][9:14], ["900", "1200", "1800", "50", "0.02"])
 
-    def test_create_run_normalizes_search_to_sort_full_url_without_double_prefix(self):
+    def test_create_run_recognizes_plp_filenames(self):
+        from services.testdata_registry import group_for_filename
+
+        self.assertEqual(group_for_filename("Search.csv").key, "Search")
+        self.assertEqual(group_for_filename("PLP.csv").key, "PLP")
+        self.assertEqual(group_for_filename("SearchToPLP.csv").key, "SearchToPLP")
+
+    def test_create_run_normalizes_search_to_plp_full_url_without_double_prefix(self):
         result = self.service.create_run(
             [
                 (
-                    "SearchToSort.csv",
+                    "SearchToPLP.csv",
                     io.BytesIO(b"https://www.lampsplus.com/s/s_chandelier/?s=1\n"),
                 )
             ],

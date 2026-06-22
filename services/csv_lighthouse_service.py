@@ -24,7 +24,7 @@ MAX_WORKERS_PER_TARGET = 4
 MAX_LIGHTHOUSE_ATTEMPTS = 2
 
 _KNOWN_ROUTE_PREFIXES = ("/p/", "/sfp/", "/more-like-this/", "/s/")
-_SEARCH_GROUP_KEYS = {"SearchToSort", "SearchToPDP"}
+_SEARCH_GROUP_KEYS = {"SearchToPLP", "SearchToPDP"}
 
 
 def normalize_csv_value(value, group=None) -> str:

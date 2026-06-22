@@ -59,16 +59,16 @@ GROUPS: dict[str, GroupDef] = {
         },
         max_rows=5,
     ),
-    "SearchBR": GroupDef(
-        key="SearchBR", label="SearchBR", csv_filename="SearchBR.csv",
+    "Search": GroupDef(
+        key="Search", label="Search", csv_filename="Search.csv",
         path_template="/s/{v}", selectors=dict(_LISTING_SELECTORS),
     ),
-    "SortBR": GroupDef(
-        key="SortBR", label="SortBR", csv_filename="SortBR.csv",
+    "PLP": GroupDef(
+        key="PLP", label="PLP", csv_filename="PLP.csv",
         path_template="/s/{v}", selectors=dict(_LISTING_SELECTORS),
     ),
-    "SearchToSort": GroupDef(
-        key="SearchToSort", label="SearchToSort", csv_filename="SearchToSort.csv",
+    "SearchToPLP": GroupDef(
+        key="SearchToPLP", label="SearchToPLP", csv_filename="SearchToPLP.csv",
         path_template="/s/s_{v}/?s=1", selectors=dict(_LISTING_SELECTORS),
     ),
     "SearchToPDP": GroupDef(
