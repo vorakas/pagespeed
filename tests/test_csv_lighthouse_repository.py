@@ -651,6 +651,23 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(stale["status"], "interrupted")
         self.assertIn("server restart", stale["error_message"])
 
+    def test_list_library_is_empty_on_fresh_schema(self):
+        self.assertEqual(self.repo.list_library(), [])
+
+    def test_upsert_library_file_inserts_then_updates_by_filename(self):
+        self.repo.upsert_library_file("PLP.csv", "PLP", "a/\nb/\n", 2)
+        self.repo.upsert_library_file("PLP.csv", "PLP", "c/\n", 1)
+        library = self.repo.list_library()
+        self.assertEqual(len(library), 1)
+        self.assertEqual(library[0]["filename"], "PLP.csv")
+        self.assertEqual(library[0]["row_count"], 1)
+        self.assertEqual(library[0]["csv_text"], "c/\n")
+
+    def test_delete_library_file_removes_row(self):
+        self.repo.upsert_library_file("PLP.csv", "PLP", "a/\n", 1)
+        self.repo.delete_library_file("PLP.csv")
+        self.assertEqual(self.repo.list_library(), [])
+
     def test_mark_item_running_refreshes_stale_run_activity(self):
         run_id = self.repo.create_run(
             label="Active worker",

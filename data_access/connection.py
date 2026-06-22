@@ -389,6 +389,18 @@ class ConnectionManager:
         """)
 
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS csv_lighthouse_library (
+                id SERIAL PRIMARY KEY,
+                filename TEXT NOT NULL UNIQUE,
+                group_key TEXT NOT NULL,
+                csv_text TEXT NOT NULL,
+                row_count INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS csv_lighthouse_items (
                 id SERIAL PRIMARY KEY,
                 run_id INTEGER NOT NULL,
@@ -719,6 +731,18 @@ class ConnectionManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (run_id) REFERENCES csv_lighthouse_runs (id) ON DELETE CASCADE
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS csv_lighthouse_library (
+                id INTEGER PRIMARY KEY,
+                filename TEXT NOT NULL UNIQUE,
+                group_key TEXT NOT NULL,
+                csv_text TEXT NOT NULL,
+                row_count INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 

@@ -180,6 +180,52 @@ class CsvLighthouseRepository:
         except Exception as exc:
             raise DatabaseError(f"Failed to delete CSV Lighthouse run {run_id}: {exc}") from exc
 
+    def list_library(self) -> list[dict]:
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM csv_lighthouse_library ORDER BY filename"
+            )
+            return self._cm.rows_to_dicts(cursor)
+
+    def upsert_library_file(
+        self, filename: str, group_key: str, csv_text: str, row_count: int
+    ) -> None:
+        ph = self._cm.placeholder()
+        try:
+            with self._cm.get_connection() as conn:
+                conn.cursor().execute(
+                    f"""
+                    INSERT INTO csv_lighthouse_library (
+                        filename, group_key, csv_text, row_count
+                    )
+                    VALUES ({ph}, {ph}, {ph}, {ph})
+                    ON CONFLICT(filename) DO UPDATE SET
+                        group_key = excluded.group_key,
+                        csv_text = excluded.csv_text,
+                        row_count = excluded.row_count,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (filename, group_key, csv_text, row_count),
+                )
+        except Exception as exc:
+            raise DatabaseError(
+                f"Failed to save CSV library file {filename}: {exc}"
+            ) from exc
+
+    def delete_library_file(self, filename: str) -> None:
+        ph = self._cm.placeholder()
+        try:
+            with self._cm.get_connection() as conn:
+                conn.cursor().execute(
+                    f"DELETE FROM csv_lighthouse_library WHERE filename = {ph}",
+                    (filename,),
+                )
+        except Exception as exc:
+            raise DatabaseError(
+                f"Failed to delete CSV library file {filename}: {exc}"
+            ) from exc
+
     def replace_pending_items(self, run_id: int, items: list[dict]) -> list[int]:
         ph = self._cm.placeholder()
         item_ids: list[int] = []
