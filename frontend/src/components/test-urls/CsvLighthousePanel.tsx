@@ -280,8 +280,13 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
+      const safeName = (selectedRun.label || "")
+        .trim()
+        .replace(/[^a-z0-9 _.-]+/gi, "-")
+        .replace(/\s+/g, "_")
+        .replace(/^[-_.]+|[-_.]+$/g, "")
       link.href = url
-      link.download = `csv-lighthouse-run-${selectedRun.id}.csv`
+      link.download = `${safeName || `csv-lighthouse-run-${selectedRun.id}`}.csv`
       document.body.appendChild(link)
       link.click()
       link.remove()
