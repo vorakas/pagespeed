@@ -215,6 +215,15 @@ class CsvLighthouseService:
         self.repository.request_cancel(run_id)
         return self.repository.get_run_detail(run_id)
 
+    def delete_run(self, run_id: int) -> None:
+        detail = self.repository.get_run_detail(run_id)
+        run = detail["run"]
+        if not run:
+            raise ValidationError("CSV Lighthouse run not found")
+        if run["status"] == "running":
+            raise ValidationError("Cancel the run before deleting it")
+        self.repository.delete_run(run_id)
+
     def run_pending_items(self, run_id: int) -> None:
         try:
             self._run_pending_items(run_id)

@@ -66,6 +66,15 @@ def create_csv_lighthouse_blueprint(service):
             return not_found
         return jsonify({"success": True, **detail})
 
+    @blueprint.route("/runs/<int:run_id>", methods=["DELETE"])
+    def delete_run(run_id):
+        detail = service.get_run(run_id)
+        not_found = _not_found_response(run_id, detail)
+        if not_found:
+            return not_found
+        service.delete_run(run_id)
+        return jsonify({"success": True})
+
     @blueprint.route("/runs/<int:run_id>/files", methods=["GET"])
     def list_files(run_id):
         detail = service.get_run(run_id)

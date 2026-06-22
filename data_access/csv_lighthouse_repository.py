@@ -163,6 +163,23 @@ class CsvLighthouseRepository:
         except Exception as exc:
             raise DatabaseError(f"Failed to delete CSV Lighthouse file {file_id}: {exc}") from exc
 
+    def delete_run(self, run_id: int) -> None:
+        ph = self._cm.placeholder()
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"DELETE FROM csv_lighthouse_items WHERE run_id = {ph}", (run_id,)
+                )
+                cursor.execute(
+                    f"DELETE FROM csv_lighthouse_files WHERE run_id = {ph}", (run_id,)
+                )
+                cursor.execute(
+                    f"DELETE FROM csv_lighthouse_runs WHERE id = {ph}", (run_id,)
+                )
+        except Exception as exc:
+            raise DatabaseError(f"Failed to delete CSV Lighthouse run {run_id}: {exc}") from exc
+
     def replace_pending_items(self, run_id: int, items: list[dict]) -> list[int]:
         ph = self._cm.placeholder()
         item_ids: list[int] = []

@@ -1147,6 +1147,10 @@ class ApiClient {
     return this.request(`/api/csv-lighthouse/runs/${runId}`)
   }
 
+  async deleteCsvLighthouseRun(runId: number): Promise<{ success: boolean }> {
+    return this.request(`/api/csv-lighthouse/runs/${runId}`, { method: "DELETE" })
+  }
+
   async listCsvLighthouseFiles(runId: number): Promise<{ success: boolean; files: CsvLighthouseFile[] }> {
     return this.request(`/api/csv-lighthouse/runs/${runId}/files`)
   }

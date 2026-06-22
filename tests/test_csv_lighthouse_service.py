@@ -227,6 +227,36 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
         self.assertEqual([item["source_filename"] for item in detail["items"]], ["SFP.csv"])
 
+    def test_delete_run_removes_run_items_and_files(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            label="Disposable",
+        )
+        run_id = result["run_id"]
+
+        self.service.delete_run(run_id)
+
+        self.assertIsNone(self.repo.get_run_detail(run_id)["run"])
+        self.assertEqual(self.repo.get_run_detail(run_id)["items"], [])
+        self.assertEqual(self.service.list_files(run_id), [])
+        self.assertNotIn(run_id, [run["id"] for run in self.service.list_runs()])
+
+    def test_delete_run_rejected_while_running(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+        run_id = result["run_id"]
+        self.repo.mark_run_running(run_id)
+
+        with self.assertRaises(ValidationError):
+            self.service.delete_run(run_id)
+
+        self.assertIsNotNone(self.repo.get_run_detail(run_id)["run"])
+
     def test_create_run_dedupes_duplicate_rows_by_site_url_strategy(self):
         result = self.service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\nbrass-lamp/\n/p/brass-lamp/\n"))],

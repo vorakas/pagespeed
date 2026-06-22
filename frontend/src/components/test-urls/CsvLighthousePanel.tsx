@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Download, FileText, Loader2, Play, Square, Upload } from "lucide-react"
+import { Download, FileText, Loader2, Play, Square, Trash2, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -77,6 +77,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
   const [starting, setStarting] = useState(false)
   const [launching, setLaunching] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [deletingRunId, setDeletingRunId] = useState<number | null>(null)
   const [loadingRuns, setLoadingRuns] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -138,6 +139,29 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
     }
   }, [])
 
+  // Poll the active (running) run without clobbering whichever run the user is
+  // currently viewing — only refresh selectedDetail when it matches the active run.
+  const pollActiveRun = useCallback(async (runId: number) => {
+    try {
+      const response = await api.getCsvLighthouseRun(runId)
+      setSelectedDetail((current) =>
+        current?.run.id === response.run.id
+          ? { run: response.run, items: response.items }
+          : current,
+      )
+      setActiveRunId((current) => {
+        if (!isTerminalStatus(response.run.status)) {
+          return response.run.id
+        }
+        return current === response.run.id ? null : current
+      })
+      setRuns((current) => current.map((run) => (run.id === response.run.id ? response.run : run)))
+      return response.run
+    } catch {
+      return null
+    }
+  }, [])
+
   useEffect(() => {
     loadRuns()
   }, [loadRuns])
@@ -146,7 +170,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
     if (!activeRunId) return
 
     const intervalId = window.setInterval(() => {
-      loadRunDetail(activeRunId, { quiet: true }).then((run) => {
+      pollActiveRun(activeRunId).then((run) => {
         if (run && isTerminalStatus(run.status)) {
           loadRuns()
         }
@@ -154,7 +178,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
     }, 5000)
 
     return () => window.clearInterval(intervalId)
-  }, [activeRunId, loadRunDetail, loadRuns])
+  }, [activeRunId, pollActiveRun, loadRuns])
 
   const handleTargetToggle = (target: CsvLighthouseSiteKey, checked: boolean) => {
     setSelectedTargets((current) => {
@@ -219,6 +243,24 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
       setError(err instanceof Error ? err.message : "Unable to cancel CSV Lighthouse run")
     } finally {
       setCancelling(false)
+    }
+  }
+
+  const handleDeleteRun = async (run: CsvLighthouseRun) => {
+    if (run.status === "running") return
+    if (!window.confirm(`Delete "${run.label || `Run #${run.id}`}"? This cannot be undone.`)) return
+
+    setDeletingRunId(run.id)
+    setError(null)
+    try {
+      await api.deleteCsvLighthouseRun(run.id)
+      setSelectedDetail((current) => (current?.run.id === run.id ? null : current))
+      setActiveRunId((current) => (current === run.id ? null : current))
+      await loadRuns()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete CSV Lighthouse run")
+    } finally {
+      setDeletingRunId(null)
     }
   }
 
@@ -386,19 +428,21 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
               <p className="aurora-text-dim text-sm">No saved runs.</p>
             ) : (
               runs.map((run) => (
-                <button
+                <div
                   key={run.id}
-                  type="button"
-                  onClick={() => {
-                    setError(null)
-                    loadRunDetail(run.id)
-                  }}
-                  className={`w-full rounded border p-3 text-left transition-colors hover:bg-muted/50 ${
+                  className={`relative rounded border transition-colors ${
                     selectedRun?.id === run.id ? "border-primary/60 bg-primary/5" : "border-border/60"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(null)
+                      loadRunDetail(run.id)
+                    }}
+                    className="block w-full rounded p-3 pr-9 text-left transition-colors hover:bg-muted/50"
+                  >
+                    <div className="min-w-0 pr-12">
                       <div className="aurora-text flex items-center gap-1.5 text-sm font-medium">
                         <FileText className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{run.label || `Run #${run.id}`}</span>
@@ -407,13 +451,29 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                         {formatDateTime(run.created_at)} · {formatRunDuration(run.started_at, run.finished_at, run.status)}
                       </p>
                     </div>
+                    <div className="aurora-text-dim mt-2 text-xs tabular-nums">
+                      {run.completed_items + run.failed_items + run.cancelled_items}/{run.total_items} processed · {run.failed_items} failed
+                      {run.cancelled_items ? ` · ${run.cancelled_items} cancelled` : ""}
+                    </div>
+                  </button>
+                  <div className="absolute right-2 top-2 flex items-center gap-1.5">
                     <RunStatusBadge status={run.status} />
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRun(run)}
+                      disabled={deletingRunId === run.id || run.status === "running"}
+                      title={run.status === "running" ? "Cancel the run before deleting" : "Delete run"}
+                      aria-label="Delete run"
+                      className="aurora-text-faint rounded p-1 transition-colors hover:bg-[color:var(--lcc-red)]/10 hover:text-[color:var(--lcc-red)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {deletingRunId === run.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </button>
                   </div>
-                  <div className="aurora-text-dim mt-2 text-xs tabular-nums">
-                    {run.completed_items + run.failed_items + run.cancelled_items}/{run.total_items} processed · {run.failed_items} failed
-                    {run.cancelled_items ? ` · ${run.cancelled_items} cancelled` : ""}
-                  </div>
-                </button>
+                </div>
               ))
             )}
           </div>
