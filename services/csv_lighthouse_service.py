@@ -16,7 +16,7 @@ from config import (
     CSV_LIGHTHOUSE_STALE_RUN_SECONDS,
 )
 from exceptions import ValidationError
-from services.testdata_registry import SITES, group_for_filename, open_url
+from services.testdata_registry import GROUPS, SITES, group_for_filename, open_url
 
 TARGET_BUDGET_SECONDS = 540
 DEFAULT_AVERAGE_SECONDS = 90
@@ -175,6 +175,35 @@ class CsvLighthouseService:
 
     def list_files(self, run_id: int) -> list[dict]:
         return self.repository.list_files(run_id)
+
+    def list_library(self) -> list[dict]:
+        return self.repository.list_library()
+
+    def save_library_files(self, files) -> list[dict]:
+        if not files:
+            raise ValidationError("No CSV files provided")
+        for filename, handle in files:
+            group = group_for_filename(filename)
+            if group is None:
+                accepted = ", ".join(g.csv_filename for g in GROUPS.values())
+                raise ValidationError(
+                    f"Unrecognized CSV filename: {filename}. "
+                    f"Expected one of: {accepted}"
+                )
+            file_bytes = self._read_limited_file(filename, handle)
+            rows = parse_column_a(file_bytes, group, filename=filename)
+            if group.max_rows is not None:
+                rows = rows[: group.max_rows]
+            self.repository.upsert_library_file(
+                filename,
+                group.key,
+                self._csv_text_from_values(rows),
+                len(rows),
+            )
+        return self.repository.list_library()
+
+    def delete_library_file(self, filename: str) -> None:
+        self.repository.delete_library_file(filename)
 
     def get_file(self, file_id: int) -> dict | None:
         return self.repository.get_file(file_id)

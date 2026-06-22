@@ -94,6 +94,28 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         )
         self.assertEqual(normalize_csv_value("///s/chandelier"), "chandelier")
 
+    def test_save_library_files_upserts_recognized_files(self):
+        self.service.save_library_files(
+            [("PLP.csv", io.BytesIO(b"brass-lamp/\nfloor-lamp/\n"))]
+        )
+        library = self.service.list_library()
+        self.assertEqual(len(library), 1)
+        self.assertEqual(library[0]["filename"], "PLP.csv")
+        self.assertEqual(library[0]["group_key"], "PLP")
+        self.assertEqual(library[0]["row_count"], 2)
+
+    def test_save_library_files_rejects_unrecognized_filename(self):
+        with self.assertRaisesRegex(ValidationError, "Unrecognized CSV filename"):
+            self.service.save_library_files(
+                [("Unknown.csv", io.BytesIO(b"brass-lamp/\n"))]
+            )
+        self.assertEqual(self.service.list_library(), [])
+
+    def test_delete_library_file_removes_it(self):
+        self.service.save_library_files([("PLP.csv", io.BytesIO(b"brass-lamp/\n"))])
+        self.service.delete_library_file("PLP.csv")
+        self.assertEqual(self.service.list_library(), [])
+
     def test_create_run_builds_pdp_urls_for_www_and_mcprod_from_column_a(self):
         result = self.service.create_run(
             [("PDP.csv", io.BytesIO(b"https://www.lampsplus.com/p/brass-lamp/\n"))],
