@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
+import { CsvLibraryPanel } from "@/components/test-urls/CsvLibraryPanel"
 import { CsvLighthouseFilesPanel } from "@/components/test-urls/CsvLighthouseFilesPanel"
 import { CsvLighthouseResultsTable } from "@/components/test-urls/CsvLighthouseResultsTable"
 import { api } from "@/services/api"
@@ -68,6 +69,7 @@ function RunStatusBadge({ status }: { status: CsvLighthouseRunStatus }) {
 
 export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
   const [files, setFiles] = useState<File[]>([])
+  const [libraryCount, setLibraryCount] = useState(0)
   const [fileInputKey, setFileInputKey] = useState(0)
   const [label, setLabel] = useState("")
   const [selectedTargets, setSelectedTargets] = useState<CsvLighthouseSiteKey[]>(["mcprod", "www"])
@@ -88,7 +90,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
     ? selectedRun.completed_items + selectedRun.failed_items + selectedRun.cancelled_items
     : 0
   const progress = selectedRun?.total_items ? Math.round((processedItems / selectedRun.total_items) * 100) : 0
-  const canStart = files.length > 0 && selectedTargets.length > 0 && !starting
+  const canStart = (files.length > 0 || libraryCount > 0) && selectedTargets.length > 0 && !starting
   const canRunSelected = Boolean(selectedRun?.status === "pending" && !launching)
   const canCancel = Boolean(activeRun?.status === "running" && !cancelling)
   const canDownload = Boolean(selectedRun && exportableStatuses.includes(selectedRun.status))
@@ -322,7 +324,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
           <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1.3fr)_minmax(12rem,0.8fr)_auto] lg:items-end">
             <div className="space-y-1.5">
               <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-lighthouse-files">
-                CSV files
+                Additional CSVs (optional)
               </label>
               <Input
                 key={fileInputKey}
@@ -333,6 +335,11 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                 onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
                 className="h-9"
               />
+              <p className="aurora-text-faint text-xs">
+                {libraryCount > 0
+                  ? `Using ${libraryCount} library file${libraryCount === 1 ? "" : "s"}${files.length ? ` + ${files.length} uploaded` : ""}`
+                  : "No library files yet — upload below or add them to the library."}
+              </p>
             </div>
             <div className="space-y-1.5">
               <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-lighthouse-label">
@@ -418,7 +425,9 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
           ) : null}
         </div>
 
-        <aside className="space-y-2">
+        <aside className="space-y-4">
+          <CsvLibraryPanel onLibraryChanged={setLibraryCount} />
+
           <div className="flex items-center justify-between">
             <h3 className="aurora-text text-xs font-semibold uppercase tracking-[0.12em]">Recent Runs</h3>
             {loadingRuns && <Loader2 className="aurora-text-faint h-3.5 w-3.5 animate-spin" />}

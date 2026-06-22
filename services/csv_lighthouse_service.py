@@ -16,7 +16,7 @@ from config import (
     CSV_LIGHTHOUSE_STALE_RUN_SECONDS,
 )
 from exceptions import ValidationError
-from services.testdata_registry import SITES, group_for_filename, open_url
+from services.testdata_registry import GROUPS, SITES, group_for_filename, open_url
 
 TARGET_BUDGET_SECONDS = 540
 DEFAULT_AVERAGE_SECONDS = 90
@@ -114,7 +114,23 @@ class CsvLighthouseService:
     ) -> dict:
         strategy = self._validate_strategy(strategy)
         site_keys = self._validate_site_keys(site_keys)
-        file_records = self._read_file_records(files)
+
+        upload_records = self._read_file_records(files)
+        uploaded_names = {record["filename"] for record in upload_records}
+        library_records = [
+            record
+            for record in self._library_file_records()
+            if record["filename"] not in uploaded_names
+        ]
+        file_records = library_records + upload_records
+        if not file_records:
+            # Distinguish "nothing supplied at all" from "uploaded files but none recognized"
+            if files:
+                raise ValidationError("Upload did not contain any recognized CSV rows")
+            raise ValidationError(
+                "No CSV files available — add files to the library or upload some"
+            )
+
         items = self._build_items_from_file_records(file_records, site_keys, strategy)
         if not items:
             raise ValidationError("Upload did not contain any recognized CSV rows")
@@ -175,6 +191,35 @@ class CsvLighthouseService:
 
     def list_files(self, run_id: int) -> list[dict]:
         return self.repository.list_files(run_id)
+
+    def list_library(self) -> list[dict]:
+        return self.repository.list_library()
+
+    def save_library_files(self, files) -> list[dict]:
+        if not files:
+            raise ValidationError("No CSV files provided")
+        for filename, handle in files:
+            group = group_for_filename(filename)
+            if group is None:
+                accepted = ", ".join(g.csv_filename for g in GROUPS.values())
+                raise ValidationError(
+                    f"Unrecognized CSV filename: {filename}. "
+                    f"Expected one of: {accepted}"
+                )
+            file_bytes = self._read_limited_file(filename, handle)
+            rows = parse_column_a(file_bytes, group, filename=filename)
+            if group.max_rows is not None:
+                rows = rows[: group.max_rows]
+            self.repository.upsert_library_file(
+                filename,
+                group.key,
+                self._csv_text_from_values(rows),
+                len(rows),
+            )
+        return self.repository.list_library()
+
+    def delete_library_file(self, filename: str) -> None:
+        self.repository.delete_library_file(filename)
 
     def get_file(self, file_id: int) -> dict | None:
         return self.repository.get_file(file_id)
@@ -376,6 +421,25 @@ class CsvLighthouseService:
                     "csv_text": self._csv_text_from_values(rows),
                     "row_count": len(rows),
                     "values": rows,
+                }
+            )
+        return records
+
+    def _library_file_records(self) -> list[dict]:
+        records = []
+        for file in self.repository.list_library():
+            values = [
+                line.strip()
+                for line in file["csv_text"].splitlines()
+                if line.strip()
+            ]
+            records.append(
+                {
+                    "filename": file["filename"],
+                    "group_key": file["group_key"],
+                    "csv_text": file["csv_text"],
+                    "row_count": file["row_count"],
+                    "values": values,
                 }
             )
         return records

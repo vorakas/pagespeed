@@ -27,8 +27,6 @@ def create_csv_lighthouse_blueprint(service):
             )
 
         files = [file for file in request.files.getlist("files") if file.filename]
-        if not files:
-            raise ValidationError("At least one CSV file is required")
         if len(files) > CSV_LIGHTHOUSE_MAX_FILES:
             raise ValidationError(
                 f"CSV Lighthouse upload accepts at most {CSV_LIGHTHOUSE_MAX_FILES} files"
@@ -138,6 +136,41 @@ def create_csv_lighthouse_blueprint(service):
                 )
             },
         )
+
+    @blueprint.route("/library", methods=["GET"])
+    def list_library():
+        return jsonify({"success": True, "files": service.list_library()})
+
+    @blueprint.route("/library", methods=["POST"])
+    def upload_library():
+        if (
+            request.content_length is not None
+            and request.content_length > CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH
+        ):
+            raise ValidationError(
+                f"CSV Lighthouse upload exceeds {CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH} bytes"
+            )
+        files = [file for file in request.files.getlist("files") if file.filename]
+        if not files:
+            raise ValidationError("At least one CSV file is required")
+        if len(files) > CSV_LIGHTHOUSE_MAX_FILES:
+            raise ValidationError(
+                f"CSV Lighthouse upload accepts at most {CSV_LIGHTHOUSE_MAX_FILES} files"
+            )
+        uploaded_files = []
+        for file in files:
+            size = _stream_size_bytes(file.stream)
+            if size > CSV_LIGHTHOUSE_MAX_FILE_BYTES:
+                raise ValidationError(
+                    f"CSV file {file.filename} exceeds {CSV_LIGHTHOUSE_MAX_FILE_BYTES} bytes"
+                )
+            uploaded_files.append((file.filename, file.stream))
+        return jsonify({"success": True, "files": service.save_library_files(uploaded_files)})
+
+    @blueprint.route("/library/<path:filename>", methods=["DELETE"])
+    def delete_library(filename):
+        service.delete_library_file(filename)
+        return jsonify({"success": True})
 
     return blueprint
 

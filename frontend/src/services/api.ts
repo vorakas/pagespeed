@@ -1182,6 +1182,29 @@ class ApiClient {
     return `${this.baseUrl}/api/csv-lighthouse/runs/${runId}/export`
   }
 
+  async listCsvLighthouseLibrary(): Promise<{ success: boolean; files: CsvLighthouseFile[] }> {
+    return this.request("/api/csv-lighthouse/library")
+  }
+
+  async uploadCsvLighthouseLibrary(files: File[]): Promise<{ success: boolean; files: CsvLighthouseFile[] }> {
+    const formData = new FormData()
+    files.forEach((file) => formData.append("files", file))
+
+    const response = await fetch(`${this.baseUrl}/api/csv-lighthouse/library`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(errorData.error || `Request failed: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async deleteCsvLighthouseLibraryFile(filename: string): Promise<{ success: boolean }> {
+    return this.request(`/api/csv-lighthouse/library/${encodeURIComponent(filename)}`, { method: "DELETE" })
+  }
+
   // ---------- TestData URL listing ----------
 
   async buildTestDataUrls(
