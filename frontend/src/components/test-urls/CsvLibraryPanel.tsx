@@ -103,7 +103,13 @@ export function CsvLibraryPanel({ onLibraryChanged }: CsvLibraryPanelProps) {
                   <RefreshCw className="h-3.5 w-3.5" />
                   Replace
                 </Button>
-                <Button variant="outline" size="sm" disabled={busy} onClick={() => remove(file.filename)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  aria-label={`Remove ${file.filename}`}
+                  onClick={() => remove(file.filename)}
+                >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
