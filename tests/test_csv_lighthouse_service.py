@@ -111,6 +111,17 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             )
         self.assertEqual(self.service.list_library(), [])
 
+    def test_save_library_files_persists_recognized_before_rejecting_unrecognized(self):
+        with self.assertRaisesRegex(ValidationError, "Unrecognized CSV filename"):
+            self.service.save_library_files(
+                [
+                    ("PLP.csv", io.BytesIO(b"brass-lamp/\n")),
+                    ("Unknown.csv", io.BytesIO(b"floor-lamp/\n")),
+                ]
+            )
+        library = self.service.list_library()
+        self.assertEqual([f["filename"] for f in library], ["PLP.csv"])
+
     def test_delete_library_file_removes_it(self):
         self.service.save_library_files([("PLP.csv", io.BytesIO(b"brass-lamp/\n"))])
         self.service.delete_library_file("PLP.csv")
