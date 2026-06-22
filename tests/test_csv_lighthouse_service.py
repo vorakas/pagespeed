@@ -657,3 +657,47 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(item["status"], "failed")
         self.assertEqual(item["attempts"], 2)
         self.assertIn("permanent PageSpeed failure", item["error_message"])
+
+    def test_create_run_uses_library_when_no_uploads(self):
+        self.service.save_library_files([("PDP.csv", io.BytesIO(b"brass-lamp/\n"))])
+        result = self.service.create_run(
+            [], site_keys=["www"], strategy="desktop", label="From library"
+        )
+        detail = self.service.get_run(result["run_id"])
+        self.assertEqual(result["total_items"], 1)
+        self.assertEqual(
+            detail["items"][0]["generated_url"],
+            "https://www.lampsplus.com/p/brass-lamp/",
+        )
+
+    def test_create_run_adhoc_upload_overrides_library_file(self):
+        self.service.save_library_files([("PDP.csv", io.BytesIO(b"old-lamp/\n"))])
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"new-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+        detail = self.service.get_run(result["run_id"])
+        files = self.service.list_files(result["run_id"])
+        self.assertEqual([f["filename"] for f in files], ["PDP.csv"])
+        self.assertEqual(
+            detail["items"][0]["generated_url"],
+            "https://www.lampsplus.com/p/new-lamp/",
+        )
+        self.assertEqual(self.service.list_library()[0]["csv_text"], "old-lamp/\n")
+
+    def test_create_run_adhoc_new_name_adds_without_touching_library(self):
+        self.service.save_library_files([("PDP.csv", io.BytesIO(b"brass-lamp/\n"))])
+        result = self.service.create_run(
+            [("SFP.csv", io.BytesIO(b"swing-arm/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+        files = sorted(f["filename"] for f in self.service.list_files(result["run_id"]))
+        self.assertEqual(files, ["PDP.csv", "SFP.csv"])
+        self.assertEqual([f["filename"] for f in self.service.list_library()], ["PDP.csv"])
+
+    def test_create_run_empty_library_and_no_upload_raises(self):
+        with self.assertRaisesRegex(ValidationError, "No CSV files available"):
+            self.service.create_run([], site_keys=["www"], strategy="desktop")
+        self.assertEqual(self.repo.list_runs(), [])
