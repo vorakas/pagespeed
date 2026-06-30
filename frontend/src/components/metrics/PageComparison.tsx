@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { ScoreBadge } from "@/components/shared/ScoreBadge"
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { EmptyState } from "@/components/shared/EmptyState"
-import { formatMilliseconds, formatCls, formatBytes } from "@/lib/utils"
+import { formatMilliseconds, formatCls, formatBytes, formatDate } from "@/lib/utils"
 import { useSites } from "@/hooks/use-sites"
 import { api } from "@/services/api"
 import type { LatestResult } from "@/types"
@@ -195,6 +195,26 @@ function renderRadarAxisTick({ x = 0, y = 0, payload }: RadarAxisTickProps) {
   )
 }
 
+const STALE_AFTER_DAYS = 7
+
+function describeTested(testedAt: string): { text: string; stale: boolean } {
+  const days = Math.floor((Date.now() - new Date(testedAt).getTime()) / 86_400_000)
+  const relative = days <= 0 ? "today" : days === 1 ? "1 day ago" : `${days} days ago`
+  return { text: `${formatDate(testedAt)} · ${relative}`, stale: days >= STALE_AFTER_DAYS }
+}
+
+function TestedCaption({ siteName, testedAt }: { siteName: string; testedAt: string }) {
+  const { text, stale } = describeTested(testedAt)
+  return (
+    <span className="flex min-w-0 items-baseline gap-1.5">
+      <span className="aurora-text-faint truncate" title={siteName}>{siteName}</span>
+      <span className="aurora-num" style={stale ? { color: "var(--lcc-amber)" } : undefined}>
+        tested {text}
+      </span>
+    </span>
+  )
+}
+
 function ComparisonResults({ data }: { data: ComparisonResult }) {
   const { url1, url2 } = data
   const site1Name = url1.site_name || "Site 1"
@@ -296,7 +316,12 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(420px,0.9fr)_minmax(360px,0.8fr)]">
+    <div className="space-y-4">
+      <div className="aurora-callout flex flex-wrap items-center gap-x-6 gap-y-1 p-3 text-xs">
+        <TestedCaption siteName={site1Name} testedAt={url1.tested_at} />
+        <TestedCaption siteName={site2Name} testedAt={url2.tested_at} />
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(420px,0.9fr)_minmax(360px,0.8fr)]">
       <div className="min-w-0 space-y-5">
         <div>
           <div className="mb-2 grid grid-cols-[minmax(120px,1fr)_76px_76px] items-end gap-3">
@@ -427,6 +452,7 @@ function ComparisonResults({ data }: { data: ComparisonResult }) {
             />
           ))}
         </div>
+      </div>
       </div>
     </div>
   )

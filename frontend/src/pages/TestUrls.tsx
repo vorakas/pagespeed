@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react"
+import { toast } from "sonner"
 import { Monitor, Smartphone, Rocket, RefreshCw } from "lucide-react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
@@ -94,12 +95,17 @@ export function TestUrls() {
   const handleRetestUrl = useCallback(async (urlId: number, url: string) => {
     setRetestingUrlId(urlId)
     try {
-      await api.testUrl(urlId, url, strategy)
+      const response = await api.testUrl(urlId, url, strategy)
+      if (response.success === false) {
+        toast.error(response.error || `Test failed for ${url}`)
+      } else {
+        toast.success(`Retested ${url}`)
+      }
       if (activeSiteId !== null) {
         await loadResults(activeSiteId, strategy)
       }
-    } catch {
-      // Error handled silently — the user sees the spinner stop
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Test failed for ${url}`)
     } finally {
       setRetestingUrlId(null)
     }
