@@ -61,7 +61,7 @@ function statusClassName(status: CsvLighthouseRunStatus) {
 
 function RunStatusBadge({ status }: { status: CsvLighthouseRunStatus }) {
   return (
-    <span className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${statusClassName(status)}`}>
+    <span className={`inline-flex shrink-0 whitespace-nowrap rounded border px-2 py-0.5 text-[10px] font-semibold uppercase ${statusClassName(status)}`}>
       {formatStatus(status)}
     </span>
   )
@@ -456,10 +456,11 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                     }}
                     className="block w-full rounded p-3 pr-9 text-left transition-colors hover:bg-muted/50"
                   >
-                    <div className="min-w-0 pr-12">
+                    <div className="min-w-0">
                       <div className="aurora-text flex items-center gap-1.5 text-sm font-medium">
                         <FileText className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{run.label || `Run #${run.id}`}</span>
+                        <span className="min-w-0 flex-1 truncate">{run.label || `Run #${run.id}`}</span>
+                        <RunStatusBadge status={run.status} />
                       </div>
                       <p className="aurora-text-faint mt-1 text-xs">
                         {formatDateTime(run.created_at)} · {formatRunDuration(run.started_at, run.finished_at, run.status)}
@@ -470,8 +471,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                       {run.cancelled_items ? ` · ${run.cancelled_items} cancelled` : ""}
                     </div>
                   </button>
-                  <div className="absolute right-2 top-2 flex items-center gap-1.5">
-                    <RunStatusBadge status={run.status} />
+                  <div className="absolute right-2 top-2">
                     <button
                       type="button"
                       onClick={() => handleDeleteRun(run)}
