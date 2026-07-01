@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Loader2, RefreshCw, Trash2 } from "lucide-react"
+import { ChevronDown, Loader2, RefreshCw, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,6 +17,7 @@ export function CsvLibraryPanel({ onLibraryChanged }: CsvLibraryPanelProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const replaceInputRef = useRef<HTMLInputElement | null>(null)
+  const libraryCountLabel = files.length > 0 ? `${files.length} file${files.length === 1 ? "" : "s"}` : ""
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -65,92 +66,98 @@ export function CsvLibraryPanel({ onLibraryChanged }: CsvLibraryPanelProps) {
   }
 
   return (
-    <section className="aurora-panel space-y-3 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="aurora-text text-xs font-semibold uppercase tracking-[0.12em]">CSV Library</h3>
+    <details className="aurora-panel group" open={false}>
+      <summary className="flex cursor-pointer items-center justify-between gap-2 px-4 py-3 select-none list-none [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2">
+          <ChevronDown className="aurora-text-faint h-3.5 w-3.5 shrink-0 transition-transform duration-150 group-open:rotate-180" />
+          <h3 className="aurora-text text-xs font-semibold uppercase tracking-[0.12em]">CSV Library</h3>
+          {libraryCountLabel && <span className="aurora-text-faint text-xs">{libraryCountLabel}</span>}
+        </span>
         {loading && <Loader2 className="aurora-text-faint h-3.5 w-3.5 animate-spin" />}
-      </div>
+      </summary>
 
-      <p className="aurora-text-dim text-xs">
-        Stored files are reused for every run. Re-upload a file to update it when stock changes.
-      </p>
+      <div className="space-y-3 px-4 pb-4">
+        <p className="aurora-text-dim text-xs">
+          Stored files are reused for every run. Re-upload a file to update it when stock changes.
+        </p>
 
-      {error && (
-        <div className="rounded border border-[color:var(--lcc-red)]/40 bg-[color:var(--lcc-red)]/10 px-3 py-2 text-sm text-[color:var(--lcc-red)]">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="rounded border border-[color:var(--lcc-red)]/40 bg-[color:var(--lcc-red)]/10 px-3 py-2 text-sm text-[color:var(--lcc-red)]">
+            {error}
+          </div>
+        )}
 
-      <div className="space-y-2">
-        {files.length === 0 && !loading ? (
-          <p className="aurora-text-dim text-sm">No library files yet.</p>
-        ) : (
-          files.map((file) => (
-            <div key={file.filename} className="flex items-center justify-between gap-2 rounded border border-border/60 p-2">
-              <div className="min-w-0">
-                <div className="aurora-text truncate text-sm font-medium">{file.filename}</div>
-                <div className="aurora-text-faint text-xs">
-                  {file.group_key} · {file.row_count} rows · {formatDateTime(file.updated_at)}
+        <div className="space-y-2">
+          {files.length === 0 && !loading ? (
+            <p className="aurora-text-dim text-sm">No library files yet.</p>
+          ) : (
+            files.map((file) => (
+              <div key={file.filename} className="flex items-center justify-between gap-2 rounded border border-border/60 p-2">
+                <div className="min-w-0">
+                  <div className="aurora-text truncate text-sm font-medium">{file.filename}</div>
+                  <div className="aurora-text-faint text-xs">
+                    {file.group_key} · {file.row_count} rows · {formatDateTime(file.updated_at)}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => replaceInputRef.current?.click()}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Replace
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    aria-label={`Remove ${file.filename}`}
+                    onClick={() => remove(file.filename)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => replaceInputRef.current?.click()}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Replace
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  aria-label={`Remove ${file.filename}`}
-                  onClick={() => remove(file.filename)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
 
-      <div className="space-y-1.5">
-        <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-library-add">Add files</label>
-        <Input
-          id="csv-library-add"
+        <div className="space-y-1.5">
+          <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-library-add">Add files</label>
+          <Input
+            id="csv-library-add"
+            type="file"
+            accept=".csv,text/csv"
+            multiple
+            disabled={busy}
+            onChange={(event) => {
+              void upload(Array.from(event.target.files ?? []))
+              event.target.value = ""
+            }}
+            className="h-9"
+          />
+        </div>
+
+        <input
+          ref={replaceInputRef}
           type="file"
           accept=".csv,text/csv"
-          multiple
-          disabled={busy}
+          className="hidden"
           onChange={(event) => {
-            void upload(Array.from(event.target.files ?? []))
+            const selected = Array.from(event.target.files ?? [])
             event.target.value = ""
+            void upload(selected)
           }}
-          className="h-9"
         />
+
+        {busy && (
+          <div className="aurora-text-dim flex items-center gap-2 text-xs">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
+          </div>
+        )}
       </div>
-
-      <input
-        ref={replaceInputRef}
-        type="file"
-        accept=".csv,text/csv"
-        className="hidden"
-        onChange={(event) => {
-          const selected = Array.from(event.target.files ?? [])
-          event.target.value = ""
-          void upload(selected)
-        }}
-      />
-
-      {busy && (
-        <div className="aurora-text-dim flex items-center gap-2 text-xs">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
-        </div>
-      )}
-    </section>
+    </details>
   )
 }

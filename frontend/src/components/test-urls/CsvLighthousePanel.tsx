@@ -459,7 +459,9 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                     <div className="min-w-0">
                       <div className="aurora-text flex items-center gap-1.5 text-sm font-medium">
                         <FileText className="h-3.5 w-3.5 shrink-0" />
-                        <span className="min-w-0 flex-1 truncate">{run.label || `Run #${run.id}`}</span>
+                        <span className="min-w-0 flex-1 truncate" title={run.label || `Run #${run.id}`}>
+                          {run.label || `Run #${run.id}`}
+                        </span>
                         <RunStatusBadge status={run.status} />
                       </div>
                       <p className="aurora-text-faint mt-1 text-xs">
