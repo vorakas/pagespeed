@@ -380,6 +380,44 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(group_for_filename("PLP.csv").key, "PLP")
         self.assertEqual(group_for_filename("SearchToPLP.csv").key, "SearchToPLP")
 
+    def test_create_run_recognizes_homepage_filename(self):
+        from services.testdata_registry import group_for_filename
+
+        self.assertEqual(group_for_filename("Homepage.csv").key, "Homepage")
+
+    def test_create_run_builds_homepage_root_urls_for_selected_sites(self):
+        result = self.service.create_run(
+            [("Homepage.csv", io.BytesIO(b"home\n"))],
+            site_keys=["www", "mcprod"],
+            strategy="mobile",
+            label="Homepage",
+        )
+
+        detail = self.repo.get_run_detail(result["run_id"])
+        urls = [item["generated_url"] for item in detail["items"]]
+
+        self.assertEqual(result["total_items"], 2)
+        self.assertEqual(
+            urls,
+            [
+                "https://www.lampsplus.com/",
+                "https://mcprod.lampsplus.com/",
+            ],
+        )
+
+    def test_create_run_homepage_respects_single_site_selection(self):
+        result = self.service.create_run(
+            [("Homepage.csv", io.BytesIO(b"home\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            label="Homepage www only",
+        )
+
+        detail = self.repo.get_run_detail(result["run_id"])
+        urls = [item["generated_url"] for item in detail["items"]]
+
+        self.assertEqual(urls, ["https://www.lampsplus.com/"])
+
     def test_create_run_normalizes_search_to_plp_full_url_without_double_prefix(self):
         result = self.service.create_run(
             [

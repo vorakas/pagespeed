@@ -42,6 +42,13 @@ _LISTING_SELECTORS = {
 
 
 GROUPS: dict[str, GroupDef] = {
+    "Homepage": GroupDef(
+        key="Homepage", label="Homepage", csv_filename="Homepage.csv",
+        # Root of each site; the column-A value is a placeholder (no {v} in the
+        # template).  Not part of a JMeter load test, so selectors are unused.
+        path_template="/",
+        selectors={"mcprod": "body", "www": "body"},
+    ),
     "PDP": GroupDef(
         key="PDP", label="PDP", csv_filename="PDP.csv",
         path_template="/p/{v}", selectors=dict(_PDP_SELECTORS),
