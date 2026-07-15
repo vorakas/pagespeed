@@ -22,6 +22,17 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         os.chdir(self._cwd)
         self.tmp.cleanup()
 
+    def test_schema_has_samples_table_and_samples_per_url_column(self):
+        with self.conn_mgr.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='csv_lighthouse_samples'"
+            )
+            self.assertIsNotNone(cursor.fetchone())
+            cursor.execute("PRAGMA table_info(csv_lighthouse_runs)")
+            columns = {row[1] for row in cursor.fetchall()}
+            self.assertIn("samples_per_url", columns)
+
     def test_create_run_create_item_get_detail_round_trip(self):
         run_id = self.repo.create_run(
             label="June CSV smoke",

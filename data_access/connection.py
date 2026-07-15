@@ -427,10 +427,32 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS csv_lighthouse_samples (
+                id SERIAL PRIMARY KEY,
+                run_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                sample_index INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                fcp REAL,
+                speed_index REAL,
+                lcp REAL,
+                tbt REAL,
+                cls REAL,
+                attempts INTEGER NOT NULL DEFAULT 1,
+                duration_ms INTEGER,
+                error_message TEXT,
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (run_id) REFERENCES csv_lighthouse_runs (id) ON DELETE CASCADE,
+                FOREIGN KEY (item_id) REFERENCES csv_lighthouse_items (id) ON DELETE CASCADE
+            )
+        """)
+
         # Migration: add trigger execution tracking columns
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP")
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_status TEXT")
         cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS cancelled_items INTEGER NOT NULL DEFAULT 0")
+        cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS samples_per_url INTEGER NOT NULL DEFAULT 1")
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 1")
 
         cursor.execute("""
@@ -774,6 +796,27 @@ class ConnectionManager:
         """)
 
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS csv_lighthouse_samples (
+                id INTEGER PRIMARY KEY,
+                run_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                sample_index INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                fcp REAL,
+                speed_index REAL,
+                lcp REAL,
+                tbt REAL,
+                cls REAL,
+                attempts INTEGER NOT NULL DEFAULT 1,
+                duration_ms INTEGER,
+                error_message TEXT,
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (run_id) REFERENCES csv_lighthouse_runs (id) ON DELETE CASCADE,
+                FOREIGN KEY (item_id) REFERENCES csv_lighthouse_items (id) ON DELETE CASCADE
+            )
+        """)
+
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS migration_snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 snapshot_date TEXT NOT NULL UNIQUE,
@@ -923,6 +966,7 @@ class ConnectionManager:
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_at TIMESTAMP",
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_status TEXT",
             "ALTER TABLE csv_lighthouse_runs ADD COLUMN cancelled_items INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE csv_lighthouse_runs ADD COLUMN samples_per_url INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE csv_lighthouse_items ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_id INTEGER",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_name TEXT",
@@ -1238,6 +1282,14 @@ class ConnectionManager:
             CREATE INDEX IF NOT EXISTS idx_autofix_fix_build_id
             ON autofix_fix (build_id)
             """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_csv_lighthouse_samples_run
+            ON csv_lighthouse_samples (run_id, item_id, sample_index)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_csv_lighthouse_samples_item
+            ON csv_lighthouse_samples (item_id)
+            """,
         ]
         for statement in index_statements:
             cursor.execute(statement)
@@ -1320,6 +1372,14 @@ class ConnectionManager:
             """
             CREATE INDEX IF NOT EXISTS idx_autofix_fix_build_id
             ON autofix_fix (build_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_csv_lighthouse_samples_run
+            ON csv_lighthouse_samples (run_id, item_id, sample_index)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_csv_lighthouse_samples_item
+            ON csv_lighthouse_samples (item_id)
             """,
         ]
         for statement in index_statements:
