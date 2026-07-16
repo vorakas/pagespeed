@@ -342,11 +342,6 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                 onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
                 className="h-9"
               />
-              <p className="aurora-text-faint text-xs">
-                {libraryCount > 0
-                  ? `Using ${libraryCount} library file${libraryCount === 1 ? "" : "s"}${files.length ? ` + ${files.length} uploaded` : ""}`
-                  : "No library files yet — upload below or add them to the library."}
-              </p>
             </div>
             <div className="space-y-1.5">
               <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-lighthouse-label">
@@ -381,6 +376,12 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
               Save CSVs
             </Button>
           </div>
+
+          <p className="aurora-text-faint text-xs">
+            {libraryCount > 0
+              ? `Using ${libraryCount} library file${libraryCount === 1 ? "" : "s"}${files.length ? ` + ${files.length} uploaded` : ""}`
+              : "No library files yet — upload below or add them to the library."}
+          </p>
 
           <div className="flex flex-wrap items-center gap-4">
             {targetOptions.map((target) => (
