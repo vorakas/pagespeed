@@ -16,6 +16,7 @@ from config import (
     CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE,
     CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL,
     CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES,
+    CSV_LIGHTHOUSE_MAX_WORKERS,
     CSV_LIGHTHOUSE_STALE_RUN_SECONDS,
 )
 from exceptions import ValidationError
@@ -23,7 +24,6 @@ from services.testdata_registry import GROUPS, SITES, group_for_filename, open_u
 
 TARGET_BUDGET_SECONDS = 540
 DEFAULT_AVERAGE_SECONDS = 90
-MAX_WORKERS_PER_TARGET = 4
 MAX_LIGHTHOUSE_ATTEMPTS = 2
 
 _KNOWN_ROUTE_PREFIXES = ("/p/", "/sfp/", "/more-like-this/", "/s/")
@@ -92,14 +92,19 @@ def parse_column_a(
 
 
 def calculate_worker_count(
-    url_count: int, average_seconds: int = DEFAULT_AVERAGE_SECONDS
+    url_count: int,
+    samples_per_url: int = 1,
+    average_seconds: int = DEFAULT_AVERAGE_SECONDS,
 ) -> int:
     if url_count <= 0:
         return 0
     if average_seconds <= 0:
         average_seconds = DEFAULT_AVERAGE_SECONDS
-    required = math.ceil((url_count * average_seconds) / TARGET_BUDGET_SECONDS)
-    return max(1, min(MAX_WORKERS_PER_TARGET, required))
+    # Concurrency scales with total PSI calls (urls x samples), not urls alone,
+    # so a high-sample run does not crawl at the single-sample worker count.
+    total_samples = url_count * max(1, samples_per_url)
+    required = math.ceil((total_samples * average_seconds) / TARGET_BUDGET_SECONDS)
+    return max(1, min(CSV_LIGHTHOUSE_MAX_WORKERS, required))
 
 
 class CsvLighthouseService:
@@ -150,7 +155,7 @@ class CsvLighthouseService:
                 f"CSV Lighthouse run would make {total_samples} total samples; "
                 f"maximum is {CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES}"
             )
-        worker_count = calculate_worker_count(len(items))
+        worker_count = calculate_worker_count(len(items), samples_per_url)
         run_id = self.repository.create_run(
             label=label or "CSV Lighthouse run",
             strategy=strategy,

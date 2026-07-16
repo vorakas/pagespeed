@@ -315,11 +315,27 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(result["total_items"], 1)
         self.assertEqual(len(detail["items"]), 1)
 
-    def test_calculate_worker_count_caps_at_4_and_targets_budget(self):
+    def test_calculate_worker_count_scales_with_samples_and_caps(self):
+        # Single-sample runs keep modest concurrency (budget-driven).
         self.assertEqual(calculate_worker_count(1), 1)
         self.assertEqual(calculate_worker_count(12, average_seconds=90), 2)
-        self.assertEqual(calculate_worker_count(100, average_seconds=90), 4)
+        # Sampling multiplies the work, so concurrency scales up to the cap (16).
+        # ceil(2*25*90/540)=ceil(8.33)=9
+        self.assertEqual(calculate_worker_count(2, samples_per_url=25, average_seconds=90), 9)
+        # ceil(32*25*90/540)=134 -> capped at 16
+        self.assertEqual(calculate_worker_count(32, samples_per_url=25, average_seconds=90), 16)
         self.assertEqual(DEFAULT_AVERAGE_SECONDS, 90)
+
+    def test_create_run_scales_worker_count_with_samples(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"a/\nb/\nc/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            samples_per_url=25,
+        )
+        run = self.service.get_run(result["run_id"])["run"]
+        # 3 urls x 25 samples -> ceil(3*25*90/540)=ceil(12.5)=13 workers
+        self.assertEqual(run["worker_count"], 13)
 
     def test_run_pending_items_saves_metrics_from_pagespeed_client(self):
         result = self.service.create_run(
