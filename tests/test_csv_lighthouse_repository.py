@@ -780,6 +780,47 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(samples[1]["status"], "failed")
         self.assertEqual(samples[1]["error_message"], "PageSpeed timeout")
 
+    def test_create_sample_advances_run_heartbeat(self):
+        run_id = self.repo.create_run("Heartbeat", "desktop", ["www"], 1, 540, 1, samples_per_url=2)
+        item_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                }
+            ],
+        )[0]
+        self.repo.mark_run_running(run_id)
+        # Backdate the run's heartbeat to simulate a long-running item.
+        with self.conn_mgr.get_connection() as conn:
+            conn.execute(
+                "UPDATE csv_lighthouse_runs SET updated_at = datetime('now', '-31 minutes') WHERE id = ?",
+                (run_id,),
+            )
+
+        self.repo.create_sample(
+            run_id=run_id,
+            item_id=item_id,
+            sample_index=1,
+            status="passed",
+            metrics={"fcp": 900},
+            attempts=1,
+            duration_ms=1000,
+            error_message=None,
+        )
+
+        # After recording a sample, the run must no longer look stale.
+        recovered = self.repo.recover_interrupted_runs(
+            "Run interrupted by server restart", stale_seconds=1800
+        )
+        self.assertEqual(recovered, 0)
+        self.assertEqual(self.repo.get_run_detail(run_id)["run"]["status"], "running")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -126,7 +126,16 @@ class CsvLighthouseRepository:
                         error_message,
                     ),
                 )
-                return self._cm.last_insert_id(cursor)
+                sample_id = self._cm.last_insert_id(cursor)
+                cursor.execute(
+                    f"""
+                    UPDATE csv_lighthouse_runs
+                    SET updated_at = CURRENT_TIMESTAMP
+                    WHERE id = {ph}
+                    """,
+                    (run_id,),
+                )
+                return sample_id
         except Exception as exc:
             raise DatabaseError(f"Failed to create CSV Lighthouse sample: {exc}") from exc
 

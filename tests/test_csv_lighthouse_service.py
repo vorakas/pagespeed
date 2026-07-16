@@ -639,6 +639,30 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(detail["run"]["status"], "cancelled")
         self.assertEqual(statuses, ["passed", "cancelled"])
 
+    def test_cancel_between_samples_stops_early_and_keeps_passed(self):
+        run_id_holder = {}
+        service = CsvLighthouseService(
+            self.repo,
+            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"]),
+            start_background=False,
+        )
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            samples_per_url=5,
+        )
+        run_id_holder["run_id"] = result["run_id"]
+
+        service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        item = detail["items"][0]
+        samples = self.repo.list_samples(result["run_id"])
+
+        # Cancel fires after sample 1's PSI call; sample 2 sees it and breaks.
+        self.assertEqual(len(samples), 1)
+        self.assertEqual(item["status"], "passed")
+
     def test_late_cancel_after_all_items_passed_finishes_completed_and_exports(self):
         run_id_holder = {}
         service = CsvLighthouseService(

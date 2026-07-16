@@ -591,6 +591,8 @@ class CsvLighthouseService:
         duration_ms = int((time.monotonic() - started) * 1000)
         if passed_samples:
             representative = self._median_metrics(passed_samples)
+            # attempts here is the summed PSI attempts across all samples for this
+            # item; per-sample attempts live in csv_lighthouse_samples.
             representative["attempts"] = total_attempts
             representative["duration_ms"] = duration_ms
             self.repository.mark_item_passed(item["id"], representative)
