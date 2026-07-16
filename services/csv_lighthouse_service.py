@@ -334,88 +334,111 @@ class CsvLighthouseService:
                 return
         self.repository.finish_run_if_complete(run_id)
 
+    EXPORT_HEADER = [
+        "run_id", "label", "source_filename", "group_key", "site_key",
+        "original_value", "generated_url", "strategy", "kind",
+        "sample_index", "n", "status", "fcp", "speed_index", "lcp",
+        "tbt", "cls", "attempts", "duration_ms", "error_message",
+        "completed_at",
+    ]
+
     def export_csv(self, run_id: int) -> str:
         detail = self.repository.get_run_detail(run_id)
         run = detail["run"]
+        samples_by_item = self._samples_by_item(run_id, detail["items"])
+
         output = io.StringIO()
         writer = csv.writer(output, lineterminator="\n")
-        writer.writerow(
-            [
-                "run_id",
-                "label",
-                "source_filename",
-                "group_key",
-                "site_key",
-                "original_value",
-                "generated_url",
-                "strategy",
-                "status",
-                "fcp",
-                "speed_index",
-                "lcp",
-                "tbt",
-                "cls",
-                "attempts",
-                "error_message",
-            ]
-        )
+        writer.writerow(self.EXPORT_HEADER)
+
         sections: dict[tuple[str, str], list[dict]] = {}
         for item in detail["items"]:
             key = (item["site_key"], item["group_key"])
             sections.setdefault(key, []).append(item)
 
-        for (site_key, group_key), items in sections.items():
+        for (_site_key, _group_key), items in sections.items():
             for item in items:
-                writer.writerow(
-                    [
-                        run["id"],
-                        run["label"],
-                        item["source_filename"],
-                        item["group_key"],
-                        item["site_key"],
-                        item["original_value"],
-                        item["generated_url"],
-                        item["strategy"],
-                        item["status"],
-                        self._csv_value(item.get("fcp")),
-                        self._csv_value(item.get("speed_index")),
-                        self._csv_value(item.get("lcp")),
-                        self._csv_value(item.get("tbt")),
-                        self._csv_value(item.get("cls")),
-                        item.get("attempts"),
-                        item.get("error_message"),
-                    ]
-                )
-
-            passed_items = [item for item in items if item["status"] == "passed"]
-            writer.writerow(
-                [
-                    run["id"],
-                    run["label"],
-                    "Averages",
-                    group_key,
-                    site_key,
-                    "Averages",
-                    f"{len(passed_items)} passed",
-                    run["strategy"],
-                    "average",
-                    self._csv_value(self._average_metric(passed_items, "fcp")),
-                    self._csv_value(self._average_metric(passed_items, "speed_index")),
-                    self._csv_value(self._average_metric(passed_items, "lcp")),
-                    self._csv_value(self._average_metric(passed_items, "tbt")),
-                    self._csv_value(self._average_metric(passed_items, "cls")),
-                    "",
-                    "",
-                ]
-            )
+                samples = samples_by_item.get(item["id"], [])
+                for sample in samples:
+                    writer.writerow(self._sample_row(run, item, sample))
+                passed = [s for s in samples if s["status"] == "passed"]
+                for stat in ("mean", "median", "min", "max"):
+                    writer.writerow(self._summary_row(run, item, passed, stat))
         return output.getvalue()
 
+    def _samples_by_item(self, run_id: int, items: list[dict]) -> dict[int, list[dict]]:
+        grouped: dict[int, list[dict]] = {}
+        for sample in self.repository.list_samples(run_id):
+            grouped.setdefault(sample["item_id"], []).append(sample)
+        # Backward compatibility: synthesize a single sample from the item's
+        # inline metrics for runs recorded before sampling existed.
+        for item in items:
+            if item["id"] in grouped:
+                continue
+            if item["status"] not in ("passed", "failed"):
+                continue
+            grouped[item["id"]] = [
+                {
+                    "item_id": item["id"],
+                    "sample_index": 1,
+                    "status": item["status"],
+                    "fcp": item.get("fcp"),
+                    "speed_index": item.get("speed_index"),
+                    "lcp": item.get("lcp"),
+                    "tbt": item.get("tbt"),
+                    "cls": item.get("cls"),
+                    "attempts": item.get("attempts"),
+                    "duration_ms": item.get("duration_ms"),
+                    "error_message": item.get("error_message"),
+                    "completed_at": item.get("completed_at"),
+                }
+            ]
+        return grouped
+
+    def _sample_row(self, run: dict, item: dict, sample: dict) -> list:
+        return [
+            run["id"], run["label"], item["source_filename"], item["group_key"],
+            item["site_key"], item["original_value"], item["generated_url"],
+            item["strategy"], "sample", sample["sample_index"], "",
+            sample["status"],
+            self._csv_value(sample.get("fcp")),
+            self._csv_value(sample.get("speed_index")),
+            self._csv_value(sample.get("lcp")),
+            self._csv_value(sample.get("tbt")),
+            self._csv_value(sample.get("cls")),
+            sample.get("attempts"),
+            sample.get("duration_ms"),
+            sample.get("error_message"),
+            sample.get("completed_at"),
+        ]
+
+    def _summary_row(self, run: dict, item: dict, passed: list[dict], stat: str) -> list:
+        return [
+            run["id"], run["label"], item["source_filename"], item["group_key"],
+            item["site_key"], item["original_value"], item["generated_url"],
+            item["strategy"], stat, "", len(passed), "",
+            self._csv_value(self._summarize(passed, "fcp", stat)),
+            self._csv_value(self._summarize(passed, "speed_index", stat)),
+            self._csv_value(self._summarize(passed, "lcp", stat)),
+            self._csv_value(self._summarize(passed, "tbt", stat)),
+            self._csv_value(self._summarize(passed, "cls", stat)),
+            "", "", "", "",
+        ]
+
     @staticmethod
-    def _average_metric(items: list[dict], key: str):
-        values = [item.get(key) for item in items if isinstance(item.get(key), (int, float))]
+    def _summarize(samples: list[dict], key: str, stat: str):
+        values = [s[key] for s in samples if isinstance(s.get(key), (int, float))]
         if not values:
             return None
-        return sum(values) / len(values)
+        if stat == "mean":
+            return sum(values) / len(values)
+        if stat == "median":
+            return statistics.median(values)
+        if stat == "min":
+            return min(values)
+        if stat == "max":
+            return max(values)
+        return None
 
     def _read_file_records(self, files) -> list[dict]:
         records = []

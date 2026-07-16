@@ -393,50 +393,83 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(len(samples), 2)
         self.assertTrue(all(s["status"] == "failed" for s in samples))
 
-    def test_export_csv_includes_saved_run_rows_and_headers(self):
-        result = self.service.create_run(
+    def test_export_csv_has_raw_samples_and_per_url_summary(self):
+        pagespeed = SequencePageSpeedClient([100, 900, 500])
+        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        result = service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
             site_keys=["www"],
             strategy="desktop",
             label="Export smoke",
+            samples_per_url=3,
         )
-        self.service.run_pending_items(result["run_id"])
+        service.run_pending_items(result["run_id"])
 
-        exported = self.service.export_csv(result["run_id"])
+        exported = service.export_csv(result["run_id"])
         rows = list(csv.reader(io.StringIO(exported)))
+        header = rows[0]
 
         self.assertEqual(
-            rows[0],
+            header,
             [
-                "run_id",
-                "label",
-                "source_filename",
-                "group_key",
-                "site_key",
-                "original_value",
-                "generated_url",
-                "strategy",
-                "status",
-                "fcp",
-                "speed_index",
-                "lcp",
-                "tbt",
-                "cls",
-                "attempts",
-                "error_message",
+                "run_id", "label", "source_filename", "group_key", "site_key",
+                "original_value", "generated_url", "strategy", "kind",
+                "sample_index", "n", "status", "fcp", "speed_index", "lcp",
+                "tbt", "cls", "attempts", "duration_ms", "error_message",
+                "completed_at",
             ],
         )
-        self.assertEqual(rows[1][0], str(result["run_id"]))
-        self.assertEqual(rows[1][1], "Export smoke")
-        self.assertEqual(rows[1][6], "https://www.lampsplus.com/p/brass-lamp/")
-        self.assertEqual(rows[1][8], "passed")
-        self.assertEqual(rows[1][9:14], ["900", "1200", "1800", "50", "0.02"])
-        self.assertEqual(rows[1][14], "1")
-        self.assertEqual(rows[2][2], "Averages")
-        self.assertEqual(rows[2][3], "PDP")
-        self.assertEqual(rows[2][4], "www")
-        self.assertEqual(rows[2][8], "average")
-        self.assertEqual(rows[2][9:14], ["900", "1200", "1800", "50", "0.02"])
+
+        kind_idx = header.index("kind")
+        fcp_idx = header.index("fcp")
+        n_idx = header.index("n")
+
+        sample_rows = [r for r in rows[1:] if r[kind_idx] == "sample"]
+        self.assertEqual(len(sample_rows), 3)
+        self.assertEqual([r[fcp_idx] for r in sample_rows], ["100", "900", "500"])
+
+        mean_row = next(r for r in rows[1:] if r[kind_idx] == "mean")
+        median_row = next(r for r in rows[1:] if r[kind_idx] == "median")
+        min_row = next(r for r in rows[1:] if r[kind_idx] == "min")
+        max_row = next(r for r in rows[1:] if r[kind_idx] == "max")
+
+        self.assertEqual(mean_row[fcp_idx], "500")       # (100+900+500)/3=500.0, _csv_value collapses to 500
+        self.assertEqual(median_row[fcp_idx], "500")     # median of 100,900,500
+        self.assertEqual(min_row[fcp_idx], "100")
+        self.assertEqual(max_row[fcp_idx], "900")
+        self.assertEqual(median_row[n_idx], "3")
+
+    def test_export_csv_synthesizes_sample_for_legacy_run(self):
+        # A run whose item was marked passed directly, with no sample rows.
+        run_id = self.repo.create_run("Legacy", "desktop", ["www"], 1, 540, 1)
+        item_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                }
+            ],
+        )[0]
+        self.repo.mark_run_running(run_id)
+        self.repo.mark_item_running(item_id)
+        self.repo.mark_item_passed(item_id, {"fcp": 800, "speed_index": 1000, "lcp": 1500, "tbt": 30, "cls": 0.01, "attempts": 1, "duration_ms": 1200})
+
+        exported = self.service.export_csv(run_id)
+        rows = list(csv.reader(io.StringIO(exported)))
+        header = rows[0]
+        kind_idx = header.index("kind")
+        fcp_idx = header.index("fcp")
+
+        sample_rows = [r for r in rows[1:] if r[kind_idx] == "sample"]
+        self.assertEqual(len(sample_rows), 1)
+        self.assertEqual(sample_rows[0][fcp_idx], "800")
+        median_row = next(r for r in rows[1:] if r[kind_idx] == "median")
+        self.assertEqual(median_row[fcp_idx], "800")
 
     def test_create_run_recognizes_plp_filenames(self):
         from services.testdata_registry import group_for_filename
