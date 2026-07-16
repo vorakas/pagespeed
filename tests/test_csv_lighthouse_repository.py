@@ -722,6 +722,64 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(detail["run"]["status"], "running")
         self.assertEqual(detail["items"][0]["status"], "running")
 
+    def test_create_run_stores_samples_per_url(self):
+        run_id = self.repo.create_run(
+            label="Sampled",
+            strategy="desktop",
+            site_keys=["www"],
+            worker_count=1,
+            target_budget_seconds=540,
+            total_items=1,
+            samples_per_url=25,
+        )
+        run = self.repo.get_run_detail(run_id)["run"]
+        self.assertEqual(run["samples_per_url"], 25)
+
+    def test_create_and_list_samples_round_trip(self):
+        run_id = self.repo.create_run("S", "desktop", ["www"], 1, 540, 1, samples_per_url=2)
+        item_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                }
+            ],
+        )[0]
+
+        self.repo.create_sample(
+            run_id=run_id,
+            item_id=item_id,
+            sample_index=1,
+            status="passed",
+            metrics={"fcp": 900, "speed_index": 1200, "lcp": 1800, "tbt": 50, "cls": 0.02},
+            attempts=1,
+            duration_ms=1500,
+            error_message=None,
+        )
+        self.repo.create_sample(
+            run_id=run_id,
+            item_id=item_id,
+            sample_index=2,
+            status="failed",
+            metrics=None,
+            attempts=2,
+            duration_ms=None,
+            error_message="PageSpeed timeout",
+        )
+
+        samples = self.repo.list_samples(run_id)
+        self.assertEqual([s["sample_index"] for s in samples], [1, 2])
+        self.assertEqual(samples[0]["status"], "passed")
+        self.assertEqual(samples[0]["fcp"], 900)
+        self.assertEqual(samples[0]["attempts"], 1)
+        self.assertEqual(samples[1]["status"], "failed")
+        self.assertEqual(samples[1]["error_message"], "PageSpeed timeout")
+
 
 if __name__ == "__main__":
     unittest.main()

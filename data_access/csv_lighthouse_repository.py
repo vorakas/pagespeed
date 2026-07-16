@@ -21,6 +21,7 @@ class CsvLighthouseRepository:
         worker_count: int,
         target_budget_seconds: int | None,
         total_items: int,
+        samples_per_url: int = 1,
     ) -> int:
         ph = self._cm.placeholder()
         try:
@@ -30,9 +31,9 @@ class CsvLighthouseRepository:
                     f"""
                     INSERT INTO csv_lighthouse_runs (
                         label, strategy, site_keys, worker_count,
-                        target_budget_seconds, total_items
+                        target_budget_seconds, total_items, samples_per_url
                     )
-                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                     {self._cm.returning_id()}
                     """,
                     (
@@ -42,6 +43,7 @@ class CsvLighthouseRepository:
                         worker_count,
                         target_budget_seconds,
                         total_items,
+                        samples_per_url,
                     ),
                 )
                 return self._cm.last_insert_id(cursor)
@@ -82,6 +84,66 @@ class CsvLighthouseRepository:
             raise
         except Exception as exc:
             raise DatabaseError(f"Failed to create CSV Lighthouse items: {exc}") from exc
+
+    def create_sample(
+        self,
+        run_id: int,
+        item_id: int,
+        sample_index: int,
+        status: str,
+        metrics: dict | None,
+        attempts: int,
+        duration_ms: int | None,
+        error_message: str | None,
+    ) -> int:
+        ph = self._cm.placeholder()
+        metrics = metrics or {}
+        try:
+            with self._cm.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    INSERT INTO csv_lighthouse_samples (
+                        run_id, item_id, sample_index, status,
+                        fcp, speed_index, lcp, tbt, cls,
+                        attempts, duration_ms, error_message
+                    )
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    {self._cm.returning_id()}
+                    """,
+                    (
+                        run_id,
+                        item_id,
+                        sample_index,
+                        status,
+                        metrics.get("fcp"),
+                        metrics.get("speed_index"),
+                        metrics.get("lcp"),
+                        metrics.get("tbt"),
+                        metrics.get("cls"),
+                        attempts,
+                        duration_ms,
+                        error_message,
+                    ),
+                )
+                return self._cm.last_insert_id(cursor)
+        except Exception as exc:
+            raise DatabaseError(f"Failed to create CSV Lighthouse sample: {exc}") from exc
+
+    def list_samples(self, run_id: int) -> list[dict]:
+        ph = self._cm.placeholder()
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT *
+                FROM csv_lighthouse_samples
+                WHERE run_id = {ph}
+                ORDER BY item_id, sample_index
+                """,
+                (run_id,),
+            )
+            return self._cm.rows_to_dicts(cursor)
 
     def create_file(
         self,
