@@ -328,7 +328,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
 
       <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1.3fr)_minmax(12rem,0.8fr)_auto] lg:items-end">
+          <div className="grid gap-3 lg:grid-cols-[minmax(16rem,1.3fr)_minmax(10rem,0.8fr)_auto_auto] lg:items-end">
             <div className="space-y-1.5">
               <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-lighthouse-files">
                 Additional CSVs (optional)
