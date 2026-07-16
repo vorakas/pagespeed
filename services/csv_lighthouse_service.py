@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import math
+import statistics
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -290,6 +291,7 @@ class CsvLighthouseService:
         detail = self.repository.get_run_detail(run_id)
         run = detail["run"]
         max_workers = max(1, int(run.get("worker_count") or 1))
+        samples_per_url = max(1, int(run.get("samples_per_url") or 1))
         self.repository.mark_run_running(run_id)
         pending_items = self.repository.pending_items(run_id)
 
@@ -306,7 +308,11 @@ class CsvLighthouseService:
                     and not self.repository.should_cancel(run_id)
                 ):
                     futures.add(
-                        executor.submit(self._process_item, pending_items[next_index])
+                        executor.submit(
+                            self._process_item,
+                            pending_items[next_index],
+                            samples_per_url,
+                        )
                     )
                     next_index += 1
                     submitted += 1
@@ -543,26 +549,85 @@ class CsvLighthouseService:
             )
         return handle.read()
 
-    def _process_item(self, item: dict) -> None:
+    def _process_item(self, item: dict, samples_per_url: int = 1) -> None:
         if not self.repository.mark_item_running(item["id"]):
             return
+        run_id = item["run_id"]
+        started = time.monotonic()
+        passed_samples: list[dict] = []
+        total_attempts = 0
+        last_error: Exception | None = None
+
+        for sample_index in range(1, samples_per_url + 1):
+            if sample_index > 1 and self.repository.should_cancel(run_id):
+                break
+            metrics, attempts, error = self._collect_sample(item)
+            total_attempts += attempts
+            if metrics is not None:
+                passed_samples.append(metrics)
+                self.repository.create_sample(
+                    run_id=run_id,
+                    item_id=item["id"],
+                    sample_index=sample_index,
+                    status="passed",
+                    metrics=metrics,
+                    attempts=attempts,
+                    duration_ms=metrics.get("duration_ms"),
+                    error_message=None,
+                )
+            else:
+                last_error = error
+                self.repository.create_sample(
+                    run_id=run_id,
+                    item_id=item["id"],
+                    sample_index=sample_index,
+                    status="failed",
+                    metrics=None,
+                    attempts=attempts,
+                    duration_ms=None,
+                    error_message=str(error or "PageSpeed failed"),
+                )
+
+        duration_ms = int((time.monotonic() - started) * 1000)
+        if passed_samples:
+            representative = self._median_metrics(passed_samples)
+            representative["attempts"] = total_attempts
+            representative["duration_ms"] = duration_ms
+            self.repository.mark_item_passed(item["id"], representative)
+        else:
+            self.repository.mark_item_failed(
+                item["id"],
+                str(last_error or "PageSpeed failed"),
+                attempts=total_attempts or MAX_LIGHTHOUSE_ATTEMPTS,
+            )
+
+    def _collect_sample(self, item: dict):
+        """Run one PSI measurement with retries.
+
+        Returns ``(metrics | None, attempts, error)``.  ``metrics`` includes a
+        ``duration_ms`` for that single sample.
+        """
         started = time.monotonic()
         last_error: Exception | None = None
         for attempt in range(1, MAX_LIGHTHOUSE_ATTEMPTS + 1):
             try:
-                metrics = self.pagespeed_client.test_url(
-                    item["generated_url"], item["strategy"]
+                metrics = dict(
+                    self.pagespeed_client.test_url(item["generated_url"], item["strategy"])
                 )
-                metrics["attempts"] = attempt
                 metrics["duration_ms"] = int((time.monotonic() - started) * 1000)
-                self.repository.mark_item_passed(item["id"], metrics)
-                return
+                return metrics, attempt, None
             except Exception as exc:
                 last_error = exc
+        return None, MAX_LIGHTHOUSE_ATTEMPTS, last_error
 
-        self.repository.mark_item_failed(
-            item["id"], str(last_error or "PageSpeed failed"), attempts=MAX_LIGHTHOUSE_ATTEMPTS
-        )
+    @staticmethod
+    def _median_metrics(samples: list[dict]) -> dict:
+        keys = ("fcp", "speed_index", "lcp", "tbt", "cls")
+        result: dict = {}
+        for key in keys:
+            values = [s[key] for s in samples if isinstance(s.get(key), (int, float))]
+            result[key] = statistics.median(values) if values else None
+        return result
 
     def _csv_value(self, value):
         if isinstance(value, float) and value.is_integer():

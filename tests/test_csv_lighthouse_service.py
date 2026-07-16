@@ -57,6 +57,19 @@ class AlwaysFailsPageSpeedClient(FakePageSpeedClient):
         raise RuntimeError("permanent PageSpeed failure")
 
 
+class SequencePageSpeedClient(FakePageSpeedClient):
+    """Returns a scripted FCP per call so median is predictable."""
+
+    def __init__(self, fcp_values):
+        super().__init__()
+        self._fcp_values = list(fcp_values)
+
+    def test_url(self, url, strategy):
+        self.calls.append((url, strategy))
+        fcp = self._fcp_values[(len(self.calls) - 1) % len(self._fcp_values)]
+        return {"fcp": fcp, "speed_index": 1200, "lcp": 1800, "tbt": 50, "cls": 0.02}
+
+
 class CancellingPageSpeedClient(FakePageSpeedClient):
     def __init__(self, repository, run_id_getter):
         super().__init__()
@@ -327,6 +340,58 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(item["lcp"], 1800)
         self.assertEqual(item["tbt"], 50)
         self.assertEqual(item["cls"], 0.02)
+
+    def test_run_samples_each_url_n_times_and_stores_median(self):
+        pagespeed = SequencePageSpeedClient([100, 900, 500])
+        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            samples_per_url=3,
+        )
+
+        service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        item = detail["items"][0]
+        samples = self.repo.list_samples(result["run_id"])
+
+        self.assertEqual(len(pagespeed.calls), 3)
+        self.assertEqual(len(samples), 3)
+        self.assertEqual(item["status"], "passed")
+        self.assertEqual(item["fcp"], 500)  # median of 100, 900, 500
+
+    def test_single_sample_run_matches_legacy_behavior(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+        self.service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        item = detail["items"][0]
+        samples = self.repo.list_samples(result["run_id"])
+
+        self.assertEqual(len(self.pagespeed.calls), 1)
+        self.assertEqual(len(samples), 1)
+        self.assertEqual(item["fcp"], 900)
+
+    def test_item_fails_when_all_samples_fail(self):
+        pagespeed = AlwaysFailsPageSpeedClient()
+        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            samples_per_url=2,
+        )
+        service.run_pending_items(result["run_id"])
+        item = self.repo.get_run_detail(result["run_id"])["items"][0]
+        samples = self.repo.list_samples(result["run_id"])
+
+        self.assertEqual(item["status"], "failed")
+        self.assertEqual(len(samples), 2)
+        self.assertTrue(all(s["status"] == "failed" for s in samples))
 
     def test_export_csv_includes_saved_run_rows_and_headers(self):
         result = self.service.create_run(
