@@ -18,7 +18,7 @@ class FakeCsvLighthouseService:
         self.updated_files = []
         self.deleted_file_ids = []
 
-    def create_run(self, files, site_keys, strategy, label=None):
+    def create_run(self, files, site_keys, strategy, label=None, samples_per_url=1):
         self.create_calls.append(
             {
                 "files": [(filename, handle.read()) for filename, handle in files],

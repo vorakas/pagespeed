@@ -660,6 +660,17 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         run = self.service.get_run(result["run_id"])["run"]
         self.assertEqual(run["samples_per_url"], 25)
 
+    def test_create_run_accepts_string_samples_per_url_from_form(self):
+        # The Flask form delivers strings; the service must coerce.
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            samples_per_url="25",
+        )
+        run = self.service.get_run(result["run_id"])["run"]
+        self.assertEqual(run["samples_per_url"], 25)
+
     def test_create_run_defaults_samples_per_url_to_one(self):
         result = self.service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],

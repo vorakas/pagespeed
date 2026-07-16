@@ -35,6 +35,7 @@ def create_csv_lighthouse_blueprint(service):
         site_keys = _parse_site_keys()
         strategy = request.form.get("strategy") or "desktop"
         label = request.form.get("label") or None
+        samples_per_url = request.form.get("samples_per_url") or 1
         uploaded_files = []
         for file in files:
             size = _stream_size_bytes(file.stream)
@@ -49,6 +50,7 @@ def create_csv_lighthouse_blueprint(service):
             site_keys=site_keys,
             strategy=strategy,
             label=label,
+            samples_per_url=samples_per_url,
         )
         return jsonify({"success": True, **result})
 

@@ -72,6 +72,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
   const [libraryCount, setLibraryCount] = useState(0)
   const [fileInputKey, setFileInputKey] = useState(0)
   const [label, setLabel] = useState("")
+  const [samplesPerUrl, setSamplesPerUrl] = useState(25)
   const [selectedTargets, setSelectedTargets] = useState<CsvLighthouseSiteKey[]>(["mcprod", "www"])
   const [runs, setRuns] = useState<CsvLighthouseRun[]>([])
   const [selectedDetail, setSelectedDetail] = useState<CsvLighthouseRunDetail | null>(null)
@@ -202,6 +203,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
         siteKeys: selectedTargets,
         strategy,
         label,
+        samplesPerUrl,
       })
       setFiles([])
       setFileInputKey((current) => current + 1)
@@ -356,6 +358,22 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                 onChange={(event) => setLabel(event.target.value)}
                 placeholder="Optional"
                 className="h-9"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-lighthouse-samples">
+                Samples per URL
+              </label>
+              <Input
+                id="csv-lighthouse-samples"
+                type="number"
+                min={1}
+                max={50}
+                value={samplesPerUrl}
+                onChange={(event) =>
+                  setSamplesPerUrl(Math.max(1, Math.min(50, Number(event.target.value) || 1)))
+                }
+                className="h-9 w-24"
               />
             </div>
             <Button onClick={handleStart} disabled={!canStart} className="h-9">

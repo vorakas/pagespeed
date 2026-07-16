@@ -1679,6 +1679,7 @@ export interface CsvLighthouseRun {
   site_keys: CsvLighthouseSiteKey[]
   status: CsvLighthouseRunStatus
   worker_count: number
+  samples_per_url?: number
   target_budget_seconds: number
   total_items: number
   completed_items: number
