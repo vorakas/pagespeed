@@ -394,7 +394,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertTrue(all(s["status"] == "failed" for s in samples))
 
     def test_export_csv_has_raw_samples_and_per_url_summary(self):
-        pagespeed = SequencePageSpeedClient([100, 900, 500])
+        # Mean (400) and median (200) differ, so the two stats are independently pinned.
+        pagespeed = SequencePageSpeedClient([100, 200, 900])
         service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
         result = service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
@@ -426,15 +427,15 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
         sample_rows = [r for r in rows[1:] if r[kind_idx] == "sample"]
         self.assertEqual(len(sample_rows), 3)
-        self.assertEqual([r[fcp_idx] for r in sample_rows], ["100", "900", "500"])
+        self.assertEqual([r[fcp_idx] for r in sample_rows], ["100", "200", "900"])
 
         mean_row = next(r for r in rows[1:] if r[kind_idx] == "mean")
         median_row = next(r for r in rows[1:] if r[kind_idx] == "median")
         min_row = next(r for r in rows[1:] if r[kind_idx] == "min")
         max_row = next(r for r in rows[1:] if r[kind_idx] == "max")
 
-        self.assertEqual(mean_row[fcp_idx], "500")       # (100+900+500)/3=500.0, _csv_value collapses to 500
-        self.assertEqual(median_row[fcp_idx], "500")     # median of 100,900,500
+        self.assertEqual(mean_row[fcp_idx], "400")       # (100+200+900)/3=400.0, _csv_value collapses to 400
+        self.assertEqual(median_row[fcp_idx], "200")     # median of 100,200,900
         self.assertEqual(min_row[fcp_idx], "100")
         self.assertEqual(max_row[fcp_idx], "900")
         self.assertEqual(median_row[n_idx], "3")
@@ -470,6 +471,45 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(sample_rows[0][fcp_idx], "800")
         median_row = next(r for r in rows[1:] if r[kind_idx] == "median")
         self.assertEqual(median_row[fcp_idx], "800")
+
+    def test_export_csv_synthesizes_failed_sample_for_legacy_failed_run(self):
+        # A legacy failed item (no sample rows) synthesizes one failed sample
+        # and yields summary rows with n=0 and blank stats.
+        run_id = self.repo.create_run("Legacy fail", "desktop", ["www"], 1, 540, 1)
+        item_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "www",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                }
+            ],
+        )[0]
+        self.repo.mark_run_running(run_id)
+        self.repo.mark_item_running(item_id)
+        self.repo.mark_item_failed(item_id, "PageSpeed timeout", attempts=2)
+
+        exported = self.service.export_csv(run_id)
+        rows = list(csv.reader(io.StringIO(exported)))
+        header = rows[0]
+        kind_idx = header.index("kind")
+        fcp_idx = header.index("fcp")
+        n_idx = header.index("n")
+        status_idx = header.index("status")
+        error_idx = header.index("error_message")
+
+        sample_rows = [r for r in rows[1:] if r[kind_idx] == "sample"]
+        self.assertEqual(len(sample_rows), 1)
+        self.assertEqual(sample_rows[0][status_idx], "failed")
+        self.assertEqual(sample_rows[0][fcp_idx], "")
+        self.assertEqual(sample_rows[0][error_idx], "PageSpeed timeout")
+        median_row = next(r for r in rows[1:] if r[kind_idx] == "median")
+        self.assertEqual(median_row[n_idx], "0")
+        self.assertEqual(median_row[fcp_idx], "")
 
     def test_create_run_recognizes_plp_filenames(self):
         from services.testdata_registry import group_for_filename
