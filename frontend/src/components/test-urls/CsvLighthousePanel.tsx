@@ -371,7 +371,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                 className="h-9 w-24"
               />
             </div>
-            <Button onClick={handleStart} disabled={!canStart} className="h-9">
+            <Button onClick={handleStart} disabled={!canStart} className="h-9 text-black!">
               {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               Save CSVs
             </Button>
