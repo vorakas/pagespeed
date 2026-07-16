@@ -13,6 +13,8 @@ from config import (
     CSV_LIGHTHOUSE_MAX_FILE_BYTES,
     CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN,
     CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE,
+    CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL,
+    CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES,
     CSV_LIGHTHOUSE_STALE_RUN_SECONDS,
 )
 from exceptions import ValidationError
@@ -111,9 +113,11 @@ class CsvLighthouseService:
         site_keys,
         strategy: str,
         label: str | None = None,
+        samples_per_url: int = 1,
     ) -> dict:
         strategy = self._validate_strategy(strategy)
         site_keys = self._validate_site_keys(site_keys)
+        samples_per_url = self._validate_samples_per_url(samples_per_url)
 
         upload_records = self._read_file_records(files)
         uploaded_names = {record["filename"] for record in upload_records}
@@ -139,6 +143,12 @@ class CsvLighthouseService:
                 "CSV Lighthouse run would create "
                 f"{len(items)} items; maximum is {CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN}"
             )
+        total_samples = len(items) * samples_per_url
+        if total_samples > CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES:
+            raise ValidationError(
+                f"CSV Lighthouse run would make {total_samples} total samples; "
+                f"maximum is {CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES}"
+            )
         worker_count = calculate_worker_count(len(items))
         run_id = self.repository.create_run(
             label=label or "CSV Lighthouse run",
@@ -147,6 +157,7 @@ class CsvLighthouseService:
             worker_count=worker_count,
             target_budget_seconds=TARGET_BUDGET_SECONDS,
             total_items=len(items),
+            samples_per_url=samples_per_url,
         )
         for file_record in file_records:
             self.repository.create_file(
@@ -570,6 +581,17 @@ class CsvLighthouseService:
         if strategy not in {"desktop", "mobile"}:
             raise ValidationError("Strategy must be desktop or mobile")
         return strategy
+
+    def _validate_samples_per_url(self, samples_per_url) -> int:
+        try:
+            value = int(samples_per_url)
+        except (TypeError, ValueError):
+            raise ValidationError("samples per URL must be a whole number")
+        if value < 1 or value > CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL:
+            raise ValidationError(
+                f"samples per URL must be between 1 and {CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL}"
+            )
+        return value
 
     def _validate_site_keys(self, site_keys) -> list[str]:
         if not site_keys:

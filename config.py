@@ -57,6 +57,12 @@ CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_ROWS_P
 CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN', '200'))
 """Maximum generated Lighthouse URL checks in one CSV run."""
 
+# Maximum PSI samples collected per URL in one run
+CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL', '50'))
+
+# Maximum total PSI calls (items x samples) per run
+CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES', '3000'))
+
 CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH', '8000000'))
 """Maximum request body size for CSV Lighthouse uploads."""
 

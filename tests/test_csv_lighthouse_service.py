@@ -511,6 +511,48 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
         self.assertEqual(self.repo.list_runs(), [])
 
+    def test_create_run_stores_samples_per_url(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            label="Sampled",
+            samples_per_url=25,
+        )
+        run = self.service.get_run(result["run_id"])["run"]
+        self.assertEqual(run["samples_per_url"], 25)
+
+    def test_create_run_defaults_samples_per_url_to_one(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+        )
+        run = self.service.get_run(result["run_id"])["run"]
+        self.assertEqual(run["samples_per_url"], 1)
+
+    def test_create_run_rejects_samples_per_url_over_cap(self):
+        with patch.object(csv_lighthouse_service, "CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL", 10):
+            with self.assertRaisesRegex(ValidationError, "samples per URL"):
+                self.service.create_run(
+                    [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+                    site_keys=["www"],
+                    strategy="desktop",
+                    samples_per_url=11,
+                )
+        self.assertEqual(self.repo.list_runs(), [])
+
+    def test_create_run_rejects_too_many_total_samples(self):
+        with patch.object(csv_lighthouse_service, "CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES", 1):
+            with self.assertRaisesRegex(ValidationError, "total samples"):
+                self.service.create_run(
+                    [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+                    site_keys=["www", "mcprod"],
+                    strategy="desktop",
+                    samples_per_url=1,
+                )
+        self.assertEqual(self.repo.list_runs(), [])
+
     def test_cancel_stops_scheduling_new_items_and_marks_pending_cancelled(self):
         run_id_holder = {}
         service = CsvLighthouseService(
