@@ -2218,6 +2218,11 @@
   border-bottom: 1px solid var(--glass-border);
   white-space: nowrap;
 }
+/* Let right-aligned headers win over the default left-align so numeric
+   column headers (Perf, FCP, LCP, …) sit above their right-aligned values. */
+.aurora-table thead th.text-right {
+  text-align: right;
+}
 .aurora-table tbody td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--glass-border);
