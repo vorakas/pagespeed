@@ -821,6 +821,39 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(recovered, 0)
         self.assertEqual(self.repo.get_run_detail(run_id)["run"]["status"], "running")
 
+    def test_mark_item_passed_stores_valid_samples(self):
+        run_id = self.repo.create_run(
+            label="valid-samples", strategy="desktop", site_keys=["www"],
+            worker_count=1, target_budget_seconds=60, total_items=1,
+        )
+        item_id = self.repo.create_items(run_id, [
+            {"source_filename": "PDP.csv", "group_key": "PDP", "site_key": "www",
+             "original_value": "brass-lamp/",
+             "generated_url": "https://www.lampsplus.com/p/brass-lamp/", "strategy": "desktop"},
+        ])[0]
+        self.repo.mark_item_running(item_id)
+        self.repo.mark_item_passed(item_id, {"fcp": 100, "valid_samples": 25, "attempts": 30})
+        item = self.repo.get_run_detail(run_id)["items"][0]
+        self.assertEqual(item["valid_samples"], 25)
+        self.assertEqual(item["attempts"], 30)
+
+    def test_mark_unfinished_items_cancelled_covers_pending_and_running(self):
+        run_id = self.repo.create_run(
+            label="cancel", strategy="desktop", site_keys=["www"],
+            worker_count=1, target_budget_seconds=60, total_items=2,
+        )
+        ids = self.repo.create_items(run_id, [
+            {"source_filename": "PDP.csv", "group_key": "PDP", "site_key": "www",
+             "original_value": "a/", "generated_url": "https://www.lampsplus.com/p/a/", "strategy": "desktop"},
+            {"source_filename": "PDP.csv", "group_key": "PDP", "site_key": "www",
+             "original_value": "b/", "generated_url": "https://www.lampsplus.com/p/b/", "strategy": "desktop"},
+        ])
+        self.repo.mark_item_running(ids[0])  # running; ids[1] stays pending
+        count = self.repo.mark_unfinished_items_cancelled(run_id)
+        statuses = sorted(i["status"] for i in self.repo.get_run_detail(run_id)["items"])
+        self.assertEqual(count, 2)
+        self.assertEqual(statuses, ["cancelled", "cancelled"])
+
 
 if __name__ == "__main__":
     unittest.main()

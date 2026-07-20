@@ -418,6 +418,7 @@ class ConnectionManager:
                 tbt REAL,
                 cls REAL,
                 performance REAL,
+                valid_samples INTEGER,
                 attempts INTEGER NOT NULL DEFAULT 1,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
@@ -457,6 +458,7 @@ class ConnectionManager:
         cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS samples_per_url INTEGER NOT NULL DEFAULT 1")
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 1")
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS performance REAL")
+        cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS valid_samples INTEGER")
         cursor.execute("ALTER TABLE csv_lighthouse_samples ADD COLUMN IF NOT EXISTS performance REAL")
 
         cursor.execute("""
@@ -790,6 +792,7 @@ class ConnectionManager:
                 tbt REAL,
                 cls REAL,
                 performance REAL,
+                valid_samples INTEGER,
                 attempts INTEGER NOT NULL DEFAULT 1,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
@@ -975,6 +978,7 @@ class ConnectionManager:
             "ALTER TABLE csv_lighthouse_runs ADD COLUMN samples_per_url INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE csv_lighthouse_items ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE csv_lighthouse_items ADD COLUMN performance REAL",
+            "ALTER TABLE csv_lighthouse_items ADD COLUMN valid_samples INTEGER",
             "ALTER TABLE csv_lighthouse_samples ADD COLUMN performance REAL",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_id INTEGER",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_name TEXT",
