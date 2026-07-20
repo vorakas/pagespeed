@@ -63,8 +63,28 @@ CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_SAMP
 CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES', '3000'))
 """Maximum total PSI calls (items x samples) in one CSV Lighthouse run."""
 
-CSV_LIGHTHOUSE_MAX_WORKERS: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_WORKERS', '16'))
-"""Maximum concurrent PSI workers for a CSV Lighthouse run (bounded by the DB pool)."""
+CSV_LIGHTHOUSE_MAX_WORKERS: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_WORKERS', '6'))
+"""Maximum concurrent URLs tested at once in a CSV Lighthouse run."""
+
+CSV_LIGHTHOUSE_REQUESTS_PER_MINUTE: float = float(
+    os.getenv('CSV_LIGHTHOUSE_REQUESTS_PER_MINUTE', '30')
+)
+"""Global PSI request ceiling for a CSV Lighthouse run (token bucket; adapts down on 429)."""
+
+CSV_LIGHTHOUSE_SAMPLE_COOLDOWN_SECONDS: float = float(
+    os.getenv('CSV_LIGHTHOUSE_SAMPLE_COOLDOWN_SECONDS', '20')
+)
+"""Minimum gap between successive samples of the same URL (defeats PSI caching)."""
+
+CSV_LIGHTHOUSE_CACHE_COOLDOWN_SECONDS: float = float(
+    os.getenv('CSV_LIGHTHOUSE_CACHE_COOLDOWN_SECONDS', '90')
+)
+"""Longer cooldown applied after PSI returns a cached (duplicate) result."""
+
+CSV_LIGHTHOUSE_MAX_ATTEMPTS_PER_SAMPLE: int = int(
+    os.getenv('CSV_LIGHTHOUSE_MAX_ATTEMPTS_PER_SAMPLE', '6')
+)
+"""Safety cap: consecutive attempts for one sample slot before giving up on a URL."""
 
 CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_CONTENT_LENGTH', '8000000'))
 """Maximum request body size for CSV Lighthouse uploads."""

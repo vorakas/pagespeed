@@ -10,7 +10,6 @@ from data_access.csv_lighthouse_repository import CsvLighthouseRepository
 from exceptions import ValidationError
 import services.csv_lighthouse_service as csv_lighthouse_service
 from services.csv_lighthouse_service import (
-    DEFAULT_AVERAGE_SECONDS,
     CsvLighthouseService,
     calculate_worker_count,
     normalize_csv_value,
@@ -316,18 +315,14 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(result["total_items"], 1)
         self.assertEqual(len(detail["items"]), 1)
 
-    def test_calculate_worker_count_scales_with_samples_and_caps(self):
-        # Single-sample runs keep modest concurrency (budget-driven).
+    def test_calculate_worker_count_scales_with_urls_and_caps(self):
+        self.assertEqual(calculate_worker_count(0), 0)
         self.assertEqual(calculate_worker_count(1), 1)
-        self.assertEqual(calculate_worker_count(12, average_seconds=90), 2)
-        # Sampling multiplies the work, so concurrency scales up to the cap (16).
-        # ceil(2*25*90/540)=ceil(8.33)=9
-        self.assertEqual(calculate_worker_count(2, samples_per_url=25, average_seconds=90), 9)
-        # ceil(32*25*90/540)=134 -> capped at 16
-        self.assertEqual(calculate_worker_count(32, samples_per_url=25, average_seconds=90), 16)
-        self.assertEqual(DEFAULT_AVERAGE_SECONDS, 90)
+        self.assertEqual(calculate_worker_count(4), 4)
+        # Capped at CSV_LIGHTHOUSE_MAX_WORKERS (6).
+        self.assertEqual(calculate_worker_count(12), 6)
 
-    def test_create_run_scales_worker_count_with_samples(self):
+    def test_create_run_worker_count_is_capped_url_count(self):
         result = self.service.create_run(
             [("PDP.csv", io.BytesIO(b"a/\nb/\nc/\n"))],
             site_keys=["www"],
@@ -335,8 +330,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             samples_per_url=25,
         )
         run = self.service.get_run(result["run_id"])["run"]
-        # 3 urls x 25 samples -> ceil(3*25*90/540)=ceil(12.5)=13 workers
-        self.assertEqual(run["worker_count"], 13)
+        # 3 URLs -> min(6, 3) = 3 workers (no longer scaled by samples_per_url).
+        self.assertEqual(run["worker_count"], 3)
 
     def test_run_pending_items_saves_metrics_from_pagespeed_client(self):
         result = self.service.create_run(

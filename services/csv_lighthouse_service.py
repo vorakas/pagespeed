@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import io
-import math
 import statistics
 import threading
 import time
@@ -11,19 +10,22 @@ from typing import BinaryIO
 from urllib.parse import urlparse
 
 from config import (
+    CSV_LIGHTHOUSE_CACHE_COOLDOWN_SECONDS,
+    CSV_LIGHTHOUSE_MAX_ATTEMPTS_PER_SAMPLE,
     CSV_LIGHTHOUSE_MAX_FILE_BYTES,
     CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN,
     CSV_LIGHTHOUSE_MAX_ROWS_PER_FILE,
     CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL,
     CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES,
     CSV_LIGHTHOUSE_MAX_WORKERS,
+    CSV_LIGHTHOUSE_REQUESTS_PER_MINUTE,
+    CSV_LIGHTHOUSE_SAMPLE_COOLDOWN_SECONDS,
     CSV_LIGHTHOUSE_STALE_RUN_SECONDS,
 )
 from exceptions import ValidationError
 from services.testdata_registry import GROUPS, SITES, group_for_filename, open_url
 
 TARGET_BUDGET_SECONDS = 540
-DEFAULT_AVERAGE_SECONDS = 90
 MAX_LIGHTHOUSE_ATTEMPTS = 2
 
 _KNOWN_ROUTE_PREFIXES = ("/p/", "/sfp/", "/more-like-this/", "/s/")
@@ -91,20 +93,10 @@ def parse_column_a(
     return values
 
 
-def calculate_worker_count(
-    url_count: int,
-    samples_per_url: int = 1,
-    average_seconds: int = DEFAULT_AVERAGE_SECONDS,
-) -> int:
+def calculate_worker_count(url_count: int) -> int:
     if url_count <= 0:
         return 0
-    if average_seconds <= 0:
-        average_seconds = DEFAULT_AVERAGE_SECONDS
-    # Concurrency scales with total PSI calls (urls x samples), not urls alone,
-    # so a high-sample run does not crawl at the single-sample worker count.
-    total_samples = url_count * max(1, samples_per_url)
-    required = math.ceil((total_samples * average_seconds) / TARGET_BUDGET_SECONDS)
-    return max(1, min(CSV_LIGHTHOUSE_MAX_WORKERS, required))
+    return max(1, min(CSV_LIGHTHOUSE_MAX_WORKERS, url_count))
 
 
 class CsvLighthouseService:
@@ -155,7 +147,7 @@ class CsvLighthouseService:
                 f"CSV Lighthouse run would make {total_samples} total samples; "
                 f"maximum is {CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES}"
             )
-        worker_count = calculate_worker_count(len(items), samples_per_url)
+        worker_count = calculate_worker_count(len(items))
         run_id = self.repository.create_run(
             label=label or "CSV Lighthouse run",
             strategy=strategy,
