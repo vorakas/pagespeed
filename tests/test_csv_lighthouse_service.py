@@ -2,6 +2,7 @@ import csv
 import io
 import os
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -14,6 +15,20 @@ from services.csv_lighthouse_service import (
     calculate_worker_count,
     normalize_csv_value,
 )
+
+
+class FakeClock:
+    def __init__(self):
+        self._t = 0.0
+        self._lock = threading.Lock()
+
+    def now(self):
+        with self._lock:
+            return self._t
+
+    def sleep(self, seconds):
+        with self._lock:
+            self._t += max(0.0, seconds)
 
 
 class FakePageSpeedClient:
@@ -82,6 +97,22 @@ class CancellingPageSpeedClient(FakePageSpeedClient):
         return result
 
 
+class TimestampedPageSpeedClient(FakePageSpeedClient):
+    """Returns scripted analysisUTCTimestamps to simulate fresh vs cached runs."""
+
+    def __init__(self, timestamps):
+        super().__init__()
+        self._timestamps = list(timestamps)
+
+    def test_url(self, url, strategy):
+        self.calls.append((url, strategy))
+        ts = self._timestamps[(len(self.calls) - 1) % len(self._timestamps)]
+        return {
+            "fcp": 900, "speed_index": 1200, "lcp": 1800, "tbt": 50, "cls": 0.02,
+            "performance_score": 80, "raw_data": {"fetch_time": ts},
+        }
+
+
 class CsvLighthouseServiceTest(unittest.TestCase):
     def setUp(self):
         self._cwd = os.getcwd()
@@ -91,14 +122,22 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.conn_mgr.init_schema()
         self.repo = CsvLighthouseRepository(self.conn_mgr)
         self.pagespeed = FakePageSpeedClient()
+        self.clock = FakeClock()
         self.service = CsvLighthouseService(
-            self.repo, self.pagespeed, start_background=False
+            self.repo, self.pagespeed, start_background=False,
+            time_source=self.clock.now, sleep_func=self.clock.sleep,
         )
 
     def tearDown(self):
         self.conn_mgr.close_all()
         os.chdir(self._cwd)
         self.tmp.cleanup()
+
+    def _make_service(self, pagespeed):
+        return CsvLighthouseService(
+            self.repo, pagespeed, start_background=False,
+            time_source=self.clock.now, sleep_func=self.clock.sleep,
+        )
 
     def test_normalize_csv_value_removes_origin_prefix_and_leading_slash(self):
         self.assertEqual(
@@ -356,7 +395,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
     def test_run_samples_each_url_n_times_and_stores_median(self):
         pagespeed = SequencePageSpeedClient([100, 900, 500])
-        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        service = self._make_service(pagespeed)
         result = service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
             site_keys=["www"],
@@ -391,7 +430,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
     def test_item_fails_when_all_samples_fail(self):
         pagespeed = AlwaysFailsPageSpeedClient()
-        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        service = self._make_service(pagespeed)
         result = service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
             site_keys=["www"],
@@ -403,13 +442,35 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         samples = self.repo.list_samples(result["run_id"])
 
         self.assertEqual(item["status"], "failed")
-        self.assertEqual(len(samples), 2)
-        self.assertTrue(all(s["status"] == "failed" for s in samples))
+        self.assertEqual(len(samples), 0)  # only valid samples are persisted now
+
+    def test_cached_duplicates_are_discarded_until_25_fresh(self):
+        # Every other response repeats the previous timestamp (a cache hit).
+        timestamps = []
+        for i in range(1, 60):
+            timestamps.append(i)
+            timestamps.append(i)  # duplicate right after each fresh one
+        pagespeed = TimestampedPageSpeedClient(timestamps)
+        service = self._make_service(pagespeed)
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"], strategy="desktop", samples_per_url=25,
+        )
+        service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        item = detail["items"][0]
+        samples = self.repo.list_samples(result["run_id"])
+        fetch_times = {s.get("sample_index") for s in samples}
+
+        self.assertEqual(item["status"], "passed")
+        self.assertEqual(item["valid_samples"], 25)
+        self.assertEqual(len(samples), 25)          # duplicates were not persisted
+        self.assertEqual(len(fetch_times), 25)      # 25 distinct sample slots
 
     def test_export_csv_has_raw_samples_and_per_url_summary(self):
         # Mean (400) and median (200) differ, so the two stats are independently pinned.
         pagespeed = SequencePageSpeedClient([100, 200, 900])
-        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        service = self._make_service(pagespeed)
         result = service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
             site_keys=["www"],
@@ -717,16 +778,15 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
     def test_cancel_stops_scheduling_new_items_and_marks_pending_cancelled(self):
         run_id_holder = {}
-        service = CsvLighthouseService(
-            self.repo,
-            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"]),
-            start_background=False,
+        service = self._make_service(
+            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"])
         )
-        result = service.create_run(
-            [("PDP.csv", io.BytesIO(b"brass-lamp/\nfloor-lamp/\n"))],
-            site_keys=["www"],
-            strategy="desktop",
-        )
+        with patch.object(csv_lighthouse_service, "CSV_LIGHTHOUSE_MAX_WORKERS", 1):
+            result = service.create_run(
+                [("PDP.csv", io.BytesIO(b"brass-lamp/\nfloor-lamp/\n"))],
+                site_keys=["www"],
+                strategy="desktop",
+            )
         run_id_holder["run_id"] = result["run_id"]
 
         service.run_pending_items(result["run_id"])
@@ -738,10 +798,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
     def test_cancel_between_samples_stops_early_and_keeps_passed(self):
         run_id_holder = {}
-        service = CsvLighthouseService(
-            self.repo,
-            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"]),
-            start_background=False,
+        service = self._make_service(
+            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"])
         )
         result = service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
@@ -762,10 +820,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
     def test_late_cancel_after_all_items_passed_finishes_completed_and_exports(self):
         run_id_holder = {}
-        service = CsvLighthouseService(
-            self.repo,
-            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"]),
-            start_background=False,
+        service = self._make_service(
+            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"])
         )
         result = service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
@@ -890,7 +946,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
 
     def test_page_speed_failure_retries_once_and_saves_passing_metrics(self):
         pagespeed = FailsOncePageSpeedClient()
-        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        service = self._make_service(pagespeed)
         result = service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
             site_keys=["www"],
@@ -906,9 +962,9 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(item["attempts"], 2)
         self.assertEqual(item["fcp"], 700)
 
-    def test_page_speed_failure_retries_once_and_saves_final_failure(self):
+    def test_page_speed_failure_retries_up_to_cap_and_saves_final_failure(self):
         pagespeed = AlwaysFailsPageSpeedClient()
-        service = CsvLighthouseService(self.repo, pagespeed, start_background=False)
+        service = self._make_service(pagespeed)
         result = service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
             site_keys=["www"],
@@ -919,10 +975,11 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         detail = self.repo.get_run_detail(result["run_id"])
         item = detail["items"][0]
 
-        self.assertEqual(len(pagespeed.calls), 2)
+        cap = csv_lighthouse_service.CSV_LIGHTHOUSE_MAX_ATTEMPTS_PER_SAMPLE
+        self.assertEqual(len(pagespeed.calls), cap)
         self.assertEqual(item["status"], "failed")
-        self.assertEqual(item["attempts"], 2)
-        self.assertIn("permanent PageSpeed failure", item["error_message"])
+        self.assertEqual(item["attempts"], cap)
+        self.assertIn("attempt cap", item["error_message"])
 
     def test_create_run_uses_library_when_no_uploads(self):
         self.service.save_library_files([("PDP.csv", io.BytesIO(b"brass-lamp/\n"))])

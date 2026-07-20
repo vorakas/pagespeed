@@ -5,7 +5,7 @@ import io
 import statistics
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from typing import BinaryIO
 from urllib.parse import urlparse
 
@@ -22,11 +22,11 @@ from config import (
     CSV_LIGHTHOUSE_SAMPLE_COOLDOWN_SECONDS,
     CSV_LIGHTHOUSE_STALE_RUN_SECONDS,
 )
-from exceptions import ValidationError
+from exceptions import RateLimitError, ValidationError
+from services.rate_limiter import RateLimiter
 from services.testdata_registry import GROUPS, SITES, group_for_filename, open_url
 
 TARGET_BUDGET_SECONDS = 540
-MAX_LIGHTHOUSE_ATTEMPTS = 2
 
 _KNOWN_ROUTE_PREFIXES = ("/p/", "/sfp/", "/more-like-this/", "/s/")
 _SEARCH_GROUP_KEYS = {"SearchToPLP", "SearchToPDP"}
@@ -99,11 +99,37 @@ def calculate_worker_count(url_count: int) -> int:
     return max(1, min(CSV_LIGHTHOUSE_MAX_WORKERS, url_count))
 
 
+@dataclass
+class _ItemState:
+    """In-memory scheduling state for one URL during a run (not persisted)."""
+
+    item: dict
+    target: int
+    valid_count: int = 0
+    attempts_used: int = 0
+    slot_attempts: int = 0
+    next_eligible_at: float = 0.0
+    in_flight: bool = False
+    started: bool = False
+    done: bool = False
+    seen_timestamps: set = field(default_factory=set)
+    passed_samples: list = field(default_factory=list)
+
+
 class CsvLighthouseService:
-    def __init__(self, repository, pagespeed_client, start_background: bool = True):
+    def __init__(
+        self,
+        repository,
+        pagespeed_client,
+        start_background: bool = True,
+        time_source=time.monotonic,
+        sleep_func=time.sleep,
+    ):
         self.repository = repository
         self.pagespeed_client = pagespeed_client
         self.start_background = start_background
+        self._now = time_source
+        self._sleep = sleep_func
 
     def create_run(
         self,
@@ -287,49 +313,202 @@ class CsvLighthouseService:
     def _run_pending_items(self, run_id: int) -> None:
         detail = self.repository.get_run_detail(run_id)
         run = detail["run"]
-        max_workers = max(1, int(run.get("worker_count") or 1))
         samples_per_url = max(1, int(run.get("samples_per_url") or 1))
+        max_workers = max(1, int(run.get("worker_count") or 1))
         self.repository.mark_run_running(run_id)
-        pending_items = self.repository.pending_items(run_id)
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = set()
-            next_index = 0
+        pending = self.repository.pending_items(run_id)
+        if not pending:
+            self.repository.finish_run_if_complete(run_id)
+            return
 
-            def submit_available() -> int:
-                nonlocal next_index
-                submitted = 0
-                while (
-                    next_index < len(pending_items)
-                    and len(futures) < max_workers
-                    and not self.repository.should_cancel(run_id)
-                ):
-                    futures.add(
-                        executor.submit(
-                            self._process_item,
-                            pending_items[next_index],
-                            samples_per_url,
-                        )
+        states = [_ItemState(item=item, target=samples_per_url) for item in pending]
+        limiter = RateLimiter(
+            CSV_LIGHTHOUSE_REQUESTS_PER_MINUTE,
+            clock=self._now,
+            sleep_func=self._sleep,
+        )
+        lock = threading.Lock()
+        worker_errors: list = []
+
+        def claim_next():
+            """Return a claimable state, ('wait', seconds), or None (all done / cancelled)."""
+            with lock:
+                if self.repository.should_cancel(run_id):
+                    return None
+                now = self._now()
+                soonest = None
+                for state in states:
+                    if state.done or state.in_flight:
+                        continue
+                    if now >= state.next_eligible_at:
+                        state.in_flight = True
+                        return state
+                    soonest = (
+                        state.next_eligible_at
+                        if soonest is None
+                        else min(soonest, state.next_eligible_at)
                     )
-                    next_index += 1
-                    submitted += 1
-                return submitted
+                if all(state.done for state in states):
+                    return None
+                if soonest is not None:
+                    return ("wait", max(0.05, soonest - now))
+                return ("wait", 0.25)  # items in flight; poll again shortly
 
-            submit_available()
-            while futures:
-                for future in as_completed(futures):
-                    futures.remove(future)
-                    future.result()
-                    if not self.repository.should_cancel(run_id):
-                        submit_available()
-                    break
+        def worker():
+            while True:
+                claim = claim_next()
+                if claim is None:
+                    return
+                if isinstance(claim, tuple):
+                    self._sleep(claim[1])
+                    continue
+                state = claim
+                try:
+                    if not state.started:
+                        self.repository.mark_item_running(state.item["id"])
+                        state.started = True
+                    self._work_one_sample(run_id, state, limiter, lock)
+                except Exception as exc:
+                    # Raw threads swallow exceptions; capture so the run is marked
+                    # failed by run_pending_items instead of silently hanging.
+                    with lock:
+                        worker_errors.append(exc)
+                    return
+                finally:
+                    with lock:
+                        state.in_flight = False
 
-        if self.repository.should_cancel(run_id):
-            cancelled_items = self.repository.mark_pending_items_cancelled(run_id)
-            if cancelled_items:
-                self.repository.mark_run_cancelled(run_id)
-                return
+        threads = [threading.Thread(target=worker, daemon=False) for _ in range(max_workers)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        if worker_errors:
+            raise worker_errors[0]
+
+        # Finalize any URL interrupted mid-run: keep partial data as passed, else sweep.
+        for state in states:
+            if not state.done and state.passed_samples:
+                state.done = True
+                self._finalize_item(state)
+
+        cancelled = self.repository.mark_unfinished_items_cancelled(run_id)
+        if self.repository.should_cancel(run_id) and cancelled:
+            self.repository.mark_run_cancelled(run_id)
+            return
         self.repository.finish_run_if_complete(run_id)
+
+    def _attempt_sample(self, item: dict):
+        """One PSI call. Returns (metrics|None, rate_limited: bool, retry_after: float)."""
+        started = self._now()
+        try:
+            metrics = dict(
+                self.pagespeed_client.test_url(item["generated_url"], item["strategy"])
+            )
+            metrics["performance"] = metrics.get("performance_score")
+            metrics["duration_ms"] = int((self._now() - started) * 1000)
+            return metrics, False, 0.0
+        except RateLimitError as exc:
+            return None, True, float(getattr(exc, "retry_after", 30) or 30)
+        except Exception:
+            return None, False, 0.0
+
+    @staticmethod
+    def _sample_signature(metrics: dict):
+        """A hashable identity for a PSI result: its analysis timestamp, or a
+        metric-tuple fallback when the timestamp is absent."""
+        raw = metrics.get("raw_data")
+        if isinstance(raw, dict) and raw.get("fetch_time"):
+            return raw["fetch_time"]
+        return (
+            "metrics", metrics.get("fcp"), metrics.get("lcp"),
+            metrics.get("speed_index"), metrics.get("tbt"), metrics.get("cls"),
+        )
+
+    def _error_backoff(self, slot_attempts: int) -> float:
+        base = CSV_LIGHTHOUSE_SAMPLE_COOLDOWN_SECONDS
+        return min(
+            CSV_LIGHTHOUSE_CACHE_COOLDOWN_SECONDS,
+            base * (2 ** max(0, slot_attempts - 1)),
+        )
+
+    def _finalize_item(self, state: _ItemState) -> None:
+        item_id = state.item["id"]
+        if state.passed_samples:
+            representative = self._median_metrics(state.passed_samples)
+            representative["attempts"] = state.attempts_used
+            durations = [
+                s.get("duration_ms")
+                for s in state.passed_samples
+                if isinstance(s.get("duration_ms"), (int, float))
+            ]
+            representative["duration_ms"] = int(sum(durations)) if durations else None
+            representative["valid_samples"] = state.valid_count
+            self.repository.mark_item_passed(item_id, representative)
+        else:
+            self.repository.mark_item_failed(
+                item_id,
+                "No successful PSI samples within the attempt cap",
+                attempts=state.attempts_used or 1,
+            )
+
+    def _work_one_sample(self, run_id, state, limiter, lock) -> None:
+        limiter.acquire()
+        metrics, rate_limited, retry_after = self._attempt_sample(state.item)
+
+        persist_sample = None
+        finalize = False
+        with lock:
+            state.attempts_used += 1
+            state.slot_attempts += 1
+            now = self._now()
+            if metrics is not None:
+                signature = self._sample_signature(metrics)
+                if signature in state.seen_timestamps:
+                    state.next_eligible_at = now + CSV_LIGHTHOUSE_CACHE_COOLDOWN_SECONDS
+                else:
+                    state.seen_timestamps.add(signature)
+                    state.valid_count += 1
+                    state.slot_attempts = 0
+                    state.passed_samples.append(metrics)
+                    persist_sample = (state.valid_count, metrics)
+                    state.next_eligible_at = now + CSV_LIGHTHOUSE_SAMPLE_COOLDOWN_SECONDS
+            elif rate_limited:
+                state.next_eligible_at = now + max(1.0, retry_after)
+            else:
+                state.next_eligible_at = now + self._error_backoff(state.slot_attempts)
+
+            if (
+                state.valid_count >= state.target
+                or state.slot_attempts >= CSV_LIGHTHOUSE_MAX_ATTEMPTS_PER_SAMPLE
+            ):
+                if not state.done:
+                    state.done = True
+                    finalize = True
+
+        if persist_sample is not None:
+            index, sample_metrics = persist_sample
+            self.repository.create_sample(
+                run_id=run_id,
+                item_id=state.item["id"],
+                sample_index=index,
+                status="passed",
+                metrics=sample_metrics,
+                attempts=1,
+                duration_ms=sample_metrics.get("duration_ms"),
+                error_message=None,
+            )
+            limiter.recover()
+        elif rate_limited:
+            limiter.penalize(retry_after)
+            self.repository.heartbeat(run_id)
+        else:
+            self.repository.heartbeat(run_id)
+
+        if finalize:
+            self._finalize_item(state)
 
     EXPORT_HEADER = [
         "run_id", "label", "source_filename", "group_key", "site_key",
@@ -571,82 +750,6 @@ class CsvLighthouseService:
                 f"CSV file {filename} exceeds {CSV_LIGHTHOUSE_MAX_FILE_BYTES} bytes"
             )
         return handle.read()
-
-    def _process_item(self, item: dict, samples_per_url: int = 1) -> None:
-        if not self.repository.mark_item_running(item["id"]):
-            return
-        run_id = item["run_id"]
-        started = time.monotonic()
-        passed_samples: list[dict] = []
-        total_attempts = 0
-        last_error: Exception | None = None
-
-        for sample_index in range(1, samples_per_url + 1):
-            if sample_index > 1 and self.repository.should_cancel(run_id):
-                break
-            metrics, attempts, error = self._collect_sample(item)
-            total_attempts += attempts
-            if metrics is not None:
-                passed_samples.append(metrics)
-                self.repository.create_sample(
-                    run_id=run_id,
-                    item_id=item["id"],
-                    sample_index=sample_index,
-                    status="passed",
-                    metrics=metrics,
-                    attempts=attempts,
-                    duration_ms=metrics.get("duration_ms"),
-                    error_message=None,
-                )
-            else:
-                last_error = error
-                self.repository.create_sample(
-                    run_id=run_id,
-                    item_id=item["id"],
-                    sample_index=sample_index,
-                    status="failed",
-                    metrics=None,
-                    attempts=attempts,
-                    duration_ms=None,
-                    error_message=str(error or "PageSpeed failed"),
-                )
-
-        duration_ms = int((time.monotonic() - started) * 1000)
-        if passed_samples:
-            representative = self._median_metrics(passed_samples)
-            # attempts here is the summed PSI attempts across all samples for this
-            # item; per-sample attempts live in csv_lighthouse_samples.
-            representative["attempts"] = total_attempts
-            representative["duration_ms"] = duration_ms
-            self.repository.mark_item_passed(item["id"], representative)
-        else:
-            self.repository.mark_item_failed(
-                item["id"],
-                str(last_error or "PageSpeed failed"),
-                attempts=total_attempts or MAX_LIGHTHOUSE_ATTEMPTS,
-            )
-
-    def _collect_sample(self, item: dict):
-        """Run one PSI measurement with retries.
-
-        Returns ``(metrics | None, attempts, error)``.  ``metrics`` includes a
-        ``duration_ms`` for that single sample.
-        """
-        started = time.monotonic()
-        last_error: Exception | None = None
-        for attempt in range(1, MAX_LIGHTHOUSE_ATTEMPTS + 1):
-            try:
-                metrics = dict(
-                    self.pagespeed_client.test_url(item["generated_url"], item["strategy"])
-                )
-                # PSI exposes the Lighthouse Performance score as ``performance_score``;
-                # store it under ``performance`` alongside the other CSV metrics.
-                metrics["performance"] = metrics.get("performance_score")
-                metrics["duration_ms"] = int((time.monotonic() - started) * 1000)
-                return metrics, attempt, None
-            except Exception as exc:
-                last_error = exc
-        return None, MAX_LIGHTHOUSE_ATTEMPTS, last_error
 
     @staticmethod
     def _median_metrics(samples: list[dict]) -> dict:
