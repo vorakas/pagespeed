@@ -29,6 +29,7 @@ class FakePageSpeedClient:
             "lcp": 1800,
             "tbt": 50,
             "cls": 0.02,
+            "performance_score": 87,
         }
 
 
@@ -356,6 +357,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(item["lcp"], 1800)
         self.assertEqual(item["tbt"], 50)
         self.assertEqual(item["cls"], 0.02)
+        self.assertEqual(item["performance"], 87)
 
     def test_run_samples_each_url_n_times_and_stores_median(self):
         pagespeed = SequencePageSpeedClient([100, 900, 500])
@@ -431,7 +433,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             [
                 "run_id", "label", "source_filename", "group_key", "site_key",
                 "original_value", "generated_url", "strategy", "kind",
-                "sample_index", "n", "status", "fcp", "speed_index", "lcp",
+                "sample_index", "n", "status", "performance", "fcp", "speed_index", "lcp",
                 "tbt", "cls", "attempts", "duration_ms", "error_message",
                 "completed_at",
             ],

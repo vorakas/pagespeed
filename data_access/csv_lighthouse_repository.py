@@ -105,10 +105,10 @@ class CsvLighthouseRepository:
                     f"""
                     INSERT INTO csv_lighthouse_samples (
                         run_id, item_id, sample_index, status,
-                        fcp, speed_index, lcp, tbt, cls,
+                        fcp, speed_index, lcp, tbt, cls, performance,
                         attempts, duration_ms, error_message
                     )
-                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                     {self._cm.returning_id()}
                     """,
                     (
@@ -121,6 +121,7 @@ class CsvLighthouseRepository:
                         metrics.get("lcp"),
                         metrics.get("tbt"),
                         metrics.get("cls"),
+                        metrics.get("performance"),
                         attempts,
                         duration_ms,
                         error_message,
@@ -450,6 +451,7 @@ class CsvLighthouseRepository:
                         lcp = {ph},
                         tbt = {ph},
                         cls = {ph},
+                        performance = {ph},
                         attempts = {ph},
                         duration_ms = {ph},
                         completed_at = CURRENT_TIMESTAMP
@@ -461,6 +463,7 @@ class CsvLighthouseRepository:
                         metrics.get("lcp"),
                         metrics.get("tbt"),
                         metrics.get("cls"),
+                        metrics.get("performance"),
                         metrics.get("attempts", 1),
                         metrics.get("duration_ms"),
                         item_id,

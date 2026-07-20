@@ -417,6 +417,7 @@ class ConnectionManager:
                 lcp REAL,
                 tbt REAL,
                 cls REAL,
+                performance REAL,
                 attempts INTEGER NOT NULL DEFAULT 1,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
@@ -439,6 +440,7 @@ class ConnectionManager:
                 lcp REAL,
                 tbt REAL,
                 cls REAL,
+                performance REAL,
                 attempts INTEGER NOT NULL DEFAULT 1,
                 duration_ms INTEGER,
                 error_message TEXT,
@@ -454,6 +456,8 @@ class ConnectionManager:
         cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS cancelled_items INTEGER NOT NULL DEFAULT 0")
         cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS samples_per_url INTEGER NOT NULL DEFAULT 1")
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 1")
+        cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS performance REAL")
+        cursor.execute("ALTER TABLE csv_lighthouse_samples ADD COLUMN IF NOT EXISTS performance REAL")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS migration_snapshots (
@@ -785,6 +789,7 @@ class ConnectionManager:
                 lcp REAL,
                 tbt REAL,
                 cls REAL,
+                performance REAL,
                 attempts INTEGER NOT NULL DEFAULT 1,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
@@ -807,6 +812,7 @@ class ConnectionManager:
                 lcp REAL,
                 tbt REAL,
                 cls REAL,
+                performance REAL,
                 attempts INTEGER NOT NULL DEFAULT 1,
                 duration_ms INTEGER,
                 error_message TEXT,
@@ -968,6 +974,8 @@ class ConnectionManager:
             "ALTER TABLE csv_lighthouse_runs ADD COLUMN cancelled_items INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE csv_lighthouse_runs ADD COLUMN samples_per_url INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE csv_lighthouse_items ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE csv_lighthouse_items ADD COLUMN performance REAL",
+            "ALTER TABLE csv_lighthouse_samples ADD COLUMN performance REAL",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_id INTEGER",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_name TEXT",
             "ALTER TABLE requirement_sources ADD COLUMN original_filename TEXT",

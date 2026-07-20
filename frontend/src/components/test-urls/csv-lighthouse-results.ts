@@ -2,6 +2,7 @@ import type { CsvLighthouseItem } from "@/types"
 
 export interface CsvLighthouseAverageRow {
   passedCount: number
+  performance: number | null
   fcp: number | null
   speed_index: number | null
   lcp: number | null
@@ -17,7 +18,7 @@ export interface CsvLighthouseResultSection {
   average: CsvLighthouseAverageRow
 }
 
-const metricKeys = ["fcp", "speed_index", "lcp", "tbt", "cls"] as const
+const metricKeys = ["performance", "fcp", "speed_index", "lcp", "tbt", "cls"] as const
 
 function average(values: number[]) {
   if (values.length === 0) return null
@@ -28,6 +29,7 @@ function buildAverage(items: CsvLighthouseItem[]): CsvLighthouseAverageRow {
   const passedItems = items.filter((item) => item.status === "passed")
   const row: CsvLighthouseAverageRow = {
     passedCount: passedItems.length,
+    performance: null,
     fcp: null,
     speed_index: null,
     lcp: null,
@@ -64,6 +66,7 @@ export function buildCsvLighthouseResultSections(items: CsvLighthouseItem[]) {
       items: [item],
       average: {
         passedCount: 0,
+        performance: null,
         fcp: null,
         speed_index: null,
         lcp: null,

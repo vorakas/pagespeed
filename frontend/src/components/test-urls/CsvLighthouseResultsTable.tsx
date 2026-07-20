@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table"
 import type { CsvLighthouseItem } from "@/types"
 import { formatCls, formatMilliseconds } from "@/lib/utils"
+import { ScoreBadge } from "@/components/shared/ScoreBadge"
 import { buildCsvLighthouseResultSections } from "@/components/test-urls/csv-lighthouse-results"
 
 interface CsvLighthouseResultsTableProps {
@@ -73,6 +74,7 @@ export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTablePr
             <TableHead>Value</TableHead>
             <TableHead>URL</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead className="text-right">Perf</TableHead>
             <TableHead className="text-right">FCP</TableHead>
             <TableHead className="text-right">Speed Index</TableHead>
             <TableHead className="text-right">LCP</TableHead>
@@ -109,6 +111,7 @@ export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTablePr
                   <TableCell>
                     <StatusPill status={item.status} />
                   </TableCell>
+                  <TableCell className="text-right"><ScoreBadge score={item.performance} /></TableCell>
                   <TableCell className="aurora-num text-right">{formatMilliseconds(item.fcp)}</TableCell>
                   <TableCell className="aurora-num text-right">{formatMilliseconds(item.speed_index)}</TableCell>
                   <TableCell className="aurora-num text-right">{formatMilliseconds(item.lcp)}</TableCell>
@@ -135,6 +138,9 @@ export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTablePr
                 </TableCell>
                 <TableCell className="aurora-text-dim">{section.average.passedCount} passed</TableCell>
                 <TableCell>-</TableCell>
+                <TableCell className="text-right">
+                  <ScoreBadge score={section.average.performance == null ? null : Math.round(section.average.performance)} />
+                </TableCell>
                 <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatMilliseconds(section.average.fcp)}</TableCell>
                 <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatMilliseconds(section.average.speed_index)}</TableCell>
                 <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatMilliseconds(section.average.lcp)}</TableCell>

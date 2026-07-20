@@ -342,7 +342,7 @@ class CsvLighthouseService:
     EXPORT_HEADER = [
         "run_id", "label", "source_filename", "group_key", "site_key",
         "original_value", "generated_url", "strategy", "kind",
-        "sample_index", "n", "status", "fcp", "speed_index", "lcp",
+        "sample_index", "n", "status", "performance", "fcp", "speed_index", "lcp",
         "tbt", "cls", "attempts", "duration_ms", "error_message",
         "completed_at",
     ]
@@ -392,6 +392,7 @@ class CsvLighthouseService:
                     "lcp": item.get("lcp"),
                     "tbt": item.get("tbt"),
                     "cls": item.get("cls"),
+                    "performance": item.get("performance"),
                     "attempts": item.get("attempts"),
                     "duration_ms": item.get("duration_ms"),
                     "error_message": item.get("error_message"),
@@ -406,6 +407,7 @@ class CsvLighthouseService:
             item["site_key"], item["original_value"], item["generated_url"],
             item["strategy"], "sample", sample["sample_index"], "",
             sample["status"],
+            self._csv_value(sample.get("performance")),
             self._csv_value(sample.get("fcp")),
             self._csv_value(sample.get("speed_index")),
             self._csv_value(sample.get("lcp")),
@@ -422,6 +424,7 @@ class CsvLighthouseService:
             run["id"], run["label"], item["source_filename"], item["group_key"],
             item["site_key"], item["original_value"], item["generated_url"],
             item["strategy"], stat, "", len(passed), "",
+            self._csv_value(self._summarize(passed, "performance", stat)),
             self._csv_value(self._summarize(passed, "fcp", stat)),
             self._csv_value(self._summarize(passed, "speed_index", stat)),
             self._csv_value(self._summarize(passed, "lcp", stat)),
@@ -644,6 +647,9 @@ class CsvLighthouseService:
                 metrics = dict(
                     self.pagespeed_client.test_url(item["generated_url"], item["strategy"])
                 )
+                # PSI exposes the Lighthouse Performance score as ``performance_score``;
+                # store it under ``performance`` alongside the other CSV metrics.
+                metrics["performance"] = metrics.get("performance_score")
                 metrics["duration_ms"] = int((time.monotonic() - started) * 1000)
                 return metrics, attempt, None
             except Exception as exc:
@@ -652,7 +658,7 @@ class CsvLighthouseService:
 
     @staticmethod
     def _median_metrics(samples: list[dict]) -> dict:
-        keys = ("fcp", "speed_index", "lcp", "tbt", "cls")
+        keys = ("fcp", "speed_index", "lcp", "tbt", "cls", "performance")
         result: dict = {}
         for key in keys:
             values = [s[key] for s in samples if isinstance(s.get(key), (int, float))]

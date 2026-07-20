@@ -1705,6 +1705,7 @@ export interface CsvLighthouseItem {
   strategy: Strategy
   status: CsvLighthouseItemStatus
   error_message: string | null
+  performance: number | null
   fcp: number | null
   speed_index: number | null
   lcp: number | null
