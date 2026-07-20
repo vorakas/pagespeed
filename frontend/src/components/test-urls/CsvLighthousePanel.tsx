@@ -445,7 +445,10 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
               </div>
             </div>
           ) : selectedDetail ? (
-            <CsvLighthouseResultsTable items={selectedDetail.items} />
+            <CsvLighthouseResultsTable
+              items={selectedDetail.items}
+              samplesPerUrl={selectedRun?.samples_per_url ?? 1}
+            />
           ) : null}
         </div>
 

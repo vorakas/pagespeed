@@ -16,6 +16,7 @@ import { buildCsvLighthouseResultSections } from "@/components/test-urls/csv-lig
 
 interface CsvLighthouseResultsTableProps {
   items: CsvLighthouseItem[]
+  samplesPerUrl: number
 }
 
 const targetLabels: Record<CsvLighthouseItem["site_key"], string> = {
@@ -52,7 +53,7 @@ function StatusPill({ status }: { status: CsvLighthouseItem["status"] }) {
   )
 }
 
-export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTableProps) {
+export function CsvLighthouseResultsTable({ items, samplesPerUrl }: CsvLighthouseResultsTableProps) {
   const sections = buildCsvLighthouseResultSections(items)
 
   if (items.length === 0) {
@@ -80,7 +81,7 @@ export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTablePr
             <TableHead className="text-right">LCP</TableHead>
             <TableHead className="text-right">TBT</TableHead>
             <TableHead className="text-right">CLS</TableHead>
-            <TableHead className="text-right">Attempts</TableHead>
+            <TableHead className="text-right">Samples</TableHead>
             <TableHead>Error</TableHead>
           </TableRow>
         </TableHeader>
@@ -117,7 +118,9 @@ export function CsvLighthouseResultsTable({ items }: CsvLighthouseResultsTablePr
                   <TableCell className="aurora-num text-right">{formatMilliseconds(item.lcp)}</TableCell>
                   <TableCell className="aurora-num text-right">{formatMilliseconds(item.tbt)}</TableCell>
                   <TableCell className="aurora-num text-right">{formatCls(item.cls)}</TableCell>
-                  <TableCell className="aurora-num text-right">{item.attempts}</TableCell>
+                  <TableCell className="aurora-num text-right">
+                    {item.valid_samples == null ? item.attempts : `${item.valid_samples} / ${samplesPerUrl}`}
+                  </TableCell>
                   <TableCell>
                     <TruncatedText value={item.error_message} className="max-w-[16rem]" />
                   </TableCell>

@@ -21,6 +21,7 @@ function item(overrides: Partial<CsvLighthouseItem>): CsvLighthouseItem {
     tbt: 40,
     cls: 0.01,
     attempts: 1,
+    valid_samples: null,
     started_at: null,
     completed_at: null,
     duration_ms: null,

@@ -1712,6 +1712,7 @@ export interface CsvLighthouseItem {
   tbt: number | null
   cls: number | null
   attempts: number
+  valid_samples: number | null
   started_at?: string | null
   completed_at?: string | null
   duration_ms?: number | null
