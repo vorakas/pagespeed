@@ -818,6 +818,31 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(len(samples), 1)
         self.assertEqual(item["status"], "passed")
 
+    def test_cancel_with_partial_samples_marks_run_cancelled(self):
+        # A cancel arriving after a URL has collected partial (but not all) samples
+        # must mark the RUN cancelled, not completed.
+        run_id_holder = {}
+        service = self._make_service(
+            CancellingPageSpeedClient(self.repo, lambda: run_id_holder["run_id"])
+        )
+        with patch.object(csv_lighthouse_service, "CSV_LIGHTHOUSE_MAX_WORKERS", 1):
+            result = service.create_run(
+                [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+                site_keys=["www"],
+                strategy="desktop",
+                samples_per_url=3,
+            )
+        run_id_holder["run_id"] = result["run_id"]
+
+        service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        item = detail["items"][0]
+        samples = self.repo.list_samples(result["run_id"])
+
+        self.assertEqual(detail["run"]["status"], "cancelled")
+        self.assertEqual(item["status"], "passed")
+        self.assertGreaterEqual(len(samples), 1)
+
     def test_late_cancel_after_all_items_passed_finishes_completed_and_exports(self):
         run_id_holder = {}
         service = self._make_service(

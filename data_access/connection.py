@@ -66,6 +66,9 @@ class ConnectionManager:
             return self._get_pool().getconn()
         conn = sqlite3.connect(_SQLITE_PATH)
         conn.execute("PRAGMA foreign_keys = ON")
+        # Concurrent writers wait up to 30s for a lock instead of raising
+        # "database is locked" (the interleaved scheduler runs multiple workers).
+        conn.execute("PRAGMA busy_timeout = 30000")
         conn.row_factory = sqlite3.Row
         return conn
 

@@ -385,19 +385,35 @@ class CsvLighthouseService:
         for thread in threads:
             thread.join()
 
-        if worker_errors:
-            raise worker_errors[0]
-
-        # Finalize any URL interrupted mid-run: keep partial data as passed, else sweep.
+        # Finalize any URL interrupted mid-run: keep whatever valid samples it got.
+        interrupted = False
         for state in states:
             if not state.done and state.passed_samples:
                 state.done = True
                 self._finalize_item(state)
+                interrupted = True
 
-        cancelled = self.repository.mark_unfinished_items_cancelled(run_id)
-        if self.repository.should_cancel(run_id) and cancelled:
-            self.repository.mark_run_cancelled(run_id)
+        if self.repository.should_cancel(run_id):
+            cancelled = self.repository.mark_unfinished_items_cancelled(run_id)
+            if cancelled or interrupted:
+                self.repository.mark_run_cancelled(run_id)
+            else:
+                # Cancel arrived after every item already finished — a normal finish.
+                self.repository.finish_run_if_complete(run_id)
             return
+
+        if worker_errors:
+            # A worker died unexpectedly. Only fail the whole run if it actually left
+            # work unfinished; if every item still reached a terminal state, the run
+            # genuinely succeeded despite the transient error.
+            detail = self.repository.get_run_detail(run_id)
+            unfinished = [
+                item for item in detail["items"]
+                if item["status"] in ("pending", "running")
+            ]
+            if unfinished:
+                raise worker_errors[0]
+
         self.repository.finish_run_if_complete(run_id)
 
     def _attempt_sample(self, item: dict):
