@@ -18,7 +18,7 @@ from config import (
     PAGESPEED_API_URL,
     PAGESPEED_TIMEOUT_SECONDS,
 )
-from exceptions import PageSpeedError
+from exceptions import PageSpeedError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,14 @@ class PageSpeedClient:
                     time.sleep(self._RETRY_BACKOFF_SECONDS)
                     continue
             except requests.exceptions.HTTPError as exc:
-                if exc.response is not None and exc.response.status_code >= 500 and attempt < self._MAX_RETRIES:
+                status = exc.response.status_code if exc.response is not None else None
+                if status == 429:
+                    raise RateLimitError(
+                        self._friendly_error(url, exc),
+                        provider="Google PageSpeed",
+                        retry_after=self._parse_retry_after(exc.response),
+                    ) from exc
+                if status is not None and status >= 500 and attempt < self._MAX_RETRIES:
                     last_exception = exc
                     time.sleep(self._RETRY_BACKOFF_SECONDS)
                     continue
@@ -130,6 +137,19 @@ class PageSpeedClient:
                 return f"Google's API rate limit hit while testing {url} — try again in a few minutes"
             return f"Google's API returned HTTP {status} while testing {url}"
         return f"Google's PageSpeed API request failed for {url}"
+
+    @staticmethod
+    def _parse_retry_after(response) -> int:
+        """Parse a Retry-After header (seconds); default 30 if absent/unparseable."""
+        if response is None:
+            return 30
+        value = response.headers.get("Retry-After")
+        if not value:
+            return 30
+        try:
+            return max(1, int(value))
+        except (TypeError, ValueError):
+            return 30
 
     # ------------------------------------------------------------------
     # Parsing helpers — each stays under ~30 lines
