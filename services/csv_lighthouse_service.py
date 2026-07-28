@@ -5,9 +5,10 @@ import io
 import statistics
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import BinaryIO
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 
 from config import (
     CSV_LIGHTHOUSE_CACHE_COOLDOWN_SECONDS,
@@ -416,12 +417,27 @@ class CsvLighthouseService:
 
         self.repository.finish_run_if_complete(run_id)
 
+    @staticmethod
+    def _cache_busted_url(url: str) -> str:
+        """Append a unique query param so PSI runs a fresh Lighthouse audit for
+        every sample instead of returning its per-URL cached result.
+
+        The busted URL is used only for the PSI request; the stored
+        ``generated_url`` stays clean for display, export, and comparison.
+        """
+        parts = urlsplit(url)
+        query = parse_qsl(parts.query, keep_blank_values=True)
+        query.append(("psi_cb", uuid.uuid4().hex))
+        return urlunsplit(parts._replace(query=urlencode(query)))
+
     def _attempt_sample(self, item: dict):
         """One PSI call. Returns (metrics|None, rate_limited: bool, retry_after: float)."""
         started = self._now()
         try:
             metrics = dict(
-                self.pagespeed_client.test_url(item["generated_url"], item["strategy"])
+                self.pagespeed_client.test_url(
+                    self._cache_busted_url(item["generated_url"]), item["strategy"]
+                )
             )
             metrics["performance"] = metrics.get("performance_score")
             metrics["duration_ms"] = int((self._now() - started) * 1000)

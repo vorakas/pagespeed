@@ -5,6 +5,7 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from data_access.connection import ConnectionManager
 from data_access.csv_lighthouse_repository import CsvLighthouseRepository
@@ -383,7 +384,11 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         detail = self.repo.get_run_detail(result["run_id"])
         item = detail["items"][0]
 
-        self.assertEqual(self.pagespeed.calls, [(item["generated_url"], "desktop")])
+        self.assertEqual(len(self.pagespeed.calls), 1)
+        called_url, called_strategy = self.pagespeed.calls[0]
+        self.assertEqual(called_strategy, "desktop")
+        self.assertTrue(called_url.startswith(item["generated_url"]))
+        self.assertIn("psi_cb=", called_url)  # cache-busted at request time
         self.assertEqual(detail["run"]["status"], "completed")
         self.assertEqual(item["status"], "passed")
         self.assertEqual(item["fcp"], 900)
@@ -466,6 +471,40 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(item["valid_samples"], 25)
         self.assertEqual(len(samples), 25)          # duplicates were not persisted
         self.assertEqual(len(fetch_times), 25)      # 25 distinct sample slots
+
+    def test_each_sample_gets_unique_cache_bust_param(self):
+        # Distinct metrics per call so the dedup safety net does not fire
+        # (mirrors production, where each fresh PSI run has a unique timestamp).
+        pagespeed = SequencePageSpeedClient([100, 200, 300])
+        service = self._make_service(pagespeed)
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"], strategy="desktop", samples_per_url=3,
+        )
+        service.run_pending_items(result["run_id"])
+
+        called_urls = [url for url, _ in pagespeed.calls]
+        item = self.repo.get_run_detail(result["run_id"])["items"][0]
+        generated_url = item["generated_url"]
+
+        self.assertEqual(len(called_urls), 3)
+        nonces = set()
+        for url in called_urls:
+            parts = urlsplit(url)
+            pairs = parse_qsl(parts.query, keep_blank_values=True)
+            params = dict(pairs)
+            self.assertIn("psi_cb", params)  # every PSI call is cache-busted
+            nonces.add(params["psi_cb"])
+            # Stripping the buster yields the clean, stored generated_url.
+            clean = urlunsplit(
+                parts._replace(
+                    query=urlencode([(k, v) for k, v in pairs if k != "psi_cb"])
+                )
+            )
+            self.assertEqual(clean, generated_url)
+
+        self.assertEqual(len(nonces), 3)  # each sample got a distinct nonce
+        self.assertNotIn("psi_cb", generated_url)  # stored URL stays clean
 
     def test_export_csv_has_raw_samples_and_per_url_summary(self):
         # Mean (400) and median (200) differ, so the two stats are independently pinned.
