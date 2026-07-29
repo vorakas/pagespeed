@@ -29,6 +29,11 @@ from services.testdata_registry import GROUPS, SITES, group_for_filename, open_u
 
 TARGET_BUDGET_SECONDS = 540
 
+# Backstop: give up on a URL only after this many *consecutive* rate-limited
+# (429) attempts, so transient throttling never abandons a URL prematurely
+# while a total PSI outage still can't hang the run forever.
+_MAX_RATE_LIMITED_STREAK = 20
+
 _KNOWN_ROUTE_PREFIXES = ("/p/", "/sfp/", "/more-like-this/", "/s/")
 _SEARCH_GROUP_KEYS = {"SearchToPLP", "SearchToPDP"}
 
@@ -109,6 +114,9 @@ class _ItemState:
     valid_count: int = 0
     attempts_used: int = 0
     slot_attempts: int = 0
+    rate_limited_count: int = 0
+    error_count: int = 0
+    rate_limited_streak: int = 0
     next_eligible_at: float = 0.0
     in_flight: bool = False
     started: bool = False
@@ -431,7 +439,12 @@ class CsvLighthouseService:
         return urlunsplit(parts._replace(query=urlencode(query)))
 
     def _attempt_sample(self, item: dict):
-        """One PSI call. Returns (metrics|None, rate_limited: bool, retry_after: float)."""
+        """One PSI call.
+
+        Returns ``(metrics|None, rate_limited, retry_after, error_message)``.
+        ``error_message`` carries the friendly PSI failure text (429 vs 500 vs
+        timeout) so the reason can be persisted for diagnosis.
+        """
         started = self._now()
         try:
             metrics = dict(
@@ -441,11 +454,11 @@ class CsvLighthouseService:
             )
             metrics["performance"] = metrics.get("performance_score")
             metrics["duration_ms"] = int((self._now() - started) * 1000)
-            return metrics, False, 0.0
+            return metrics, False, 0.0, None
         except RateLimitError as exc:
-            return None, True, float(getattr(exc, "retry_after", 30) or 30)
-        except Exception:
-            return None, False, 0.0
+            return None, True, float(getattr(exc, "retry_after", 30) or 30), str(exc)
+        except Exception as exc:
+            return None, False, 0.0, str(exc)
 
     @staticmethod
     def _sample_signature(metrics: dict):
@@ -482,23 +495,30 @@ class CsvLighthouseService:
         else:
             self.repository.mark_item_failed(
                 item_id,
-                "No successful PSI samples within the attempt cap",
+                (
+                    "No successful PSI samples within the attempt cap "
+                    f"(rate_limited={state.rate_limited_count}, errors={state.error_count})"
+                ),
                 attempts=state.attempts_used or 1,
             )
 
     def _work_one_sample(self, run_id, state, limiter, lock) -> None:
         limiter.acquire()
-        metrics, rate_limited, retry_after = self._attempt_sample(state.item)
+        metrics, rate_limited, retry_after, error_message = self._attempt_sample(state.item)
 
         persist_sample = None
+        persist_failure = None
         finalize = False
         with lock:
             state.attempts_used += 1
-            state.slot_attempts += 1
             now = self._now()
             if metrics is not None:
+                state.rate_limited_streak = 0
                 signature = self._sample_signature(metrics)
                 if signature in state.seen_timestamps:
+                    # Cache dupe (should not happen with cache-busting) — counts
+                    # toward the give-up cap as a genuine failed attempt.
+                    state.slot_attempts += 1
                     state.next_eligible_at = now + CSV_LIGHTHOUSE_CACHE_COOLDOWN_SECONDS
                 else:
                     state.seen_timestamps.add(signature)
@@ -508,13 +528,23 @@ class CsvLighthouseService:
                     persist_sample = (state.valid_count, metrics)
                     state.next_eligible_at = now + CSV_LIGHTHOUSE_SAMPLE_COOLDOWN_SECONDS
             elif rate_limited:
+                # 429 is backpressure, not a failed sample: do NOT count it toward
+                # the per-sample give-up cap, only the consecutive-streak backstop.
+                state.rate_limited_count += 1
+                state.rate_limited_streak += 1
+                persist_failure = ("rate_limited", error_message)
                 state.next_eligible_at = now + max(1.0, retry_after)
             else:
+                state.rate_limited_streak = 0
+                state.slot_attempts += 1
+                state.error_count += 1
+                persist_failure = ("error", error_message)
                 state.next_eligible_at = now + self._error_backoff(state.slot_attempts)
 
             if (
                 state.valid_count >= state.target
                 or state.slot_attempts >= CSV_LIGHTHOUSE_MAX_ATTEMPTS_PER_SAMPLE
+                or state.rate_limited_streak >= _MAX_RATE_LIMITED_STREAK
             ):
                 if not state.done:
                     state.done = True
@@ -533,10 +563,26 @@ class CsvLighthouseService:
                 error_message=None,
             )
             limiter.recover()
-        elif rate_limited:
-            limiter.penalize(retry_after)
+        elif persist_failure is not None:
+            status, message = persist_failure
+            # Persist the failed attempt (status + reason) for diagnosis. Failed
+            # rows use sample_index 0 so they never collide with valid samples.
+            self.repository.create_sample(
+                run_id=run_id,
+                item_id=state.item["id"],
+                sample_index=0,
+                status=status,
+                metrics=None,
+                attempts=1,
+                duration_ms=None,
+                error_message=message,
+            )
+            if rate_limited:
+                limiter.penalize(retry_after)
             self.repository.heartbeat(run_id)
         else:
+            # Cache dupe (no cache-busting, or a coincidental repeat) — not
+            # persisted; it only nudges the give-up cap.
             self.repository.heartbeat(run_id)
 
         if finalize:

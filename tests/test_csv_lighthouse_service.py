@@ -9,7 +9,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from data_access.connection import ConnectionManager
 from data_access.csv_lighthouse_repository import CsvLighthouseRepository
-from exceptions import ValidationError
+from exceptions import RateLimitError, ValidationError
 import services.csv_lighthouse_service as csv_lighthouse_service
 from services.csv_lighthouse_service import (
     CsvLighthouseService,
@@ -111,6 +111,26 @@ class TimestampedPageSpeedClient(FakePageSpeedClient):
         return {
             "fcp": 900, "speed_index": 1200, "lcp": 1800, "tbt": 50, "cls": 0.02,
             "performance_score": 80, "raw_data": {"fetch_time": ts},
+        }
+
+
+class RateLimitedThenOkPageSpeedClient(FakePageSpeedClient):
+    """Raises RateLimitError for the first ``fail_times`` calls, then succeeds
+    with a fresh timestamp per call."""
+
+    def __init__(self, fail_times):
+        super().__init__()
+        self._fail_times = fail_times
+
+    def test_url(self, url, strategy):
+        self.calls.append((url, strategy))
+        if len(self.calls) <= self._fail_times:
+            raise RateLimitError(
+                "rate limited", provider="Google PageSpeed", retry_after=0
+            )
+        return {
+            "fcp": 900, "speed_index": 1200, "lcp": 1800, "tbt": 50, "cls": 0.02,
+            "performance_score": 80, "raw_data": {"fetch_time": len(self.calls)},
         }
 
 
@@ -447,7 +467,30 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         samples = self.repo.list_samples(result["run_id"])
 
         self.assertEqual(item["status"], "failed")
-        self.assertEqual(len(samples), 0)  # only valid samples are persisted now
+        # Failed attempts are now persisted (status='error') for diagnosis.
+        self.assertEqual(len(samples), 6)  # gave up after MAX_ATTEMPTS_PER_SAMPLE errors
+        self.assertTrue(all(s["status"] == "error" for s in samples))
+        self.assertIn("errors=6", item["error_message"])
+
+    def test_rate_limited_attempts_do_not_abandon_url(self):
+        # 10 consecutive 429s (> MAX_ATTEMPTS_PER_SAMPLE) then success: 429 is
+        # backpressure, not a failed sample, so the URL must NOT give up early.
+        pagespeed = RateLimitedThenOkPageSpeedClient(fail_times=10)
+        service = self._make_service(pagespeed)
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"], strategy="desktop", samples_per_url=2,
+        )
+        service.run_pending_items(result["run_id"])
+        item = self.repo.get_run_detail(result["run_id"])["items"][0]
+        samples = self.repo.list_samples(result["run_id"])
+        passed = [s for s in samples if s["status"] == "passed"]
+        rate_limited = [s for s in samples if s["status"] == "rate_limited"]
+
+        self.assertEqual(item["status"], "passed")
+        self.assertEqual(item["valid_samples"], 2)   # reached target despite 10x 429
+        self.assertEqual(len(passed), 2)
+        self.assertEqual(len(rate_limited), 10)      # every 429 persisted for diagnosis
 
     def test_cached_duplicates_are_discarded_until_25_fresh(self):
         # Every other response repeats the previous timestamp (a cache hit).
