@@ -39,8 +39,20 @@ class RateLimiter:
             self._tokens = min(self._rate, self._tokens + elapsed * (self._rate / 60.0))
             self._last_refill = now
 
-    def acquire(self) -> None:
+    # When a caller passes ``should_abort``, cap each sleep to this slice so the
+    # abort predicate is re-checked promptly instead of after a full pause.
+    _ABORT_SLICE_SECONDS: float = 0.5
+
+    def acquire(self, should_abort: Callable[[], bool] | None = None) -> bool:
+        """Block until a token is available.
+
+        Returns ``True`` once a token is consumed. If ``should_abort`` is given
+        and becomes true while waiting, returns ``False`` without consuming a
+        token. With no ``should_abort`` the wait is unbounded (original behavior).
+        """
         while True:
+            if should_abort is not None and should_abort():
+                return False
             with self._lock:
                 now = self._clock()
                 if now < self._paused_until:
@@ -49,8 +61,10 @@ class RateLimiter:
                     self._refill(now)
                     if self._tokens >= 1.0:
                         self._tokens -= 1.0
-                        return
+                        return True
                     wait = (1.0 - self._tokens) / (self._rate / 60.0)
+            if should_abort is not None:
+                wait = min(wait, self._ABORT_SLICE_SECONDS)
             self._sleep(max(wait, 0.001))
 
     def penalize(self, retry_after: float = 30.0) -> None:

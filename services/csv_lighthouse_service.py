@@ -139,6 +139,10 @@ class CsvLighthouseService:
         self.start_background = start_background
         self._now = time_source
         self._sleep = sleep_func
+        # In-memory cancel signals per running run, so a Cancel request wakes
+        # worker threads immediately instead of waiting out rate-limit pauses.
+        self._cancel_events: dict[int, threading.Event] = {}
+        self._cancel_events_lock = threading.Lock()
 
     def create_run(
         self,
@@ -302,6 +306,10 @@ class CsvLighthouseService:
 
     def cancel_run(self, run_id: int):
         self.repository.request_cancel(run_id)
+        with self._cancel_events_lock:
+            event = self._cancel_events.get(run_id)
+        if event is not None:
+            event.set()
         return self.repository.get_run_detail(run_id)
 
     def delete_run(self, run_id: int) -> None:
@@ -314,12 +322,18 @@ class CsvLighthouseService:
         self.repository.delete_run(run_id)
 
     def run_pending_items(self, run_id: int) -> None:
+        cancel_event = threading.Event()
+        with self._cancel_events_lock:
+            self._cancel_events[run_id] = cancel_event
         try:
-            self._run_pending_items(run_id)
+            self._run_pending_items(run_id, cancel_event)
         except Exception as exc:
             self.repository.mark_run_failed(run_id, str(exc))
+        finally:
+            with self._cancel_events_lock:
+                self._cancel_events.pop(run_id, None)
 
-    def _run_pending_items(self, run_id: int) -> None:
+    def _run_pending_items(self, run_id: int, cancel_event: threading.Event) -> None:
         detail = self.repository.get_run_detail(run_id)
         run = detail["run"]
         samples_per_url = max(1, int(run.get("samples_per_url") or 1))
@@ -343,7 +357,8 @@ class CsvLighthouseService:
         def claim_next():
             """Return a claimable state, ('wait', seconds), or None (all done / cancelled)."""
             with lock:
-                if self.repository.should_cancel(run_id):
+                if cancel_event.is_set() or self.repository.should_cancel(run_id):
+                    cancel_event.set()
                     return None
                 now = self._now()
                 soonest = None
@@ -366,18 +381,22 @@ class CsvLighthouseService:
 
         def worker():
             while True:
+                if cancel_event.is_set():
+                    return
                 claim = claim_next()
                 if claim is None:
                     return
                 if isinstance(claim, tuple):
-                    self._sleep(claim[1])
+                    # Sleep in short slices so a cancel is noticed within ~1s
+                    # instead of after a full cooldown/rate-limit pause.
+                    self._sleep(min(claim[1], 1.0))
                     continue
                 state = claim
                 try:
                     if not state.started:
                         self.repository.mark_item_running(state.item["id"])
                         state.started = True
-                    self._work_one_sample(run_id, state, limiter, lock)
+                    self._work_one_sample(run_id, state, limiter, lock, cancel_event)
                 except Exception as exc:
                     # Raw threads swallow exceptions; capture so the run is marked
                     # failed by run_pending_items instead of silently hanging.
@@ -502,8 +521,11 @@ class CsvLighthouseService:
                 attempts=state.attempts_used or 1,
             )
 
-    def _work_one_sample(self, run_id, state, limiter, lock) -> None:
-        limiter.acquire()
+    def _work_one_sample(self, run_id, state, limiter, lock, cancel_event) -> None:
+        if not limiter.acquire(should_abort=cancel_event.is_set):
+            return  # cancelled while waiting for a rate-limit token
+        if cancel_event.is_set():
+            return  # cancelled after acquiring, before starting the PSI call
         metrics, rate_limited, retry_after, error_message = self._attempt_sample(state.item)
 
         persist_sample = None

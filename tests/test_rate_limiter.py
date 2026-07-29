@@ -51,6 +51,20 @@ class RateLimiterTest(unittest.TestCase):
             limiter.penalize(retry_after=0)
         self.assertGreaterEqual(limiter.effective_rate_per_minute(), 30)
 
+    def test_acquire_returns_true_when_not_aborted(self):
+        clock = FakeClock()
+        limiter = RateLimiter(60, clock=clock.now, sleep_func=clock.sleep)
+        self.assertIs(limiter.acquire(should_abort=lambda: False), True)
+
+    def test_acquire_aborts_during_penalize_pause(self):
+        clock = FakeClock()
+        limiter = RateLimiter(60, clock=clock.now, sleep_func=clock.sleep)
+        limiter.acquire()
+        limiter.penalize(retry_after=300)  # long pause
+        # Abort predicate is true, so acquire must bail out instead of sleeping 300s.
+        self.assertIs(limiter.acquire(should_abort=lambda: True), False)
+        self.assertLess(clock.now(), 300.0)
+
 
 if __name__ == "__main__":
     unittest.main()
