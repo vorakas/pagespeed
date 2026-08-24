@@ -236,7 +236,7 @@ export function Knowledge() {
               <RefreshCw className="size-4" aria-hidden="true" />
               Refresh
             </Button>
-            <Button type="button" onClick={startNewEntry} disabled={activeDomains.length === 0}>
+            <Button type="button" onClick={startNewEntry}>
               <Plus className="size-4" aria-hidden="true" />
               New Entry
             </Button>
