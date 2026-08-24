@@ -12,6 +12,52 @@ def make_repo(tmp_path: Path, monkeypatch):
     return KnowledgeRepository(cm)
 
 
+class RecordingCursor:
+    def __init__(self):
+        self.sql = ""
+        self.params = []
+
+    def execute(self, sql, params=None):
+        self.sql = sql
+        self.params = list(params or [])
+
+    def fetchall(self):
+        return []
+
+
+class RecordingConnection:
+    def __init__(self):
+        self.cursor_instance = RecordingCursor()
+
+    def cursor(self):
+        return self.cursor_instance
+
+
+class RecordingConnectionContext:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def __enter__(self):
+        return self.connection
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+
+class RecordingConnectionManager:
+    def __init__(self):
+        self.connection = RecordingConnection()
+
+    def placeholder(self):
+        return "%s"
+
+    def get_connection(self):
+        return RecordingConnectionContext(self.connection)
+
+    def rows_to_dicts(self, cursor):
+        return []
+
+
 def test_create_and_list_domains(tmp_path, monkeypatch):
     repo = make_repo(tmp_path, monkeypatch)
 
@@ -148,6 +194,29 @@ def test_search_is_case_insensitive(tmp_path, monkeypatch):
     rows = repo.search_entries(query="cart", tag="pricing")
 
     assert [row["id"] for row in rows] == [entry_id]
+
+
+def test_search_query_sql_normalizes_query_fields():
+    cm = RecordingConnectionManager()
+    repo = KnowledgeRepository(cm)
+
+    repo.search_entries(query="CheCkOut")
+
+    sql = " ".join(cm.connection.cursor_instance.sql.split())
+    assert "LOWER(e.title) LIKE" in sql
+    assert "LOWER(e.details) LIKE" in sql
+    assert "LOWER(e.source) LIKE" in sql
+    assert "LOWER(e.tags) LIKE" in sql
+    assert "e.title LIKE" not in sql
+    assert "e.details LIKE" not in sql
+    assert "e.source LIKE" not in sql
+    assert "e.tags LIKE" not in sql
+    assert cm.connection.cursor_instance.params == [
+        "%checkout%",
+        "%checkout%",
+        "%checkout%",
+        "%checkout%",
+    ]
 
 
 def test_update_entry_partial_payload_preserves_omitted_fields(tmp_path, monkeypatch):
