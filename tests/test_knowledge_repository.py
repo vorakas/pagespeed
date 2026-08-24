@@ -264,6 +264,12 @@ def test_search_excludes_archived_domains(tmp_path, monkeypatch):
     repo.archive_domain(domain_id)
 
     hidden = repo.search_entries(query="cart", include_archived=False)
-    visible = repo.search_entries(query="cart", include_archived=True)
+    entry_archives_visible = repo.search_entries(query="cart", include_archived=True)
+    archived_domains_visible = repo.search_entries(
+        query="cart",
+        include_archived=True,
+        include_archived_domains=True,
+    )
     assert hidden == []
-    assert [row["id"] for row in visible] == [entry_id]
+    assert entry_archives_visible == []
+    assert [row["id"] for row in archived_domains_visible] == [entry_id]

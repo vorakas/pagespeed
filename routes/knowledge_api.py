@@ -52,6 +52,7 @@ def create_knowledge_blueprint(knowledge_service: KnowledgeService) -> Blueprint
                 status=request.args.get("status"),
                 tag=request.args.get("tag"),
                 include_archived=_include_archived(),
+                include_archived_domains=_include_archived_domains(),
             )
         )
 
@@ -78,6 +79,10 @@ def create_knowledge_blueprint(knowledge_service: KnowledgeService) -> Blueprint
 
 def _include_archived() -> bool:
     return request.args.get("include_archived", "").lower() == "true"
+
+
+def _include_archived_domains() -> bool:
+    return request.args.get("include_archived_domains", "").lower() == "true"
 
 
 def _domain_id_arg() -> int | None:

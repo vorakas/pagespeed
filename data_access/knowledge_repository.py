@@ -197,6 +197,7 @@ class KnowledgeRepository:
         status: str | None = None,
         tag: str | None = None,
         include_archived: bool = False,
+        include_archived_domains: bool = False,
     ) -> list[dict]:
         """Search knowledge entries with optional filters."""
         ph = self._cm.placeholder()
@@ -210,6 +211,7 @@ class KnowledgeRepository:
 
         if not include_archived:
             clauses.append("e.status <> 'Archived'")
+        if not include_archived_domains:
             clauses.append("d.archived_at IS NULL")
         if query:
             pattern = f"%{query.lower()}%"

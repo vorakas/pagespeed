@@ -1031,6 +1031,9 @@ class ApiClient {
     if (params.status) searchParams.set("status", params.status)
     if (params.tag) searchParams.set("tag", params.tag)
     if (params.include_archived !== undefined) searchParams.set("include_archived", String(params.include_archived))
+    if (params.include_archived_domains !== undefined) {
+      searchParams.set("include_archived_domains", String(params.include_archived_domains))
+    }
 
     const queryString = searchParams.toString()
     return this.request<KnowledgeEntry[]>(`/api/knowledge/entries${queryString ? `?${queryString}` : ""}`)

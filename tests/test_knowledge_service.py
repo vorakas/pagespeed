@@ -98,6 +98,7 @@ class FakeKnowledgeRepository:
         status=None,
         tag=None,
         include_archived=False,
+        include_archived_domains=False,
     ):
         self.last_search_args = {
             "query": query,
@@ -106,6 +107,7 @@ class FakeKnowledgeRepository:
             "status": status,
             "tag": tag,
             "include_archived": include_archived,
+            "include_archived_domains": include_archived_domains,
         }
         return [
             self.get_entry(entry_id)
@@ -196,6 +198,25 @@ def test_create_entry_requires_domain_type_title_details():
         )
 
 
+@pytest.mark.parametrize("domain_id", ["abc", 0, None])
+def test_create_entry_rejects_malformed_domain_id(domain_id):
+    service, repo = make_service()
+
+    with pytest.raises(
+        ValidationError, match="Domain is required|domain_id must be a positive integer"
+    ):
+        service.create_entry(
+            {
+                "domain_id": domain_id,
+                "entry_type": "Decision",
+                "title": "Source of truth",
+                "details": "Migration team owns checkout requirements.",
+            }
+        )
+
+    assert repo.entries == {}
+
+
 def test_create_entry_rejects_unknown_type_and_status():
     service, _ = make_service()
     domain = service.create_domain("Adobe Commerce Migration")
@@ -242,6 +263,7 @@ def test_search_entries_delegates_trimmed_query_tag_and_filters():
         status="Active",
         tag="  launch  ",
         include_archived=True,
+        include_archived_domains=True,
     )
 
     assert repo.last_search_args == {
@@ -251,6 +273,7 @@ def test_search_entries_delegates_trimmed_query_tag_and_filters():
         "status": "Active",
         "tag": "launch",
         "include_archived": True,
+        "include_archived_domains": True,
     }
 
 
@@ -351,6 +374,54 @@ def test_update_entry_normalizes_payload_and_returns_updated_entry():
     assert updated["tags"] == "qa,checkout"
 
 
+@pytest.mark.parametrize("domain_id", ["abc", 0, None])
+def test_update_entry_rejects_malformed_domain_id(domain_id):
+    service, repo = make_service()
+    domain = service.create_domain("Adobe Commerce Migration")
+    entry = service.create_entry(
+        {
+            "domain_id": domain["id"],
+            "entry_type": "Decision",
+            "title": "Source of truth",
+            "details": "Migration team owns checkout requirements.",
+        }
+    )
+
+    with pytest.raises(
+        ValidationError, match="Domain is required|domain_id must be a positive integer"
+    ):
+        service.update_entry(entry["id"], {"domain_id": domain_id})
+
+    assert repo.entries[entry["id"]]["domain_id"] == domain["id"]
+
+
+def test_update_entry_allows_existing_archived_domain_when_domain_unchanged():
+    service, _ = make_service()
+    domain = service.create_domain("Retired Domain")
+    entry = service.create_entry(
+        {
+            "domain_id": domain["id"],
+            "entry_type": "Decision",
+            "title": "Original title",
+            "details": "Original details.",
+        }
+    )
+    service.archive_domain(domain["id"])
+
+    updated = service.update_entry(
+        entry["id"],
+        {
+            "domain_id": domain["id"],
+            "title": "Updated title",
+            "details": "Updated details.",
+        },
+    )
+
+    assert updated["domain_id"] == domain["id"]
+    assert updated["title"] == "Updated title"
+    assert updated["details"] == "Updated details."
+
+
 def test_update_entry_rejects_archived_target_domain():
     service, _ = make_service()
     active_domain = service.create_domain("Adobe Commerce Migration")
@@ -365,9 +436,7 @@ def test_update_entry_rejects_archived_target_domain():
         }
     )
 
-    with pytest.raises(
-        ValidationError, match="Cannot create entries in archived domain"
-    ):
+    with pytest.raises(ValidationError, match="Cannot move entries into archived domain"):
         service.update_entry(entry["id"], {"domain_id": archived_domain["id"]})
 
 

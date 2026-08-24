@@ -99,6 +99,7 @@ export function Knowledge() {
         status: status || undefined,
         tag: tag.trim() || undefined,
         include_archived: includeArchivedEntries,
+        include_archived_domains: includeArchivedDomains,
       })
       if (requestId !== entryRequestIdRef.current) return
       setEntries(loadedEntries)

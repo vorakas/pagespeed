@@ -71,17 +71,20 @@ class KnowledgeService:
         status: str | None = None,
         tag: str | None = None,
         include_archived: bool = False,
+        include_archived_domains: bool = False,
     ) -> list[dict]:
+        normalized_domain_id = self._normalize_domain_id(domain_id, required=False)
         entry_type = self._validate_entry_type(entry_type, required=False)
         status = self._validate_status(status, required=False)
 
         return self._repository.search_entries(
             query=self._trim(query),
-            domain_id=domain_id,
+            domain_id=normalized_domain_id,
             entry_type=entry_type,
             status=status,
             tag=self._trim(tag),
             include_archived=include_archived,
+            include_archived_domains=include_archived_domains,
         )
 
     def get_entry(self, entry_id: int) -> dict:
@@ -111,8 +114,8 @@ class KnowledgeService:
         domain = self._repository.get_domain(payload["domain_id"])
         if domain is None:
             raise ValidationError("Domain not found")
-        if domain.get("archived_at"):
-            raise ValidationError("Cannot create entries in archived domain")
+        if domain.get("archived_at") and payload["domain_id"] != existing["domain_id"]:
+            raise ValidationError("Cannot move entries into archived domain")
 
         if not self._repository.update_entry(entry_id, payload):
             raise ValidationError("Entry not found")
@@ -126,9 +129,7 @@ class KnowledgeService:
         return self.get_entry(entry_id)
 
     def _normalize_entry_payload(self, data: dict, require_fields: bool) -> dict:
-        domain_id = data.get("domain_id")
-        if require_fields and not domain_id:
-            raise ValidationError("Domain is required")
+        domain_id = self._normalize_domain_id(data.get("domain_id"), required=require_fields)
 
         entry_type = self._validate_entry_type(
             data.get("entry_type"),
@@ -156,6 +157,26 @@ class KnowledgeService:
             "source": self._trim(data.get("source")),
             "tags": self._normalize_tags(data.get("tags")),
         }
+
+    def _normalize_domain_id(self, value, required: bool) -> int | None:
+        if value in (None, ""):
+            if required:
+                raise ValidationError("Domain is required")
+            return None
+        if isinstance(value, bool):
+            raise ValidationError("domain_id must be a positive integer")
+
+        try:
+            domain_id = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("domain_id must be a positive integer") from exc
+
+        if domain_id <= 0:
+            if required:
+                raise ValidationError("Domain is required")
+            raise ValidationError("domain_id must be a positive integer")
+
+        return domain_id
 
     def _validate_entry_type(self, value: str | None, required: bool) -> str | None:
         value = self._trim(value)

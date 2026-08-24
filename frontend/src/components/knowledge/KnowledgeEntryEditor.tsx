@@ -57,7 +57,12 @@ export function KnowledgeEntryEditor({
   onArchive,
   onClose,
 }: KnowledgeEntryEditorProps) {
-  const activeDomains = domains.filter((domain) => !domain.archived_at)
+  const selectableDomains = domains.filter(
+    (domain) => !domain.archived_at || (entry && domain.id === entry.domain_id)
+  )
+  const hasCurrentEntryDomain = Boolean(
+    entry && domains.some((domain) => domain.id === entry.domain_id)
+  )
   const canArchive = Boolean(entry && entry.status !== "Archived")
 
   const updateDraft = <Key extends keyof KnowledgeEntryDraft>(
@@ -98,11 +103,17 @@ export function KnowledgeEntryEditor({
                   <SelectValue placeholder="Select domain" />
                 </SelectTrigger>
                 <SelectContent>
-                  {activeDomains.map((domain) => (
+                  {selectableDomains.map((domain) => (
                     <SelectItem key={domain.id} value={String(domain.id)}>
                       {domain.name}
+                      {domain.archived_at ? " (Archived)" : ""}
                     </SelectItem>
                   ))}
+                  {entry && !hasCurrentEntryDomain && (
+                    <SelectItem value={String(entry.domain_id)}>
+                      {entry.domain_name} (Archived)
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </label>

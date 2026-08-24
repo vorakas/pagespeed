@@ -1818,6 +1818,7 @@ export interface KnowledgeEntrySearchParams {
   status?: KnowledgeStatus
   tag?: string
   include_archived?: boolean
+  include_archived_domains?: boolean
 }
 
 export const KNOWLEDGE_ENTRY_TYPES: KnowledgeEntryType[] = [
