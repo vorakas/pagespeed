@@ -112,7 +112,7 @@ export function Knowledge() {
         setLoadingEntries(false)
       }
     }
-  }, [entryType, includeArchivedEntries, query, selectedDomainId, status, tag])
+  }, [entryType, includeArchivedDomains, includeArchivedEntries, query, selectedDomainId, status, tag])
 
   useEffect(() => {
     void loadDomains()

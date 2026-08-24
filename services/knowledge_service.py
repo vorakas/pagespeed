@@ -163,7 +163,7 @@ class KnowledgeService:
             if required:
                 raise ValidationError("Domain is required")
             return None
-        if isinstance(value, bool):
+        if isinstance(value, bool | float):
             raise ValidationError("domain_id must be a positive integer")
 
         try:

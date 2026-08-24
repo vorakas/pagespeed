@@ -198,7 +198,7 @@ def test_create_entry_requires_domain_type_title_details():
         )
 
 
-@pytest.mark.parametrize("domain_id", ["abc", 0, None])
+@pytest.mark.parametrize("domain_id", ["abc", 1.1, 1.0, 0, None])
 def test_create_entry_rejects_malformed_domain_id(domain_id):
     service, repo = make_service()
 
@@ -374,7 +374,7 @@ def test_update_entry_normalizes_payload_and_returns_updated_entry():
     assert updated["tags"] == "qa,checkout"
 
 
-@pytest.mark.parametrize("domain_id", ["abc", 0, None])
+@pytest.mark.parametrize("domain_id", ["abc", 1.1, 1.0, 0, None])
 def test_update_entry_rejects_malformed_domain_id(domain_id):
     service, repo = make_service()
     domain = service.create_domain("Adobe Commerce Migration")
