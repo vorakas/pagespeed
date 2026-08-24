@@ -99,3 +99,21 @@ class TriggerStrategy(str, Enum):
     DESKTOP = 'desktop'
     MOBILE = 'mobile'
     BOTH = 'both'
+
+
+class KnowledgeEntryType(str, Enum):
+    REQUIREMENT = 'Requirement'
+    RULE = 'Rule'
+    DECISION = 'Decision'
+    KNOWN_ISSUE = 'Known Issue'
+    PROCESS = 'Process'
+    ENVIRONMENT_FACT = 'Environment Fact'
+    OPEN_QUESTION = 'Open Question'
+    EVIDENCE = 'Evidence'
+
+
+class KnowledgeStatus(str, Enum):
+    DRAFT = 'Draft'
+    ACTIVE = 'Active'
+    SUPERSEDED = 'Superseded'
+    ARCHIVED = 'Archived'

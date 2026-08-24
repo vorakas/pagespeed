@@ -15,6 +15,7 @@ from services.ai_claude import ClaudeClient
 from services.ai_openai import OpenAIClient
 from services.ai_orchestrator import AIOrchestrator
 from services.trigger_service import TriggerService
+from services.knowledge_service import KnowledgeService
 
 __all__ = [
     "validate_required_fields",
@@ -22,6 +23,7 @@ __all__ = [
     "SiteService",
     "TestingService",
     "TriggerService",
+    "KnowledgeService",
     "PageSpeedClient",
     "NewRelicClient",
     "AzureLogAnalyticsClient",
