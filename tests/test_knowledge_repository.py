@@ -83,6 +83,7 @@ def test_create_update_archive_and_search_entries(tmp_path, monkeypatch):
     entry = repo.get_entry(entry_id)
     assert entry["status"] == "Archived"
     assert entry["title"] == "Checkout requirement owner"
+    assert entry["domain_name"] == "Adobe Commerce Migration"
 
     hidden = repo.search_entries(query="checkout", include_archived=False)
     visible = repo.search_entries(query="checkout", include_archived=True)

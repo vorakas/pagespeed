@@ -93,7 +93,15 @@ class KnowledgeRepository:
         ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM knowledge_entries WHERE id = {ph}", (entry_id,))
+            cursor.execute(
+                f"""
+                SELECT e.*, d.name AS domain_name
+                FROM knowledge_entries e
+                JOIN knowledge_domains d ON d.id = e.domain_id
+                WHERE e.id = {ph}
+                """,
+                (entry_id,),
+            )
             rows = self._cm.rows_to_dicts(cursor)
             return rows[0] if rows else None
 
