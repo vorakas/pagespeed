@@ -1000,7 +1000,7 @@ class ApiClient {
 
   async getKnowledgeDomains(includeArchived = false): Promise<KnowledgeDomain[]> {
     const params = new URLSearchParams({ include_archived: String(includeArchived) })
-    return this.request(`/api/knowledge/domains?${params.toString()}`)
+    return this.request<KnowledgeDomain[]>(`/api/knowledge/domains?${params.toString()}`)
   }
 
   async createKnowledgeDomain(data: KnowledgeDomainPayload): Promise<KnowledgeDomain> {
@@ -1033,7 +1033,7 @@ class ApiClient {
     if (params.include_archived !== undefined) searchParams.set("include_archived", String(params.include_archived))
 
     const queryString = searchParams.toString()
-    return this.request(`/api/knowledge/entries${queryString ? `?${queryString}` : ""}`)
+    return this.request<KnowledgeEntry[]>(`/api/knowledge/entries${queryString ? `?${queryString}` : ""}`)
   }
 
   async createKnowledgeEntry(data: KnowledgeEntryPayload): Promise<KnowledgeEntry> {
