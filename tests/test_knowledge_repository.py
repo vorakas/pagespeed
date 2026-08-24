@@ -128,3 +128,73 @@ def test_search_filters_domain_type_status_and_tag(tmp_path, monkeypatch):
 
     assert len(rows) == 1
     assert rows[0]["title"] == "Cart discount"
+
+
+def test_search_is_case_insensitive(tmp_path, monkeypatch):
+    repo = make_repo(tmp_path, monkeypatch)
+    domain_id = repo.create_domain("Adobe Commerce Migration", "")
+    entry_id = repo.create_entry(
+        {
+            "domain_id": domain_id,
+            "entry_type": "Requirement",
+            "status": "Active",
+            "title": "Checkout Requirement",
+            "details": "Adobe Commerce owns CART pricing.",
+            "source": "Migration Notes",
+            "tags": "Checkout,Pricing",
+        }
+    )
+
+    rows = repo.search_entries(query="cart", tag="pricing")
+
+    assert [row["id"] for row in rows] == [entry_id]
+
+
+def test_update_entry_partial_payload_preserves_omitted_fields(tmp_path, monkeypatch):
+    repo = make_repo(tmp_path, monkeypatch)
+    domain_id = repo.create_domain("Adobe Commerce Migration", "")
+    entry_id = repo.create_entry(
+        {
+            "domain_id": domain_id,
+            "entry_type": "Decision",
+            "status": "Draft",
+            "title": "Original title",
+            "details": "Original details",
+            "source": "meeting notes",
+            "tags": "checkout,owner",
+        }
+    )
+
+    assert repo.update_entry(entry_id, {"title": "Updated title"}) is True
+
+    entry = repo.get_entry(entry_id)
+    assert entry["domain_id"] == domain_id
+    assert entry["entry_type"] == "Decision"
+    assert entry["status"] == "Draft"
+    assert entry["title"] == "Updated title"
+    assert entry["details"] == "Original details"
+    assert entry["source"] == "meeting notes"
+    assert entry["tags"] == "checkout,owner"
+
+
+def test_search_excludes_archived_domains(tmp_path, monkeypatch):
+    repo = make_repo(tmp_path, monkeypatch)
+    domain_id = repo.create_domain("Adobe Commerce Migration", "")
+    entry_id = repo.create_entry(
+        {
+            "domain_id": domain_id,
+            "entry_type": "Requirement",
+            "status": "Active",
+            "title": "Cart migration",
+            "details": "Cart checkout coverage.",
+            "source": "",
+            "tags": "cart",
+        }
+    )
+
+    repo.archive_domain(domain_id)
+
+    hidden = repo.search_entries(query="cart", include_archived=False)
+    visible = repo.search_entries(query="cart", include_archived=True)
+    assert hidden == []
+    assert [row["id"] for row in visible] == [entry_id]

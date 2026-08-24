@@ -131,6 +131,20 @@ class KnowledgeRepository:
 
     def update_entry(self, entry_id: int, data: dict) -> bool:
         """Update a knowledge entry."""
+        existing = self.get_entry(entry_id)
+        if existing is None:
+            return False
+
+        values = {
+            "domain_id": data.get("domain_id", existing["domain_id"]),
+            "entry_type": data.get("entry_type", existing["entry_type"]),
+            "status": data.get("status", existing["status"]),
+            "title": data.get("title", existing["title"]),
+            "details": data.get("details", existing["details"]),
+            "source": data.get("source", existing["source"]),
+            "tags": data.get("tags", existing["tags"]),
+        }
+
         ph = self._cm.placeholder()
         with self._cm.get_connection() as conn:
             cursor = conn.cursor()
@@ -148,13 +162,13 @@ class KnowledgeRepository:
                 WHERE id = {ph}
                 """,
                 (
-                    data["domain_id"],
-                    data["entry_type"],
-                    data.get("status", "Active"),
-                    data["title"],
-                    data["details"],
-                    data.get("source", ""),
-                    data.get("tags", ""),
+                    values["domain_id"],
+                    values["entry_type"],
+                    values["status"],
+                    values["title"],
+                    values["details"],
+                    values["source"],
+                    values["tags"],
                     entry_id,
                 ),
             )
@@ -198,9 +212,16 @@ class KnowledgeRepository:
             clauses.append("e.status <> 'Archived'")
             clauses.append("d.archived_at IS NULL")
         if query:
-            pattern = f"%{query}%"
+            pattern = f"%{query.lower()}%"
             clauses.append(
-                f"(e.title LIKE {ph} OR e.details LIKE {ph} OR e.source LIKE {ph} OR e.tags LIKE {ph})"
+                f"""
+                (
+                    LOWER(e.title) LIKE {ph}
+                    OR LOWER(e.details) LIKE {ph}
+                    OR LOWER(e.source) LIKE {ph}
+                    OR LOWER(e.tags) LIKE {ph}
+                )
+                """
             )
             params.extend([pattern, pattern, pattern, pattern])
         if domain_id is not None:
@@ -213,8 +234,8 @@ class KnowledgeRepository:
             clauses.append(f"e.status = {ph}")
             params.append(status)
         if tag:
-            clauses.append(f"e.tags LIKE {ph}")
-            params.append(f"%{tag}%")
+            clauses.append(f"LOWER(e.tags) LIKE {ph}")
+            params.append(f"%{tag.lower()}%")
 
         if clauses:
             sql += " WHERE " + " AND ".join(clauses)
