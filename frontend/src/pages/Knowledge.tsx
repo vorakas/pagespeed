@@ -8,6 +8,7 @@ import { KnowledgeEntryList } from "@/components/knowledge/KnowledgeEntryList"
 import { KnowledgeFilters } from "@/components/knowledge/KnowledgeFilters"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { api } from "@/services/api"
 import type { KnowledgeDomain, KnowledgeEntry, KnowledgeEntryPayload, KnowledgeEntryType, KnowledgeStatus } from "@/types"
 
@@ -259,39 +260,50 @@ export function Knowledge() {
           onCreateDomain={() => void createDomain()}
         />
 
-        <main className="flex min-w-0 flex-1 flex-col bg-background">
-          <KnowledgeFilters
-            query={query}
-            entryType={entryType}
-            status={status}
-            tag={tag}
-            includeArchived={includeArchivedEntries}
-            onQueryChange={setQuery}
-            onEntryTypeChange={setEntryType}
-            onStatusChange={setStatus}
-            onTagChange={setTag}
-            onIncludeArchivedChange={setIncludeArchivedEntries}
-          />
-          <KnowledgeEntryList
-            entries={entries}
-            selectedEntryId={selectedEntryId}
-            loading={loadingEntries}
-            onSelectEntry={openEntry}
-          />
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col bg-background">
+          <main
+            className={cn(
+              "flex min-h-0 flex-col",
+              editorOpen
+                ? "max-h-[36vh] min-h-40 shrink-0 overflow-hidden border-b border-border"
+                : "flex-1"
+            )}
+          >
+            <KnowledgeFilters
+              query={query}
+              entryType={entryType}
+              status={status}
+              tag={tag}
+              includeArchived={includeArchivedEntries}
+              onQueryChange={setQuery}
+              onEntryTypeChange={setEntryType}
+              onStatusChange={setStatus}
+              onTagChange={setTag}
+              onIncludeArchivedChange={setIncludeArchivedEntries}
+            />
+            <div className="min-h-0 flex-1 overflow-auto">
+              <KnowledgeEntryList
+                entries={entries}
+                selectedEntryId={selectedEntryId}
+                loading={loadingEntries}
+                onSelectEntry={openEntry}
+              />
+            </div>
+          </main>
 
-        {editorOpen && (
-          <KnowledgeEntryEditor
-            domains={domains}
-            entry={selectedEntry}
-            draft={draft}
-            saving={savingEntry}
-            onDraftChange={setDraft}
-            onSave={() => void saveEntry()}
-            onArchive={() => void archiveEntry()}
-            onClose={() => setEditorOpen(false)}
-          />
-        )}
+          {editorOpen && (
+            <KnowledgeEntryEditor
+              domains={domains}
+              entry={selectedEntry}
+              draft={draft}
+              saving={savingEntry}
+              onDraftChange={setDraft}
+              onSave={() => void saveEntry()}
+              onArchive={() => void archiveEntry()}
+              onClose={() => setEditorOpen(false)}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

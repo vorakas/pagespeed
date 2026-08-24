@@ -75,7 +75,7 @@ export function KnowledgeEntryEditor({
   }
 
   return (
-    <aside className="w-full border-l border-border bg-card/40 lg:w-[28rem]">
+    <section className="flex min-h-[24rem] flex-1 flex-col bg-card/40">
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
@@ -94,7 +94,7 @@ export function KnowledgeEntryEditor({
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Domain</span>
               <Select
@@ -225,6 +225,6 @@ export function KnowledgeEntryEditor({
           )}
         </div>
       </div>
-    </aside>
+    </section>
   )
 }
