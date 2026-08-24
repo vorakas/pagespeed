@@ -60,6 +60,8 @@ export function KnowledgeEntryEditor({
   const selectableDomains = domains.filter(
     (domain) => !domain.archived_at || (entry && domain.id === entry.domain_id)
   )
+  const selectedDomainName =
+    domains.find((domain) => domain.id === draft.domain_id)?.name ?? ""
   const hasCurrentEntryDomain = Boolean(
     entry && domains.some((domain) => domain.id === entry.domain_id)
   )
@@ -100,7 +102,9 @@ export function KnowledgeEntryEditor({
                 onValueChange={(value) => updateDraft("domain_id", Number(value))}
               >
                 <SelectTrigger className="w-full" aria-label="Entry domain">
-                  <SelectValue placeholder="Select domain" />
+                  <SelectValue placeholder="Select domain">
+                    {selectedDomainName}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {selectableDomains.map((domain) => (
