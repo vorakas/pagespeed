@@ -108,8 +108,11 @@ class KnowledgeService:
             require_fields=True,
         )
 
-        if self._repository.get_domain(payload["domain_id"]) is None:
+        domain = self._repository.get_domain(payload["domain_id"])
+        if domain is None:
             raise ValidationError("Domain not found")
+        if domain.get("archived_at"):
+            raise ValidationError("Cannot create entries in archived domain")
 
         if not self._repository.update_entry(entry_id, payload):
             raise ValidationError("Entry not found")

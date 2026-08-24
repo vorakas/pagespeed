@@ -10,6 +10,7 @@ class FakeKnowledgeRepository:
         self.entries = {}
         self.next_domain_id = 1
         self.next_entry_id = 1
+        self.last_search_args = None
 
     def list_domains(self, include_archived=False):
         domains = list(self.domains.values())
@@ -98,6 +99,14 @@ class FakeKnowledgeRepository:
         tag=None,
         include_archived=False,
     ):
+        self.last_search_args = {
+            "query": query,
+            "domain_id": domain_id,
+            "entry_type": entry_type,
+            "status": status,
+            "tag": tag,
+            "include_archived": include_archived,
+        }
         return [
             self.get_entry(entry_id)
             for entry_id, entry in self.entries.items()
@@ -223,6 +232,28 @@ def test_search_entries_rejects_unknown_type_and_status_filters():
         service.search_entries(status="Open")
 
 
+def test_search_entries_delegates_trimmed_query_tag_and_filters():
+    service, repo = make_service()
+
+    service.search_entries(
+        query="  checkout  ",
+        domain_id=12,
+        entry_type="Decision",
+        status="Active",
+        tag="  launch  ",
+        include_archived=True,
+    )
+
+    assert repo.last_search_args == {
+        "query": "checkout",
+        "domain_id": 12,
+        "entry_type": "Decision",
+        "status": "Active",
+        "tag": "launch",
+        "include_archived": True,
+    }
+
+
 def test_create_entry_rejects_archived_domain():
     service, _ = make_service()
     domain = service.create_domain("Adobe Commerce Migration")
@@ -318,6 +349,26 @@ def test_update_entry_normalizes_payload_and_returns_updated_entry():
     assert updated["details"] == "QA owns validation."
     assert updated["source"] == "qa notes"
     assert updated["tags"] == "qa,checkout"
+
+
+def test_update_entry_rejects_archived_target_domain():
+    service, _ = make_service()
+    active_domain = service.create_domain("Adobe Commerce Migration")
+    archived_domain = service.create_domain("Retired Domain")
+    service.archive_domain(archived_domain["id"])
+    entry = service.create_entry(
+        {
+            "domain_id": active_domain["id"],
+            "entry_type": "Decision",
+            "title": "Source of truth",
+            "details": "Migration team owns checkout requirements.",
+        }
+    )
+
+    with pytest.raises(
+        ValidationError, match="Cannot create entries in archived domain"
+    ):
+        service.update_entry(entry["id"], {"domain_id": archived_domain["id"]})
 
 
 def test_archive_entry_marks_entry_archived_and_rejects_missing_entry():
