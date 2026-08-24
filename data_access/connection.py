@@ -603,6 +603,46 @@ class ConnectionManager:
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS knowledge_domains (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                archived_at TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS knowledge_entries (
+                id SERIAL PRIMARY KEY,
+                domain_id INTEGER NOT NULL,
+                entry_type TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'Active',
+                title TEXT NOT NULL,
+                details TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (domain_id) REFERENCES knowledge_domains (id)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_entries_domain_id
+            ON knowledge_entries(domain_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_entries_type
+            ON knowledge_entries(entry_type)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_entries_status
+            ON knowledge_entries(status)
+        """)
+
         self._create_postgres_requirement_tables(cursor)
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS mime_type TEXT")
@@ -968,6 +1008,46 @@ class ConnectionManager:
         """)
 
         self._create_sqlite_requirement_tables(cursor)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS knowledge_domains (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                archived_at TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS knowledge_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                domain_id INTEGER NOT NULL,
+                entry_type TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'Active',
+                title TEXT NOT NULL,
+                details TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (domain_id) REFERENCES knowledge_domains (id)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_entries_domain_id
+            ON knowledge_entries(domain_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_entries_type
+            ON knowledge_entries(entry_type)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_entries_status
+            ON knowledge_entries(status)
+        """)
 
         # SQLite lacks IF NOT EXISTS for ALTER TABLE — tolerate failures.
         _SQLITE_MIGRATIONS = [
