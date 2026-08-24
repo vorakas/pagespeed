@@ -3,8 +3,10 @@ from app import create_app
 
 def test_knowledge_domain_and_entry_flow(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PHAROS_DISABLE_SCHEDULER", "1")
     app = create_app()
     app.config["TESTING"] = True
+    assert "scheduler_lease" not in app.extensions
     client = app.test_client()
 
     domain_response = client.post(
@@ -47,8 +49,10 @@ def test_knowledge_domain_and_entry_flow(tmp_path, monkeypatch):
 
 def test_knowledge_api_returns_validation_error(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PHAROS_DISABLE_SCHEDULER", "1")
     app = create_app()
     app.config["TESTING"] = True
+    assert "scheduler_lease" not in app.extensions
     client = app.test_client()
 
     response = client.post(

@@ -244,9 +244,12 @@ def create_app() -> Flask:
     # Explicit UTC timezone ensures cron expressions fire at the same time
     # regardless of where the server is hosted (Railway, local dev, etc.).
     scheduler = BackgroundScheduler(timezone='UTC')
-    scheduler_lease = SchedulerLease()
-    scheduler_enabled = scheduler_lease.acquire()
-    flask_app.extensions["scheduler_lease"] = scheduler_lease
+    scheduler_disabled = os.environ.get("PHAROS_DISABLE_SCHEDULER") == "1"
+    scheduler_enabled = False
+    if not scheduler_disabled:
+        scheduler_lease = SchedulerLease()
+        scheduler_enabled = scheduler_lease.acquire()
+        flask_app.extensions["scheduler_lease"] = scheduler_lease
     flask_app.extensions["scheduler_enabled"] = scheduler_enabled
 
     trigger_service = TriggerService(trigger_repo, preset_repo, url_repo, testing_service, scheduler)
@@ -266,12 +269,14 @@ def create_app() -> Flask:
             replace_existing=True,
             max_instances=1,
         )
-    else:
+    elif not scheduler_disabled:
         logging.warning(
             "Scheduler lease held by another worker; this worker will serve requests "
             "without starting background jobs (%s)",
             scheduler_lease.path,
         )
+    else:
+        logging.info("Scheduler disabled by PHAROS_DISABLE_SCHEDULER")
 
     # ---- BlazeMeter (optional; only wired when env vars are present) ----
     blazemeter_client: BlazemeterClient | None = None
