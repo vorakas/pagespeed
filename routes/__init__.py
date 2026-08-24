@@ -18,6 +18,7 @@ from routes.csv_lighthouse_api import create_csv_lighthouse_blueprint
 from routes.dashboard_api import create_dashboard_blueprint
 from routes.devops_api import create_devops_blueprint
 from routes.github_webhook_api import create_github_webhook_blueprint
+from routes.knowledge_api import create_knowledge_blueprint
 from routes.metrics_api import create_metrics_blueprint
 from routes.newrelic_api import create_newrelic_blueprint
 from routes.obsidian_api import create_obsidian_blueprint
@@ -37,6 +38,7 @@ from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService
 from services.qa_testing_service import QaTestingReportService
 from services.requirement_kb_service import RequirementKbService
+from services.knowledge_service import KnowledgeService
 from services.site_service import SiteService
 from services.snapshot_service import SnapshotService
 from services.testing_service import TestingService
@@ -76,6 +78,7 @@ def register_blueprints(
     autofix_ingest_service: "AutofixIngestService | None" = None,
     autofix_pipeline_ids: "list | None" = None,
     testdata_url_service: "TestDataUrlService | None" = None,
+    knowledge_service: "KnowledgeService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -95,6 +98,8 @@ def register_blueprints(
     app.register_blueprint(create_newrelic_blueprint())
     app.register_blueprint(create_azure_blueprint())
     app.register_blueprint(create_ai_blueprint(ai_config_service))
+    if knowledge_service is not None:
+        app.register_blueprint(create_knowledge_blueprint(knowledge_service))
     if requirement_service is not None:
         app.register_blueprint(create_requirements_blueprint(
             requirement_service,

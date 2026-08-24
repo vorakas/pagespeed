@@ -68,6 +68,7 @@ from data_access import (
     ConnectionManager,
     CsvLighthouseRepository,
     JiraUserCacheRepository,
+    KnowledgeRepository,
     QaCycleRepository,
     QaReportCacheRepository,
     QaTestCaseCacheRepository,
@@ -90,6 +91,7 @@ from services.applitools_storage import ApplitoolsBatchStore
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.csv_lighthouse_service import CsvLighthouseService
+from services.knowledge_service import KnowledgeService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService, SyncAlreadyRunning
 from services.obsidian_sync.vault_reader import VaultReader
@@ -218,6 +220,7 @@ def create_app() -> Flask:
     csv_lighthouse_repo = CsvLighthouseRepository(conn_mgr)
     applitools_batch_repo = ApplitoolsBatchRepository(conn_mgr, ttl_seconds=24 * 60 * 60)
     autofix_repo = AutofixRepository(conn_mgr)
+    knowledge_repo = KnowledgeRepository(conn_mgr)
     autofix_ingest_service = AutofixIngestService(autofix_repo)
 
     pagespeed = PageSpeedClient(api_key=PAGESPEED_API_KEY)
@@ -225,6 +228,7 @@ def create_app() -> Flask:
     site_service = SiteService(site_repo, url_repo, test_result_repo)
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
     csv_lighthouse_service = CsvLighthouseService(csv_lighthouse_repo, pagespeed)
+    knowledge_service = KnowledgeService(knowledge_repo)
     csv_lighthouse_service.recover_interrupted_runs()
 
     # ---- TestData URL listing (builds openable URLs from uploaded CSVs) ----
@@ -560,6 +564,7 @@ def create_app() -> Flask:
         autofix_ingest_service=autofix_ingest_service,
         autofix_pipeline_ids=AUTOFIX_PIPELINE_IDS,
         testdata_url_service=testdata_url_service,
+        knowledge_service=knowledge_service,
     )
 
     # ---- Centralized error handlers ----
