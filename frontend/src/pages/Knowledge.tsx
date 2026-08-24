@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Plus, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
@@ -60,6 +60,7 @@ export default function Knowledge() {
   const [loadingEntries, setLoadingEntries] = useState(false)
   const [savingDomain, setSavingDomain] = useState(false)
   const [savingEntry, setSavingEntry] = useState(false)
+  const entryRequestIdRef = useRef(0)
 
   const activeDomains = useMemo(
     () => domains.filter((domain) => !domain.archived_at),
@@ -87,6 +88,8 @@ export default function Knowledge() {
   }, [includeArchivedDomains])
 
   const loadEntries = useCallback(async () => {
+    const requestId = entryRequestIdRef.current + 1
+    entryRequestIdRef.current = requestId
     setLoadingEntries(true)
     try {
       const loadedEntries = await api.searchKnowledgeEntries({
@@ -97,16 +100,16 @@ export default function Knowledge() {
         tag: tag.trim() || undefined,
         include_archived: includeArchivedEntries,
       })
+      if (requestId !== entryRequestIdRef.current) return
       setEntries(loadedEntries)
-      setSelectedEntry((currentEntry) =>
-        currentEntry && !loadedEntries.some((entry) => entry.id === currentEntry.id)
-          ? null
-          : currentEntry
-      )
     } catch (error) {
-      toast.error("Could not load entries", { description: getErrorMessage(error) })
+      if (requestId === entryRequestIdRef.current) {
+        toast.error("Could not load entries", { description: getErrorMessage(error) })
+      }
     } finally {
-      setLoadingEntries(false)
+      if (requestId === entryRequestIdRef.current) {
+        setLoadingEntries(false)
+      }
     }
   }, [entryType, includeArchivedEntries, query, selectedDomainId, status, tag])
 

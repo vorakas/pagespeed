@@ -42,7 +42,7 @@ export function KnowledgeFilters({
 }: KnowledgeFiltersProps) {
   return (
     <div className="border-b border-border bg-background px-4 py-3">
-      <div className="grid gap-2 md:grid-cols-[minmax(16rem,1fr)_12rem_12rem_12rem_auto]">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_12rem_12rem_12rem_auto]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -50,6 +50,7 @@ export function KnowledgeFilters({
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Search knowledge"
             className="pl-9"
+            aria-label="Search knowledge entries"
           />
         </div>
 
@@ -59,7 +60,7 @@ export function KnowledgeFilters({
             onEntryTypeChange(value === ALL_TYPES ? "" : (value as KnowledgeEntryType))
           }
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full" aria-label="Filter by entry type">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -78,7 +79,7 @@ export function KnowledgeFilters({
             onStatusChange(value === ALL_STATUSES ? "" : (value as KnowledgeStatus))
           }
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full" aria-label="Filter by status">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -95,6 +96,7 @@ export function KnowledgeFilters({
           value={tag}
           onChange={(event) => onTagChange(event.target.value)}
           placeholder="Tag"
+          aria-label="Filter by tag"
         />
 
         <label className="flex h-10 items-center gap-2 whitespace-nowrap rounded-md border border-input px-3 text-sm text-muted-foreground">

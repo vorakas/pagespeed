@@ -35,6 +35,18 @@ interface KnowledgeEntryEditorProps {
   onClose: () => void
 }
 
+function formatUpdatedAt(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Unknown"
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date)
+}
+
 export function KnowledgeEntryEditor({
   domains,
   entry,
@@ -64,7 +76,9 @@ export function KnowledgeEntryEditor({
               {entry ? "Edit Entry" : "New Entry"}
             </h2>
             {entry && (
-              <p className="text-xs text-muted-foreground">Updated {entry.updated_at}</p>
+              <p className="text-xs text-muted-foreground">
+                Updated {formatUpdatedAt(entry.updated_at)}
+              </p>
             )}
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close editor">
@@ -80,7 +94,7 @@ export function KnowledgeEntryEditor({
                 value={draft.domain_id ? String(draft.domain_id) : ""}
                 onValueChange={(value) => updateDraft("domain_id", Number(value))}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label="Entry domain">
                   <SelectValue placeholder="Select domain" />
                 </SelectTrigger>
                 <SelectContent>
@@ -99,7 +113,7 @@ export function KnowledgeEntryEditor({
                 value={draft.entry_type}
                 onValueChange={(value) => updateDraft("entry_type", value as KnowledgeEntryType)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label="Entry type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -118,7 +132,7 @@ export function KnowledgeEntryEditor({
                 value={draft.status}
                 onValueChange={(value) => updateDraft("status", value as KnowledgeStatus)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label="Entry status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -147,6 +161,7 @@ export function KnowledgeEntryEditor({
               value={draft.title}
               onChange={(event) => updateDraft("title", event.target.value)}
               placeholder="Title"
+              aria-label="Entry title"
             />
           </label>
 
@@ -157,6 +172,7 @@ export function KnowledgeEntryEditor({
               onChange={(event) => updateDraft("details", event.target.value)}
               placeholder="Details"
               rows={10}
+              aria-label="Entry details"
             />
           </label>
 
@@ -166,6 +182,7 @@ export function KnowledgeEntryEditor({
               value={draft.source}
               onChange={(event) => updateDraft("source", event.target.value)}
               placeholder="Source"
+              aria-label="Entry source"
             />
           </label>
 
@@ -175,6 +192,7 @@ export function KnowledgeEntryEditor({
               value={draft.tags}
               onChange={(event) => updateDraft("tags", event.target.value)}
               placeholder="comma, separated, tags"
+              aria-label="Entry tags"
             />
           </label>
         </div>
