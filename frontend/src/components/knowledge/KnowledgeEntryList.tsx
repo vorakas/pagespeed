@@ -12,6 +12,9 @@ interface KnowledgeEntryListProps {
   onSelectEntry: (entry: KnowledgeEntry) => void
 }
 
+const ENTRY_GRID_CLASS =
+  "min-w-[58rem] grid-cols-[minmax(18rem,1fr)_8rem_8rem_12rem_12rem_9rem]"
+
 function formatUpdatedAt(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "Unknown"
@@ -56,7 +59,12 @@ export function KnowledgeEntryList({
 
   return (
     <div className="overflow-auto">
-      <div className="grid min-w-[58rem] grid-cols-[minmax(18rem,1fr)_8rem_8rem_12rem_12rem_9rem] border-b border-border bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <div
+        className={cn(
+          "grid w-full border-b border-border bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+          ENTRY_GRID_CLASS
+        )}
+      >
         <span>Title</span>
         <span>Type</span>
         <span>Status</span>
@@ -74,7 +82,8 @@ export function KnowledgeEntryList({
               type="button"
               variant="ghost"
               className={cn(
-                "grid h-auto min-w-[58rem] grid-cols-[minmax(18rem,1fr)_8rem_8rem_12rem_12rem_9rem] rounded-none px-4 py-3 text-left",
+                "grid h-auto w-full !justify-start gap-0 rounded-none px-4 py-3 text-left",
+                ENTRY_GRID_CLASS,
                 selected && "bg-muted",
                 archived && "text-muted-foreground"
               )}
