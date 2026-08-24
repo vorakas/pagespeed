@@ -178,7 +178,10 @@ class KnowledgeService:
         if isinstance(value, list):
             tags = [self._trim(tag) for tag in value]
         else:
-            tags = self._trim(value).split(",") if value is not None else []
+            tags = [
+                self._trim(tag)
+                for tag in self._trim(value).split(",")
+            ] if value is not None else []
         return ",".join(tag for tag in tags if tag)
 
     @staticmethod

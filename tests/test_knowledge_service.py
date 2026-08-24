@@ -134,6 +134,41 @@ def test_duplicate_domain_raises_validation_error():
         service.create_domain("Pharos")
 
 
+def test_update_domain_trims_fields_and_validates_name_not_found_and_duplicate():
+    service, _ = make_service()
+    domain = service.create_domain("Pharos")
+    service.create_domain("QA Automation")
+
+    updated = service.update_domain(domain["id"], "  Adobe Migration  ", "  Facts  ")
+
+    assert updated["name"] == "Adobe Migration"
+    assert updated["description"] == "Facts"
+
+    with pytest.raises(ValidationError, match="Domain name is required"):
+        service.update_domain(domain["id"], "   ")
+
+    with pytest.raises(ValidationError, match="Domain not found"):
+        service.update_domain(999, "Missing")
+
+    with pytest.raises(ValidationError, match="already exists"):
+        service.update_domain(domain["id"], "QA Automation")
+
+
+def test_archive_domain_rejects_missing_and_already_archived_domain():
+    service, _ = make_service()
+    domain = service.create_domain("Adobe Commerce Migration")
+
+    archived = service.archive_domain(domain["id"])
+
+    assert archived["archived_at"] is not None
+
+    with pytest.raises(ValidationError, match="Domain not found"):
+        service.archive_domain(999)
+
+    with pytest.raises(ValidationError, match="Domain is already archived"):
+        service.archive_domain(domain["id"])
+
+
 def test_create_entry_requires_domain_type_title_details():
     service, _ = make_service()
 
@@ -178,6 +213,16 @@ def test_create_entry_rejects_unknown_type_and_status():
         )
 
 
+def test_search_entries_rejects_unknown_type_and_status_filters():
+    service, _ = make_service()
+
+    with pytest.raises(ValidationError, match="Invalid entry type"):
+        service.search_entries(entry_type="Note")
+
+    with pytest.raises(ValidationError, match="Invalid status"):
+        service.search_entries(status="Open")
+
+
 def test_create_entry_rejects_archived_domain():
     service, _ = make_service()
     domain = service.create_domain("Adobe Commerce Migration")
@@ -216,3 +261,80 @@ def test_create_entry_defaults_status_to_active_and_normalizes_tags_list():
     assert entry["details"] == "Migration team owns checkout requirements."
     assert entry["source"] == "meeting notes"
     assert entry["tags"] == "checkout,launch"
+
+
+def test_create_entry_normalizes_comma_string_tags():
+    service, _ = make_service()
+    domain = service.create_domain("Adobe Commerce Migration")
+
+    entry = service.create_entry(
+        {
+            "domain_id": domain["id"],
+            "entry_type": "Decision",
+            "title": "Source of truth",
+            "details": "Migration team owns checkout requirements.",
+            "tags": " checkout, migration, ",
+        }
+    )
+
+    assert entry["tags"] == "checkout,migration"
+
+
+def test_get_entry_raises_validation_error_when_missing():
+    service, _ = make_service()
+
+    with pytest.raises(ValidationError, match="Entry not found"):
+        service.get_entry(999)
+
+
+def test_update_entry_normalizes_payload_and_returns_updated_entry():
+    service, _ = make_service()
+    domain = service.create_domain("Adobe Commerce Migration")
+    entry = service.create_entry(
+        {
+            "domain_id": domain["id"],
+            "entry_type": "Decision",
+            "title": "Source of truth",
+            "details": "Migration team owns checkout requirements.",
+            "tags": ["checkout"],
+        }
+    )
+
+    updated = service.update_entry(
+        entry["id"],
+        {
+            "entry_type": "Rule",
+            "status": "Superseded",
+            "title": "  Checkout owner  ",
+            "details": "  QA owns validation.  ",
+            "source": "  qa notes  ",
+            "tags": [" qa ", "", " checkout "],
+        },
+    )
+
+    assert updated["entry_type"] == "Rule"
+    assert updated["status"] == "Superseded"
+    assert updated["title"] == "Checkout owner"
+    assert updated["details"] == "QA owns validation."
+    assert updated["source"] == "qa notes"
+    assert updated["tags"] == "qa,checkout"
+
+
+def test_archive_entry_marks_entry_archived_and_rejects_missing_entry():
+    service, _ = make_service()
+    domain = service.create_domain("Adobe Commerce Migration")
+    entry = service.create_entry(
+        {
+            "domain_id": domain["id"],
+            "entry_type": "Decision",
+            "title": "Source of truth",
+            "details": "Migration team owns checkout requirements.",
+        }
+    )
+
+    archived = service.archive_entry(entry["id"])
+
+    assert archived["status"] == "Archived"
+
+    with pytest.raises(ValidationError, match="Entry not found"):
+        service.archive_entry(999)
