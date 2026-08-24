@@ -8,6 +8,11 @@ import type {
   WorstPerformer,
   TestDetail,
   HistoryPoint,
+  KnowledgeDomain,
+  KnowledgeDomainPayload,
+  KnowledgeEntry,
+  KnowledgeEntryPayload,
+  KnowledgeEntrySearchParams,
   Trigger,
   TriggerFormData,
   SchedulePreset,
@@ -989,6 +994,66 @@ class ApiClient {
 
   async reingestMigrationSnapshots(): Promise<{ ingested: string[] }> {
     return this.request("/api/dashboard/snapshots/reingest", { method: "POST" })
+  }
+
+  // ---------- Knowledge ----------
+
+  async getKnowledgeDomains(includeArchived = false): Promise<KnowledgeDomain[]> {
+    const params = new URLSearchParams({ include_archived: String(includeArchived) })
+    return this.request(`/api/knowledge/domains?${params.toString()}`)
+  }
+
+  async createKnowledgeDomain(data: KnowledgeDomainPayload): Promise<KnowledgeDomain> {
+    return this.request<KnowledgeDomain>("/api/knowledge/domains", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateKnowledgeDomain(domainId: number, data: KnowledgeDomainPayload): Promise<KnowledgeDomain> {
+    return this.request<KnowledgeDomain>(`/api/knowledge/domains/${domainId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async archiveKnowledgeDomain(domainId: number): Promise<KnowledgeDomain> {
+    return this.request<KnowledgeDomain>(`/api/knowledge/domains/${domainId}/archive`, {
+      method: "POST",
+    })
+  }
+
+  async searchKnowledgeEntries(params: KnowledgeEntrySearchParams = {}): Promise<KnowledgeEntry[]> {
+    const searchParams = new URLSearchParams()
+    if (params.query) searchParams.set("query", params.query)
+    if (params.domain_id !== undefined) searchParams.set("domain_id", String(params.domain_id))
+    if (params.entry_type) searchParams.set("entry_type", params.entry_type)
+    if (params.status) searchParams.set("status", params.status)
+    if (params.tag) searchParams.set("tag", params.tag)
+    if (params.include_archived !== undefined) searchParams.set("include_archived", String(params.include_archived))
+
+    const queryString = searchParams.toString()
+    return this.request(`/api/knowledge/entries${queryString ? `?${queryString}` : ""}`)
+  }
+
+  async createKnowledgeEntry(data: KnowledgeEntryPayload): Promise<KnowledgeEntry> {
+    return this.request<KnowledgeEntry>("/api/knowledge/entries", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateKnowledgeEntry(entryId: number, data: KnowledgeEntryPayload): Promise<KnowledgeEntry> {
+    return this.request<KnowledgeEntry>(`/api/knowledge/entries/${entryId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async archiveKnowledgeEntry(entryId: number): Promise<KnowledgeEntry> {
+    return this.request<KnowledgeEntry>(`/api/knowledge/entries/${entryId}/archive`, {
+      method: "POST",
+    })
   }
 
   // ---------- Requirement Questions ----------

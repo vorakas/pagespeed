@@ -1760,3 +1760,80 @@ export interface TestDataListing {
   groups: Record<string, TestDataGroupListing>
   unrecognized: string[]
 }
+
+export type KnowledgeEntryType =
+  | "Requirement"
+  | "Rule"
+  | "Decision"
+  | "Known Issue"
+  | "Process"
+  | "Environment Fact"
+  | "Open Question"
+  | "Evidence"
+
+export type KnowledgeStatus = "Draft" | "Active" | "Superseded" | "Archived"
+
+export interface KnowledgeDomain {
+  id: number
+  name: string
+  description: string
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+}
+
+export interface KnowledgeEntry {
+  id: number
+  domain_id: number
+  domain_name: string
+  entry_type: KnowledgeEntryType
+  status: KnowledgeStatus
+  title: string
+  details: string
+  source: string
+  tags: string
+  created_at: string
+  updated_at: string
+}
+
+export interface KnowledgeDomainPayload {
+  name: string
+  description?: string
+}
+
+export interface KnowledgeEntryPayload {
+  domain_id: number
+  entry_type: KnowledgeEntryType
+  status?: KnowledgeStatus
+  title: string
+  details: string
+  source?: string
+  tags?: string[]
+}
+
+export interface KnowledgeEntrySearchParams {
+  query?: string
+  domain_id?: number
+  entry_type?: KnowledgeEntryType
+  status?: KnowledgeStatus
+  tag?: string
+  include_archived?: boolean
+}
+
+export const KNOWLEDGE_ENTRY_TYPES: KnowledgeEntryType[] = [
+  "Requirement",
+  "Rule",
+  "Decision",
+  "Known Issue",
+  "Process",
+  "Environment Fact",
+  "Open Question",
+  "Evidence",
+]
+
+export const KNOWLEDGE_STATUSES: KnowledgeStatus[] = [
+  "Draft",
+  "Active",
+  "Superseded",
+  "Archived",
+]
