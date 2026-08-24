@@ -41,7 +41,7 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Request failed"
 }
 
-export default function Knowledge() {
+export function Knowledge() {
   const [domains, setDomains] = useState<KnowledgeDomain[]>([])
   const [entries, setEntries] = useState<KnowledgeEntry[]>([])
   const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null)
