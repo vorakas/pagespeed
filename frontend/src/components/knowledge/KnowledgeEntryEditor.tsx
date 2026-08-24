@@ -1,10 +1,11 @@
-import { Archive, Save, X } from "lucide-react"
+import { Archive, ExternalLink, Save, X } from "lucide-react"
 
 import type { KnowledgeDomain, KnowledgeEntry, KnowledgeEntryType, KnowledgeStatus } from "@/types"
 import { KNOWLEDGE_ENTRY_TYPES, KNOWLEDGE_STATUSES } from "@/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { splitLinkedText } from "@/lib/linkify"
 import {
   Select,
   SelectContent,
@@ -33,6 +34,37 @@ interface KnowledgeEntryEditorProps {
   onSave: () => void
   onArchive: () => void
   onClose: () => void
+}
+
+function LinkPreview({ value }: { value: string }) {
+  const parts = splitLinkedText(value)
+  const hasLink = parts.some((part) => part.type === "link")
+
+  if (!hasLink) return null
+
+  return (
+    <div
+      className="whitespace-pre-wrap break-words rounded-md border border-border bg-background/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+      aria-label="Clickable URL preview"
+    >
+      {parts.map((part, index) => {
+        if (part.type === "text") return <span key={index}>{part.text}</span>
+
+        return (
+          <a
+            key={index}
+            href={part.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {part.text}
+            <ExternalLink className="size-3" aria-hidden="true" />
+          </a>
+        )
+      })}
+    </div>
+  )
 }
 
 function formatUpdatedAt(value: string) {
@@ -180,26 +212,32 @@ export function KnowledgeEntryEditor({
             />
           </label>
 
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Details</span>
-            <Textarea
-              value={draft.details}
-              onChange={(event) => updateDraft("details", event.target.value)}
-              placeholder="Details"
-              rows={10}
-              aria-label="Entry details"
-            />
-          </label>
+          <div className="space-y-1.5">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Details</span>
+              <Textarea
+                value={draft.details}
+                onChange={(event) => updateDraft("details", event.target.value)}
+                placeholder="Details"
+                rows={10}
+                aria-label="Entry details"
+              />
+            </label>
+            <LinkPreview value={draft.details} />
+          </div>
 
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Source</span>
-            <Input
-              value={draft.source}
-              onChange={(event) => updateDraft("source", event.target.value)}
-              placeholder="Source"
-              aria-label="Entry source"
-            />
-          </label>
+          <div className="space-y-1.5">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Source</span>
+              <Input
+                value={draft.source}
+                onChange={(event) => updateDraft("source", event.target.value)}
+                placeholder="Source"
+                aria-label="Entry source"
+              />
+            </label>
+            <LinkPreview value={draft.source} />
+          </div>
 
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Tags</span>
