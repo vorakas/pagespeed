@@ -8,7 +8,6 @@ import { KnowledgeEntryList } from "@/components/knowledge/KnowledgeEntryList"
 import { KnowledgeFilters } from "@/components/knowledge/KnowledgeFilters"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 import { api } from "@/services/api"
 import type { KnowledgeDomain, KnowledgeEntry, KnowledgeEntryPayload, KnowledgeEntryType, KnowledgeStatus } from "@/types"
 
@@ -219,7 +218,7 @@ export function Knowledge() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-[calc(100vh-1.5rem)] flex-col overflow-hidden">
       <PageHeader
         title="Knowledge"
         description="Operational facts, decisions, and migration notes."
@@ -260,15 +259,8 @@ export function Knowledge() {
           onCreateDomain={() => void createDomain()}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col bg-background">
-          <main
-            className={cn(
-              "flex min-h-0 flex-col",
-              editorOpen
-                ? "max-h-[36vh] min-h-40 shrink-0 overflow-hidden border-b border-border"
-                : "flex-1"
-            )}
-          >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+          <main className="flex h-[clamp(16rem,34vh,24rem)] shrink-0 flex-col overflow-hidden border-b border-border">
             <KnowledgeFilters
               query={query}
               entryType={entryType}
@@ -291,18 +283,20 @@ export function Knowledge() {
             </div>
           </main>
 
-          {editorOpen && (
-            <KnowledgeEntryEditor
-              domains={domains}
-              entry={selectedEntry}
-              draft={draft}
-              saving={savingEntry}
-              onDraftChange={setDraft}
-              onSave={() => void saveEntry()}
-              onArchive={() => void archiveEntry()}
-              onClose={() => setEditorOpen(false)}
-            />
-          )}
+          <section className="min-h-0 flex-1 overflow-hidden bg-card/20">
+            {editorOpen && (
+              <KnowledgeEntryEditor
+                domains={domains}
+                entry={selectedEntry}
+                draft={draft}
+                saving={savingEntry}
+                onDraftChange={setDraft}
+                onSave={() => void saveEntry()}
+                onArchive={() => void archiveEntry()}
+                onClose={() => setEditorOpen(false)}
+              />
+            )}
+          </section>
         </div>
       </div>
     </div>
