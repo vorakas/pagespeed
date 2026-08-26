@@ -34,6 +34,9 @@ const RequirementQuestions = lazyWithReload(() =>
 )
 const Knowledge = lazyWithReload(() => import("@/pages/Knowledge").then((module) => ({ default: module.Knowledge })))
 const QaTesting = lazyWithReload(() => import("@/pages/QaTesting").then((module) => ({ default: module.QaTesting })))
+const DatabaseInfo = lazyWithReload(() =>
+  import("@/pages/DatabaseInfo").then((module) => ({ default: module.DatabaseInfo })),
+)
 
 function RouteFallback() {
   return (
@@ -70,6 +73,7 @@ export default function App() {
                       <Route path="dashboard/requirements" element={<RequirementQuestions />} />
                       <Route path="knowledge" element={<Knowledge />} />
                       <Route path="dashboard/qa-testing" element={<QaTesting />} />
+                      <Route path="database-info" element={<DatabaseInfo />} />
                       <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Route>

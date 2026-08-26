@@ -15,6 +15,7 @@ import {
   CircleHelp,
   BookOpen,
   ClipboardCheck,
+  Database,
   Settings,
   type LucideIcon,
 } from "lucide-react"
@@ -46,6 +47,7 @@ const NAV: NavSection[] = [
       { label: "Requirement Questions", href: "/dashboard/requirements", icon: CircleHelp },
       { label: "Knowledge", href: "/knowledge", icon: BookOpen },
       { label: "QA Testing", href: "/dashboard/qa-testing", icon: ClipboardCheck },
+      { label: "Database Info", href: "/database-info", icon: Database },
     ],
   },
   {
