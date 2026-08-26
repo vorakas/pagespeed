@@ -259,8 +259,8 @@ export function Knowledge() {
           onCreateDomain={() => void createDomain()}
         />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-          <main className="flex h-[clamp(16rem,34vh,24rem)] shrink-0 flex-col overflow-hidden border-b border-border">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 bg-background p-4">
+          <main className="flex h-[clamp(16rem,34vh,24rem)] shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-card/60 shadow-sm">
             <KnowledgeFilters
               query={query}
               entryType={entryType}
@@ -283,9 +283,7 @@ export function Knowledge() {
             </div>
           </main>
 
-          <div aria-hidden="true" className="h-4 shrink-0 border-y border-border/70 bg-border/20" />
-
-          <section className="min-h-0 flex-1 overflow-hidden bg-card/20">
+          <section className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-card/60 shadow-sm">
             {editorOpen && (
               <KnowledgeEntryEditor
                 domains={domains}
