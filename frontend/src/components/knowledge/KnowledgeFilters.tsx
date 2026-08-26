@@ -1,4 +1,4 @@
-import { Archive, Search } from "lucide-react"
+import { Archive, Search, X } from "lucide-react"
 
 import type { KnowledgeEntryType, KnowledgeStatus } from "@/types"
 import { KNOWLEDGE_ENTRY_TYPES, KNOWLEDGE_STATUSES } from "@/types"
@@ -49,9 +49,19 @@ export function KnowledgeFilters({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Search knowledge"
-            className="pl-9"
+            className="pl-9 pr-9"
             aria-label="Search knowledge entries"
           />
+          {query && (
+            <button
+              type="button"
+              onClick={() => onQueryChange("")}
+              className="absolute right-2 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Clear search"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
 
         <Select
