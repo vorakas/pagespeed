@@ -11,6 +11,7 @@ import type {
   KnowledgeDomain,
   KnowledgeDomainPayload,
   KnowledgeEntry,
+  KnowledgeEntryAttachment,
   KnowledgeEntryPayload,
   KnowledgeEntrySearchParams,
   Trigger,
@@ -1057,6 +1058,48 @@ class ApiClient {
     return this.request<KnowledgeEntry>(`/api/knowledge/entries/${entryId}/archive`, {
       method: "POST",
     })
+  }
+
+  async listKnowledgeEntryAttachments(entryId: number): Promise<KnowledgeEntryAttachment[]> {
+    return this.request<KnowledgeEntryAttachment[]>(`/api/knowledge/entries/${entryId}/attachments`)
+  }
+
+  async uploadKnowledgeEntryAttachments(entryId: number, files: File[]): Promise<KnowledgeEntryAttachment[]> {
+    const formData = new FormData()
+    files.forEach((file) => formData.append("files", file))
+
+    const response = await fetch(`${this.baseUrl}/api/knowledge/entries/${entryId}/attachments`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(errorData.error || `Request failed: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async downloadKnowledgeEntryAttachment(entryId: number, attachmentId: number): Promise<Blob> {
+    const response = await fetch(this.getKnowledgeEntryAttachmentFileUrl(entryId, attachmentId))
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(errorData.error || `Request failed: ${response.status}`)
+    }
+    return response.blob()
+  }
+
+  async deleteKnowledgeEntryAttachment(entryId: number, attachmentId: number): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/api/knowledge/entries/${entryId}/attachments/${attachmentId}`, {
+      method: "DELETE",
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      throw new Error(errorData.error || `Request failed: ${response.status}`)
+    }
+  }
+
+  getKnowledgeEntryAttachmentFileUrl(entryId: number, attachmentId: number): string {
+    return `${this.baseUrl}/api/knowledge/entries/${entryId}/attachments/${attachmentId}/file`
   }
 
   // ---------- Requirement Questions ----------

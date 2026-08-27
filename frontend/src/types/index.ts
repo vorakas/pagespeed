@@ -1796,6 +1796,15 @@ export interface KnowledgeEntry {
   updated_at: string
 }
 
+export interface KnowledgeEntryAttachment {
+  id: number
+  entry_id: number
+  filename: string
+  mime_type: string
+  file_size: number
+  created_at: string
+}
+
 export interface KnowledgeDomainPayload {
   name: string
   description?: string

@@ -643,6 +643,23 @@ class ConnectionManager:
             ON knowledge_entries(status)
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS knowledge_entry_attachments (
+                id SERIAL PRIMARY KEY,
+                entry_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+                file_size INTEGER NOT NULL,
+                file_bytes BYTEA NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (entry_id) REFERENCES knowledge_entries (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_entry_attachments_entry_id
+            ON knowledge_entry_attachments(entry_id)
+        """)
+
         self._create_postgres_requirement_tables(cursor)
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS mime_type TEXT")
@@ -1047,6 +1064,23 @@ class ConnectionManager:
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_knowledge_entries_status
             ON knowledge_entries(status)
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS knowledge_entry_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entry_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+                file_size INTEGER NOT NULL,
+                file_bytes BLOB NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (entry_id) REFERENCES knowledge_entries (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_knowledge_entry_attachments_entry_id
+            ON knowledge_entry_attachments(entry_id)
         """)
 
         # SQLite lacks IF NOT EXISTS for ALTER TABLE — tolerate failures.

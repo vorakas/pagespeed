@@ -1,9 +1,11 @@
 """Knowledge Ledger API blueprint."""
 
-from flask import Blueprint, jsonify, request
+from io import BytesIO
+
+from flask import Blueprint, jsonify, request, send_file
 
 from exceptions import ValidationError
-from services.knowledge_service import KnowledgeService
+from services.knowledge_service import MAX_ATTACHMENT_BYTES, KnowledgeService
 
 
 def create_knowledge_blueprint(knowledge_service: KnowledgeService) -> Blueprint:
@@ -73,6 +75,48 @@ def create_knowledge_blueprint(knowledge_service: KnowledgeService) -> Blueprint
     @bp.route("/entries/<int:entry_id>/archive", methods=["POST"])
     def archive_entry(entry_id: int):
         return jsonify(knowledge_service.archive_entry(entry_id))
+
+    @bp.route("/entries/<int:entry_id>/attachments", methods=["GET"])
+    def list_entry_attachments(entry_id: int):
+        return jsonify(knowledge_service.list_entry_attachments(entry_id))
+
+    @bp.route("/entries/<int:entry_id>/attachments", methods=["POST"])
+    def upload_entry_attachments(entry_id: int):
+        uploaded_files = request.files.getlist("files")
+        if not uploaded_files:
+            raise ValidationError("At least one attachment file is required")
+
+        attachments = []
+        for uploaded_file in uploaded_files:
+            file_bytes = uploaded_file.read()
+            if len(file_bytes) > MAX_ATTACHMENT_BYTES:
+                raise ValidationError(
+                    f"Attachment '{uploaded_file.filename}' exceeds the 10 MB limit"
+                )
+            attachments.append(
+                knowledge_service.add_entry_attachment(
+                    entry_id=entry_id,
+                    filename=uploaded_file.filename,
+                    mime_type=uploaded_file.mimetype,
+                    file_bytes=file_bytes,
+                )
+            )
+        return jsonify(attachments), 201
+
+    @bp.route("/entries/<int:entry_id>/attachments/<int:attachment_id>/file", methods=["GET"])
+    def download_entry_attachment(entry_id: int, attachment_id: int):
+        attachment = knowledge_service.get_entry_attachment(entry_id, attachment_id)
+        return send_file(
+            BytesIO(attachment["file_bytes"]),
+            mimetype=attachment["mime_type"],
+            as_attachment=True,
+            download_name=attachment["filename"],
+        )
+
+    @bp.route("/entries/<int:entry_id>/attachments/<int:attachment_id>", methods=["DELETE"])
+    def delete_entry_attachment(entry_id: int, attachment_id: int):
+        knowledge_service.delete_entry_attachment(entry_id, attachment_id)
+        return "", 204
 
     return bp
 

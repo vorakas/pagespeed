@@ -9,7 +9,14 @@ import { KnowledgeFilters } from "@/components/knowledge/KnowledgeFilters"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { api } from "@/services/api"
-import type { KnowledgeDomain, KnowledgeEntry, KnowledgeEntryPayload, KnowledgeEntryType, KnowledgeStatus } from "@/types"
+import type {
+  KnowledgeDomain,
+  KnowledgeEntry,
+  KnowledgeEntryAttachment,
+  KnowledgeEntryPayload,
+  KnowledgeEntryType,
+  KnowledgeStatus,
+} from "@/types"
 
 const emptyDraft = (domainId: number | null): KnowledgeEntryDraft => ({
   domain_id: domainId,
@@ -60,7 +67,11 @@ export function Knowledge() {
   const [loadingEntries, setLoadingEntries] = useState(false)
   const [savingDomain, setSavingDomain] = useState(false)
   const [savingEntry, setSavingEntry] = useState(false)
+  const [attachments, setAttachments] = useState<KnowledgeEntryAttachment[]>([])
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false)
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false)
   const entryRequestIdRef = useRef(0)
+  const attachmentRequestIdRef = useRef(0)
 
   const activeDomains = useMemo(
     () => domains.filter((domain) => !domain.archived_at),
@@ -68,6 +79,27 @@ export function Knowledge() {
   )
 
   const selectedEntryId = selectedEntry?.id ?? null
+
+  const loadAttachments = useCallback(async (entryId: number) => {
+    const requestId = attachmentRequestIdRef.current + 1
+    attachmentRequestIdRef.current = requestId
+    setAttachmentsLoading(true)
+    setAttachments([])
+    try {
+      const loadedAttachments = await api.listKnowledgeEntryAttachments(entryId)
+      if (requestId === attachmentRequestIdRef.current) {
+        setAttachments(loadedAttachments)
+      }
+    } catch (error) {
+      if (requestId === attachmentRequestIdRef.current) {
+        toast.error("Could not load attachments", { description: getErrorMessage(error) })
+      }
+    } finally {
+      if (requestId === attachmentRequestIdRef.current) {
+        setAttachmentsLoading(false)
+      }
+    }
+  }, [])
 
   const loadDomains = useCallback(async () => {
     setLoadingDomains(true)
@@ -121,6 +153,17 @@ export function Knowledge() {
   useEffect(() => {
     void loadEntries()
   }, [loadEntries])
+
+  useEffect(() => {
+    if (!selectedEntryId) {
+      attachmentRequestIdRef.current += 1
+      setAttachments([])
+      setAttachmentsLoading(false)
+      return
+    }
+
+    void loadAttachments(selectedEntryId)
+  }, [loadAttachments, selectedEntryId])
 
   const startNewEntry = () => {
     const domainId =
@@ -208,12 +251,60 @@ export function Knowledge() {
       await api.archiveKnowledgeEntry(selectedEntry.id)
       setEditorOpen(false)
       setSelectedEntry(null)
+      setAttachments([])
       await loadEntries()
       toast.success("Entry archived")
     } catch (error) {
       toast.error("Could not archive entry", { description: getErrorMessage(error) })
     } finally {
       setSavingEntry(false)
+    }
+  }
+
+  const uploadAttachments = async (files: File[]) => {
+    if (!selectedEntryId || files.length === 0) return
+
+    setAttachmentsUploading(true)
+    try {
+      const uploadedAttachments = await api.uploadKnowledgeEntryAttachments(selectedEntryId, files)
+      setAttachments((currentAttachments) => [...currentAttachments, ...uploadedAttachments])
+      toast.success(files.length === 1 ? "Attachment uploaded" : "Attachments uploaded")
+    } catch (error) {
+      toast.error("Could not upload attachment", { description: getErrorMessage(error) })
+    } finally {
+      setAttachmentsUploading(false)
+    }
+  }
+
+  const downloadAttachment = async (attachment: KnowledgeEntryAttachment) => {
+    if (!selectedEntryId) return
+
+    try {
+      const blob = await api.downloadKnowledgeEntryAttachment(selectedEntryId, attachment.id)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = attachment.filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      toast.error("Could not download attachment", { description: getErrorMessage(error) })
+    }
+  }
+
+  const deleteAttachment = async (attachment: KnowledgeEntryAttachment) => {
+    if (!selectedEntryId) return
+
+    try {
+      await api.deleteKnowledgeEntryAttachment(selectedEntryId, attachment.id)
+      setAttachments((currentAttachments) =>
+        currentAttachments.filter((currentAttachment) => currentAttachment.id !== attachment.id)
+      )
+      toast.success("Attachment deleted")
+    } catch (error) {
+      toast.error("Could not delete attachment", { description: getErrorMessage(error) })
     }
   }
 
@@ -290,6 +381,17 @@ export function Knowledge() {
                 entry={selectedEntry}
                 draft={draft}
                 saving={savingEntry}
+                attachments={attachments}
+                attachmentsLoading={attachmentsLoading}
+                attachmentsUploading={attachmentsUploading}
+                getAttachmentUrl={(attachment) =>
+                  selectedEntryId
+                    ? api.getKnowledgeEntryAttachmentFileUrl(selectedEntryId, attachment.id)
+                    : ""
+                }
+                onUploadAttachments={(files) => void uploadAttachments(files)}
+                onDownloadAttachment={(attachment) => void downloadAttachment(attachment)}
+                onDeleteAttachment={(attachment) => void deleteAttachment(attachment)}
                 onDraftChange={setDraft}
                 onSave={() => void saveEntry()}
                 onArchive={() => void archiveEntry()}

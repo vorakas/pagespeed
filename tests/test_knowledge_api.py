@@ -1,3 +1,5 @@
+from io import BytesIO
+
 from app import create_app
 
 
@@ -152,3 +154,103 @@ def test_knowledge_api_separates_archived_entries_from_archived_domains(
     assert [result["id"] for result in include_domains_response.get_json()] == [
         entry["id"]
     ]
+
+
+def test_knowledge_entry_attachment_flow(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PHAROS_DISABLE_SCHEDULER", "1")
+    app = create_app()
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    domain_response = client.post(
+        "/api/knowledge/domains",
+        json={"name": "Testing Tips"},
+    )
+    domain = domain_response.get_json()
+    entry_response = client.post(
+        "/api/knowledge/entries",
+        json={
+            "domain_id": domain["id"],
+            "entry_type": "Process",
+            "title": "Kiosk Testing",
+            "details": "Chrome DevTools kiosk notes.",
+            "source": "",
+            "tags": ["kiosk"],
+        },
+    )
+    entry = entry_response.get_json()
+
+    upload_response = client.post(
+        f"/api/knowledge/entries/{entry['id']}/attachments",
+        data={
+            "files": [
+                (BytesIO(b"plain evidence"), "notes.txt"),
+                (BytesIO(b"\x89PNG\r\n\x1a\nimage-bytes"), "kiosk.png"),
+            ],
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert upload_response.status_code == 201
+    attachments = upload_response.get_json()
+    assert [attachment["filename"] for attachment in attachments] == [
+        "notes.txt",
+        "kiosk.png",
+    ]
+    assert attachments[0]["file_size"] == len(b"plain evidence")
+    assert "file_bytes" not in attachments[0]
+
+    list_response = client.get(f"/api/knowledge/entries/{entry['id']}/attachments")
+    assert list_response.status_code == 200
+    listed = list_response.get_json()
+    assert [attachment["filename"] for attachment in listed] == ["notes.txt", "kiosk.png"]
+
+    file_response = client.get(
+        f"/api/knowledge/entries/{entry['id']}/attachments/{listed[0]['id']}/file"
+    )
+    assert file_response.status_code == 200
+    assert file_response.data == b"plain evidence"
+    assert file_response.headers["Content-Disposition"].startswith("attachment;")
+
+    delete_response = client.delete(
+        f"/api/knowledge/entries/{entry['id']}/attachments/{listed[0]['id']}"
+    )
+    assert delete_response.status_code == 204
+
+    remaining_response = client.get(f"/api/knowledge/entries/{entry['id']}/attachments")
+    remaining = remaining_response.get_json()
+    assert [attachment["filename"] for attachment in remaining] == ["kiosk.png"]
+
+
+def test_knowledge_entry_attachment_rejects_oversized_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PHAROS_DISABLE_SCHEDULER", "1")
+    app = create_app()
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    domain_response = client.post("/api/knowledge/domains", json={"name": "Testing Tips"})
+    domain = domain_response.get_json()
+    entry_response = client.post(
+        "/api/knowledge/entries",
+        json={
+            "domain_id": domain["id"],
+            "entry_type": "Process",
+            "title": "Kiosk Testing",
+            "details": "Chrome DevTools kiosk notes.",
+        },
+    )
+    entry = entry_response.get_json()
+
+    response = client.post(
+        f"/api/knowledge/entries/{entry['id']}/attachments",
+        data={"files": [(BytesIO(b"x" * (10 * 1024 * 1024 + 1)), "large.bin")]},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "Attachment 'large.bin' exceeds the 10 MB limit",
+    }

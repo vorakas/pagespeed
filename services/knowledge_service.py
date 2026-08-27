@@ -4,6 +4,8 @@ from data_access.knowledge_repository import KnowledgeRepository
 from enums import KnowledgeEntryType, KnowledgeStatus
 from exceptions import ValidationError
 
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
 
 class KnowledgeService:
     """Validate and normalize Knowledge Ledger data before persistence."""
@@ -128,6 +130,55 @@ class KnowledgeService:
             raise ValidationError("Entry not found")
         return self.get_entry(entry_id)
 
+    def list_entry_attachments(self, entry_id: int) -> list[dict]:
+        self._require_entry(entry_id)
+        return self._repository.list_entry_attachments(entry_id)
+
+    def add_entry_attachment(
+        self,
+        entry_id: int,
+        filename: str,
+        mime_type: str,
+        file_bytes: bytes,
+    ) -> dict:
+        self._require_entry(entry_id)
+        clean_filename = self._trim(filename)
+        if not clean_filename:
+            raise ValidationError("Filename is required")
+        if not file_bytes:
+            raise ValidationError("Attachment file is required")
+        if len(file_bytes) > MAX_ATTACHMENT_BYTES:
+            raise ValidationError("Attachment must be 10 MB or smaller")
+
+        attachment_id = self._repository.create_entry_attachment(
+            entry_id=entry_id,
+            filename=clean_filename,
+            mime_type=self._trim(mime_type) or "application/octet-stream",
+            file_size=len(file_bytes),
+            file_bytes=file_bytes,
+        )
+        attachment = self._repository.get_entry_attachment(entry_id, attachment_id)
+        if not attachment:
+            raise ValidationError("Attachment could not be saved")
+        attachment.pop("file_bytes", None)
+        return attachment
+
+    def get_entry_attachment(self, entry_id: int, attachment_id: int) -> dict:
+        self._require_entry(entry_id)
+        attachment = self._repository.get_entry_attachment(entry_id, attachment_id)
+        if not attachment:
+            raise ValidationError("Attachment not found")
+        file_bytes = attachment.get("file_bytes")
+        if isinstance(file_bytes, memoryview):
+            attachment["file_bytes"] = file_bytes.tobytes()
+        return attachment
+
+    def delete_entry_attachment(self, entry_id: int, attachment_id: int) -> bool:
+        self._require_entry(entry_id)
+        if not self._repository.delete_entry_attachment(entry_id, attachment_id):
+            raise ValidationError("Attachment not found")
+        return True
+
     def _normalize_entry_payload(self, data: dict, require_fields: bool) -> dict:
         domain_id = self._normalize_domain_id(data.get("domain_id"), required=require_fields)
 
@@ -177,6 +228,12 @@ class KnowledgeService:
             raise ValidationError("domain_id must be a positive integer")
 
         return domain_id
+
+    def _require_entry(self, entry_id: int) -> dict:
+        entry = self._repository.get_entry(entry_id)
+        if not entry:
+            raise ValidationError("Entry not found")
+        return entry
 
     def _validate_entry_type(self, value: str | None, required: bool) -> str | None:
         value = self._trim(value)

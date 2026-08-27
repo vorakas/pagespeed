@@ -189,6 +189,75 @@ class KnowledgeRepository:
             )
             return cursor.rowcount > 0
 
+    def list_entry_attachments(self, entry_id: int) -> list[dict]:
+        """List attachment metadata for an entry."""
+        ph = self._cm.placeholder()
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT id, entry_id, filename, mime_type, file_size, created_at
+                FROM knowledge_entry_attachments
+                WHERE entry_id = {ph}
+                ORDER BY created_at ASC, id ASC
+                """,
+                (entry_id,),
+            )
+            return self._cm.rows_to_dicts(cursor)
+
+    def get_entry_attachment(self, entry_id: int, attachment_id: int) -> dict | None:
+        """Get a single attachment, including file bytes."""
+        ph = self._cm.placeholder()
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT id, entry_id, filename, mime_type, file_size, file_bytes, created_at
+                FROM knowledge_entry_attachments
+                WHERE entry_id = {ph} AND id = {ph}
+                """,
+                (entry_id, attachment_id),
+            )
+            rows = self._cm.rows_to_dicts(cursor)
+            return rows[0] if rows else None
+
+    def create_entry_attachment(
+        self,
+        entry_id: int,
+        filename: str,
+        mime_type: str,
+        file_size: int,
+        file_bytes: bytes,
+    ) -> int:
+        """Create an entry attachment."""
+        ph = self._cm.placeholder()
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO knowledge_entry_attachments
+                (entry_id, filename, mime_type, file_size, file_bytes)
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph})
+                {self._cm.returning_id()}
+                """,
+                (entry_id, filename, mime_type, file_size, file_bytes),
+            )
+            return self._cm.last_insert_id(cursor)
+
+    def delete_entry_attachment(self, entry_id: int, attachment_id: int) -> bool:
+        """Delete a single entry attachment."""
+        ph = self._cm.placeholder()
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                DELETE FROM knowledge_entry_attachments
+                WHERE entry_id = {ph} AND id = {ph}
+                """,
+                (entry_id, attachment_id),
+            )
+            return cursor.rowcount > 0
+
     def search_entries(
         self,
         query: str = "",
