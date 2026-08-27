@@ -223,7 +223,6 @@ export function KnowledgeEntryEditor({
                 aria-label="Entry details"
               />
             </label>
-            <LinkPreview value={draft.details} />
           </div>
 
           <div className="space-y-1.5">
