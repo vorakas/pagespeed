@@ -1,8 +1,9 @@
-import { type ChangeEvent, useRef } from "react"
+import { type ChangeEvent, useRef, useState } from "react"
 import { Archive, Download, ExternalLink, File, Image, Loader2, Paperclip, Save, Trash2, Upload, X } from "lucide-react"
 
 import type { KnowledgeDomain, KnowledgeEntry, KnowledgeEntryAttachment, KnowledgeEntryType, KnowledgeStatus } from "@/types"
 import { KNOWLEDGE_ENTRY_TYPES, KNOWLEDGE_STATUSES } from "@/types"
+import { AttachmentPreviewDialog } from "@/components/knowledge/AttachmentPreviewDialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,6 +36,7 @@ interface KnowledgeEntryEditorProps {
   attachmentsLoading: boolean
   attachmentsUploading: boolean
   getAttachmentUrl: (attachment: KnowledgeEntryAttachment) => string
+  onFetchAttachmentBlob: (attachment: KnowledgeEntryAttachment) => Promise<Blob>
   onUploadAttachments: (files: File[]) => void
   onDownloadAttachment: (attachment: KnowledgeEntryAttachment) => void
   onDeleteAttachment: (attachment: KnowledgeEntryAttachment) => void
@@ -102,6 +104,7 @@ export function KnowledgeEntryEditor({
   attachmentsLoading,
   attachmentsUploading,
   getAttachmentUrl,
+  onFetchAttachmentBlob,
   onUploadAttachments,
   onDownloadAttachment,
   onDeleteAttachment,
@@ -111,6 +114,7 @@ export function KnowledgeEntryEditor({
   onClose,
 }: KnowledgeEntryEditorProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [previewAttachment, setPreviewAttachment] = useState<KnowledgeEntryAttachment | null>(null)
   const selectableDomains = domains.filter(
     (domain) => !domain.archived_at || (entry && domain.id === entry.domain_id)
   )
@@ -318,7 +322,12 @@ export function KnowledgeEntryEditor({
                       key={attachment.id}
                       className="min-w-0 overflow-hidden rounded-md border border-border bg-background/60"
                     >
-                      <div className="flex h-24 items-center justify-center bg-muted/30">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewAttachment(attachment)}
+                        className="flex h-24 w-full items-center justify-center bg-muted/30 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label={`Preview ${attachment.filename}`}
+                      >
                         {isImage ? (
                           <img
                             src={getAttachmentUrl(attachment)}
@@ -328,7 +337,7 @@ export function KnowledgeEntryEditor({
                         ) : (
                           <File className="size-8 text-muted-foreground" aria-hidden="true" />
                         )}
-                      </div>
+                      </button>
                       <div className="flex items-center gap-2 p-2">
                         {isImage ? (
                           <Image className="size-4 shrink-0 text-primary" aria-hidden="true" />
@@ -396,6 +405,14 @@ export function KnowledgeEntryEditor({
           )}
         </div>
       </div>
+
+      <AttachmentPreviewDialog
+        attachment={previewAttachment}
+        imageUrl={previewAttachment ? getAttachmentUrl(previewAttachment) : ""}
+        onFetchBlob={onFetchAttachmentBlob}
+        onDownload={onDownloadAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
     </section>
   )
 }

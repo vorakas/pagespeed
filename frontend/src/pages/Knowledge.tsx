@@ -294,6 +294,14 @@ export function Knowledge() {
     }
   }
 
+  const fetchAttachmentBlob = useCallback(
+    (attachment: KnowledgeEntryAttachment) => {
+      if (!selectedEntryId) return Promise.reject(new Error("No entry selected"))
+      return api.downloadKnowledgeEntryAttachment(selectedEntryId, attachment.id)
+    },
+    [selectedEntryId]
+  )
+
   const deleteAttachment = async (attachment: KnowledgeEntryAttachment) => {
     if (!selectedEntryId) return
 
@@ -389,6 +397,7 @@ export function Knowledge() {
                     ? api.getKnowledgeEntryAttachmentFileUrl(selectedEntryId, attachment.id)
                     : ""
                 }
+                onFetchAttachmentBlob={fetchAttachmentBlob}
                 onUploadAttachments={(files) => void uploadAttachments(files)}
                 onDownloadAttachment={(attachment) => void downloadAttachment(attachment)}
                 onDeleteAttachment={(attachment) => void deleteAttachment(attachment)}
