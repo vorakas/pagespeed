@@ -98,12 +98,31 @@ def test_rejects_incomplete_structured_link(tmp_path):
         service.create_change(payload)
 
 
+def test_rejects_archived_status_on_create_and_update(tmp_path):
+    service = make_service(tmp_path)
+    payload = valid_payload()
+    payload["status"] = "Archived"
+
+    with pytest.raises(ValidationError, match="Archived status is only set by archive_change"):
+        service.create_change(payload)
+
+    created = service.create_change(valid_payload())
+    update_payload = valid_payload()
+    update_payload["status"] = "Archived"
+
+    with pytest.raises(ValidationError, match="Archived status is only set by archive_change"):
+        service.update_change(created["id"], update_payload)
+
+
 def test_attachment_validation_and_lookup(tmp_path):
     service = make_service(tmp_path)
     change = service.create_change(valid_payload())
 
     with pytest.raises(ValidationError, match="Attachment filename is required"):
         service.add_change_attachment(change["id"], "", "text/plain", 4, b"test")
+
+    with pytest.raises(ValidationError, match="Attachment file is required"):
+        service.add_change_attachment(change["id"], "empty.txt", "text/plain", 0, b"")
 
     with pytest.raises(ValidationError, match="exceeds the 10 MB limit"):
         service.add_change_attachment(
@@ -117,9 +136,10 @@ def test_attachment_validation_and_lookup(tmp_path):
     attachment = service.add_change_attachment(
         change["id"],
         "note.txt",
-        "text/plain",
+        "",
         4,
         b"test",
     )
     assert attachment["filename"] == "note.txt"
+    assert attachment["mime_type"] == "application/octet-stream"
     assert service.get_change_attachment(change["id"], attachment["id"])["file_bytes"] == b"test"

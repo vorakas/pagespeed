@@ -9,6 +9,7 @@ from exceptions import ValidationError
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 VALID_STATUSES = {"Active", "Draft", "Superseded", "Archived"}
+WRITABLE_STATUSES = {"Active", "Draft", "Superseded"}
 
 
 class TestCaseDatabaseService:
@@ -75,12 +76,14 @@ class TestCaseDatabaseService:
         mime_type = (mime_type or "").strip()
         if not filename:
             raise ValidationError("Attachment filename is required")
+        if not file_bytes:
+            raise ValidationError("Attachment file is required")
         if file_size > MAX_ATTACHMENT_BYTES or len(file_bytes) > MAX_ATTACHMENT_BYTES:
             raise ValidationError(f"Attachment '{filename}' exceeds the 10 MB limit")
         attachment_id = self._repository.create_change_attachment(
             change_id=change_id,
             filename=filename,
-            mime_type=mime_type,
+            mime_type=mime_type or "application/octet-stream",
             file_size=file_size,
             file_bytes=file_bytes,
         )
@@ -115,7 +118,10 @@ class TestCaseDatabaseService:
             "after_state": self._trim(data.get("after_state")),
             "changed_by": self._trim(data.get("changed_by")),
             "change_date": self._trim(data.get("change_date")),
-            "status": self._validate_status(data.get("status") or "Active"),
+            "status": self._validate_status(
+                data.get("status") or "Active",
+                allow_archived=False,
+            ),
             "tags": self._normalize_tags(data.get("tags")),
             "associated_bugs": self._normalize_links(
                 data.get("associated_bugs"),
@@ -166,7 +172,12 @@ class TestCaseDatabaseService:
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValidationError(message)
 
-    def _validate_status(self, status: str | None, required: bool = True) -> str | None:
+    def _validate_status(
+        self,
+        status: str | None,
+        required: bool = True,
+        allow_archived: bool = True,
+    ) -> str | None:
         value = self._trim(status)
         if not value:
             if required:
@@ -174,6 +185,8 @@ class TestCaseDatabaseService:
             return None
         if value not in VALID_STATUSES:
             raise ValidationError(f"Status must be one of: {', '.join(sorted(VALID_STATUSES))}")
+        if not allow_archived and value not in WRITABLE_STATUSES:
+            raise ValidationError("Archived status is only set by archive_change")
         return value
 
     def _normalize_tags(self, value: object) -> list[str]:
