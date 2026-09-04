@@ -1773,6 +1773,65 @@ export type KnowledgeEntryType =
 
 export type KnowledgeStatus = "Draft" | "Active" | "Superseded" | "Archived"
 
+export type TestCaseChangeStatus = "Draft" | "Active" | "Superseded" | "Archived"
+
+export interface TestCaseChangeLink {
+  id?: number
+  label: string
+  url: string
+}
+
+export interface TestCaseChangeAttachment {
+  id: number
+  change_id: number
+  filename: string
+  mime_type: string
+  file_size: number
+  created_at: string
+}
+
+export interface TestCaseChange {
+  id: number
+  test_case_id: string
+  title: string
+  test_case_url: string
+  change_summary: string
+  before_state: string
+  after_state: string
+  changed_by: string
+  change_date: string
+  status: TestCaseChangeStatus
+  tags: string[]
+  associated_bugs: TestCaseChangeLink[]
+  associated_tasks: TestCaseChangeLink[]
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+}
+
+export interface TestCaseChangePayload {
+  test_case_id: string
+  title: string
+  test_case_url: string
+  change_summary: string
+  before_state: string
+  after_state: string
+  changed_by: string
+  change_date: string
+  status: TestCaseChangeStatus
+  tags: string[]
+  associated_bugs: TestCaseChangeLink[]
+  associated_tasks: TestCaseChangeLink[]
+}
+
+export interface TestCaseChangeSearchParams {
+  q?: string
+  test_case_id?: string
+  status?: TestCaseChangeStatus | "all"
+  tag?: string
+  include_archived?: boolean
+}
+
 export interface KnowledgeDomain {
   id: number
   name: string

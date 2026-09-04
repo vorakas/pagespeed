@@ -14,6 +14,10 @@ import type {
   KnowledgeEntryAttachment,
   KnowledgeEntryPayload,
   KnowledgeEntrySearchParams,
+  TestCaseChange,
+  TestCaseChangeAttachment,
+  TestCaseChangePayload,
+  TestCaseChangeSearchParams,
   Trigger,
   TriggerFormData,
   SchedulePreset,
@@ -1100,6 +1104,80 @@ class ApiClient {
 
   getKnowledgeEntryAttachmentFileUrl(entryId: number, attachmentId: number): string {
     return `${this.baseUrl}/api/knowledge/entries/${entryId}/attachments/${attachmentId}/file`
+  }
+
+  // ---------- Test Case Database ----------
+
+  async searchTestCaseChanges(params: TestCaseChangeSearchParams = {}): Promise<TestCaseChange[]> {
+    const searchParams = new URLSearchParams()
+    if (params.q) searchParams.set("q", params.q)
+    if (params.test_case_id) searchParams.set("test_case_id", params.test_case_id)
+    if (params.status && params.status !== "all") searchParams.set("status", params.status)
+    if (params.tag) searchParams.set("tag", params.tag)
+    if (params.include_archived) searchParams.set("include_archived", "true")
+    const queryString = searchParams.toString()
+    return this.request<TestCaseChange[]>(
+      `/api/test-case-database/changes${queryString ? `?${queryString}` : ""}`
+    )
+  }
+
+  async createTestCaseChange(data: TestCaseChangePayload): Promise<TestCaseChange> {
+    return this.request<TestCaseChange>("/api/test-case-database/changes", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateTestCaseChange(changeId: number, data: TestCaseChangePayload): Promise<TestCaseChange> {
+    return this.request<TestCaseChange>(`/api/test-case-database/changes/${changeId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async archiveTestCaseChange(changeId: number): Promise<TestCaseChange> {
+    return this.request<TestCaseChange>(`/api/test-case-database/changes/${changeId}/archive`, {
+      method: "POST",
+    })
+  }
+
+  async listTestCaseChangeAttachments(changeId: number): Promise<TestCaseChangeAttachment[]> {
+    return this.request<TestCaseChangeAttachment[]>(
+      `/api/test-case-database/changes/${changeId}/attachments`
+    )
+  }
+
+  async uploadTestCaseChangeAttachments(
+    changeId: number,
+    files: File[]
+  ): Promise<TestCaseChangeAttachment[]> {
+    const formData = new FormData()
+    files.forEach((file) => formData.append("files", file))
+
+    const response = await fetch(`${this.baseUrl}/api/test-case-database/changes/${changeId}/attachments`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "Upload failed" }))
+      throw new Error(error.error || "Upload failed")
+    }
+    return response.json()
+  }
+
+  async downloadTestCaseChangeAttachment(changeId: number, attachmentId: number): Promise<Blob> {
+    const response = await fetch(
+      `${this.baseUrl}/api/test-case-database/changes/${changeId}/attachments/${attachmentId}/file`
+    )
+    if (!response.ok) throw new Error("Download failed")
+    return response.blob()
+  }
+
+  async deleteTestCaseChangeAttachment(changeId: number, attachmentId: number): Promise<void> {
+    await this.request<void>(
+      `/api/test-case-database/changes/${changeId}/attachments/${attachmentId}`,
+      { method: "DELETE" }
+    )
   }
 
   // ---------- Requirement Questions ----------
