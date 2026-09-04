@@ -31,7 +31,13 @@ class ConnectionManager:
     """
 
     def __init__(self, db_url: str | None = None) -> None:
-        self._db_url: str | None = db_url or DATABASE_URL
+        configured_url = db_url or DATABASE_URL
+        self._sqlite_path = _SQLITE_PATH
+        if db_url and self._looks_like_sqlite_path(db_url):
+            self._db_url = None
+            self._sqlite_path = db_url
+        else:
+            self._db_url = configured_url
         self._pool: psycopg2.pool.ThreadedConnectionPool | None = None
         self._pool_lock = threading.Lock()
 
@@ -64,7 +70,7 @@ class ConnectionManager:
         """Borrow a connection from the pool or open a local SQLite connection."""
         if self.is_postgres:
             return self._get_pool().getconn()
-        conn = sqlite3.connect(_SQLITE_PATH)
+        conn = sqlite3.connect(self._sqlite_path)
         conn.execute("PRAGMA foreign_keys = ON")
         # Concurrent writers wait up to 30s for a lock instead of raising
         # "database is locked" (the interleaved scheduler runs multiple workers).
@@ -169,6 +175,13 @@ class ConnectionManager:
     def _is_integrity_error(self, exc: Exception) -> bool:
         """Backward-compatible alias for older repository code."""
         return self.is_integrity_error(exc)
+
+    @staticmethod
+    def _looks_like_sqlite_path(value: str) -> bool:
+        lowered = value.lower()
+        if "://" in lowered or "=" in value:
+            return False
+        return lowered.endswith((".db", ".sqlite", ".sqlite3"))
 
     # ------------------------------------------------------------------
     # Result-set conversion

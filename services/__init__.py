@@ -16,6 +16,7 @@ from services.ai_openai import OpenAIClient
 from services.ai_orchestrator import AIOrchestrator
 from services.trigger_service import TriggerService
 from services.knowledge_service import KnowledgeService
+from services.test_case_database_service import TestCaseDatabaseService
 
 __all__ = [
     "validate_required_fields",
@@ -24,6 +25,7 @@ __all__ = [
     "TestingService",
     "TriggerService",
     "KnowledgeService",
+    "TestCaseDatabaseService",
     "PageSpeedClient",
     "NewRelicClient",
     "AzureLogAnalyticsClient",
