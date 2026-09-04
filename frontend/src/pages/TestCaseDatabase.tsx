@@ -6,7 +6,9 @@ import { TestCaseChangeEditor } from "@/components/test-case-database/TestCaseCh
 import { TestCaseChangeFilters } from "@/components/test-case-database/TestCaseChangeFilters"
 import { TestCaseChangeList } from "@/components/test-case-database/TestCaseChangeList"
 import { PageHeader } from "@/components/layout/PageHeader"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import { Button } from "@/components/ui/button"
+import { useUnsavedChangesBlocker } from "@/hooks/use-unsaved-changes-blocker"
 import { api } from "@/services/api"
 import type {
   TestCaseChange,
@@ -31,10 +33,13 @@ export function TestCaseDatabase() {
   const [saving, setSaving] = useState(false)
   const [attachmentsLoading, setAttachmentsLoading] = useState(false)
   const [attachmentsUploading, setAttachmentsUploading] = useState(false)
+  const [editorDirty, setEditorDirty] = useState(false)
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
   const requestIdRef = useRef(0)
   const attachmentRequestIdRef = useRef(0)
 
   const selectedId = selectedChange?.id ?? null
+  const navigationBlocker = useUnsavedChangesBlocker(editorDirty)
 
   const loadChanges = useCallback(async () => {
     const requestId = requestIdRef.current + 1
@@ -196,10 +201,26 @@ export function TestCaseDatabase() {
     }
   }
 
-  function startNewChange() {
+  function selectChange(change: TestCaseChange) {
+    if (editorDirty && change !== selectedChange) {
+      setPendingAction(() => () => setSelectedChange(change))
+      return
+    }
+    setSelectedChange(change)
+  }
+
+  function applyStartNewChange() {
     setSelectedChange(null)
     setAttachments([])
     setAttachmentsLoading(false)
+  }
+
+  function startNewChange() {
+    if (editorDirty && selectedChange !== null) {
+      setPendingAction(() => applyStartNewChange)
+      return
+    }
+    applyStartNewChange()
   }
 
   return (
@@ -249,7 +270,7 @@ export function TestCaseDatabase() {
               changes={changes}
               selectedId={selectedId}
               loading={loading}
-              onSelect={setSelectedChange}
+              onSelect={selectChange}
             />
           </div>
         </main>
@@ -261,6 +282,7 @@ export function TestCaseDatabase() {
             attachmentsLoading={attachmentsLoading}
             attachmentsUploading={attachmentsUploading}
             saving={saving}
+            onDirtyChange={setEditorDirty}
             onSave={saveChange}
             onArchive={archiveChange}
             onUploadAttachments={uploadAttachments}
@@ -269,6 +291,29 @@ export function TestCaseDatabase() {
           />
         </section>
       </div>
+
+      <ConfirmDialog
+        open={pendingAction !== null || navigationBlocker.state === "blocked"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingAction(null)
+            if (navigationBlocker.state === "blocked") navigationBlocker.reset()
+          }
+        }}
+        title="Unsaved changes"
+        description="This change has unsaved edits. Keep editing to save them, or discard the edits to continue."
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        destructive
+        onConfirm={() => {
+          if (pendingAction) {
+            pendingAction()
+            setPendingAction(null)
+          } else if (navigationBlocker.state === "blocked") {
+            navigationBlocker.proceed()
+          }
+        }}
+      />
     </div>
   )
 }

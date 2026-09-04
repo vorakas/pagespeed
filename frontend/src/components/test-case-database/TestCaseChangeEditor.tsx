@@ -41,6 +41,7 @@ interface TestCaseChangeEditorProps {
   attachmentsLoading: boolean
   attachmentsUploading: boolean
   saving: boolean
+  onDirtyChange: (dirty: boolean) => void
   onSave: (draft: TestCaseChangePayload) => Promise<void>
   onArchive: (changeId: number) => Promise<void>
   onUploadAttachments: (files: File[]) => Promise<void>
@@ -54,6 +55,7 @@ export function TestCaseChangeEditor({
   attachmentsLoading,
   attachmentsUploading,
   saving,
+  onDirtyChange,
   onSave,
   onArchive,
   onUploadAttachments,
@@ -65,13 +67,12 @@ export function TestCaseChangeEditor({
   const isSaved = selectedChange !== null
   const isArchived = selectedChange?.archived_at !== null && selectedChange?.archived_at !== undefined
 
-  useEffect(() => {
+  const baselineDraft = useMemo<TestCaseChangePayload>(() => {
     if (!selectedChange) {
-      setDraft({ ...EMPTY_DRAFT, change_date: new Date().toISOString().slice(0, 10) })
-      return
+      return { ...EMPTY_DRAFT, change_date: new Date().toISOString().slice(0, 10) }
     }
 
-    setDraft({
+    return {
       test_case_id: selectedChange.test_case_id,
       title: selectedChange.title,
       test_case_url: selectedChange.test_case_url,
@@ -84,8 +85,21 @@ export function TestCaseChangeEditor({
       tags: selectedChange.tags,
       associated_bugs: selectedChange.associated_bugs,
       associated_tasks: selectedChange.associated_tasks,
-    })
+    }
   }, [selectedChange])
+
+  useEffect(() => {
+    setDraft(baselineDraft)
+  }, [baselineDraft])
+
+  const isDirty = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(baselineDraft),
+    [baselineDraft, draft]
+  )
+
+  useEffect(() => {
+    onDirtyChange(isDirty)
+  }, [isDirty, onDirtyChange])
 
   const tagText = useMemo(() => draft.tags.join(", "), [draft.tags])
 

@@ -1,5 +1,12 @@
 import { Suspense } from "react"
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Navigate,
+  Outlet,
+  Route,
+  RouterProvider,
+} from "react-router-dom"
 
 import { SitesProvider } from "@/context/SitesContext"
 import { BatchTestProvider } from "@/context/BatchTestContext"
@@ -49,44 +56,54 @@ function RouteFallback() {
   )
 }
 
+// Data router (createBrowserRouter) is required for useBlocker, which
+// powers the unsaved-changes guard on route navigation.
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route
+      element={
+        <RouteErrorBoundary>
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet />
+          </Suspense>
+        </RouteErrorBoundary>
+      }
+    >
+      <Route element={<AppLayout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="test" element={<TestUrls />} />
+        <Route path="metrics" element={<Metrics />} />
+        <Route path="setup" element={<Setup />} />
+        <Route path="newrelic" element={<NewRelic />} />
+        <Route path="iislogs" element={<IisLogs />} />
+        <Route path="ai-analysis" element={<AiAnalysis />} />
+        <Route path="builds" element={<Builds />} />
+        <Route path="ai-fixes" element={<AiFixes />} />
+        <Route path="load-testing" element={<LoadTesting />} />
+        <Route path="obsidian" element={<Obsidian />} />
+        <Route path="dashboard" element={<LaunchDashboard />} />
+        <Route path="dashboard/history" element={<StatusHistory />} />
+        <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
+        <Route path="dashboard/requirements" element={<RequirementQuestions />} />
+        <Route path="knowledge" element={<Knowledge />} />
+        <Route path="test-case-database" element={<TestCaseDatabase />} />
+        <Route path="dashboard/qa-testing" element={<QaTesting />} />
+        <Route path="database-info" element={<DatabaseInfo />} />
+        <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Route>
+  )
+)
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <TooltipProvider>
-        <SitesProvider>
-          <BatchTestProvider>
-            <RouteErrorBoundary>
-              <Suspense fallback={<RouteFallback />}>
-                <Routes>
-                    <Route element={<AppLayout />}>
-                      <Route index element={<Dashboard />} />
-                      <Route path="test" element={<TestUrls />} />
-                      <Route path="metrics" element={<Metrics />} />
-                      <Route path="setup" element={<Setup />} />
-                      <Route path="newrelic" element={<NewRelic />} />
-                      <Route path="iislogs" element={<IisLogs />} />
-                      <Route path="ai-analysis" element={<AiAnalysis />} />
-                      <Route path="builds" element={<Builds />} />
-                      <Route path="ai-fixes" element={<AiFixes />} />
-                      <Route path="load-testing" element={<LoadTesting />} />
-                      <Route path="obsidian" element={<Obsidian />} />
-                      <Route path="dashboard" element={<LaunchDashboard />} />
-                      <Route path="dashboard/history" element={<StatusHistory />} />
-                      <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
-                      <Route path="dashboard/requirements" element={<RequirementQuestions />} />
-                      <Route path="knowledge" element={<Knowledge />} />
-                      <Route path="test-case-database" element={<TestCaseDatabase />} />
-                      <Route path="dashboard/qa-testing" element={<QaTesting />} />
-                      <Route path="database-info" element={<DatabaseInfo />} />
-                      <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Route>
-                </Routes>
-              </Suspense>
-            </RouteErrorBoundary>
-          </BatchTestProvider>
-        </SitesProvider>
-      </TooltipProvider>
-    </BrowserRouter>
+    <TooltipProvider>
+      <SitesProvider>
+        <BatchTestProvider>
+          <RouterProvider router={router} />
+        </BatchTestProvider>
+      </SitesProvider>
+    </TooltipProvider>
   )
 }

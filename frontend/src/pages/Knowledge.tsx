@@ -7,7 +7,9 @@ import { KnowledgeEntryEditor, type KnowledgeEntryDraft } from "@/components/kno
 import { KnowledgeEntryList } from "@/components/knowledge/KnowledgeEntryList"
 import { KnowledgeFilters } from "@/components/knowledge/KnowledgeFilters"
 import { PageHeader } from "@/components/layout/PageHeader"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import { Button } from "@/components/ui/button"
+import { useUnsavedChangesBlocker } from "@/hooks/use-unsaved-changes-blocker"
 import { api } from "@/services/api"
 import type {
   KnowledgeDomain,
@@ -38,6 +40,15 @@ const draftFromEntry = (entry: KnowledgeEntry): KnowledgeEntryDraft => ({
   tags: entry.tags,
 })
 
+const isDraftEqual = (a: KnowledgeEntryDraft, b: KnowledgeEntryDraft) =>
+  a.domain_id === b.domain_id &&
+  a.entry_type === b.entry_type &&
+  a.status === b.status &&
+  a.title === b.title &&
+  a.details === b.details &&
+  a.source === b.source &&
+  a.tags === b.tags
+
 const tagsToPayload = (tags: string) =>
   tags
     .split(",")
@@ -54,6 +65,8 @@ export function Knowledge() {
   const [selectedDomainId, setSelectedDomainId] = useState<number | null>(null)
   const [selectedEntry, setSelectedEntry] = useState<KnowledgeEntry | null>(null)
   const [draft, setDraft] = useState<KnowledgeEntryDraft>(() => emptyDraft(null))
+  const [baselineDraft, setBaselineDraft] = useState<KnowledgeEntryDraft>(() => emptyDraft(null))
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [entryType, setEntryType] = useState<KnowledgeEntryType | "">("")
@@ -79,6 +92,8 @@ export function Knowledge() {
   )
 
   const selectedEntryId = selectedEntry?.id ?? null
+  const hasUnsavedEdits = editorOpen && !isDraftEqual(draft, baselineDraft)
+  const navigationBlocker = useUnsavedChangesBlocker(hasUnsavedEdits)
 
   const loadAttachments = useCallback(async (entryId: number) => {
     const requestId = attachmentRequestIdRef.current + 1
@@ -165,7 +180,7 @@ export function Knowledge() {
     void loadAttachments(selectedEntryId)
   }, [loadAttachments, selectedEntryId])
 
-  const startNewEntry = () => {
+  const applyStartNewEntry = () => {
     const domainId =
       selectedDomainId && activeDomains.some((domain) => domain.id === selectedDomainId)
         ? selectedDomainId
@@ -178,13 +193,31 @@ export function Knowledge() {
 
     setSelectedEntry(null)
     setDraft(emptyDraft(domainId))
+    setBaselineDraft(emptyDraft(domainId))
+    setEditorOpen(true)
+  }
+
+  const startNewEntry = () => {
+    if (hasUnsavedEdits) {
+      setPendingAction(() => applyStartNewEntry)
+      return
+    }
+    applyStartNewEntry()
+  }
+
+  const applyOpenEntry = (entry: KnowledgeEntry) => {
+    setSelectedEntry(entry)
+    setDraft(draftFromEntry(entry))
+    setBaselineDraft(draftFromEntry(entry))
     setEditorOpen(true)
   }
 
   const openEntry = (entry: KnowledgeEntry) => {
-    setSelectedEntry(entry)
-    setDraft(draftFromEntry(entry))
-    setEditorOpen(true)
+    if (hasUnsavedEdits) {
+      setPendingAction(() => () => applyOpenEntry(entry))
+      return
+    }
+    applyOpenEntry(entry)
   }
 
   const createDomain = async () => {
@@ -233,6 +266,7 @@ export function Knowledge() {
 
       setSelectedEntry(savedEntry)
       setDraft(draftFromEntry(savedEntry))
+      setBaselineDraft(draftFromEntry(savedEntry))
       setEditorOpen(true)
       await loadEntries()
       toast.success(selectedEntry ? "Entry updated" : "Entry created")
@@ -410,6 +444,29 @@ export function Knowledge() {
           </section>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pendingAction !== null || navigationBlocker.state === "blocked"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingAction(null)
+            if (navigationBlocker.state === "blocked") navigationBlocker.reset()
+          }
+        }}
+        title="Unsaved changes"
+        description="This entry has unsaved edits. Keep editing to save them, or discard the edits to continue."
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        destructive
+        onConfirm={() => {
+          if (pendingAction) {
+            pendingAction()
+            setPendingAction(null)
+          } else if (navigationBlocker.state === "blocked") {
+            navigationBlocker.proceed()
+          }
+        }}
+      />
     </div>
   )
 }
