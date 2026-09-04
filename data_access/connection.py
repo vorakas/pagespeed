@@ -660,6 +660,64 @@ class ConnectionManager:
             ON knowledge_entry_attachments(entry_id)
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS test_case_changes (
+                id SERIAL PRIMARY KEY,
+                test_case_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                test_case_url TEXT NOT NULL DEFAULT '',
+                change_summary TEXT NOT NULL,
+                before_state TEXT NOT NULL DEFAULT '',
+                after_state TEXT NOT NULL DEFAULT '',
+                changed_by TEXT NOT NULL DEFAULT '',
+                change_date TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'Active',
+                tags TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                archived_at TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS test_case_change_links (
+                id SERIAL PRIMARY KEY,
+                change_id INTEGER NOT NULL,
+                link_type TEXT NOT NULL,
+                label TEXT NOT NULL,
+                url TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (change_id) REFERENCES test_case_changes (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS test_case_change_attachments (
+                id SERIAL PRIMARY KEY,
+                change_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                mime_type TEXT NOT NULL DEFAULT '',
+                file_size INTEGER NOT NULL DEFAULT 0,
+                file_bytes BYTEA NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (change_id) REFERENCES test_case_changes (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_test_case_changes_test_case_id
+            ON test_case_changes(test_case_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_test_case_changes_status
+            ON test_case_changes(status)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_test_case_change_links_change_id
+            ON test_case_change_links(change_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_test_case_change_attachments_change_id
+            ON test_case_change_attachments(change_id)
+        """)
+
         self._create_postgres_requirement_tables(cursor)
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS mime_type TEXT")
@@ -1081,6 +1139,64 @@ class ConnectionManager:
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_knowledge_entry_attachments_entry_id
             ON knowledge_entry_attachments(entry_id)
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS test_case_changes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                test_case_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                test_case_url TEXT NOT NULL DEFAULT '',
+                change_summary TEXT NOT NULL,
+                before_state TEXT NOT NULL DEFAULT '',
+                after_state TEXT NOT NULL DEFAULT '',
+                changed_by TEXT NOT NULL DEFAULT '',
+                change_date TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'Active',
+                tags TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                archived_at TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS test_case_change_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                change_id INTEGER NOT NULL,
+                link_type TEXT NOT NULL,
+                label TEXT NOT NULL,
+                url TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (change_id) REFERENCES test_case_changes (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS test_case_change_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                change_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                mime_type TEXT NOT NULL DEFAULT '',
+                file_size INTEGER NOT NULL DEFAULT 0,
+                file_bytes BLOB NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (change_id) REFERENCES test_case_changes (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_test_case_changes_test_case_id
+            ON test_case_changes(test_case_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_test_case_changes_status
+            ON test_case_changes(status)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_test_case_change_links_change_id
+            ON test_case_change_links(change_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_test_case_change_attachments_change_id
+            ON test_case_change_attachments(change_id)
         """)
 
         # SQLite lacks IF NOT EXISTS for ALTER TABLE — tolerate failures.

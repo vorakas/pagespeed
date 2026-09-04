@@ -21,6 +21,7 @@ from data_access.qa_test_case_cache_repository import QaTestCaseCacheRepository
 from data_access.snapshot_repository import SnapshotRecord, SnapshotRepository
 from data_access.autofix_repository import AutofixRepository
 from data_access.knowledge_repository import KnowledgeRepository
+from data_access.test_case_database_repository import TestCaseDatabaseRepository
 
 __all__ = [
     "ConnectionManager",
@@ -41,4 +42,5 @@ __all__ = [
     "SnapshotRepository",
     "AutofixRepository",
     "KnowledgeRepository",
+    "TestCaseDatabaseRepository",
 ]
