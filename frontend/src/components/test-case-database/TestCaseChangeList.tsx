@@ -70,7 +70,7 @@ export function TestCaseChangeList({
               onClick={() => onSelect(change)}
             >
               <span className="font-mono text-xs text-foreground">{change.test_case_id}</span>
-              <div className="min-w-0">
+              <span className="min-w-0">
                 <span className="flex items-center gap-2">
                   <span className="truncate text-sm font-medium text-foreground">
                     {change.title}
@@ -83,7 +83,7 @@ export function TestCaseChangeList({
                 <span className="mt-1 block truncate text-xs text-muted-foreground">
                   {change.tags.join(", ") || "No tags"}
                 </span>
-              </div>
+              </span>
               <span>
                 <Badge variant="outline">{change.status}</Badge>
               </span>
