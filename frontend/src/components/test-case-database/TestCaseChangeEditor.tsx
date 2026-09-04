@@ -1,5 +1,5 @@
-import { Download, ExternalLink, FileUp, Plus, Save, Trash2 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { Archive, Download, ExternalLink, FileUp, Plus, Save, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import type {
   TestCaseChange,
@@ -61,7 +61,9 @@ export function TestCaseChangeEditor({
   onDeleteAttachment,
 }: TestCaseChangeEditorProps) {
   const [draft, setDraft] = useState<TestCaseChangePayload>(EMPTY_DRAFT)
+  const nextDraftLinkId = useRef(-1)
   const isSaved = selectedChange !== null
+  const isArchived = selectedChange?.archived_at !== null && selectedChange?.archived_at !== undefined
 
   useEffect(() => {
     if (!selectedChange) {
@@ -101,6 +103,12 @@ export function TestCaseChangeEditor({
     setDraft((current) => ({ ...current, [key]: links }))
   }
 
+  function createDraftLink(): TestCaseChangeLink {
+    const id = nextDraftLinkId.current
+    nextDraftLinkId.current -= 1
+    return { id, label: "", url: "" }
+  }
+
   return (
     <section className="flex h-full min-h-0 flex-col bg-card/40">
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -111,6 +119,12 @@ export function TestCaseChangeEditor({
           <p className="text-xs text-muted-foreground">
             Manual history for Zephyr test case updates.
           </p>
+          {isArchived ? (
+            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <Archive className="size-3.5" aria-hidden="true" />
+              Archived changes are read-only.
+            </p>
+          ) : null}
         </div>
         <div className="flex gap-2">
           {selectedChange && !selectedChange.archived_at ? (
@@ -121,7 +135,7 @@ export function TestCaseChangeEditor({
           <Button
             type="button"
             onClick={() => void onSave(draft)}
-            disabled={saving || !draft.test_case_id.trim() || !draft.title.trim()}
+            disabled={isArchived || saving || !draft.test_case_id.trim() || !draft.title.trim()}
           >
             <Save className="size-4" aria-hidden="true" />
             {saving ? "Saving" : "Save"}
@@ -136,30 +150,40 @@ export function TestCaseChangeEditor({
               label="Test Case ID"
               value={draft.test_case_id}
               onChange={(value) => updateField("test_case_id", value)}
+              disabled={isArchived}
             />
-            <Field label="Title" value={draft.title} onChange={(value) => updateField("title", value)} />
+            <Field
+              label="Title"
+              value={draft.title}
+              onChange={(value) => updateField("title", value)}
+              disabled={isArchived}
+            />
             <LinkField
               label="Test Case URL"
               value={draft.test_case_url}
               placeholder="https://..."
               onChange={(value) => updateField("test_case_url", value)}
+              disabled={isArchived}
             />
             <Field
               label="Changed By"
               value={draft.changed_by}
               onChange={(value) => updateField("changed_by", value)}
+              disabled={isArchived}
             />
             <Field
               label="Change Date"
               type="date"
               value={draft.change_date}
               onChange={(value) => updateField("change_date", value)}
+              disabled={isArchived}
             />
             <div className="space-y-1.5">
               <Label>Status</Label>
               <Select
                 value={draft.status}
                 onValueChange={(value) => updateField("status", value as TestCaseChangeStatus)}
+                disabled={isArchived}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -168,7 +192,6 @@ export function TestCaseChangeEditor({
                   <SelectItem value="Draft">Draft</SelectItem>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Superseded">Superseded</SelectItem>
-                  <SelectItem value="Archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -178,17 +201,20 @@ export function TestCaseChangeEditor({
             label="Change Summary"
             value={draft.change_summary}
             onChange={(value) => updateField("change_summary", value)}
+            disabled={isArchived}
           />
           <div className="grid gap-4 lg:grid-cols-2">
             <TextBlock
               label="Before"
               value={draft.before_state}
               onChange={(value) => updateField("before_state", value)}
+              disabled={isArchived}
             />
             <TextBlock
               label="After"
               value={draft.after_state}
               onChange={(value) => updateField("after_state", value)}
+              disabled={isArchived}
             />
           </div>
           <Field
@@ -203,6 +229,7 @@ export function TestCaseChangeEditor({
                   .filter(Boolean)
               )
             }
+            disabled={isArchived}
           />
         </div>
 
@@ -211,14 +238,18 @@ export function TestCaseChangeEditor({
             title="Associated Bugs"
             links={draft.associated_bugs}
             onChange={(links) => updateLinks("associated_bugs", links)}
+            disabled={isArchived}
+            createDraftLink={createDraftLink}
           />
           <LinkRows
             title="Associated Tasks"
             links={draft.associated_tasks}
             onChange={(links) => updateLinks("associated_tasks", links)}
+            disabled={isArchived}
+            createDraftLink={createDraftLink}
           />
           <Attachments
-            disabled={!isSaved}
+            disabled={!isSaved || isArchived}
             attachments={attachments}
             loading={attachmentsLoading}
             uploading={attachmentsUploading}
@@ -237,16 +268,23 @@ function Field({
   value,
   type = "text",
   onChange,
+  disabled = false,
 }: {
   label: string
   value: string
   type?: string
   onChange: (value: string) => void
+  disabled?: boolean
 }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input
+        type={type}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   )
 }
@@ -256,12 +294,16 @@ function LinkField({
   value,
   placeholder,
   onChange,
+  disabled = false,
 }: {
   label: string
   value: string
   placeholder?: string
   onChange: (value: string) => void
+  disabled?: boolean
 }) {
+  const openable = isOpenableHttpUrl(value)
+
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
@@ -269,10 +311,11 @@ function LinkField({
         <Input
           type="url"
           value={value}
+          disabled={disabled}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
         />
-        {value.trim() ? (
+        {openable ? (
           <a
             href={value}
             target="_blank"
@@ -292,15 +335,22 @@ function TextBlock({
   label,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
+  disabled?: boolean
 }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Textarea value={value} onChange={(event) => onChange(event.target.value)} rows={5} />
+      <Textarea
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        rows={5}
+      />
     </div>
   )
 }
@@ -309,10 +359,14 @@ function LinkRows({
   title,
   links,
   onChange,
+  disabled = false,
+  createDraftLink,
 }: {
   title: string
   links: TestCaseChangeLink[]
   onChange: (links: TestCaseChangeLink[]) => void
+  disabled?: boolean
+  createDraftLink: () => TestCaseChangeLink
 }) {
   return (
     <div className="space-y-2 rounded-md border border-border bg-background/60 p-3">
@@ -322,7 +376,8 @@ function LinkRows({
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => onChange([...links, { label: "", url: "" }])}
+          disabled={disabled}
+          onClick={() => onChange([...links, createDraftLink()])}
         >
           <Plus className="size-4" aria-hidden="true" />
           Add
@@ -330,9 +385,10 @@ function LinkRows({
       </div>
       <div className="space-y-2">
         {links.map((link, index) => (
-          <div key={index} className="grid gap-2">
+          <div key={link.id ?? `${title}-${link.label}-${link.url}-${index}`} className="grid gap-2">
             <Input
               value={link.label}
+              disabled={disabled}
               placeholder="BUG-1234"
               onChange={(event) => {
                 const next = [...links]
@@ -343,6 +399,7 @@ function LinkRows({
             <div className="flex gap-2">
               <Input
                 value={link.url}
+                disabled={disabled}
                 placeholder="https://..."
                 onChange={(event) => {
                   const next = [...links]
@@ -350,7 +407,7 @@ function LinkRows({
                   onChange(next)
                 }}
               />
-              {link.url ? (
+              {isOpenableHttpUrl(link.url) ? (
                 <a
                   href={link.url}
                   target="_blank"
@@ -365,6 +422,7 @@ function LinkRows({
                 type="button"
                 variant="outline"
                 size="icon"
+                disabled={disabled}
                 onClick={() => onChange(links.filter((_, itemIndex) => itemIndex !== index))}
                 aria-label={`Remove ${title} row ${index + 1}`}
               >
@@ -376,6 +434,20 @@ function LinkRows({
       </div>
     </div>
   )
+}
+
+function isOpenableHttpUrl(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return false
+  }
+
+  try {
+    const parsed = new URL(trimmed)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
 }
 
 function Attachments({

@@ -148,7 +148,7 @@ class TestCaseDatabaseRepository:
                     status = {ph},
                     tags = {ph},
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = {ph}
+                WHERE id = {ph} AND archived_at IS NULL
                 """,
                 (
                     data["test_case_id"],

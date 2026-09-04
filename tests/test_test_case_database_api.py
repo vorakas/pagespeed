@@ -99,6 +99,49 @@ def test_change_validation_error(tmp_path, monkeypatch):
     }
 
 
+def test_change_update_rejects_archived_record(tmp_path, monkeypatch):
+    client = make_client(tmp_path, monkeypatch)
+    created = client.post("/api/test-case-database/changes", json=payload()).get_json()
+    archived_response = client.post(f"/api/test-case-database/changes/{created['id']}/archive")
+    assert archived_response.status_code == 200
+
+    response = client.put(
+        f"/api/test-case-database/changes/{created['id']}",
+        json=payload(),
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "Archived test case changes cannot be edited",
+    }
+
+
+def test_change_routes_reject_non_object_json_payloads(tmp_path, monkeypatch):
+    client = make_client(tmp_path, monkeypatch)
+
+    create_response = client.post(
+        "/api/test-case-database/changes",
+        json=["not", "an", "object"],
+    )
+    assert create_response.status_code == 400
+    assert create_response.get_json() == {
+        "success": False,
+        "error": "Request body must be a JSON object",
+    }
+
+    created = client.post("/api/test-case-database/changes", json=payload()).get_json()
+    update_response = client.put(
+        f"/api/test-case-database/changes/{created['id']}",
+        json="not an object",
+    )
+    assert update_response.status_code == 400
+    assert update_response.get_json() == {
+        "success": False,
+        "error": "Request body must be a JSON object",
+    }
+
+
 def test_attachment_upload_download_delete_flow(tmp_path, monkeypatch):
     client = make_client(tmp_path, monkeypatch)
     created = client.post("/api/test-case-database/changes", json=payload()).get_json()

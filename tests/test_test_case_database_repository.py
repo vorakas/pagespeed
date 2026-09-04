@@ -94,6 +94,21 @@ def test_create_get_update_archive_and_search_changes(tmp_path: Path, monkeypatc
     assert archived[0]["archived_at"] is not None
 
 
+def test_update_change_rejects_archived_rows(tmp_path: Path, monkeypatch) -> None:
+    repo = make_repo(tmp_path, monkeypatch)
+    change_id = repo.create_change(sample_payload())
+    assert repo.archive_change(change_id) is True
+
+    updated_payload = sample_payload()
+    updated_payload["status"] = "Superseded"
+
+    assert repo.update_change(change_id, updated_payload) is False
+    archived = repo.get_change(change_id)
+    assert archived is not None
+    assert archived["status"] == "Archived"
+    assert archived["archived_at"] is not None
+
+
 def test_attachment_metadata_bytes_and_delete(tmp_path: Path, monkeypatch) -> None:
     repo = make_repo(tmp_path, monkeypatch)
     change_id = repo.create_change(sample_payload())

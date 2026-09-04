@@ -119,7 +119,7 @@ class ApiClient {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: response.statusText }))
+      const errorData = await this.readError(response)
       if (response.status === 429) {
         throw new RateLimitError(
           errorData.error || "Rate limit exceeded",
@@ -130,6 +130,10 @@ class ApiClient {
     }
 
     return response.json()
+  }
+
+  private async readError(response: Response): Promise<{ error?: string; retryAfter?: number }> {
+    return response.json().catch(() => ({ error: response.statusText || `Request failed: ${response.status}` }))
   }
 
   // ---------- Sites ----------
@@ -1159,8 +1163,8 @@ class ApiClient {
       body: formData,
     })
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: "Upload failed" }))
-      throw new Error(error.error || "Upload failed")
+      const error = await this.readError(response)
+      throw new Error(error.error || `Request failed: ${response.status}`)
     }
     return response.json()
   }
@@ -1169,7 +1173,10 @@ class ApiClient {
     const response = await fetch(
       `${this.baseUrl}/api/test-case-database/changes/${changeId}/attachments/${attachmentId}/file`
     )
-    if (!response.ok) throw new Error("Download failed")
+    if (!response.ok) {
+      const error = await this.readError(response)
+      throw new Error(error.error || `Request failed: ${response.status}`)
+    }
     return response.blob()
   }
 

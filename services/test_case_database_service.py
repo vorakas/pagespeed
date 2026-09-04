@@ -47,7 +47,9 @@ class TestCaseDatabaseService:
         return self.get_change(change_id)
 
     def update_change(self, change_id: int, data: dict) -> dict:
-        self.get_change(change_id)
+        current = self.get_change(change_id)
+        if current.get("archived_at"):
+            raise ValidationError("Archived test case changes cannot be edited")
         payload = self._normalize_payload(data)
         if not self._repository.update_change(change_id, payload):
             raise ValidationError("Test case change not found")
@@ -174,6 +176,7 @@ class TestCaseDatabaseService:
             raise ValidationError(f"Attachment '{filename}' exceeds the 10 MB limit")
 
     def _normalize_payload(self, data: dict) -> dict:
+        self._require_object_payload(data)
         payload = {
             "test_case_id": self._trim(data.get("test_case_id")),
             "title": self._trim(data.get("title")),
@@ -209,6 +212,10 @@ class TestCaseDatabaseService:
                 "Test case URL must be an http or https URL",
             )
         return payload
+
+    def _require_object_payload(self, data: object) -> None:
+        if not isinstance(data, dict):
+            raise ValidationError("Request body must be a JSON object")
 
     def _normalize_links(self, value: object, label: str) -> list[dict]:
         if not value:

@@ -114,6 +114,28 @@ def test_rejects_archived_status_on_create_and_update(tmp_path):
         service.update_change(created["id"], update_payload)
 
 
+def test_rejects_updates_to_archived_changes(tmp_path):
+    service = make_service(tmp_path)
+    created = service.create_change(valid_payload())
+    service.archive_change(created["id"])
+
+    with pytest.raises(ValidationError, match="Archived test case changes cannot be edited"):
+        service.update_change(created["id"], valid_payload())
+
+
+@pytest.mark.parametrize("payload", [None, [], "bad payload"])
+def test_rejects_non_object_payloads(tmp_path, payload):
+    service = make_service(tmp_path)
+
+    with pytest.raises(ValidationError, match="Request body must be a JSON object"):
+        service.create_change(payload)
+
+    created = service.create_change(valid_payload())
+
+    with pytest.raises(ValidationError, match="Request body must be a JSON object"):
+        service.update_change(created["id"], payload)
+
+
 def test_attachment_validation_and_lookup(tmp_path):
     service = make_service(tmp_path)
     change = service.create_change(valid_payload())
