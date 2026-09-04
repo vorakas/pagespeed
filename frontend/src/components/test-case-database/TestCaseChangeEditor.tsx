@@ -138,9 +138,10 @@ export function TestCaseChangeEditor({
               onChange={(value) => updateField("test_case_id", value)}
             />
             <Field label="Title" value={draft.title} onChange={(value) => updateField("title", value)} />
-            <Field
+            <LinkField
               label="Test Case URL"
               value={draft.test_case_url}
+              placeholder="https://..."
               onChange={(value) => updateField("test_case_url", value)}
             />
             <Field
@@ -246,6 +247,43 @@ function Field({
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <Input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+    </div>
+  )
+}
+
+function LinkField({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string
+  value: string
+  placeholder?: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          type="url"
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        {value.trim() ? (
+          <a
+            href={value}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open ${label} in new tab`}
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-input bg-transparent text-foreground shadow-xs transition-[color,box-shadow] hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <ExternalLink className="size-4" aria-hidden="true" />
+          </a>
+        ) : null}
+      </div>
     </div>
   )
 }
