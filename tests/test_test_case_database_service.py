@@ -143,3 +143,29 @@ def test_attachment_validation_and_lookup(tmp_path):
     assert attachment["filename"] == "note.txt"
     assert attachment["mime_type"] == "application/octet-stream"
     assert service.get_change_attachment(change["id"], attachment["id"])["file_bytes"] == b"test"
+
+
+def test_add_change_attachments_validates_batch_before_persisting(tmp_path):
+    service = make_service(tmp_path)
+    change = service.create_change(valid_payload())
+
+    with pytest.raises(ValidationError, match="exceeds the 10 MB limit"):
+        service.add_change_attachments(
+            change["id"],
+            [
+                {
+                    "filename": "note.txt",
+                    "mime_type": "text/plain",
+                    "file_size": 4,
+                    "file_bytes": b"test",
+                },
+                {
+                    "filename": "large.txt",
+                    "mime_type": "text/plain",
+                    "file_size": MAX_ATTACHMENT_BYTES + 1,
+                    "file_bytes": b"x",
+                },
+            ],
+        )
+
+    assert service.list_change_attachments(change["id"]) == []

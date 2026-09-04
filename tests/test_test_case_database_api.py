@@ -135,3 +135,51 @@ def test_attachment_upload_download_delete_flow(tmp_path, monkeypatch):
         f"/api/test-case-database/changes/{created['id']}/attachments/{first_attachment_id}"
     )
     assert delete_response.status_code == 204
+
+
+def test_attachment_upload_requires_at_least_one_file(tmp_path, monkeypatch):
+    client = make_client(tmp_path, monkeypatch)
+    created = client.post("/api/test-case-database/changes", json=payload()).get_json()
+
+    response = client.post(
+        f"/api/test-case-database/changes/{created['id']}/attachments",
+        data={},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "At least one attachment file is required",
+    }
+
+
+def test_attachment_upload_rejects_invalid_batch_without_partial_write(
+    tmp_path,
+    monkeypatch,
+):
+    client = make_client(tmp_path, monkeypatch)
+    created = client.post("/api/test-case-database/changes", json=payload()).get_json()
+
+    response = client.post(
+        f"/api/test-case-database/changes/{created['id']}/attachments",
+        data={
+            "files": [
+                (BytesIO(b"hello world"), "evidence.txt"),
+                (BytesIO(b"x" * (10 * 1024 * 1024 + 1)), "too-large.txt"),
+            ]
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "Attachment 'too-large.txt' exceeds the 10 MB limit",
+    }
+
+    list_response = client.get(
+        f"/api/test-case-database/changes/{created['id']}/attachments"
+    )
+    assert list_response.status_code == 200
+    assert list_response.get_json() == []

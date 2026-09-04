@@ -63,6 +63,22 @@ class TestCaseDatabaseService:
         self.get_change(change_id)
         return self._repository.list_change_attachments(change_id)
 
+    def add_change_attachments(self, change_id: int, attachments: list[dict]) -> list[dict]:
+        self.get_change(change_id)
+        normalized_attachments = self._normalize_attachments(attachments)
+        created_attachments = []
+        for attachment in normalized_attachments:
+            created_attachments.append(
+                self.add_change_attachment(
+                    change_id=change_id,
+                    filename=attachment["filename"],
+                    mime_type=attachment["mime_type"],
+                    file_size=attachment["file_size"],
+                    file_bytes=attachment["file_bytes"],
+                )
+            )
+        return created_attachments
+
     def add_change_attachment(
         self,
         change_id: int,
@@ -107,6 +123,55 @@ class TestCaseDatabaseService:
         self.get_change(change_id)
         if not self._repository.delete_change_attachment(change_id, attachment_id):
             raise ValidationError("Attachment not found")
+
+    def _normalize_attachments(self, attachments: object) -> list[dict]:
+        if not isinstance(attachments, list) or not attachments:
+            raise ValidationError("At least one attachment file is required")
+
+        normalized_attachments = []
+        for raw_attachment in attachments:
+            if not isinstance(raw_attachment, dict):
+                raise ValidationError("Attachment file is required")
+            filename = (raw_attachment.get("filename") or "").strip()
+            mime_type = (raw_attachment.get("mime_type") or "").strip()
+            file_bytes = raw_attachment.get("file_bytes") or b""
+            file_size = raw_attachment.get("file_size")
+            if isinstance(file_bytes, memoryview):
+                file_bytes = file_bytes.tobytes()
+            if not isinstance(file_bytes, bytes):
+                raise ValidationError("Attachment file is required")
+            if not isinstance(file_size, int):
+                file_size = len(file_bytes)
+            self._validate_attachment(
+                filename=filename,
+                mime_type=mime_type,
+                file_size=file_size,
+                file_bytes=file_bytes,
+            )
+            normalized_attachments.append(
+                {
+                    "filename": filename,
+                    "mime_type": mime_type,
+                    "file_size": file_size,
+                    "file_bytes": file_bytes,
+                }
+            )
+        return normalized_attachments
+
+    def _validate_attachment(
+        self,
+        filename: str,
+        mime_type: str,
+        file_size: int,
+        file_bytes: bytes,
+    ) -> None:
+        del mime_type
+        if not filename:
+            raise ValidationError("Attachment filename is required")
+        if not file_bytes:
+            raise ValidationError("Attachment file is required")
+        if file_size > MAX_ATTACHMENT_BYTES or len(file_bytes) > MAX_ATTACHMENT_BYTES:
+            raise ValidationError(f"Attachment '{filename}' exceeds the 10 MB limit")
 
     def _normalize_payload(self, data: dict) -> dict:
         payload = {

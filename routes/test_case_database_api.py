@@ -6,11 +6,7 @@ from io import BytesIO
 
 from flask import Blueprint, jsonify, request, send_file
 
-from exceptions import ValidationError
-from services.test_case_database_service import (
-    MAX_ATTACHMENT_BYTES,
-    TestCaseDatabaseService,
-)
+from services.test_case_database_service import TestCaseDatabaseService
 
 
 def create_test_case_database_blueprint(
@@ -64,26 +60,20 @@ def create_test_case_database_blueprint(
 
     @bp.route("/changes/<int:change_id>/attachments", methods=["POST"])
     def upload_change_attachments(change_id: int):
-        uploaded_files = request.files.getlist("files")
-        if not uploaded_files:
-            raise ValidationError("At least one attachment file is required")
-
-        attachments = []
-        for uploaded_file in uploaded_files:
-            file_bytes = uploaded_file.read()
-            if len(file_bytes) > MAX_ATTACHMENT_BYTES:
-                raise ValidationError(
-                    f"Attachment '{uploaded_file.filename}' exceeds the 10 MB limit"
-                )
-            attachments.append(
-                test_case_database_service.add_change_attachment(
-                    change_id=change_id,
-                    filename=uploaded_file.filename or "",
-                    mime_type=uploaded_file.mimetype or "",
-                    file_size=len(file_bytes),
-                    file_bytes=file_bytes,
-                )
-            )
+        attachments = [
+            {
+                "filename": uploaded_file.filename or "",
+                "mime_type": uploaded_file.mimetype or "",
+                "file_size": len(file_bytes),
+                "file_bytes": file_bytes,
+            }
+            for uploaded_file in request.files.getlist("files")
+            for file_bytes in [uploaded_file.read()]
+        ]
+        attachments = test_case_database_service.add_change_attachments(
+            change_id=change_id,
+            attachments=attachments,
+        )
         return jsonify(attachments), 201
 
     @bp.route(
