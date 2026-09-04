@@ -74,6 +74,7 @@ from data_access import (
     QaTestCaseCacheRepository,
     SiteRepository,
     SnapshotRepository,
+    TestCaseDatabaseRepository,
     UrlRepository,
     TestResultRepository,
     TriggerRepository,
@@ -104,6 +105,7 @@ from services.pagespeed_client import PageSpeedClient
 from services.vault_git_service import VaultGitService
 from routes import register_blueprints
 from services.site_service import SiteService
+from services.test_case_database_service import TestCaseDatabaseService
 from services.testing_service import TestingService
 from services.trigger_service import TriggerService
 
@@ -221,6 +223,7 @@ def create_app() -> Flask:
     applitools_batch_repo = ApplitoolsBatchRepository(conn_mgr, ttl_seconds=24 * 60 * 60)
     autofix_repo = AutofixRepository(conn_mgr)
     knowledge_repo = KnowledgeRepository(conn_mgr)
+    test_case_database_repo = TestCaseDatabaseRepository(conn_mgr)
     autofix_ingest_service = AutofixIngestService(autofix_repo)
 
     pagespeed = PageSpeedClient(api_key=PAGESPEED_API_KEY)
@@ -229,6 +232,7 @@ def create_app() -> Flask:
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
     csv_lighthouse_service = CsvLighthouseService(csv_lighthouse_repo, pagespeed)
     knowledge_service = KnowledgeService(knowledge_repo)
+    test_case_database_service = TestCaseDatabaseService(test_case_database_repo)
     csv_lighthouse_service.recover_interrupted_runs()
 
     # ---- TestData URL listing (builds openable URLs from uploaded CSVs) ----
@@ -570,6 +574,7 @@ def create_app() -> Flask:
         autofix_pipeline_ids=AUTOFIX_PIPELINE_IDS,
         testdata_url_service=testdata_url_service,
         knowledge_service=knowledge_service,
+        test_case_database_service=test_case_database_service,
     )
 
     # ---- Centralized error handlers ----

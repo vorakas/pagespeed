@@ -25,6 +25,7 @@ from routes.obsidian_api import create_obsidian_blueprint
 from routes.pages import create_pages_blueprint
 from routes.requirements_api import create_requirements_blueprint
 from routes.sites_api import create_sites_blueprint
+from routes.test_case_database_api import create_test_case_database_blueprint
 from routes.testing_api import create_testing_blueprint
 from routes.testdata_validation_api import create_testdata_validation_blueprint
 from routes.triggers_api import create_triggers_blueprint
@@ -42,6 +43,7 @@ from services.knowledge_service import KnowledgeService
 from services.site_service import SiteService
 from services.snapshot_service import SnapshotService
 from services.testing_service import TestingService
+from services.test_case_database_service import TestCaseDatabaseService
 from services.testdata_url_service import TestDataUrlService
 from services.trigger_service import TriggerService
 from services.vault_git_service import VaultGitService
@@ -79,6 +81,7 @@ def register_blueprints(
     autofix_pipeline_ids: "list | None" = None,
     testdata_url_service: "TestDataUrlService | None" = None,
     knowledge_service: "KnowledgeService | None" = None,
+    test_case_database_service: "TestCaseDatabaseService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -100,6 +103,10 @@ def register_blueprints(
     app.register_blueprint(create_ai_blueprint(ai_config_service))
     if knowledge_service is not None:
         app.register_blueprint(create_knowledge_blueprint(knowledge_service))
+    if test_case_database_service is not None:
+        app.register_blueprint(
+            create_test_case_database_blueprint(test_case_database_service)
+        )
     if requirement_service is not None:
         app.register_blueprint(create_requirements_blueprint(
             requirement_service,
