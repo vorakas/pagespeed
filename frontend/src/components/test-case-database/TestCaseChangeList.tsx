@@ -1,7 +1,6 @@
 import { Archive, Paperclip } from "lucide-react"
 
 import type { TestCaseChange } from "@/types"
-import { RichTextPreview } from "@/components/shared/RichTextTextarea"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn, formatDateTime } from "@/lib/utils"
@@ -78,10 +77,9 @@ export function TestCaseChangeList({
                   </span>
                   {isArchived && <Archive className="size-3.5 shrink-0" aria-label="Archived" />}
                 </span>
-                <RichTextPreview
-                  value={change.change_summary}
-                  className="mt-1 line-clamp-2 min-h-0 border-0 bg-transparent p-0 text-xs leading-5 text-muted-foreground"
-                />
+                <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">
+                  {stripRichTextMarkup(change.change_summary)}
+                </span>
                 <span className="mt-1 block truncate text-xs text-muted-foreground">
                   {change.tags.join(", ") || "No tags"}
                 </span>
@@ -108,4 +106,13 @@ export function TestCaseChangeList({
       </div>
     </div>
   )
+}
+
+function stripRichTextMarkup(value: string) {
+  return value
+    .replace(/<span style="color:\s*#[0-9a-fA-F]{6}">([\s\S]*?)<\/span>/g, "$1")
+    .replace(/<\/?u>/g, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/(^|[^*])\*([^*]+)\*/g, "$1$2")
+    .replace(/^\s*(?:[-*]|\d+\.)\s+/gm, "")
 }

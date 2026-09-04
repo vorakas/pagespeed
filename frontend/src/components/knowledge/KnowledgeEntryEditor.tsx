@@ -246,16 +246,14 @@ export function KnowledgeEntryEditor({
           </label>
 
           <div className="space-y-1.5">
-            <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Details</span>
-              <RichTextTextarea
-                value={draft.details}
-                onChange={(value) => updateDraft("details", value)}
-                placeholder="Details"
-                rows={10}
-                aria-label="Entry details"
-              />
-            </label>
+            <span className="text-xs font-medium text-muted-foreground">Details</span>
+            <RichTextTextarea
+              value={draft.details}
+              onChange={(value) => updateDraft("details", value)}
+              placeholder="Details"
+              rows={10}
+              aria-label="Entry details"
+            />
           </div>
 
           <div className="space-y-1.5">
