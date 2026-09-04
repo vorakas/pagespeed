@@ -33,6 +33,9 @@ const RequirementQuestions = lazyWithReload(() =>
   import("@/pages/RequirementQuestions").then((module) => ({ default: module.RequirementQuestions })),
 )
 const Knowledge = lazyWithReload(() => import("@/pages/Knowledge").then((module) => ({ default: module.Knowledge })))
+const TestCaseDatabase = lazyWithReload(() =>
+  import("@/pages/TestCaseDatabase").then((module) => ({ default: module.TestCaseDatabase })),
+)
 const QaTesting = lazyWithReload(() => import("@/pages/QaTesting").then((module) => ({ default: module.QaTesting })))
 const DatabaseInfo = lazyWithReload(() =>
   import("@/pages/DatabaseInfo").then((module) => ({ default: module.DatabaseInfo })),
@@ -72,6 +75,7 @@ export default function App() {
                       <Route path="dashboard/workstreams/:id" element={<WorkstreamDetail />} />
                       <Route path="dashboard/requirements" element={<RequirementQuestions />} />
                       <Route path="knowledge" element={<Knowledge />} />
+                      <Route path="test-case-database" element={<TestCaseDatabase />} />
                       <Route path="dashboard/qa-testing" element={<QaTesting />} />
                       <Route path="database-info" element={<DatabaseInfo />} />
                       <Route path="dashboard/projects/:key" element={<ProjectDashboard />} />
