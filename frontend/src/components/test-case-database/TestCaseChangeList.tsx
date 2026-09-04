@@ -1,6 +1,7 @@
 import { Archive, Paperclip } from "lucide-react"
 
 import type { TestCaseChange } from "@/types"
+import { RichTextPreview } from "@/components/shared/RichTextTextarea"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn, formatDateTime } from "@/lib/utils"
@@ -70,20 +71,21 @@ export function TestCaseChangeList({
               onClick={() => onSelect(change)}
             >
               <span className="font-mono text-xs text-foreground">{change.test_case_id}</span>
-              <span className="min-w-0">
+              <div className="min-w-0">
                 <span className="flex items-center gap-2">
                   <span className="truncate text-sm font-medium text-foreground">
                     {change.title}
                   </span>
                   {isArchived && <Archive className="size-3.5 shrink-0" aria-label="Archived" />}
                 </span>
-                <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">
-                  {change.change_summary}
-                </span>
+                <RichTextPreview
+                  value={change.change_summary}
+                  className="mt-1 line-clamp-2 min-h-0 border-0 bg-transparent p-0 text-xs leading-5 text-muted-foreground"
+                />
                 <span className="mt-1 block truncate text-xs text-muted-foreground">
                   {change.tags.join(", ") || "No tags"}
                 </span>
-              </span>
+              </div>
               <span>
                 <Badge variant="outline">{change.status}</Badge>
               </span>
