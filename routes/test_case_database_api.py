@@ -34,7 +34,7 @@ def create_test_case_database_blueprint(
 
     @bp.route("/changes", methods=["POST"])
     def create_change():
-        change = test_case_database_service.create_change(request.get_json(silent=True) or {})
+        change = test_case_database_service.create_change(_json_payload())
         return jsonify(change), 201
 
     @bp.route("/changes/<int:change_id>", methods=["GET"])
@@ -46,7 +46,7 @@ def create_test_case_database_blueprint(
         return jsonify(
             test_case_database_service.update_change(
                 change_id,
-                request.get_json(silent=True) or {},
+                _json_payload(),
             )
         )
 
@@ -105,3 +105,10 @@ def create_test_case_database_blueprint(
 
 def _include_archived() -> bool:
     return request.args.get("include_archived", "").lower() in {"1", "true", "yes"}
+
+
+def _json_payload() -> object:
+    data = request.get_json(silent=True)
+    if data is None and not request.data:
+        return {}
+    return data
