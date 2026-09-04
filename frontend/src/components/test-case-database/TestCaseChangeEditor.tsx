@@ -63,6 +63,7 @@ export function TestCaseChangeEditor({
   onDeleteAttachment,
 }: TestCaseChangeEditorProps) {
   const [draft, setDraft] = useState<TestCaseChangePayload>(EMPTY_DRAFT)
+  const [tagsText, setTagsText] = useState("")
   const nextDraftLinkId = useRef(-1)
   const isSaved = selectedChange !== null
   const isArchived = selectedChange?.archived_at !== null && selectedChange?.archived_at !== undefined
@@ -90,6 +91,7 @@ export function TestCaseChangeEditor({
 
   useEffect(() => {
     setDraft(baselineDraft)
+    setTagsText(baselineDraft.tags.join(", "))
   }, [baselineDraft])
 
   const isDirty = useMemo(
@@ -100,8 +102,6 @@ export function TestCaseChangeEditor({
   useEffect(() => {
     onDirtyChange(isDirty)
   }, [isDirty, onDirtyChange])
-
-  const tagText = useMemo(() => draft.tags.join(", "), [draft.tags])
 
   function updateField<K extends keyof TestCaseChangePayload>(
     key: K,
@@ -233,8 +233,9 @@ export function TestCaseChangeEditor({
           </div>
           <Field
             label="Tags"
-            value={tagText}
-            onChange={(value) =>
+            value={tagsText}
+            onChange={(value) => {
+              setTagsText(value)
               updateField(
                 "tags",
                 value
@@ -242,7 +243,7 @@ export function TestCaseChangeEditor({
                   .map((tag) => tag.trim())
                   .filter(Boolean)
               )
-            }
+            }}
             disabled={isArchived}
           />
         </div>

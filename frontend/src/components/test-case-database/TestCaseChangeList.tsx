@@ -77,9 +77,6 @@ export function TestCaseChangeList({
                   </span>
                   {isArchived && <Archive className="size-3.5 shrink-0" aria-label="Archived" />}
                 </span>
-                <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">
-                  {stripRichTextMarkup(change.change_summary)}
-                </span>
                 <span className="mt-1 block truncate text-xs text-muted-foreground">
                   {change.tags.join(", ") || "No tags"}
                 </span>
@@ -106,13 +103,4 @@ export function TestCaseChangeList({
       </div>
     </div>
   )
-}
-
-function stripRichTextMarkup(value: string) {
-  return value
-    .replace(/<span style="color:\s*#[0-9a-fA-F]{6}">([\s\S]*?)<\/span>/g, "$1")
-    .replace(/<\/?u>/g, "")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/(^|[^*])\*([^*]+)\*/g, "$1$2")
-    .replace(/^\s*(?:[-*]|\d+\.)\s+/gm, "")
 }
