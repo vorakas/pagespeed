@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { splitLinkedText } from "@/lib/linkify"
+import { RichTextTextarea } from "@/components/shared/RichTextTextarea"
 import {
   Select,
   SelectContent,
@@ -15,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 
 export interface KnowledgeEntryDraft {
   domain_id: number | null
@@ -248,9 +248,9 @@ export function KnowledgeEntryEditor({
           <div className="space-y-1.5">
             <label className="block space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Details</span>
-              <Textarea
+              <RichTextTextarea
                 value={draft.details}
-                onChange={(event) => updateDraft("details", event.target.value)}
+                onChange={(value) => updateDraft("details", value)}
                 placeholder="Details"
                 rows={10}
                 aria-label="Entry details"

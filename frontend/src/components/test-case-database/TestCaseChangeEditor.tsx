@@ -11,6 +11,7 @@ import type {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RichTextTextarea } from "@/components/shared/RichTextTextarea"
 import {
   Select,
   SelectContent,
@@ -18,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 
 const EMPTY_DRAFT: TestCaseChangePayload = {
   test_case_id: "",
@@ -345,10 +345,10 @@ function TextBlock({
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Textarea
+      <RichTextTextarea
         value={value}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={onChange}
         rows={5}
       />
     </div>
