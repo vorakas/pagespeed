@@ -82,9 +82,9 @@ def test_transform_builds_record_with_sections_and_summary() -> None:
         record["change_summary"]
         == "Updated Precondition; updated step 2; added steps 5-6; removed step 1"
     )
-    assert "<h4>Precondition</h4><ol><li>Old precondition</li></ol>" in record["before_state"]
-    assert "<h4>Precondition</h4><ol><li>New precondition</li></ol>" in record["after_state"]
-    assert "<h4>Step 2 — Description</h4><p>New step two</p>" in record["after_state"]
+    assert "**Precondition**\n1. Old precondition" in record["before_state"]
+    assert "**Precondition**\n1. New precondition" in record["after_state"]
+    assert "**Step 2 — Description**\nNew step two" in record["after_state"]
     # Boilerplate TEST_DATA item was filtered out entirely.
     assert "Test Data" not in record["before_state"]
     assert "Test Data" not in record["after_state"]
@@ -122,8 +122,8 @@ def test_transform_keeps_folder_move_with_special_summary() -> None:
 
     assert record is not None
     assert record["change_summary"] == "Moved folder"
-    assert "/Data Sync/WUP to AC/Cart Data" in record["before_state"]
-    assert "/Data Sync/Cart/WUP to AC" in record["after_state"]
+    assert "**Folder**\n/Data Sync/WUP to AC/Cart Data" in record["before_state"]
+    assert "**Folder**\n/Data Sync/Cart/WUP to AC" in record["after_state"]
 
 
 def test_transform_create_entry() -> None:
@@ -160,5 +160,87 @@ def test_transform_missing_side_renders_dash_placeholder() -> None:
 
     assert record is not None
     assert record["change_summary"] == "Updated User Role"
-    assert "<h4>User Role</h4><p>—</p>" in record["before_state"]
-    assert "<h4>User Role</h4>SNIS-PCSI" in record["after_state"]
+    assert "**User Role**\n—" in record["before_state"]
+    assert "**User Role**\nSNIS-PCSI" in record["after_state"]
+
+
+def test_html_to_rich_text_converts_zephyr_markup() -> None:
+    from services.zephyr_import_service import html_to_rich_text
+
+    value = (
+        "<ol><li><strong>User role:</strong> professional.</li>"
+        "<li>Note the <code>Cart #</code>.<pre>SELECT 1\nFROM t</pre></li></ol>"
+    )
+    assert html_to_rich_text(value) == (
+        "1. **User role:** professional.\n2. Note the Cart #.\nSELECT 1\nFROM t"
+    )
+    assert html_to_rich_text("<p>one</p><p>two &mdash; three</p>") == "one\n\ntwo — three"
+    assert html_to_rich_text("<ul><li>a</li><li>b</li></ul>") == "- a\n- b"
+    assert html_to_rich_text(None) == ""
+    assert html_to_rich_text(123) == "123"
+
+
+def test_transform_added_only_entry_has_summary_but_empty_states() -> None:
+    entry = make_entry(
+        changeHistoryItems=[
+            {"id": 1, "fieldName": 'TEST_SCRIPT.STEP.ADDED {"step":5}', "newValue": "-"},
+            {"id": 2, "fieldName": 'TEST_SCRIPT.STEP.ADDED {"step":6}', "newValue": "-"},
+        ]
+    )
+
+    record = transform_entry(entry, "TC-T1", "Anything", BASE_URL)
+
+    assert record is not None
+    assert record["change_summary"] == "Added steps 5-6"
+    assert record["before_state"] == ""
+    assert record["after_state"] == ""
+
+
+def test_transform_keeps_one_sided_placeholder_test_data() -> None:
+    entry = make_entry(
+        changeHistoryItems=[
+            {
+                "id": 3,
+                "fieldName": 'TEST_SCRIPT.STEP.TEST_DATA {"step":1}',
+                "originalValue": "<p>Real recorded data</p>",
+                "newValue": BOILERPLATE_TEST_DATA,
+            }
+        ]
+    )
+
+    record = transform_entry(entry, "TC-T1", "Anything", BASE_URL)
+
+    assert record is not None
+    assert "Real recorded data" in record["before_state"]
+    assert "{User Roles} {Operating System} {Browser}" in record["after_state"]
+
+
+def test_transform_entry_without_id_is_skipped() -> None:
+    entry = make_entry(id=None)
+    entry["changeHistoryItems"] = [
+        {"id": 9, "fieldName": "PRECONDITION", "originalValue": "<p>a</p>", "newValue": "<p>b</p>"}
+    ]
+
+    assert transform_entry(entry, "TC-T1", "Anything", BASE_URL) is None
+
+
+def test_format_step_ranges_empty_returns_empty_string() -> None:
+    assert format_step_ranges([]) == ""
+
+
+def test_transform_tolerates_non_string_values() -> None:
+    entry = make_entry(
+        changeHistoryItems=[{"id": 4, "fieldName": "Estimate", "originalValue": 5, "newValue": 10}]
+    )
+
+    record = transform_entry(entry, "TC-T1", "Anything", BASE_URL)
+
+    assert record is not None
+    assert "**Estimate**\n5" in record["before_state"]
+    assert "**Estimate**\n10" in record["after_state"]
+
+
+def test_transform_tolerates_malformed_items_container() -> None:
+    entry = make_entry(changeHistoryItems="not-a-list")
+
+    assert transform_entry(entry, "TC-T1", "Anything", BASE_URL) is None

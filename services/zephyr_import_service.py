@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+from html.parser import HTMLParser
 from typing import Any
 
 IMPORT_STATUS = "Imported"
@@ -17,8 +18,6 @@ _STEP_KIND_LABELS = {
     "DESCRIPTION": "Description",
     "EXPECTED_RESULT": "Expected Result",
     "TEST_DATA": "Test Data",
-    "ADDED": "Added",
-    "REMOVED": "Removed",
 }
 
 
@@ -36,6 +35,8 @@ def prettify_field_name(field_name: str) -> str:
 def format_step_ranges(steps: list[int]) -> str:
     """Compress step numbers: [1,2,3,5] -> '1-3, 5'."""
     ordered = sorted(set(steps))
+    if not ordered:
+        return ""
     ranges: list[str] = []
     start = previous = ordered[0]
     for step in ordered[1:]:
@@ -48,15 +49,15 @@ def format_step_ranges(steps: list[int]) -> str:
     return ", ".join(ranges)
 
 
-def _decoded(value: str | None) -> str:
-    return html.unescape(value or "")
+def _decoded(value: Any) -> str:
+    return html.unescape(str(value or ""))
 
 
-def _visible_text(value: str | None) -> str:
+def _visible_text(value: Any) -> str:
     """Tag-stripped, entity-decoded text with whitespace and word-joiners removed."""
-    without_tags = _HTML_TAG_RE.sub("", value or "")
+    without_tags = _HTML_TAG_RE.sub("", str(value or ""))
     decoded = html.unescape(without_tags)
-    return re.sub(r"[\s⁠​]+", "", decoded)
+    return re.sub(r"[\s\u2060\u200b]+", "", decoded)
 
 
 def _is_noise(field_name: str, original: str | None, new: str | None) -> bool:
@@ -115,14 +116,107 @@ def _compose_summary(
     return summary[0].upper() + summary[1:] if summary else summary
 
 
+class _ZephyrHtmlToRichText(HTMLParser):
+    """Flatten Zephyr's HTML field values into the app's rich-text markup."""
+
+    _BOLD_TAGS = {"strong", "b"}
+    _ITALIC_TAGS = {"em", "i"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._out: list[str] = []
+        self._list_stack: list[dict[str, Any]] = []
+        self._in_pre = False
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag in ("ol", "ul"):
+            self._list_stack.append({"tag": tag, "count": 0})
+        elif tag == "li":
+            self._newline()
+            if self._list_stack and self._list_stack[-1]["tag"] == "ol":
+                self._list_stack[-1]["count"] += 1
+                self._out.append(f"{self._list_stack[-1]['count']}. ")
+            else:
+                self._out.append("- ")
+        elif tag == "p":
+            self._blankline()
+        elif tag == "br":
+            self._newline()
+        elif tag == "pre":
+            self._in_pre = True
+            self._newline()
+        elif tag in self._BOLD_TAGS:
+            self._out.append("**")
+        elif tag in self._ITALIC_TAGS:
+            self._out.append("*")
+        elif tag == "u":
+            self._out.append("<u>")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("ol", "ul"):
+            if self._list_stack:
+                self._list_stack.pop()
+            self._newline()
+        elif tag in ("li", "p"):
+            self._newline()
+        elif tag == "pre":
+            self._in_pre = False
+            self._newline()
+        elif tag in self._BOLD_TAGS:
+            self._out.append("**")
+        elif tag in self._ITALIC_TAGS:
+            self._out.append("*")
+        elif tag == "u":
+            self._out.append("</u>")
+
+    def handle_data(self, data: str) -> None:
+        cleaned = re.sub(r"[\u2060\u200b]", "", data)
+        if self._in_pre:
+            self._out.append(cleaned)
+            return
+        collapsed = re.sub(r"\s+", " ", cleaned)
+        if collapsed == " " and (not self._out or self._out[-1].endswith("\n")):
+            return
+        self._out.append(collapsed)
+
+    def _newline(self) -> None:
+        if self._out and not self._out[-1].endswith("\n"):
+            self._out.append("\n")
+
+    def _blankline(self) -> None:
+        self._newline()
+        self._out.append("\n")
+
+    def text(self) -> str:
+        lines = [line.rstrip() for line in "".join(self._out).split("\n")]
+        result: list[str] = []
+        for line in lines:
+            if not line and result and not result[-1]:
+                continue
+            result.append(line)
+        while result and not result[0]:
+            result.pop(0)
+        while result and not result[-1]:
+            result.pop()
+        return "\n".join(result)
+
+
+def html_to_rich_text(value: Any) -> str:
+    """Convert a Zephyr HTML field value to the frontend's rich-text markup."""
+    parser = _ZephyrHtmlToRichText()
+    parser.feed(str(value or ""))
+    parser.close()
+    return parser.text()
+
+
 def _compose_sections(surviving: list[dict[str, Any]]) -> tuple[str, str]:
     before_parts: list[str] = []
     after_parts: list[str] = []
     for item in surviving:
-        heading = f"<h4>{prettify_field_name(str(item.get('fieldName') or ''))}</h4>"
-        before_parts.append(heading + (item.get("originalValue") or "<p>—</p>"))
-        after_parts.append(heading + (item.get("newValue") or "<p>—</p>"))
-    return "".join(before_parts), "".join(after_parts)
+        heading = f"**{prettify_field_name(str(item.get('fieldName') or ''))}**"
+        before_parts.append(f"{heading}\n{html_to_rich_text(item.get('originalValue')) or '—'}")
+        after_parts.append(f"{heading}\n{html_to_rich_text(item.get('newValue')) or '—'}")
+    return "\n\n".join(before_parts), "\n\n".join(after_parts)
 
 
 def transform_entry(
@@ -132,6 +226,11 @@ def transform_entry(
     jira_base_url: str,
 ) -> dict[str, Any] | None:
     """One Zephyr history entry (one save) -> one change record, or None if pure noise."""
+    try:
+        history_id = int(entry.get("id"))
+    except (TypeError, ValueError):
+        return None
+
     base_record = {
         "test_case_id": test_case_key,
         "title": test_case_name,
@@ -142,7 +241,7 @@ def transform_entry(
         "tags": [IMPORT_TAG],
         "associated_bugs": [],
         "associated_tasks": [],
-        "zephyr_history_id": entry.get("id"),
+        "zephyr_history_id": history_id,
     }
 
     if str(entry.get("type") or "").upper() == "CREATE":
@@ -151,7 +250,12 @@ def transform_entry(
     surviving: list[dict[str, Any]] = []
     added_steps: list[int] = []
     removed_steps: list[int] = []
-    for item in entry.get("changeHistoryItems") or []:
+    items = entry.get("changeHistoryItems")
+    if not isinstance(items, list):
+        items = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
         field_name = str(item.get("fieldName") or "")
         marker = _step_marker(field_name)
         if marker:
