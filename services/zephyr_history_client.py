@@ -32,9 +32,10 @@ class ZephyrHistoryClient:
         start_at = 0
         results: list[dict[str, Any]] = []
         seen_keys: set[str] = set()
+        escaped_folder = folder.replace('"', '\\"')
         while True:
             params: dict[str, Any] = {
-                "query": f'projectId = {project_id} AND folder = "{folder}"',
+                "query": f'projectId = {project_id} AND folder = "{escaped_folder}"',
                 "fields": "key,name,folder",
                 "maxResults": SEARCH_PAGE_SIZE,
             }

@@ -44,6 +44,16 @@ def test_search_test_cases_handles_dict_payload_and_dedupes(mock_get) -> None:
 
 
 @patch("services.zephyr_history_client.requests.get")
+def test_search_test_cases_escapes_quotes_in_folder(mock_get) -> None:
+    mock_get.return_value = _response([])
+
+    make_client().search_test_cases(14210, '/Data "Sync"')
+
+    query = mock_get.call_args.kwargs["params"]["query"]
+    assert query == 'projectId = 14210 AND folder = "/Data \\"Sync\\""'
+
+
+@patch("services.zephyr_history_client.requests.get")
 def test_version_ids_extracts_ints(mock_get) -> None:
     mock_get.return_value = _response([{"id": 30707}, {"id": "30901"}, {"id": None}])
 
