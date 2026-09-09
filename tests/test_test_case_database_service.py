@@ -191,3 +191,10 @@ def test_add_change_attachments_validates_batch_before_persisting(tmp_path):
         )
 
     assert service.list_change_attachments(change["id"]) == []
+
+
+def test_imported_is_a_writable_status() -> None:
+    from services.test_case_database_service import VALID_STATUSES, WRITABLE_STATUSES
+
+    assert "Imported" in VALID_STATUSES
+    assert "Imported" in WRITABLE_STATUSES

@@ -8,8 +8,8 @@ from data_access.test_case_database_repository import TestCaseDatabaseRepository
 from exceptions import ValidationError
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
-VALID_STATUSES = {"Active", "Draft", "Superseded", "Archived"}
-WRITABLE_STATUSES = {"Active", "Draft", "Superseded"}
+VALID_STATUSES = {"Active", "Draft", "Superseded", "Archived", "Imported"}
+WRITABLE_STATUSES = {"Active", "Draft", "Superseded", "Imported"}
 
 
 class TestCaseDatabaseService:
