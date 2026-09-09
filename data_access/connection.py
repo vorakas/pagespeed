@@ -730,6 +730,11 @@ class ConnectionManager:
             CREATE INDEX IF NOT EXISTS idx_test_case_change_attachments_change_id
             ON test_case_change_attachments(change_id)
         """)
+        cursor.execute("ALTER TABLE test_case_changes ADD COLUMN IF NOT EXISTS zephyr_history_id BIGINT")
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_test_case_changes_zephyr_history_id
+            ON test_case_changes(zephyr_history_id)
+        """)
 
         self._create_postgres_requirement_tables(cursor)
         cursor.execute("ALTER TABLE requirement_sources ADD COLUMN IF NOT EXISTS original_filename TEXT")
@@ -1232,12 +1237,18 @@ class ConnectionManager:
             "ALTER TABLE requirement_sources ADD COLUMN mime_type TEXT",
             "ALTER TABLE requirement_sources ADD COLUMN file_size INTEGER",
             "ALTER TABLE requirement_sources ADD COLUMN file_bytes BLOB",
+            "ALTER TABLE test_case_changes ADD COLUMN zephyr_history_id INTEGER",
         ]
         for statement in _SQLITE_MIGRATIONS:
             try:
                 cursor.execute(statement)
             except sqlite3.OperationalError:
                 pass  # Column already exists
+
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_test_case_changes_zephyr_history_id
+            ON test_case_changes(zephyr_history_id)
+        """)
 
         cursor.execute("UPDATE test_results SET strategy = 'desktop' WHERE strategy IS NULL")
         self._create_sqlite_indexes(cursor)

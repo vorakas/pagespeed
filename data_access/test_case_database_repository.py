@@ -96,8 +96,9 @@ class TestCaseDatabaseRepository:
                 f"""
                 INSERT INTO test_case_changes (
                     test_case_id, title, test_case_url, change_summary,
-                    before_state, after_state, changed_by, change_date, status, tags
-                ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    before_state, after_state, changed_by, change_date, status, tags,
+                    zephyr_history_id
+                ) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                 {self._cm.returning_id()}
                 """,
                 (
@@ -111,6 +112,7 @@ class TestCaseDatabaseRepository:
                     data["change_date"],
                     data["status"],
                     json.dumps(data["tags"]),
+                    data.get("zephyr_history_id"),
                 ),
             )
             change_id = self._cm.last_insert_id(cursor)
@@ -245,6 +247,24 @@ class TestCaseDatabaseRepository:
             cursor.execute(sql, tuple(params))
             changes = [self._normalize_change(row) for row in self._cm.rows_to_dicts(cursor)]
         return self._attach_links(changes)
+
+    def existing_zephyr_history_ids(self, history_ids: list[int]) -> set[int]:
+        """Return the subset of ``history_ids`` already stored on any change."""
+        if not history_ids:
+            return set()
+        ph = self._cm.placeholder()
+        placeholders = ", ".join([ph] * len(history_ids))
+        with self._cm.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT zephyr_history_id
+                FROM test_case_changes
+                WHERE zephyr_history_id IN ({placeholders})
+                """,
+                tuple(history_ids),
+            )
+            return {row["zephyr_history_id"] for row in self._cm.rows_to_dicts(cursor)}
 
     def list_change_attachments(self, change_id: int) -> list[dict]:
         ph = self._cm.placeholder()

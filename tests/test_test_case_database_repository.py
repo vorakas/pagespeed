@@ -139,3 +139,53 @@ def test_attachment_metadata_bytes_and_delete(tmp_path: Path, monkeypatch) -> No
 
     assert repo.delete_change_attachment(change_id, attachment_id) is True
     assert repo.list_change_attachments(change_id) == []
+
+
+def test_create_change_stores_zephyr_history_id(tmp_path: Path, monkeypatch) -> None:
+    repo = make_repo(tmp_path, monkeypatch)
+
+    payload = sample_payload()
+    payload["zephyr_history_id"] = 547403
+    change_id = repo.create_change(payload)
+    created = repo.get_change(change_id)
+
+    assert created is not None
+    assert created["zephyr_history_id"] == 547403
+
+
+def test_create_change_without_zephyr_history_id_allows_many_nulls(tmp_path: Path, monkeypatch) -> None:
+    repo = make_repo(tmp_path, monkeypatch)
+
+    first_id = repo.create_change(sample_payload())
+    second_id = repo.create_change(sample_payload())
+
+    assert first_id != second_id
+    assert repo.get_change(first_id)["zephyr_history_id"] is None
+
+
+def test_duplicate_zephyr_history_id_is_rejected(tmp_path: Path, monkeypatch) -> None:
+    import sqlite3
+
+    import pytest
+
+    repo = make_repo(tmp_path, monkeypatch)
+
+    payload = sample_payload()
+    payload["zephyr_history_id"] = 547403
+    repo.create_change(payload)
+
+    with pytest.raises(sqlite3.IntegrityError):
+        repo.create_change(payload)
+
+
+def test_existing_zephyr_history_ids_returns_known_subset(tmp_path: Path, monkeypatch) -> None:
+    repo = make_repo(tmp_path, monkeypatch)
+
+    payload = sample_payload()
+    payload["zephyr_history_id"] = 547403
+    repo.create_change(payload)
+
+    existing = repo.existing_zephyr_history_ids([547403, 999999])
+
+    assert existing == {547403}
+    assert repo.existing_zephyr_history_ids([]) == set()
