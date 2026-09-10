@@ -1773,7 +1773,7 @@ export type KnowledgeEntryType =
 
 export type KnowledgeStatus = "Draft" | "Active" | "Superseded" | "Archived"
 
-export type TestCaseChangeStatus = "Draft" | "Active" | "Superseded" | "Archived"
+export type TestCaseChangeStatus = "Draft" | "Active" | "Superseded" | "Archived" | "Imported"
 
 export interface TestCaseChangeLink {
   id?: number
@@ -1807,6 +1807,7 @@ export interface TestCaseChange {
   created_at: string
   updated_at: string
   archived_at: string | null
+  zephyr_history_id?: number | null
 }
 
 export interface TestCaseChangePayload {
@@ -1830,6 +1831,19 @@ export interface TestCaseChangeSearchParams {
   status?: TestCaseChangeStatus | "all"
   tag?: string
   include_archived?: boolean
+}
+
+export interface ZephyrImportFailure {
+  key: string
+  error: string
+}
+
+export interface ZephyrImportSummary {
+  testCases: number
+  recordsCreated: number
+  skippedExisting: number
+  skippedEmpty: number
+  failures: ZephyrImportFailure[]
 }
 
 export interface KnowledgeDomain {

@@ -206,6 +206,7 @@ export function TestCaseChangeEditor({
                   <SelectItem value="Draft">Draft</SelectItem>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Superseded">Superseded</SelectItem>
+                  <SelectItem value="Imported">Imported</SelectItem>
                 </SelectContent>
               </Select>
             </div>

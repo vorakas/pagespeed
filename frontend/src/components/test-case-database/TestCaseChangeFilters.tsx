@@ -64,6 +64,7 @@ export function TestCaseChangeFilters({
               <SelectItem value="Draft">Draft</SelectItem>
               <SelectItem value="Active">Active</SelectItem>
               <SelectItem value="Superseded">Superseded</SelectItem>
+              <SelectItem value="Imported">Imported</SelectItem>
               <SelectItem value="Archived">Archived</SelectItem>
             </SelectContent>
           </Select>

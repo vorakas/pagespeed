@@ -18,6 +18,7 @@ import type {
   TestCaseChangeAttachment,
   TestCaseChangePayload,
   TestCaseChangeSearchParams,
+  ZephyrImportSummary,
   Trigger,
   TriggerFormData,
   SchedulePreset,
@@ -1142,6 +1143,13 @@ class ApiClient {
   async archiveTestCaseChange(changeId: number): Promise<TestCaseChange> {
     return this.request<TestCaseChange>(`/api/test-case-database/changes/${changeId}/archive`, {
       method: "POST",
+    })
+  }
+
+  async importZephyrHistory(params: { projectId: number; folder: string }): Promise<ZephyrImportSummary> {
+    return this.request<ZephyrImportSummary>("/api/test-case-database/import", {
+      method: "POST",
+      body: JSON.stringify(params),
     })
   }
 
