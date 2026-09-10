@@ -1,10 +1,11 @@
-import { Plus, RefreshCw } from "lucide-react"
+import { Import, Plus, RefreshCw } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { TestCaseChangeEditor } from "@/components/test-case-database/TestCaseChangeEditor"
 import { TestCaseChangeFilters } from "@/components/test-case-database/TestCaseChangeFilters"
 import { TestCaseChangeList } from "@/components/test-case-database/TestCaseChangeList"
+import { ZephyrImportDialog } from "@/components/test-case-database/ZephyrImportDialog"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,7 @@ export function TestCaseDatabase() {
   const [attachmentsUploading, setAttachmentsUploading] = useState(false)
   const [editorDirty, setEditorDirty] = useState(false)
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const requestIdRef = useRef(0)
   const attachmentRequestIdRef = useRef(0)
 
@@ -233,6 +235,15 @@ export function TestCaseDatabase() {
             <Button
               type="button"
               variant="outline"
+              onClick={() => setImportOpen(true)}
+              disabled={loading}
+            >
+              <Import className="size-4" aria-hidden="true" />
+              Import from Zephyr
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => void loadChanges()}
               disabled={loading}
             >
@@ -291,6 +302,12 @@ export function TestCaseDatabase() {
           />
         </section>
       </div>
+
+      <ZephyrImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => void loadChanges()}
+      />
 
       <ConfirmDialog
         open={pendingAction !== null || navigationBlocker.state === "blocked"}
