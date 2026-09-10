@@ -30,18 +30,72 @@ class ZephyrHistoryClient:
     def search_test_cases(self, project_key: str, folder: str) -> list[dict[str, Any]]:
         """List test cases in a project folder tree via the official ATM API.
 
-        The ATM search's ``folder`` clause only matches a folder exactly and
-        ``projectId`` is not a recognized query field, so the query filters by
-        project key and the folder subtree is matched client-side.
+        The ATM search's ``folder`` clause only matches a folder exactly, so
+        the subtree's folder paths are resolved first via the internal
+        folder-tree endpoint and each folder is queried exactly. Scanning the
+        whole project instead (10k+ test cases in TC) exceeds the production
+        request timeout.
         """
         escaped_project = project_key.replace('"', '\\"')
         folder_prefix = folder.rstrip("/")
-        start_at = 0
         results: list[dict[str, Any]] = []
+        seen_keys: set[str] = set()
+        for folder_path in self.folder_paths(self.project_id(project_key), folder_prefix):
+            escaped_folder = folder_path.replace('"', '\\"')
+            query = f'projectKey = "{escaped_project}" AND folder = "{escaped_folder}"'
+            for row in self._search_pages(query):
+                key = str(row.get("key") or "")
+                if not key or key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                if self._in_folder_tree(str(row.get("folder") or ""), folder_prefix):
+                    results.append(row)
+        return results
+
+    def project_id(self, project_key: str) -> int:
+        """Resolve a Jira project key to its numeric id (official Jira API)."""
+        data = self._get_json(f"/rest/api/2/project/{project_key}")
+        return int(data["id"])
+
+    def folder_paths(self, project_id: int, folder: str) -> list[str]:
+        """The requested folder path plus every descendant folder path.
+
+        Uses the internal folder-tree endpoint — the same unsupported API
+        family as the history endpoints, so it stays isolated in this client.
+        """
+        target = folder.rstrip("/")
+        if not target:
+            return []
+        tree = self._get_json(f"/rest/tests/1.0/project/{project_id}/foldertree/testcase")
+        node: dict[str, Any] | None = tree if isinstance(tree, dict) else None
+        found_path = ""
+        for segment in [part for part in target.split("/") if part]:
+            children = (node or {}).get("children") or []
+            node = next(
+                (child for child in children if str(child.get("name") or "") == segment),
+                None,
+            )
+            if node is None:
+                return []
+            found_path = f"{found_path}/{segment}"
+
+        paths: list[str] = []
+
+        def collect(current: dict[str, Any], path: str) -> None:
+            paths.append(path)
+            for child in current.get("children") or []:
+                collect(child, f"{path}/{str(child.get('name') or '')}")
+
+        collect(node, found_path)
+        return paths
+
+    def _search_pages(self, query: str) -> list[dict[str, Any]]:
+        start_at = 0
+        rows: list[dict[str, Any]] = []
         seen_keys: set[str] = set()
         while True:
             params: dict[str, Any] = {
-                "query": f'projectKey = "{escaped_project}"',
+                "query": query,
                 "fields": "key,name,folder",
                 "maxResults": SEARCH_PAGE_SIZE,
             }
@@ -55,13 +109,12 @@ class ZephyrHistoryClient:
                 if not key or key in seen_keys:
                     continue
                 seen_keys.add(key)
+                rows.append(row)
                 new_count += 1
-                if self._in_folder_tree(str(row.get("folder") or ""), folder_prefix):
-                    results.append(row)
             if len(page) < SEARCH_PAGE_SIZE or new_count == 0:
                 break
             start_at += len(page)
-        return results
+        return rows
 
     @staticmethod
     def _in_folder_tree(folder: str, folder_prefix: str) -> bool:
