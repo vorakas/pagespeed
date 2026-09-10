@@ -202,6 +202,10 @@ class _ZephyrHtmlToRichText(HTMLParser):
         self._out.append(collapsed)
 
     def _push_inline(self, open_marker: str, close_marker: str) -> None:
+        if open_marker == "**" and any(
+            marker["open"] == "**" for marker in self._inline_stack
+        ):
+            open_marker = close_marker = ""
         self._inline_stack.append(
             {
                 "open": open_marker,

@@ -282,3 +282,10 @@ def test_transform_preserves_zero_values() -> None:
     assert record is not None
     assert "**Estimate**\n0" in record["before_state"]
     assert "**Estimate**\n5" in record["after_state"]
+
+
+def test_html_to_rich_text_deduplicates_nested_bold() -> None:
+    from services.zephyr_import_service import html_to_rich_text
+
+    assert html_to_rich_text("<h2><strong>Title</strong></h2>") == "**Title**"
+    assert html_to_rich_text("<h3><b>Bold head</b> plus tail</h3>") == "**Bold head plus tail**"
