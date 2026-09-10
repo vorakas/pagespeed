@@ -50,12 +50,12 @@ def format_step_ranges(steps: list[int]) -> str:
 
 
 def _decoded(value: Any) -> str:
-    return html.unescape(str(value or ""))
+    return html.unescape("" if value is None else str(value))
 
 
 def _visible_text(value: Any) -> str:
     """Tag-stripped, entity-decoded text with whitespace and word-joiners removed."""
-    without_tags = _HTML_TAG_RE.sub("", str(value or ""))
+    without_tags = _HTML_TAG_RE.sub("", "" if value is None else str(value))
     decoded = html.unescape(without_tags)
     return re.sub(r"[\s\u2060\u200b]+", "", decoded)
 
@@ -121,14 +121,17 @@ class _ZephyrHtmlToRichText(HTMLParser):
 
     _BOLD_TAGS = {"strong", "b"}
     _ITALIC_TAGS = {"em", "i"}
+    _HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
+    _BLOCK_TAGS = {"div", "blockquote", "tr", "dt", "dd"}
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self._out: list[str] = []
         self._list_stack: list[dict[str, Any]] = []
+        self._inline_stack: list[dict[str, Any]] = []
         self._in_pre = False
 
-    def handle_starttag(self, tag: str, attrs) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in ("ol", "ul"):
             self._list_stack.append({"tag": tag, "count": 0})
         elif tag == "li":
@@ -145,12 +148,17 @@ class _ZephyrHtmlToRichText(HTMLParser):
         elif tag == "pre":
             self._in_pre = True
             self._newline()
+        elif tag in self._HEADING_TAGS:
+            self._newline()
+            self._push_inline("**", "**")
+        elif tag in self._BLOCK_TAGS:
+            self._newline()
         elif tag in self._BOLD_TAGS:
-            self._out.append("**")
+            self._push_inline("**", "**")
         elif tag in self._ITALIC_TAGS:
-            self._out.append("*")
+            self._push_inline("*", "*")
         elif tag == "u":
-            self._out.append("<u>")
+            self._push_inline("<u>", "</u>")
 
     def handle_endtag(self, tag: str) -> None:
         if tag in ("ol", "ul"):
@@ -162,12 +170,16 @@ class _ZephyrHtmlToRichText(HTMLParser):
         elif tag == "pre":
             self._in_pre = False
             self._newline()
-        elif tag in self._BOLD_TAGS:
-            self._out.append("**")
-        elif tag in self._ITALIC_TAGS:
-            self._out.append("*")
-        elif tag == "u":
-            self._out.append("</u>")
+        elif tag in self._HEADING_TAGS:
+            self._pop_inline()
+            self._newline()
+        elif tag in self._BLOCK_TAGS:
+            self._newline()
+        elif tag in ("td", "th"):
+            if self._out and not self._out[-1].endswith(("\n", " ")):
+                self._out.append(" ")
+        elif tag in self._BOLD_TAGS or tag in self._ITALIC_TAGS or tag == "u":
+            self._pop_inline()
 
     def handle_data(self, data: str) -> None:
         cleaned = re.sub(r"[\u2060\u200b]", "", data)
@@ -175,13 +187,68 @@ class _ZephyrHtmlToRichText(HTMLParser):
             self._out.append(cleaned)
             return
         collapsed = re.sub(r"\s+", " ", cleaned)
+        if not collapsed:
+            return
         if collapsed == " " and (not self._out or self._out[-1].endswith("\n")):
             return
+        if any(marker["open"] in ("**", "*") for marker in self._inline_stack):
+            collapsed = collapsed.replace("*", "")
+            if not collapsed:
+                return
+        self._reopen_suspended()
+        if collapsed.strip():
+            for marker in self._inline_stack:
+                marker["has_content"] = True
         self._out.append(collapsed)
 
+    def _push_inline(self, open_marker: str, close_marker: str) -> None:
+        self._inline_stack.append(
+            {
+                "open": open_marker,
+                "close": close_marker,
+                "suspended": False,
+                "has_content": False,
+                "open_index": len(self._out),
+            }
+        )
+        self._out.append(open_marker)
+
+    def _pop_inline(self) -> None:
+        if not self._inline_stack:
+            return
+        marker = self._inline_stack.pop()
+        if marker["suspended"]:
+            return
+        if marker["has_content"]:
+            self._out.append(marker["close"])
+        else:
+            self._drop_opener(marker)
+
+    def _reopen_suspended(self) -> None:
+        for marker in self._inline_stack:
+            if marker["suspended"]:
+                marker["open_index"] = len(self._out)
+                marker["suspended"] = False
+                marker["has_content"] = False
+                self._out.append(marker["open"])
+
+    def _drop_opener(self, marker: dict[str, Any]) -> None:
+        index = marker["open_index"]
+        if index < len(self._out) and self._out[index] == marker["open"]:
+            del self._out[index]
+
     def _newline(self) -> None:
-        if self._out and not self._out[-1].endswith("\n"):
-            self._out.append("\n")
+        if not self._out or self._out[-1].endswith("\n"):
+            return
+        for marker in reversed(self._inline_stack):
+            if marker["suspended"]:
+                continue
+            if marker["has_content"]:
+                self._out.append(marker["close"])
+            else:
+                self._drop_opener(marker)
+            marker["suspended"] = True
+        self._out.append("\n")
 
     def _blankline(self) -> None:
         self._newline()
@@ -204,7 +271,7 @@ class _ZephyrHtmlToRichText(HTMLParser):
 def html_to_rich_text(value: Any) -> str:
     """Convert a Zephyr HTML field value to the frontend's rich-text markup."""
     parser = _ZephyrHtmlToRichText()
-    parser.feed(str(value or ""))
+    parser.feed("" if value is None else str(value))
     parser.close()
     return parser.text()
 

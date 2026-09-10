@@ -22,9 +22,9 @@ def make_entry(**overrides) -> dict:
 
 
 BOILERPLATE_TEST_DATA = (
-    '<span class="atwho-inserted">{User Roles}</span>⁠ '
-    '<span class="atwho-inserted">{Operating System}</span>⁠ '
-    '<span class="atwho-inserted">{Browser}</span>⁠ '
+    '<span class="atwho-inserted">{User Roles}</span>\u2060 '
+    '<span class="atwho-inserted">{Operating System}</span>\u2060 '
+    '<span class="atwho-inserted">{Browser}</span>\u2060 '
 )
 
 
@@ -244,3 +244,41 @@ def test_transform_tolerates_malformed_items_container() -> None:
     entry = make_entry(changeHistoryItems="not-a-list")
 
     assert transform_entry(entry, "TC-T1", "Anything", BASE_URL) is None
+
+
+def test_html_to_rich_text_handles_block_tags() -> None:
+    from services.zephyr_import_service import html_to_rich_text
+
+    assert html_to_rich_text("<div>alpha</div><div>beta</div>") == "alpha\nbeta"
+    assert html_to_rich_text("<h2>Setup</h2><h2>Teardown</h2>") == "**Setup**\n**Teardown**"
+    assert (
+        html_to_rich_text("<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>")
+        == "a b\nc d"
+    )
+
+
+def test_html_to_rich_text_wraps_emphasis_per_line() -> None:
+    from services.zephyr_import_service import html_to_rich_text
+
+    assert html_to_rich_text("<strong>line one<br/>line two</strong>") == "**line one**\n**line two**"
+    assert html_to_rich_text("x<strong></strong>y") == "xy"
+    assert html_to_rich_text("<strong>a*b</strong>") == "**ab**"
+
+
+def test_html_to_rich_text_preserves_falsy_values() -> None:
+    from services.zephyr_import_service import html_to_rich_text
+
+    assert html_to_rich_text(0) == "0"
+    assert html_to_rich_text(None) == ""
+
+
+def test_transform_preserves_zero_values() -> None:
+    entry = make_entry(
+        changeHistoryItems=[{"id": 5, "fieldName": "Estimate", "originalValue": 0, "newValue": 5}]
+    )
+
+    record = transform_entry(entry, "TC-T1", "Anything", BASE_URL)
+
+    assert record is not None
+    assert "**Estimate**\n0" in record["before_state"]
+    assert "**Estimate**\n5" in record["after_state"]
