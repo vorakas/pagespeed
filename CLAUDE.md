@@ -24,7 +24,7 @@ For backend OOP/refactoring/bug-fixing/data-safety conventions, see the global `
 ## Critical rules
 - **React frontend is the sole active frontend** (`frontend/src/`). Do NOT modify legacy `templates/`, `static/css/`, `static/js/` — archived at `/legacy/`, reference only.
 - **All credentials are client-side** in localStorage (`nrConfig`, `azureConfig`, `aiConfig`, `kqlProfiles`, `devOpsConfig`), never on the server.
-- **No automated test suite** — all testing is manual.
+- **Backend has a pytest suite** (`tests/`, run `python -m pytest tests/ -q`); the frontend has no automated tests — `npm run build` in `frontend/` is the check.
 - **Deploy:** GitHub webhook is broken; the GraphQL deploy mutation often serves stale images. Deploy via Railway CLI. See [docs/deploy.md](docs/deploy.md).
 - **Commit trailer:** `Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>`
 
@@ -36,6 +36,8 @@ For backend OOP/refactoring/bug-fixing/data-safety conventions, see the global `
 ---
 
 ## Current State
+
+The **Test Case Database supports Zephyr history import** (`POST /api/test-case-database/import`, "Import from Zephyr" dialog): re-runnable, deduped on `zephyr_history_id`, records stored as rich-text markup. All calls to the undocumented Zephyr `/rest/tests/1.0` API are isolated in `services/zephyr_history_client.py`. Spec: [docs/superpowers/specs/2026-09-09-zephyr-history-import-design.md](docs/superpowers/specs/2026-09-09-zephyr-history-import-design.md).
 
 The **Aurora register rollout is complete (Phases 1–3)**. Production renders the lifted-card Aurora register at every URL (`/`, `/dashboard`, `/test`, `/metrics`, `/newrelic`, `/iislogs`, `/ai-analysis`, `/builds`, `/load-testing`, `/obsidian`, `/setup`, plus migration cluster pages). The parallel `/prototype/<page>/aurora` URL space is retired (catch-all redirects orphans to `/`). The two-row brand banner above page titles is gone — branding now lives in the sidebar.
 
