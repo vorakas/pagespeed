@@ -45,6 +45,7 @@ from services.snapshot_service import SnapshotService
 from services.testing_service import TestingService
 from services.test_case_database_service import TestCaseDatabaseService
 from services.testdata_url_service import TestDataUrlService
+from services.zephyr_import_service import ZephyrImportService
 from services.trigger_service import TriggerService
 from services.vault_git_service import VaultGitService
 
@@ -82,6 +83,7 @@ def register_blueprints(
     testdata_url_service: "TestDataUrlService | None" = None,
     knowledge_service: "KnowledgeService | None" = None,
     test_case_database_service: "TestCaseDatabaseService | None" = None,
+    zephyr_import_service: "ZephyrImportService | None" = None,
 ) -> None:
     """Create and register all blueprints on the Flask app.
 
@@ -105,7 +107,10 @@ def register_blueprints(
         app.register_blueprint(create_knowledge_blueprint(knowledge_service))
     if test_case_database_service is not None:
         app.register_blueprint(
-            create_test_case_database_blueprint(test_case_database_service)
+            create_test_case_database_blueprint(
+                test_case_database_service,
+                zephyr_import_service=zephyr_import_service,
+            )
         )
     if requirement_service is not None:
         app.register_blueprint(create_requirements_blueprint(

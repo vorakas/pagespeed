@@ -108,6 +108,7 @@ from services.site_service import SiteService
 from services.test_case_database_service import TestCaseDatabaseService
 from services.testing_service import TestingService
 from services.trigger_service import TriggerService
+from services.zephyr_import_service import ZephyrImportService
 
 
 class SchedulerLease:
@@ -233,6 +234,10 @@ def create_app() -> Flask:
     csv_lighthouse_service = CsvLighthouseService(csv_lighthouse_repo, pagespeed)
     knowledge_service = KnowledgeService(knowledge_repo)
     test_case_database_service = TestCaseDatabaseService(test_case_database_repo)
+    zephyr_import_service = ZephyrImportService(
+        jira_pat=JIRA_PAT or "",
+        repository=test_case_database_repo,
+    )
     csv_lighthouse_service.recover_interrupted_runs()
 
     # ---- TestData URL listing (builds openable URLs from uploaded CSVs) ----
@@ -575,6 +580,7 @@ def create_app() -> Flask:
         testdata_url_service=testdata_url_service,
         knowledge_service=knowledge_service,
         test_case_database_service=test_case_database_service,
+        zephyr_import_service=zephyr_import_service,
     )
 
     # ---- Centralized error handlers ----
