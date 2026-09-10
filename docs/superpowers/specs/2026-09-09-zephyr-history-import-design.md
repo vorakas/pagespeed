@@ -29,7 +29,7 @@ One Zephyr history entry (one save) becomes one `test_case_changes` record:
 - `test_case_url`: direct lampstrack test case link.
 - `title`: the test case's current name from the search response.
 - `change_summary`: auto-composed from the surviving field items, e.g. `Updated Precondition; rewrote steps 1-6 (4 steps removed); moved folder`.
-- `before_state` / `after_state`: one section per surviving field item — a prettified heading plus the `originalValue` HTML (before) and `newValue` HTML (after).
+- `before_state` / `after_state`: one section per surviving field item — a `**Heading**` line plus the field value converted from Zephyr HTML to the frontend's rich-text markup dialect (`- `/`1. ` list lines, `**bold**`, `*italic*`, `<u>`, blank-line paragraph breaks), sections separated by blank lines; a missing side renders `—`. Raw HTML is never stored: the frontend's `renderRichTextHtml` escapes HTML, so imported records use the same markup dialect as manually written ones (and inherit its XSS-safe escaping).
 - `changed_by`: `userKey`. `change_date`: `historyDate`.
 - `status`: `Imported`. `tags`: `zephyr-import`.
 - `zephyr_history_id`: the entry's `id` (dedupe key).
