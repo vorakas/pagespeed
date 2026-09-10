@@ -64,15 +64,12 @@ def create_test_case_database_blueprint(
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             data = {}
-        try:
-            project_id = int(data.get("projectId") or 0)
-        except (TypeError, ValueError):
-            project_id = 0
+        project_key = str(data.get("projectKey") or "").strip()
         folder = str(data.get("folder") or "").strip()
-        if not project_id or not folder:
-            return jsonify({"error": "projectId and folder are required"}), 400
+        if not project_key or not folder:
+            return jsonify({"error": "projectKey and folder are required"}), 400
         try:
-            return jsonify(zephyr_import_service.run_import(project_id, folder))
+            return jsonify(zephyr_import_service.run_import(project_key, folder))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 503
         except requests.RequestException as exc:

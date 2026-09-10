@@ -1146,7 +1146,7 @@ class ApiClient {
     })
   }
 
-  async importZephyrHistory(params: { projectId: number; folder: string }): Promise<ZephyrImportSummary> {
+  async importZephyrHistory(params: { projectKey: string; folder: string }): Promise<ZephyrImportSummary> {
     return this.request<ZephyrImportSummary>("/api/test-case-database/import", {
       method: "POST",
       body: JSON.stringify(params),

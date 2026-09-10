@@ -369,7 +369,7 @@ class ZephyrImportService:
         self._client = client or ZephyrHistoryClient(jira_pat, jira_base_url)
         self._max_workers = max_workers
 
-    def run_import(self, project_id: int, folder: str) -> dict[str, Any]:
+    def run_import(self, project_key: str, folder: str) -> dict[str, Any]:
         # Validated per run, not at construction: the app wires this service at
         # boot even when JIRA_PAT is absent, and a missing PAT must surface as a
         # request-time error rather than a startup crash.
@@ -378,7 +378,7 @@ class ZephyrImportService:
 
         cases = [
             (str(case.get("key")), str(case.get("name") or case.get("key")))
-            for case in self._client.search_test_cases(project_id, folder)
+            for case in self._client.search_test_cases(project_key, folder)
             if case.get("key")
         ]
         histories, failures = self._fetch_all_histories(cases)

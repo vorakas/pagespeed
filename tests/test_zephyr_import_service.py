@@ -38,8 +38,8 @@ class FakeClient:
             202: [{"id": 9003, "historyDate": "2026-08-01T00:00:00.000Z", "userKey": "ablais", "type": "CREATE"}],
         }
 
-    def search_test_cases(self, project_id, folder):
-        assert project_id == 14210
+    def search_test_cases(self, project_key, folder):
+        assert project_key == "TC"
         assert folder == "/Data Sync"
         return self.test_cases
 
@@ -75,7 +75,7 @@ def test_run_import_creates_deduped_records_and_counts() -> None:
     repo = FakeRepository()
     service = make_service(repo=repo)
 
-    summary = service.run_import(14210, "/Data Sync")
+    summary = service.run_import("TC", "/Data Sync")
 
     assert summary["testCases"] == 2
     assert summary["recordsCreated"] == 2  # 9001 update + 9003 create; 9002 was noise
@@ -90,7 +90,7 @@ def test_run_import_creates_deduped_records_and_counts() -> None:
 
 def test_run_import_skips_already_imported_entries() -> None:
     repo = FakeRepository(existing={9001})
-    summary = make_service(repo=repo).run_import(14210, "/Data Sync")
+    summary = make_service(repo=repo).run_import("TC", "/Data Sync")
 
     assert summary["recordsCreated"] == 1
     assert summary["skippedExisting"] == 1
@@ -108,7 +108,7 @@ def test_run_import_collects_per_case_failures() -> None:
     client.version_ids = broken_versions
     repo = FakeRepository()
 
-    summary = make_service(repo=repo, client=client).run_import(14210, "/Data Sync")
+    summary = make_service(repo=repo, client=client).run_import("TC", "/Data Sync")
 
     assert summary["recordsCreated"] == 1
     assert summary["failures"] == [{"key": "TC-T2", "error": "boom"}]
@@ -117,7 +117,7 @@ def test_run_import_collects_per_case_failures() -> None:
 def test_run_import_requires_pat() -> None:
     service = ZephyrImportService(jira_pat="", repository=FakeRepository(), client=FakeClient())
     with pytest.raises(ValueError, match="JIRA_PAT is not configured"):
-        service.run_import(14210, "/Data Sync")
+        service.run_import("TC", "/Data Sync")
 
 
 def test_run_import_counts_insert_failures_as_failures() -> None:
@@ -128,7 +128,7 @@ def test_run_import_counts_insert_failures_as_failures() -> None:
             return super().create_change(data)
 
     repo = ExplodingRepository()
-    summary = make_service(repo=repo).run_import(14210, "/Data Sync")
+    summary = make_service(repo=repo).run_import("TC", "/Data Sync")
 
     assert summary["recordsCreated"] == 1
     assert {record["zephyr_history_id"] for record in repo.created} == {9003}
@@ -141,6 +141,6 @@ def test_run_import_ignores_cases_without_key() -> None:
     client = FakeClient()
     client.test_cases = [{"name": "No key"}, {"key": "TC-T1", "name": "Case One"}]
 
-    summary = make_service(client=client).run_import(14210, "/Data Sync")
+    summary = make_service(client=client).run_import("TC", "/Data Sync")
 
     assert summary["testCases"] == 1

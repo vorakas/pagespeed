@@ -27,15 +27,21 @@ class ZephyrHistoryClient:
         self.jira_pat = jira_pat
         self.jira_base_url = jira_base_url.rstrip("/")
 
-    def search_test_cases(self, project_id: int, folder: str) -> list[dict[str, Any]]:
-        """List test cases in a project folder tree via the official ATM API."""
+    def search_test_cases(self, project_key: str, folder: str) -> list[dict[str, Any]]:
+        """List test cases in a project folder tree via the official ATM API.
+
+        The ATM search's ``folder`` clause only matches a folder exactly and
+        ``projectId`` is not a recognized query field, so the query filters by
+        project key and the folder subtree is matched client-side.
+        """
+        escaped_project = project_key.replace('"', '\\"')
+        folder_prefix = folder.rstrip("/")
         start_at = 0
         results: list[dict[str, Any]] = []
         seen_keys: set[str] = set()
-        escaped_folder = folder.replace('"', '\\"')
         while True:
             params: dict[str, Any] = {
-                "query": f'projectId = {project_id} AND folder = "{escaped_folder}"',
+                "query": f'projectKey = "{escaped_project}"',
                 "fields": "key,name,folder",
                 "maxResults": SEARCH_PAGE_SIZE,
             }
@@ -49,12 +55,17 @@ class ZephyrHistoryClient:
                 if not key or key in seen_keys:
                     continue
                 seen_keys.add(key)
-                results.append(row)
                 new_count += 1
+                if self._in_folder_tree(str(row.get("folder") or ""), folder_prefix):
+                    results.append(row)
             if len(page) < SEARCH_PAGE_SIZE or new_count == 0:
                 break
             start_at += len(page)
         return results
+
+    @staticmethod
+    def _in_folder_tree(folder: str, folder_prefix: str) -> bool:
+        return folder == folder_prefix or folder.startswith(folder_prefix + "/")
 
     def version_ids(self, test_case_key: str) -> list[int]:
         """Resolve a test case key to the numeric ids of all its versions."""

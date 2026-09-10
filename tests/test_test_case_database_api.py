@@ -273,13 +273,13 @@ def _import_test_app(import_service):
 
 def test_import_returns_503_when_not_configured(tmp_path, monkeypatch):
     client = _import_test_app(None)
-    response = client.post("/api/test-case-database/import", json={"projectId": 14210, "folder": "/Data Sync"})
+    response = client.post("/api/test-case-database/import", json={"projectKey": "TC", "folder": "/Data Sync"})
     assert response.status_code == 503
 
 
 def test_import_requires_project_and_folder(tmp_path, monkeypatch):
     class StubImportService:
-        def run_import(self, project_id, folder):
+        def run_import(self, project_key, folder):
             raise AssertionError("must not be called")
 
     client = _import_test_app(StubImportService())
@@ -289,8 +289,8 @@ def test_import_requires_project_and_folder(tmp_path, monkeypatch):
 
 def test_import_returns_summary(tmp_path, monkeypatch):
     class StubImportService:
-        def run_import(self, project_id, folder):
-            assert project_id == 14210
+        def run_import(self, project_key, folder):
+            assert project_key == "TC"
             assert folder == "/Data Sync"
             return {
                 "testCases": 2,
@@ -301,14 +301,14 @@ def test_import_returns_summary(tmp_path, monkeypatch):
             }
 
     client = _import_test_app(StubImportService())
-    response = client.post("/api/test-case-database/import", json={"projectId": 14210, "folder": "/Data Sync"})
+    response = client.post("/api/test-case-database/import", json={"projectKey": "TC", "folder": "/Data Sync"})
     assert response.status_code == 200
     assert response.get_json()["recordsCreated"] == 3
 
 
 def test_import_rejects_non_object_body(tmp_path, monkeypatch):
     class StubImportService:
-        def run_import(self, project_id, folder):
+        def run_import(self, project_key, folder):
             raise AssertionError("must not be called")
 
     client = _import_test_app(StubImportService())
@@ -320,14 +320,14 @@ def test_import_maps_upstream_errors(tmp_path, monkeypatch):
     import requests
 
     class MissingPatService:
-        def run_import(self, project_id, folder):
+        def run_import(self, project_key, folder):
             raise ValueError("JIRA_PAT is not configured")
 
     class UpstreamFailureService:
-        def run_import(self, project_id, folder):
+        def run_import(self, project_key, folder):
             raise requests.HTTPError("500 Server Error")
 
-    body = {"projectId": 14210, "folder": "/Data Sync"}
+    body = {"projectKey": "TC", "folder": "/Data Sync"}
     assert _import_test_app(MissingPatService()).post("/api/test-case-database/import", json=body).status_code == 503
     response = _import_test_app(UpstreamFailureService()).post("/api/test-case-database/import", json=body)
     assert response.status_code == 502

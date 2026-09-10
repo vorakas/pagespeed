@@ -7,13 +7,13 @@ Backfill and refresh the Test Case Database from Zephyr Scale's own change histo
 ## Scope
 
 - Add a re-runnable "Import from Zephyr" action to the Test Case Database page.
-- Import history for all test cases in one folder tree of one project (default: project `14210`, folder `/Data Sync`, ~157 test cases). Both values are editable in the import dialog.
+- Import history for all test cases in one folder tree of one project (default: project key `TC`, folder `/Data Sync`, ~157 test cases). Both values are editable in the import dialog.
 - Deduplicate on Zephyr's own history entry id so re-runs insert only unseen changes.
 - No scheduler, no webhooks, no automatic polling.
 
 ## Zephyr Endpoints
 
-- **Official** `GET /rest/atm/1.0/testcase/search?query=projectId = <id> AND folder = "<folder>"` — enumerates test cases in the folder tree; returns `key`, `name`, `folder` in bulk. Same query pattern as `QaTestingReportService` ([services/qa_testing_service.py:1044](../../services/qa_testing_service.py)).
+- **Official** `GET /rest/atm/1.0/testcase/search?query=projectKey = "<key>"` — enumerates test cases in the project; returns `key`, `name`, `folder` in bulk. The folder subtree is filtered client-side because the ATM `folder` clause matches a folder exactly (not its subtree) and `projectId` is not a recognized query field. Same query pattern as `QaTestingReportService` ([services/qa_testing_service.py:1044](../../services/qa_testing_service.py)).
 - **Internal (unsupported)** `GET /rest/tests/1.0/testcase/{key}/allVersions?fields=id` — resolves a test case key to its numeric id, if the search response does not already include it. Verified working against lampstrack.
 - **Internal (unsupported)** `GET /rest/tests/1.0/testcase/{numericId}/history` — returns history entries: `id`, `historyDate`, `userKey`, `type` (`CREATE`/`UPDATE`), and `changeHistoryItems` of `{fieldName, originalValue, newValue}` with HTML values. Verified working against lampstrack (TC-T14481).
 
@@ -64,7 +64,7 @@ Add `Imported` to `VALID_STATUSES` and `WRITABLE_STATUSES` in `TestCaseDatabaseS
 ## API
 
 - `POST /api/test-case-database/import`
-  - Body: `{ "projectId": 14210, "folder": "/Data Sync" }`
+  - Body: `{ "projectKey": "TC", "folder": "/Data Sync" }`
   - Runs synchronously; history fetches are parallelized with a thread pool (pattern from `QaTestingReportService`).
   - Response: `{ "testCases": n, "recordsCreated": n, "skippedExisting": n, "skippedEmpty": n, "failures": [{ "key", "error" }] }`
   - Per-test-case failures are collected, not fatal; the run continues.
@@ -78,7 +78,7 @@ Add `Imported` to `VALID_STATUSES` and `WRITABLE_STATUSES` in `TestCaseDatabaseS
 ## UI
 
 - "Import from Zephyr" button in the Test Case Database page header.
-- Dialog: project id and folder inputs (prefilled `14210` / `/Data Sync`), Run button with in-flight state, then the result summary (created / skipped / failures).
+- Dialog: project key and folder inputs (prefilled `TC` / `/Data Sync`), Run button with in-flight state, then the result summary (created / skipped / failures).
 - After a successful run the change list refreshes.
 
 ## Components

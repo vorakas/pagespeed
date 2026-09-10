@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { api } from "@/services/api"
 import type { ZephyrImportSummary } from "@/types"
 
-const DEFAULT_PROJECT_ID = "14210"
+const DEFAULT_PROJECT_KEY = "TC"
 const DEFAULT_FOLDER = "/Data Sync"
 
 interface ZephyrImportDialogProps {
@@ -26,22 +26,21 @@ interface ZephyrImportDialogProps {
 }
 
 export function ZephyrImportDialog({ open, onOpenChange, onImported }: ZephyrImportDialogProps) {
-  const [projectId, setProjectId] = useState(DEFAULT_PROJECT_ID)
+  const [projectKey, setProjectKey] = useState(DEFAULT_PROJECT_KEY)
   const [folder, setFolder] = useState(DEFAULT_FOLDER)
   const [running, setRunning] = useState(false)
   const [summary, setSummary] = useState<ZephyrImportSummary | null>(null)
 
   async function runImport() {
-    const parsedProjectId = Number.parseInt(projectId, 10)
-    if (!Number.isFinite(parsedProjectId) || parsedProjectId <= 0 || !folder.trim()) {
-      toast.error("Project ID and folder are required")
+    if (!projectKey.trim() || !folder.trim()) {
+      toast.error("Project key and folder are required")
       return
     }
     setRunning(true)
     setSummary(null)
     try {
       const result = await api.importZephyrHistory({
-        projectId: parsedProjectId,
+        projectKey: projectKey.trim(),
         folder: folder.trim(),
       })
       setSummary(result)
@@ -76,11 +75,11 @@ export function ZephyrImportDialog({ open, onOpenChange, onImported }: ZephyrImp
 
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="zephyr-import-project">Project ID</Label>
+            <Label htmlFor="zephyr-import-project">Project Key</Label>
             <Input
               id="zephyr-import-project"
-              value={projectId}
-              onChange={(event) => setProjectId(event.target.value)}
+              value={projectKey}
+              onChange={(event) => setProjectKey(event.target.value)}
               disabled={running}
             />
           </div>

@@ -16,17 +16,19 @@ def make_client() -> ZephyrHistoryClient:
 
 @patch("services.zephyr_history_client.requests.get")
 def test_search_test_cases_paginates_and_sends_bearer(mock_get) -> None:
-    page_one = [{"key": f"TC-T{i}", "name": f"Case {i}"} for i in range(100)]
-    page_two = [{"key": "TC-T100", "name": "Case 100"}]
+    page_one = [
+        {"key": f"TC-T{i}", "name": f"Case {i}", "folder": "/Data Sync/Cart"} for i in range(100)
+    ]
+    page_two = [{"key": "TC-T100", "name": "Case 100", "folder": "/Data Sync"}]
     mock_get.side_effect = [_response(page_one), _response(page_two)]
 
     client = make_client()
-    results = client.search_test_cases(14210, "/Data Sync")
+    results = client.search_test_cases("TC", "/Data Sync")
 
     assert len(results) == 101
     first_call = mock_get.call_args_list[0]
     assert first_call.args[0] == "https://lampstrack.example.com/rest/atm/1.0/testcase/search"
-    assert first_call.kwargs["params"]["query"] == 'projectId = 14210 AND folder = "/Data Sync"'
+    assert first_call.kwargs["params"]["query"] == 'projectKey = "TC"'
     assert first_call.kwargs["headers"]["Authorization"] == "Bearer token"
     second_call = mock_get.call_args_list[1]
     assert second_call.kwargs["params"]["startAt"] == 100
@@ -35,22 +37,44 @@ def test_search_test_cases_paginates_and_sends_bearer(mock_get) -> None:
 @patch("services.zephyr_history_client.requests.get")
 def test_search_test_cases_handles_dict_payload_and_dedupes(mock_get) -> None:
     mock_get.return_value = _response(
-        {"results": [{"key": "TC-T1", "name": "One"}, {"key": "TC-T1", "name": "One"}]}
+        {
+            "results": [
+                {"key": "TC-T1", "name": "One", "folder": "/Data Sync/Cart"},
+                {"key": "TC-T1", "name": "One", "folder": "/Data Sync/Cart"},
+            ]
+        }
     )
 
-    results = make_client().search_test_cases(14210, "/Data Sync")
+    results = make_client().search_test_cases("TC", "/Data Sync")
 
     assert [row["key"] for row in results] == ["TC-T1"]
 
 
 @patch("services.zephyr_history_client.requests.get")
-def test_search_test_cases_escapes_quotes_in_folder(mock_get) -> None:
+def test_search_test_cases_filters_to_folder_subtree(mock_get) -> None:
+    mock_get.return_value = _response(
+        [
+            {"key": "TC-T1", "name": "In subtree", "folder": "/Data Sync/Cart/WUP to AC"},
+            {"key": "TC-T2", "name": "Exact folder", "folder": "/Data Sync"},
+            {"key": "TC-T3", "name": "Sibling prefix", "folder": "/Data Sync 2/Cart"},
+            {"key": "TC-T4", "name": "Elsewhere", "folder": "/Adobe/Regression"},
+            {"key": "TC-T5", "name": "No folder"},
+        ]
+    )
+
+    results = make_client().search_test_cases("TC", "/Data Sync/")
+
+    assert [row["key"] for row in results] == ["TC-T1", "TC-T2"]
+
+
+@patch("services.zephyr_history_client.requests.get")
+def test_search_test_cases_escapes_quotes_in_project_key(mock_get) -> None:
     mock_get.return_value = _response([])
 
-    make_client().search_test_cases(14210, '/Data "Sync"')
+    make_client().search_test_cases('T"C', "/Data Sync")
 
     query = mock_get.call_args.kwargs["params"]["query"]
-    assert query == 'projectId = 14210 AND folder = "/Data \\"Sync\\""'
+    assert query == 'projectKey = "T\\"C"'
 
 
 @patch("services.zephyr_history_client.requests.get")
