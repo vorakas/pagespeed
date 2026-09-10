@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -56,8 +57,15 @@ export function ZephyrImportDialog({ open, onOpenChange, onImported }: ZephyrImp
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !running && onOpenChange(next)}>
-      <DialogContent>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (running) return
+        if (!next) setSummary(null)
+        onOpenChange(next)
+      }}
+    >
+      <DialogContent showCloseButton={!running}>
         <DialogHeader>
           <DialogTitle>Import from Zephyr</DialogTitle>
           <DialogDescription>
@@ -94,8 +102,8 @@ export function ZephyrImportDialog({ open, onOpenChange, onImported }: ZephyrImp
               </p>
               {summary.failures.length > 0 && (
                 <ul className="mt-2 list-inside list-disc text-destructive">
-                  {summary.failures.map((failure) => (
-                    <li key={failure.key}>
+                  {summary.failures.map((failure, index) => (
+                    <li key={`${failure.key}-${index}`}>
                       {failure.key}: {failure.error}
                     </li>
                   ))}
@@ -110,7 +118,14 @@ export function ZephyrImportDialog({ open, onOpenChange, onImported }: ZephyrImp
             Close
           </Button>
           <Button type="button" onClick={() => void runImport()} disabled={running}>
-            {running ? "Importing…" : "Run Import"}
+            {running ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Importing…
+              </>
+            ) : (
+              "Run Import"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
