@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from io import BytesIO
 
+import requests
 from flask import Blueprint, jsonify, request, send_file
 
 from services.test_case_database_service import TestCaseDatabaseService
+from services.zephyr_import_service import ZephyrImportService
 
 
 def create_test_case_database_blueprint(
     test_case_database_service: TestCaseDatabaseService,
+    zephyr_import_service: "ZephyrImportService | None" = None,
 ) -> Blueprint:
     """Create the Test Case Database API blueprint."""
 
@@ -53,6 +56,25 @@ def create_test_case_database_blueprint(
     @bp.route("/changes/<int:change_id>/archive", methods=["POST"])
     def archive_change(change_id: int):
         return jsonify(test_case_database_service.archive_change(change_id))
+
+    @bp.route("/import", methods=["POST"])
+    def import_from_zephyr():
+        if zephyr_import_service is None:
+            return jsonify({"error": "Zephyr import is not configured"}), 503
+        data = request.get_json(silent=True) or {}
+        try:
+            project_id = int(data.get("projectId") or 0)
+        except (TypeError, ValueError):
+            project_id = 0
+        folder = str(data.get("folder") or "").strip()
+        if not project_id or not folder:
+            return jsonify({"error": "projectId and folder are required"}), 400
+        try:
+            return jsonify(zephyr_import_service.run_import(project_id, folder))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 503
+        except requests.RequestException as exc:
+            return jsonify({"error": "Zephyr API request failed", "details": str(exc)}), 502
 
     @bp.route("/changes/<int:change_id>/attachments", methods=["GET"])
     def list_change_attachments(change_id: int):
