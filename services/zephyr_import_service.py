@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import html
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from html.parser import HTMLParser
 from typing import Any
+
+from data_access.test_case_database_repository import TestCaseDatabaseRepository
+from services.zephyr_history_client import ZephyrHistoryClient
 
 IMPORT_STATUS = "Imported"
 IMPORT_TAG = "zephyr-import"
@@ -346,3 +350,93 @@ def transform_entry(
         "before_state": before_state,
         "after_state": after_state,
     }
+
+
+class ZephyrImportService:
+    """Import Zephyr Scale change history into the Test Case Database."""
+
+    def __init__(
+        self,
+        jira_pat: str,
+        repository: TestCaseDatabaseRepository,
+        client: ZephyrHistoryClient | None = None,
+        jira_base_url: str = "https://lampstrack.lampsplus.com",
+        max_workers: int = 8,
+    ) -> None:
+        self.jira_pat = jira_pat
+        self.jira_base_url = jira_base_url.rstrip("/")
+        self._repository = repository
+        self._client = client or ZephyrHistoryClient(jira_pat, jira_base_url)
+        self._max_workers = max_workers
+
+    def run_import(self, project_id: int, folder: str) -> dict[str, Any]:
+        if not self.jira_pat:
+            raise ValueError("JIRA_PAT is not configured")
+
+        test_cases = self._client.search_test_cases(project_id, folder)
+        failures: list[dict[str, str]] = []
+        histories: dict[str, tuple[str, list[dict[str, Any]]]] = {}
+
+        with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
+            futures = {
+                executor.submit(self._fetch_case_history, str(case.get("key") or "")): case
+                for case in test_cases
+                if case.get("key")
+            }
+            for future in as_completed(futures):
+                case = futures[future]
+                key = str(case.get("key") or "")
+                try:
+                    histories[key] = (str(case.get("name") or key), future.result())
+                except Exception as exc:  # noqa: BLE001 - collected into the run summary
+                    failures.append({"key": key, "error": str(exc)})
+
+        records: list[dict[str, Any]] = []
+        skipped_empty = 0
+        seen_entry_ids: set[int] = set()
+        for key, (name, entries) in histories.items():
+            for entry in entries:
+                entry_id = entry.get("id")
+                if entry_id in seen_entry_ids:
+                    continue
+                if entry_id is not None:
+                    seen_entry_ids.add(entry_id)
+                record = transform_entry(entry, key, name, self.jira_base_url)
+                if record is None:
+                    skipped_empty += 1
+                    continue
+                records.append(record)
+
+        existing_ids = self._repository.existing_zephyr_history_ids(
+            [record["zephyr_history_id"] for record in records if record["zephyr_history_id"] is not None]
+        )
+        created = 0
+        skipped_existing = 0
+        for record in records:
+            if record["zephyr_history_id"] in existing_ids:
+                skipped_existing += 1
+                continue
+            self._repository.create_change(record)
+            created += 1
+
+        return {
+            "testCases": len(test_cases),
+            "recordsCreated": created,
+            "skippedExisting": skipped_existing,
+            "skippedEmpty": skipped_empty,
+            "failures": failures,
+        }
+
+    def _fetch_case_history(self, test_case_key: str) -> list[dict[str, Any]]:
+        """History entries across every version of one test case, merged by entry id."""
+        entries: list[dict[str, Any]] = []
+        seen_ids: set[int] = set()
+        for version_id in self._client.version_ids(test_case_key):
+            for entry in self._client.fetch_history(version_id):
+                entry_id = entry.get("id")
+                if entry_id in seen_ids:
+                    continue
+                if entry_id is not None:
+                    seen_ids.add(entry_id)
+                entries.append(entry)
+        return entries
