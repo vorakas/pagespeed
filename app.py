@@ -237,6 +237,7 @@ def create_app() -> Flask:
     zephyr_import_service = ZephyrImportService(
         jira_pat=JIRA_PAT or "",
         repository=test_case_database_repo,
+        jira_base_url=JIRA_BASE_URL,
     )
     csv_lighthouse_service.recover_interrupted_runs()
 

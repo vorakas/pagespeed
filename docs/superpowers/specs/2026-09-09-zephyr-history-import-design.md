@@ -106,9 +106,9 @@ Modified:
 - Repository tests: column round-trip, unique index, existence check.
 - Frontend build check for typed API and dialog integration.
 
-## Open Implementation Check
+## Resolved Implementation Check
 
-Whether `/rest/atm/1.0/testcase/search` includes the numeric test case id in its response. If yes, skip the `allVersions` resolution call; if no, resolve via `allVersions?fields=id` (one extra cheap call per test case).
+The import always resolves numeric ids via `allVersions?fields=id` and fetches history per version id, merged by entry id — correct whether Zephyr hangs history off the latest version or each version, at the cost of one cheap extra call per test case.
 
 ## Out of Scope
 
