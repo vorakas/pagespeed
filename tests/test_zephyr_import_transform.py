@@ -72,7 +72,7 @@ def test_transform_builds_record_with_sections_and_summary() -> None:
     assert record["title"] == "Cart shipping address sync"
     assert record["test_case_url"] == f"{BASE_URL}/secure/Tests.jspa#/testCase/TC-T14481"
     assert record["changed_by"] == "ablais"
-    assert record["change_date"] == "2026-08-13T04:13:34.957Z"
+    assert record["change_date"] == "2026-08-13"
     assert record["status"] == "Imported"
     assert record["tags"] == ["zephyr-import"]
     assert record["zephyr_history_id"] == 547403
@@ -289,3 +289,23 @@ def test_html_to_rich_text_deduplicates_nested_bold() -> None:
 
     assert html_to_rich_text("<h2><strong>Title</strong></h2>") == "**Title**"
     assert html_to_rich_text("<h3><b>Bold head</b> plus tail</h3>") == "**Bold head plus tail**"
+
+
+def test_transform_change_date_is_date_only() -> None:
+    entry = make_entry(historyDate="2026-08-13T04:13:34.957Z")
+    entry["changeHistoryItems"] = [
+        {"id": 9, "fieldName": "PRECONDITION", "originalValue": "<p>a</p>", "newValue": "<p>b</p>"}
+    ]
+
+    record = transform_entry(entry, "TC-T1", "Anything", BASE_URL)
+
+    assert record is not None
+    assert record["change_date"] == "2026-08-13"
+
+    undated = make_entry(historyDate=None)
+    undated["changeHistoryItems"] = [
+        {"id": 10, "fieldName": "PRECONDITION", "originalValue": "<p>a</p>", "newValue": "<p>b</p>"}
+    ]
+    undated_record = transform_entry(undated, "TC-T1", "Anything", BASE_URL)
+    assert undated_record is not None
+    assert undated_record["change_date"] == ""

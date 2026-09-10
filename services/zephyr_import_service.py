@@ -311,7 +311,7 @@ def transform_entry(
         "title": test_case_name,
         "test_case_url": f"{jira_base_url.rstrip('/')}/secure/Tests.jspa#/testCase/{test_case_key}",
         "changed_by": str(entry.get("userKey") or ""),
-        "change_date": str(entry.get("historyDate") or ""),
+        "change_date": str(entry.get("historyDate") or "")[:10],
         "status": IMPORT_STATUS,
         "tags": [IMPORT_TAG],
         "associated_bugs": [],
