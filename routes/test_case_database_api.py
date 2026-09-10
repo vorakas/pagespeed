@@ -61,7 +61,9 @@ def create_test_case_database_blueprint(
     def import_from_zephyr():
         if zephyr_import_service is None:
             return jsonify({"error": "Zephyr import is not configured"}), 503
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            data = {}
         try:
             project_id = int(data.get("projectId") or 0)
         except (TypeError, ValueError):

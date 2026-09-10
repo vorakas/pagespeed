@@ -306,6 +306,16 @@ def test_import_returns_summary(tmp_path, monkeypatch):
     assert response.get_json()["recordsCreated"] == 3
 
 
+def test_import_rejects_non_object_body(tmp_path, monkeypatch):
+    class StubImportService:
+        def run_import(self, project_id, folder):
+            raise AssertionError("must not be called")
+
+    client = _import_test_app(StubImportService())
+    response = client.post("/api/test-case-database/import", json=[1, 2])
+    assert response.status_code == 400
+
+
 def test_import_maps_upstream_errors(tmp_path, monkeypatch):
     import requests
 
