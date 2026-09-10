@@ -47,7 +47,7 @@ Noise filtering (agreed):
 3. `TEST_SCRIPT.STEP.ADDED` / `TEST_SCRIPT.STEP.REMOVED` markers (value `-`) do not become before/after sections; they are folded into the change summary as `Step N added` / `Steps N-M removed`.
 4. If every item in a save is filtered out, no record is created for that save.
 
-`CREATE` entries (no `changeHistoryItems`) become a record with summary `Test case created` and empty before/after, so each test case's timeline is complete.
+`CREATE` entries (no `changeHistoryItems`) are skipped (counted as noise-only) — creation events carry no diff content and cluttered the list one-per-test-case. The first production import (2026-09-10) generated 157 such records before this rule; they were bulk-archived.
 
 ## Data Model
 
@@ -80,6 +80,7 @@ Add `Imported` to `VALID_STATUSES` and `WRITABLE_STATUSES` in `TestCaseDatabaseS
 - "Import from Zephyr" button in the Test Case Database page header.
 - Dialog: project key and folder inputs (prefilled `TC` / `/Data Sync`), Run button with in-flight state, then the result summary (created / skipped / failures).
 - After a successful run the change list refreshes.
+- **Grouped change list:** rows are grouped by test case id (client-side over the loaded changes). A collapsed group row shows the test case id, its latest change's title, date and author, and a change count; expanding reveals that case's change rows (newest first), selectable in the editor as before. Groups order by their most recent change; the group containing the selected change auto-expands. Filters/search still operate on individual changes — a group shows only its matching changes and its count reflects them.
 
 ## Components
 
