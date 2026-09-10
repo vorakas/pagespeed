@@ -100,16 +100,19 @@ export function TestCaseChangeList({
 
           return (
             <div key={group.testCaseId}>
-              <Button
+              <button
                 type="button"
-                variant="ghost"
                 aria-expanded={isOpen}
+                aria-controls={`tc-group-${group.testCaseId}`}
                 className={cn(
-                  "grid h-auto w-full !justify-start gap-0 rounded-none px-4 py-3 text-left",
+                  "grid h-auto w-full !justify-start gap-0 rounded-none px-4 py-3 text-left hover:bg-muted hover:text-foreground dark:hover:bg-muted/50",
                   ROW_CLASS,
-                  containsSelected && "bg-muted/50"
+                  containsSelected && "bg-primary/10"
                 )}
-                onClick={() => toggleGroup(group.testCaseId)}
+                onClick={() => {
+                  if (containsSelected) return
+                  toggleGroup(group.testCaseId)
+                }}
               >
                 <span className="flex items-center gap-1.5">
                   <ChevronRight
@@ -121,26 +124,27 @@ export function TestCaseChangeList({
                   />
                   <span className="font-mono text-xs text-foreground">{group.testCaseId}</span>
                 </span>
-                <span className="min-w-0">
-                  <span className="truncate text-sm font-medium text-foreground">
-                    {latest.title}
-                  </span>
+                <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                  {latest.title}
                 </span>
-                <span>
-                  <Badge variant="outline">
-                    {changeCount} {changeCount === 1 ? "change" : "changes"}
-                  </Badge>
-                </span>
+                <span />
                 <span className="text-xs text-muted-foreground">
                   {latest.change_date || "No date"}
                 </span>
                 <span className="truncate text-xs text-muted-foreground">
                   {latest.changed_by || "Unassigned"}
                 </span>
-                <span />
-              </Button>
+                <span>
+                  <Badge variant="outline">
+                    {changeCount} {changeCount === 1 ? "change" : "changes"}
+                  </Badge>
+                </span>
+              </button>
               {isOpen && (
-                <div className="divide-y divide-border border-t border-border">
+                <div
+                  id={`tc-group-${group.testCaseId}`}
+                  className="divide-y divide-border border-t border-border"
+                >
                   {group.changes.map((change) => {
                     const isSelected = selectedId === change.id
                     const isArchived = Boolean(change.archived_at)
