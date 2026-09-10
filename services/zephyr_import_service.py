@@ -363,52 +363,82 @@ class ZephyrImportService:
         jira_base_url: str = "https://lampstrack.lampsplus.com",
         max_workers: int = 8,
     ) -> None:
-        self.jira_pat = jira_pat
-        self.jira_base_url = jira_base_url.rstrip("/")
+        self._jira_pat = jira_pat
+        self._jira_base_url = jira_base_url.rstrip("/")
         self._repository = repository
         self._client = client or ZephyrHistoryClient(jira_pat, jira_base_url)
         self._max_workers = max_workers
 
     def run_import(self, project_id: int, folder: str) -> dict[str, Any]:
-        if not self.jira_pat:
+        # Validated per run, not at construction: the app wires this service at
+        # boot even when JIRA_PAT is absent, and a missing PAT must surface as a
+        # request-time error rather than a startup crash.
+        if not self._jira_pat:
             raise ValueError("JIRA_PAT is not configured")
 
-        test_cases = self._client.search_test_cases(project_id, folder)
-        failures: list[dict[str, str]] = []
-        histories: dict[str, tuple[str, list[dict[str, Any]]]] = {}
+        cases = [
+            (str(case.get("key")), str(case.get("name") or case.get("key")))
+            for case in self._client.search_test_cases(project_id, folder)
+            if case.get("key")
+        ]
+        histories, failures = self._fetch_all_histories(cases)
+        records, skipped_empty = self._build_records(cases, histories)
+        created, skipped_existing = self._persist(records, failures)
+        return {
+            "testCases": len(cases),
+            "recordsCreated": created,
+            "skippedExisting": skipped_existing,
+            "skippedEmpty": skipped_empty,
+            "failures": failures,
+        }
 
+    def _fetch_all_histories(
+        self,
+        cases: list[tuple[str, str]],
+    ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, str]]]:
+        histories: dict[str, list[dict[str, Any]]] = {}
+        failures: list[dict[str, str]] = []
         with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-            futures = {
-                executor.submit(self._fetch_case_history, str(case.get("key") or "")): case
-                for case in test_cases
-                if case.get("key")
-            }
+            futures = {executor.submit(self._fetch_case_history, key): key for key, _ in cases}
             for future in as_completed(futures):
-                case = futures[future]
-                key = str(case.get("key") or "")
+                key = futures[future]
                 try:
-                    histories[key] = (str(case.get("name") or key), future.result())
+                    histories[key] = future.result()
                 except Exception as exc:  # noqa: BLE001 - collected into the run summary
                     failures.append({"key": key, "error": str(exc)})
+        return histories, failures
 
+    def _build_records(
+        self,
+        cases: list[tuple[str, str]],
+        histories: dict[str, list[dict[str, Any]]],
+    ) -> tuple[list[dict[str, Any]], int]:
         records: list[dict[str, Any]] = []
         skipped_empty = 0
         seen_entry_ids: set[int] = set()
-        for key, (name, entries) in histories.items():
-            for entry in entries:
+        for key, name in cases:
+            # pop() releases each case's raw payload as soon as it is consumed
+            # and keeps record order deterministic (test-case order).
+            for entry in histories.pop(key, []):
                 entry_id = entry.get("id")
                 if entry_id in seen_entry_ids:
                     continue
                 if entry_id is not None:
                     seen_entry_ids.add(entry_id)
-                record = transform_entry(entry, key, name, self.jira_base_url)
+                record = transform_entry(entry, key, name, self._jira_base_url)
                 if record is None:
                     skipped_empty += 1
                     continue
                 records.append(record)
+        return records, skipped_empty
 
+    def _persist(
+        self,
+        records: list[dict[str, Any]],
+        failures: list[dict[str, str]],
+    ) -> tuple[int, int]:
         existing_ids = self._repository.existing_zephyr_history_ids(
-            [record["zephyr_history_id"] for record in records if record["zephyr_history_id"] is not None]
+            [record["zephyr_history_id"] for record in records]
         )
         created = 0
         skipped_existing = 0
@@ -416,16 +446,12 @@ class ZephyrImportService:
             if record["zephyr_history_id"] in existing_ids:
                 skipped_existing += 1
                 continue
-            self._repository.create_change(record)
-            created += 1
-
-        return {
-            "testCases": len(test_cases),
-            "recordsCreated": created,
-            "skippedExisting": skipped_existing,
-            "skippedEmpty": skipped_empty,
-            "failures": failures,
-        }
+            try:
+                self._repository.create_change(record)
+                created += 1
+            except Exception as exc:  # noqa: BLE001 - e.g. a concurrent import hit the unique index
+                failures.append({"key": record["test_case_id"], "error": str(exc)})
+        return created, skipped_existing
 
     def _fetch_case_history(self, test_case_key: str) -> list[dict[str, Any]]:
         """History entries across every version of one test case, merged by entry id."""

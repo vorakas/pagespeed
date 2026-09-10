@@ -1,3 +1,4 @@
+import pytest
 import requests
 
 from services.zephyr_import_service import ZephyrImportService
@@ -114,8 +115,32 @@ def test_run_import_collects_per_case_failures() -> None:
 
 
 def test_run_import_requires_pat() -> None:
-    import pytest
-
     service = ZephyrImportService(jira_pat="", repository=FakeRepository(), client=FakeClient())
     with pytest.raises(ValueError, match="JIRA_PAT is not configured"):
         service.run_import(14210, "/Data Sync")
+
+
+def test_run_import_counts_insert_failures_as_failures() -> None:
+    class ExplodingRepository(FakeRepository):
+        def create_change(self, data):
+            if data["zephyr_history_id"] == 9001:
+                raise RuntimeError("UNIQUE constraint failed: test_case_changes.zephyr_history_id")
+            return super().create_change(data)
+
+    repo = ExplodingRepository()
+    summary = make_service(repo=repo).run_import(14210, "/Data Sync")
+
+    assert summary["recordsCreated"] == 1
+    assert {record["zephyr_history_id"] for record in repo.created} == {9003}
+    assert summary["failures"] == [
+        {"key": "TC-T1", "error": "UNIQUE constraint failed: test_case_changes.zephyr_history_id"}
+    ]
+
+
+def test_run_import_ignores_cases_without_key() -> None:
+    client = FakeClient()
+    client.test_cases = [{"name": "No key"}, {"key": "TC-T1", "name": "Case One"}]
+
+    summary = make_service(client=client).run_import(14210, "/Data Sync")
+
+    assert summary["testCases"] == 1
