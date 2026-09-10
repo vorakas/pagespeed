@@ -1,5 +1,5 @@
 import { Archive, ChevronRight, Paperclip } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import type { TestCaseChange } from "@/types"
 import { Badge } from "@/components/ui/badge"
@@ -48,6 +48,18 @@ export function TestCaseChangeList({
   const [expandedTestCaseIds, setExpandedTestCaseIds] = useState<Set<string>>(new Set())
   const groups = useMemo(() => groupChanges(changes), [changes])
 
+  useEffect(() => {
+    if (selectedId == null) return
+    const selected = changes.find((change) => change.id === selectedId)
+    if (!selected) return
+    setExpandedTestCaseIds((current) => {
+      if (current.has(selected.test_case_id)) return current
+      const next = new Set(current)
+      next.add(selected.test_case_id)
+      return next
+    })
+  }, [selectedId, changes])
+
   function toggleGroup(testCaseId: string) {
     setExpandedTestCaseIds((current) => {
       const next = new Set(current)
@@ -95,7 +107,7 @@ export function TestCaseChangeList({
         {groups.map((group) => {
           const latest = group.changes[0]
           const containsSelected = group.changes.some((change) => change.id === selectedId)
-          const isOpen = expandedTestCaseIds.has(group.testCaseId) || containsSelected
+          const isOpen = expandedTestCaseIds.has(group.testCaseId)
           const changeCount = group.changes.length
 
           return (
@@ -110,7 +122,6 @@ export function TestCaseChangeList({
                   containsSelected && "bg-primary/10"
                 )}
                 onClick={() => {
-                  if (containsSelected) return
                   toggleGroup(group.testCaseId)
                 }}
               >
