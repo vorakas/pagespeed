@@ -34,8 +34,28 @@ class FakeClient:
                 },
             ],
             # Both versions of TC-T2 return the same entry -> merged by entry id.
-            201: [{"id": 9003, "historyDate": "2026-08-01T00:00:00.000Z", "userKey": "ablais", "type": "CREATE"}],
-            202: [{"id": 9003, "historyDate": "2026-08-01T00:00:00.000Z", "userKey": "ablais", "type": "CREATE"}],
+            201: [
+                {
+                    "id": 9003,
+                    "historyDate": "2026-08-01T00:00:00.000Z",
+                    "userKey": "ablais",
+                    "type": "UPDATE",
+                    "changeHistoryItems": [
+                        {"id": 3, "fieldName": "OBJECTIVE", "originalValue": "<p>old</p>", "newValue": "<p>new</p>"}
+                    ],
+                },
+            ],
+            202: [
+                {
+                    "id": 9003,
+                    "historyDate": "2026-08-01T00:00:00.000Z",
+                    "userKey": "ablais",
+                    "type": "UPDATE",
+                    "changeHistoryItems": [
+                        {"id": 3, "fieldName": "OBJECTIVE", "originalValue": "<p>old</p>", "newValue": "<p>new</p>"}
+                    ],
+                },
+            ],
         }
 
     def search_test_cases(self, project_key, folder):
@@ -78,7 +98,7 @@ def test_run_import_creates_deduped_records_and_counts() -> None:
     summary = service.run_import("TC", "/Data Sync")
 
     assert summary["testCases"] == 2
-    assert summary["recordsCreated"] == 2  # 9001 update + 9003 create; 9002 was noise
+    assert summary["recordsCreated"] == 2  # 9001 update + 9003 update (dup across versions); 9002 was noise
     assert summary["skippedExisting"] == 0
     assert summary["skippedEmpty"] == 1
     assert summary["failures"] == []

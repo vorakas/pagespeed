@@ -126,7 +126,7 @@ def test_transform_keeps_folder_move_with_special_summary() -> None:
     assert "**Folder**\n/Data Sync/Cart/WUP to AC" in record["after_state"]
 
 
-def test_transform_create_entry() -> None:
+def test_transform_create_entry_is_skipped() -> None:
     entry = {
         "id": 547238,
         "sourceId": 30707,
@@ -136,13 +136,7 @@ def test_transform_create_entry() -> None:
         "source": "TEST_CASE",
     }
 
-    record = transform_entry(entry, "TC-T14481", "Cart shipping address sync", BASE_URL)
-
-    assert record is not None
-    assert record["change_summary"] == "Test case created"
-    assert record["before_state"] == ""
-    assert record["after_state"] == ""
-    assert record["zephyr_history_id"] == 547238
+    assert transform_entry(entry, "TC-T14481", "Cart shipping address sync", BASE_URL) is None
 
 
 def test_transform_missing_side_renders_dash_placeholder() -> None:

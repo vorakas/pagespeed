@@ -306,6 +306,10 @@ def transform_entry(
     except (TypeError, ValueError):
         return None
 
+    # Creation events carry no diff content — skip them (counted as noise).
+    if str(entry.get("type") or "").upper() == "CREATE":
+        return None
+
     base_record = {
         "test_case_id": test_case_key,
         "title": test_case_name,
@@ -318,9 +322,6 @@ def transform_entry(
         "associated_tasks": [],
         "zephyr_history_id": history_id,
     }
-
-    if str(entry.get("type") or "").upper() == "CREATE":
-        return {**base_record, "change_summary": "Test case created", "before_state": "", "after_state": ""}
 
     surviving: list[dict[str, Any]] = []
     added_steps: list[int] = []
