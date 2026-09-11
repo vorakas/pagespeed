@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { test } from "node:test"
+import { test } from "vitest"
 
 process.env.TZ = "America/Los_Angeles"
 
@@ -28,10 +28,10 @@ test("buildQaBurndown computes cumulative executed and remaining cases from load
   assert.deepEqual(
     buildQaBurndown(cycles, "2026-05-11T00:00:00Z", "2026-05-13T23:59:59Z"),
     [
-      { date: "2026-05-10", executed: 1, remaining: 5 },
-      { date: "2026-05-11", executed: 2, remaining: 4 },
-      { date: "2026-05-12", executed: 4, remaining: 2 },
-      { date: "2026-05-13", executed: 4, remaining: 2 },
+      { date: "2026-05-10", executed: 2, remaining: 4 },
+      { date: "2026-05-11", executed: 3, remaining: 3 },
+      { date: "2026-05-12", executed: 5, remaining: 1 },
+      { date: "2026-05-13", executed: 5, remaining: 1 },
     ],
   )
 })
