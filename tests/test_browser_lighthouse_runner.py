@@ -145,13 +145,18 @@ def test_runner_uses_fresh_profile_per_sample(monkeypatch):
     assert profile_dirs[0] != profile_dirs[1]
 
 
-def test_runner_raises_clear_error_when_lighthouse_missing(monkeypatch):
-    def fake_run(*args, **kwargs):
-        raise FileNotFoundError("lighthouse")
+def test_runner_raises_clear_error_when_lighthouse_binary_missing(monkeypatch):
+    def fake_run(command, capture_output, text, timeout, check):
+        return subprocess.CompletedProcess(
+            command,
+            1,
+            stdout="",
+            stderr="Lighthouse executable not found: missing-lighthouse",
+        )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    with pytest.raises(PageSpeedError, match="Browser Lighthouse executable not found"):
+    with pytest.raises(PageSpeedError, match="Lighthouse executable not found: missing-lighthouse"):
         BrowserLighthouseRunner(lighthouse_bin="missing-lighthouse").run(
             "https://www.lampsplus.com/?sov=LP8675309",
             "https://www.lampsplus.com/",

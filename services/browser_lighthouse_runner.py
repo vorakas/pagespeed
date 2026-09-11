@@ -66,6 +66,8 @@ class BrowserLighthouseRunner:
 
         if completed.returncode != 0:
             stderr = (completed.stderr or "").strip()
+            if "Lighthouse executable not found" in stderr:
+                raise PageSpeedError(stderr)
             raise PageSpeedError(
                 f"Lighthouse failed for {audit_url}: {stderr or 'no stderr output'}"
             )
@@ -236,6 +238,10 @@ async function main() {
     );
 
     if (result.error) {
+      if (result.error.code === "ENOENT") {
+        process.stderr.write(`Lighthouse executable not found: ${lighthouseBin}`);
+        process.exit(127);
+      }
       throw result.error;
     }
     if (result.status !== 0) {
