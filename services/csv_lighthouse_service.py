@@ -152,6 +152,7 @@ class CsvLighthouseService:
         strategy: str,
         label: str | None = None,
         samples_per_url: int = 1,
+        library_filenames: list[str] | None = None,
     ) -> dict:
         strategy = self._validate_strategy(strategy)
         site_keys = self._validate_site_keys(site_keys)
@@ -159,10 +160,9 @@ class CsvLighthouseService:
 
         upload_records = self._read_file_records(files)
         uploaded_names = {record["filename"] for record in upload_records}
+        library_records = self._selected_library_file_records(library_filenames)
         library_records = [
-            record
-            for record in self._library_file_records()
-            if record["filename"] not in uploaded_names
+            record for record in library_records if record["filename"] not in uploaded_names
         ]
         file_records = library_records + upload_records
         if not file_records:
@@ -776,6 +776,30 @@ class CsvLighthouseService:
                 }
             )
         return records
+
+    def _selected_library_file_records(self, filenames: list[str] | None) -> list[dict]:
+        records = self._library_file_records()
+        if filenames is None:
+            return records
+
+        selected_filenames = []
+        for filename in filenames:
+            clean_filename = str(filename).strip()
+            if clean_filename and clean_filename not in selected_filenames:
+                selected_filenames.append(clean_filename)
+        if not selected_filenames:
+            return []
+
+        records_by_filename = {record["filename"]: record for record in records}
+        missing = [
+            filename for filename in selected_filenames if filename not in records_by_filename
+        ]
+        if missing:
+            raise ValidationError(
+                "Selected library file not found: " + ", ".join(missing)
+            )
+
+        return [records_by_filename[filename] for filename in selected_filenames]
 
     def _rebuild_pending_items_from_files(self, run_id: int) -> None:
         detail = self.repository.get_run_detail(run_id)

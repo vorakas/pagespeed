@@ -1319,6 +1319,7 @@ class ApiClient {
 
   async createCsvLighthouseRun(input: {
     files: File[]
+    libraryFilenames?: string[]
     siteKeys: CsvLighthouseSiteKey[]
     strategy: Strategy
     label?: string
@@ -1326,6 +1327,7 @@ class ApiClient {
   }): Promise<{ success: boolean; run_id: number; worker_count: number; total_items: number }> {
     const formData = new FormData()
     input.files.forEach((file) => formData.append("files", file))
+    input.libraryFilenames?.forEach((filename) => formData.append("library_filenames", filename))
     input.siteKeys.forEach((siteKey) => formData.append("site_keys", siteKey))
     formData.append("strategy", input.strategy)
     formData.append("samples_per_url", String(input.samplesPerUrl ?? 1))

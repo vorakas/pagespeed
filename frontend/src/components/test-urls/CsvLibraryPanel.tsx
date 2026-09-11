@@ -2,16 +2,23 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { ChevronDown, Loader2, RefreshCw, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { api } from "@/services/api"
 import type { CsvLighthouseFile } from "@/types"
 import { formatDateTime } from "@/lib/utils"
 
 interface CsvLibraryPanelProps {
-  onLibraryChanged?: (count: number) => void
+  selectedFilenames: string[]
+  onSelectedFilenamesChange: (filenames: string[]) => void
+  onLibraryChanged?: (files: CsvLighthouseFile[]) => void
 }
 
-export function CsvLibraryPanel({ onLibraryChanged }: CsvLibraryPanelProps) {
+export function CsvLibraryPanel({
+  selectedFilenames,
+  onSelectedFilenamesChange,
+  onLibraryChanged,
+}: CsvLibraryPanelProps) {
   const [files, setFiles] = useState<CsvLighthouseFile[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -24,7 +31,7 @@ export function CsvLibraryPanel({ onLibraryChanged }: CsvLibraryPanelProps) {
     try {
       const response = await api.listCsvLighthouseLibrary()
       setFiles(response.files)
-      onLibraryChanged?.(response.files.length)
+      onLibraryChanged?.(response.files)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load CSV library")
     } finally {
@@ -43,7 +50,7 @@ export function CsvLibraryPanel({ onLibraryChanged }: CsvLibraryPanelProps) {
     try {
       const response = await api.uploadCsvLighthouseLibrary(selected)
       setFiles(response.files)
-      onLibraryChanged?.(response.files.length)
+      onLibraryChanged?.(response.files)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save CSV library files")
     } finally {
@@ -65,6 +72,21 @@ export function CsvLibraryPanel({ onLibraryChanged }: CsvLibraryPanelProps) {
     }
   }
 
+  const setFileSelected = (filename: string, checked: boolean) => {
+    const next = checked
+      ? Array.from(new Set([...selectedFilenames, filename]))
+      : selectedFilenames.filter((item) => item !== filename)
+    onSelectedFilenamesChange(next)
+  }
+
+  const selectAll = () => {
+    onSelectedFilenamesChange(files.map((file) => file.filename))
+  }
+
+  const selectNone = () => {
+    onSelectedFilenamesChange([])
+  }
+
   return (
     <details className="aurora-panel group" open={false}>
       <summary className="flex cursor-pointer items-center justify-between gap-2 px-4 py-3 select-none list-none [&::-webkit-details-marker]:hidden">
@@ -77,9 +99,21 @@ export function CsvLibraryPanel({ onLibraryChanged }: CsvLibraryPanelProps) {
       </summary>
 
       <div className="space-y-3 px-4 pb-4">
-        <p className="aurora-text-dim text-xs">
-          Stored files are reused for every run. Re-upload a file to update it when stock changes.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="aurora-text-dim text-xs">
+            {selectedFilenames.length}/{files.length} selected
+          </p>
+          {files.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" disabled={busy} onClick={selectAll}>
+                All
+              </Button>
+              <Button variant="outline" size="sm" disabled={busy} onClick={selectNone}>
+                None
+              </Button>
+            </div>
+          )}
+        </div>
 
         {error && (
           <div className="rounded border border-[color:var(--lcc-red)]/40 bg-[color:var(--lcc-red)]/10 px-3 py-2 text-sm text-[color:var(--lcc-red)]">
@@ -93,10 +127,17 @@ export function CsvLibraryPanel({ onLibraryChanged }: CsvLibraryPanelProps) {
           ) : (
             files.map((file) => (
               <div key={file.filename} className="flex items-center justify-between gap-2 rounded border border-border/60 p-2">
-                <div className="min-w-0">
-                  <div className="aurora-text truncate text-sm font-medium">{file.filename}</div>
-                  <div className="aurora-text-faint text-xs">
-                    {file.group_key} · {file.row_count} rows · {formatDateTime(file.updated_at)}
+                <div className="flex min-w-0 items-center gap-2">
+                  <Checkbox
+                    checked={selectedFilenames.includes(file.filename)}
+                    onCheckedChange={(checked) => setFileSelected(file.filename, checked === true)}
+                    aria-label={`Include ${file.filename}`}
+                  />
+                  <div className="min-w-0">
+                    <div className="aurora-text truncate text-sm font-medium">{file.filename}</div>
+                    <div className="aurora-text-faint text-xs">
+                      {file.group_key} · {file.row_count} rows · {formatDateTime(file.updated_at)}
+                    </div>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">

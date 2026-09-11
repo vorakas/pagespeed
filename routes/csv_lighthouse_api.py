@@ -27,8 +27,9 @@ def create_csv_lighthouse_blueprint(service):
             )
 
         files = [file for file in request.files.getlist("files") if file.filename]
-        if not files:
-            raise ValidationError("At least one CSV file is required")
+        library_filenames = _parse_library_filenames()
+        if not files and not library_filenames:
+            raise ValidationError("At least one CSV file or selected library file is required")
         if len(files) > CSV_LIGHTHOUSE_MAX_FILES:
             raise ValidationError(
                 f"CSV Lighthouse upload accepts at most {CSV_LIGHTHOUSE_MAX_FILES} files"
@@ -53,6 +54,7 @@ def create_csv_lighthouse_blueprint(service):
             strategy=strategy,
             label=label,
             samples_per_url=samples_per_url,
+            library_filenames=library_filenames,
         )
         return jsonify({"success": True, **result})
 
@@ -181,6 +183,15 @@ def create_csv_lighthouse_blueprint(service):
 
 def _parse_site_keys() -> list[str]:
     raw_values = request.form.getlist("site_keys")
+    if len(raw_values) == 1 and "," in raw_values[0]:
+        raw_values = raw_values[0].split(",")
+    return [value.strip() for value in raw_values if value.strip()]
+
+
+def _parse_library_filenames() -> list[str] | None:
+    if "library_filenames" not in request.form:
+        return None
+    raw_values = request.form.getlist("library_filenames")
     if len(raw_values) == 1 and "," in raw_values[0]:
         raw_values = raw_values[0].split(",")
     return [value.strip() for value in raw_values if value.strip()]

@@ -18,13 +18,17 @@ class FakeCsvLighthouseService:
         self.updated_files = []
         self.deleted_file_ids = []
 
-    def create_run(self, files, site_keys, strategy, label=None, samples_per_url=1):
+    def create_run(
+        self, files, site_keys, strategy, label=None, samples_per_url=1,
+        library_filenames=None,
+    ):
         self.create_calls.append(
             {
                 "files": [(filename, handle.read()) for filename, handle in files],
                 "site_keys": site_keys,
                 "strategy": strategy,
                 "label": label,
+                "library_filenames": library_filenames,
             }
         )
         return {"run_id": 42, "worker_count": 3, "total_items": 9}
@@ -143,6 +147,7 @@ def test_create_run_accepts_multipart_files_label_strategy_and_site_keys(client,
             "site_keys": ["www", "mcprod"],
             "strategy": "mobile",
             "label": "Regression batch",
+            "library_filenames": None,
         }
     ]
 
@@ -161,9 +166,46 @@ def test_create_run_accepts_comma_separated_site_keys_and_default_strategy(clien
     assert service.create_calls[0]["site_keys"] == ["www", "mcprod"]
     assert service.create_calls[0]["strategy"] == "desktop"
     assert service.create_calls[0]["label"] is None
+    assert service.create_calls[0]["library_filenames"] is None
 
 
-def test_create_run_requires_at_least_one_file(client):
+def test_create_run_accepts_selected_library_files_without_uploads(client, service):
+    response = client.post(
+        "/api/csv-lighthouse/runs",
+        data={
+            "library_filenames": ["Homepage.csv", "SFP.csv"],
+            "site_keys": "www",
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    assert service.create_calls == [
+        {
+            "files": [],
+            "site_keys": ["www"],
+            "strategy": "desktop",
+            "label": None,
+            "library_filenames": ["Homepage.csv", "SFP.csv"],
+        }
+    ]
+
+
+def test_create_run_accepts_comma_separated_library_filenames(client, service):
+    response = client.post(
+        "/api/csv-lighthouse/runs",
+        data={
+            "library_filenames": "Homepage.csv, SFP.csv",
+            "site_keys": "www",
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    assert service.create_calls[0]["library_filenames"] == ["Homepage.csv", "SFP.csv"]
+
+
+def test_create_run_requires_upload_or_selected_library_file(client):
     response = client.post(
         "/api/csv-lighthouse/runs",
         data={"site_keys": "www"},
@@ -173,7 +215,7 @@ def test_create_run_requires_at_least_one_file(client):
     assert response.status_code == 400
     assert response.get_json() == {
         "success": False,
-        "error": "At least one CSV file is required",
+        "error": "At least one CSV file or selected library file is required",
     }
 
 

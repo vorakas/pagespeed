@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Download, FileText, Loader2, Play, Square, Trash2, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,7 @@ import type {
   CsvLighthouseRun,
   CsvLighthouseRunDetail,
   CsvLighthouseRunStatus,
+  CsvLighthouseFile,
   CsvLighthouseSiteKey,
   Strategy,
 } from "@/types"
@@ -69,7 +70,9 @@ function RunStatusBadge({ status }: { status: CsvLighthouseRunStatus }) {
 
 export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
   const [files, setFiles] = useState<File[]>([])
-  const [libraryCount, setLibraryCount] = useState(0)
+  const [libraryFiles, setLibraryFiles] = useState<CsvLighthouseFile[]>([])
+  const [selectedLibraryFilenames, setSelectedLibraryFilenames] = useState<string[]>([])
+  const librarySelectionInitialized = useRef(false)
   const [fileInputKey, setFileInputKey] = useState(0)
   const [label, setLabel] = useState("")
   const [samplesPerUrl, setSamplesPerUrl] = useState(25)
@@ -91,7 +94,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
     ? selectedRun.completed_items + selectedRun.failed_items + selectedRun.cancelled_items
     : 0
   const progress = selectedRun?.total_items ? Math.round((processedItems / selectedRun.total_items) * 100) : 0
-  const canStart = (files.length > 0 || libraryCount > 0) && selectedTargets.length > 0 && !starting
+  const canStart = (files.length > 0 || selectedLibraryFilenames.length > 0) && selectedTargets.length > 0 && !starting
   const canRunSelected = Boolean(selectedRun?.status === "pending" && !launching)
   const canCancel = Boolean(activeRun?.status === "running" && !cancelling)
   const canDownload = Boolean(selectedRun && exportableStatuses.includes(selectedRun.status))
@@ -103,6 +106,22 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
       .filter(Boolean)
       .join(", ")
   }, [selectedTargets])
+
+  const handleLibraryChanged = useCallback((nextFiles: CsvLighthouseFile[]) => {
+    const nextFilenames = nextFiles.map((file) => file.filename)
+    const previousFilenameSet = new Set(libraryFiles.map((file) => file.filename))
+    setLibraryFiles(nextFiles)
+    setSelectedLibraryFilenames((current) => {
+      if (!librarySelectionInitialized.current) {
+        librarySelectionInitialized.current = true
+        return nextFilenames
+      }
+      const nextFilenameSet = new Set(nextFilenames)
+      const selected = current.filter((filename) => nextFilenameSet.has(filename))
+      const newlyAdded = nextFilenames.filter((filename) => !previousFilenameSet.has(filename))
+      return [...selected, ...newlyAdded]
+    })
+  }, [libraryFiles])
 
   const loadRuns = useCallback(async () => {
     setLoadingRuns(true)
@@ -201,6 +220,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
       const response = await api.createCsvLighthouseRun({
         files,
         siteKeys: selectedTargets,
+        libraryFilenames: selectedLibraryFilenames,
         strategy,
         label,
         samplesPerUrl,
@@ -378,8 +398,8 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
           </div>
 
           <p className="aurora-text-faint text-xs">
-            {libraryCount > 0
-              ? `Using ${libraryCount} library file${libraryCount === 1 ? "" : "s"}${files.length ? ` + ${files.length} uploaded` : ""}`
+            {libraryFiles.length > 0
+              ? `Using ${selectedLibraryFilenames.length}/${libraryFiles.length} library file${libraryFiles.length === 1 ? "" : "s"}${files.length ? ` + ${files.length} uploaded` : ""}`
               : "No library files yet — upload below or add them to the library."}
           </p>
 
@@ -453,7 +473,11 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
         </div>
 
         <aside className="space-y-4">
-          <CsvLibraryPanel onLibraryChanged={setLibraryCount} />
+          <CsvLibraryPanel
+            selectedFilenames={selectedLibraryFilenames}
+            onSelectedFilenamesChange={setSelectedLibraryFilenames}
+            onLibraryChanged={handleLibraryChanged}
+          />
 
           <div className="flex items-center justify-between">
             <h3 className="aurora-text text-xs font-semibold uppercase tracking-[0.12em]">Recent Runs</h3>

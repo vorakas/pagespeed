@@ -1205,6 +1205,39 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             "https://www.lampsplus.com/p/brass-lamp/",
         )
 
+    def test_create_run_uses_only_selected_library_files(self):
+        self.service.save_library_files([
+            ("Homepage.csv", io.BytesIO(b"home\n")),
+            ("SFP.csv", io.BytesIO(b"table-lamps\n")),
+            ("PDP.csv", io.BytesIO(b"brass-lamp/\n")),
+        ])
+
+        result = self.service.create_run(
+            [],
+            site_keys=["www"],
+            strategy="desktop",
+            library_filenames=["Homepage.csv", "SFP.csv"],
+        )
+
+        detail = self.service.get_run(result["run_id"])
+        files = [file["filename"] for file in self.service.list_files(result["run_id"])]
+        groups = [item["group_key"] for item in detail["items"]]
+
+        self.assertEqual(files, ["Homepage.csv", "SFP.csv"])
+        self.assertEqual(groups, ["Homepage", "SFP"])
+        self.assertEqual(result["total_items"], 2)
+
+    def test_create_run_rejects_unknown_selected_library_file(self):
+        self.service.save_library_files([("Homepage.csv", io.BytesIO(b"home\n"))])
+
+        with self.assertRaisesRegex(ValidationError, "Selected library file not found"):
+            self.service.create_run(
+                [],
+                site_keys=["www"],
+                strategy="desktop",
+                library_filenames=["SFP.csv"],
+            )
+
     def test_create_run_adhoc_upload_overrides_library_file(self):
         self.service.save_library_files([("PDP.csv", io.BytesIO(b"old-lamp/\n"))])
         result = self.service.create_run(
