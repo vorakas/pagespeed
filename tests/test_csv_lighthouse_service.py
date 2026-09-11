@@ -216,7 +216,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             urls,
             [
                 "https://www.lampsplus.com/p/brass-lamp/",
-                "https://mcprod.lampsplus.com/p/brass-lamp/",
+                "https://www.lampsplus.com/p/brass-lamp/",
             ],
         )
 
@@ -695,7 +695,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             urls,
             [
                 "https://www.lampsplus.com/",
-                "https://mcprod.lampsplus.com/",
+                "https://www.lampsplus.com/",
             ],
         )
 
@@ -748,7 +748,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(item["original_value"], "chandelier")
         self.assertEqual(
             item["generated_url"],
-            "https://mcprod.lampsplus.com/s/s_chandelier/?s=1",
+            "https://www.lampsplus.com/s/s_chandelier/?s=1",
         )
 
     def test_create_run_raises_validation_error_for_bad_csv_encoding(self):
