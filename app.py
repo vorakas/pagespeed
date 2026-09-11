@@ -92,6 +92,7 @@ from services.applitools_storage import ApplitoolsBatchStore
 from services.blazemeter_client import BlazemeterClient
 from services.blazemeter_queue import BlazemeterQueueService
 from services.csv_lighthouse_service import CsvLighthouseService
+from services.browser_lighthouse_runner import BrowserLighthouseRunner
 from services.knowledge_service import KnowledgeService
 from services.migration_dashboard_service import MigrationDashboardService
 from services.obsidian_sync_service import ObsidianSyncService, SyncAlreadyRunning
@@ -228,10 +229,11 @@ def create_app() -> Flask:
     autofix_ingest_service = AutofixIngestService(autofix_repo)
 
     pagespeed = PageSpeedClient(api_key=PAGESPEED_API_KEY)
+    browser_lighthouse_runner = BrowserLighthouseRunner()
 
     site_service = SiteService(site_repo, url_repo, test_result_repo)
     testing_service = TestingService(pagespeed, url_repo, test_result_repo)
-    csv_lighthouse_service = CsvLighthouseService(csv_lighthouse_repo, pagespeed)
+    csv_lighthouse_service = CsvLighthouseService(csv_lighthouse_repo, browser_lighthouse_runner)
     knowledge_service = KnowledgeService(knowledge_repo)
     test_case_database_service = TestCaseDatabaseService(test_case_database_repo)
     zephyr_import_service = ZephyrImportService(

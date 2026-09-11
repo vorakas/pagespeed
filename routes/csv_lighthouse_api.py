@@ -27,6 +27,8 @@ def create_csv_lighthouse_blueprint(service):
             )
 
         files = [file for file in request.files.getlist("files") if file.filename]
+        if not files:
+            raise ValidationError("At least one CSV file is required")
         if len(files) > CSV_LIGHTHOUSE_MAX_FILES:
             raise ValidationError(
                 f"CSV Lighthouse upload accepts at most {CSV_LIGHTHOUSE_MAX_FILES} files"

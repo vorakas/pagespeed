@@ -34,8 +34,8 @@ const terminalStatuses: CsvLighthouseRunStatus[] = [
 const exportableStatuses: CsvLighthouseRunStatus[] = ["completed", "completed_with_failures"]
 
 const targetOptions: Array<{ key: CsvLighthouseSiteKey; label: string; shortLabel: string }> = [
-  { key: "mcprod", label: "Adobe Commerce", shortLabel: "mcprod" },
-  { key: "www", label: "LampsPlus", shortLabel: "www" },
+  { key: "mcprod", label: "Adobe Commerce", shortLabel: "Adobe" },
+  { key: "www", label: "LampsPlus", shortLabel: "LP" },
 ]
 
 function isTerminalStatus(status: CsvLighthouseRunStatus) {

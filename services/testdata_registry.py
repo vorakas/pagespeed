@@ -9,10 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from services.csv_lighthouse_target_modes import WWW_BASE_URL
+
 # Base origins for the two environments.
 SITES: dict[str, str] = {
-    "mcprod": "https://mcprod.lampsplus.com",
-    "www": "https://www.lampsplus.com",
+    "mcprod": WWW_BASE_URL,
+    "www": WWW_BASE_URL,
 }
 
 
