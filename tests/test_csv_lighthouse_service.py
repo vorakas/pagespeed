@@ -5,7 +5,6 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from data_access.connection import ConnectionManager
 from data_access.csv_lighthouse_repository import CsvLighthouseRepository
@@ -36,8 +35,13 @@ class FakePageSpeedClient:
     def __init__(self):
         self.calls = []
 
-    def test_url(self, url, strategy):
-        self.calls.append((url, strategy))
+    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+        self.calls.append({
+            "warmup_url": warmup_url,
+            "audit_url": audit_url,
+            "strategy": strategy,
+            "cancelled": cancel_event.is_set() if cancel_event else False,
+        })
         return {
             "fcp": 900,
             "speed_index": 1200,
@@ -48,13 +52,40 @@ class FakePageSpeedClient:
         }
 
 
+class FakeBrowserLighthouseRunner:
+    def __init__(self):
+        self.calls = []
+
+    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+        self.calls.append({
+            "warmup_url": warmup_url,
+            "audit_url": audit_url,
+            "strategy": strategy,
+            "cancelled": cancel_event.is_set() if cancel_event else False,
+        })
+        return {
+            "performance_score": 88,
+            "fcp": 1000,
+            "lcp": 2000,
+            "cls": 0.01,
+            "tbt": 50,
+            "speed_index": 1500,
+            "raw_data": {"source": "fake-browser-lighthouse"},
+        }
+
+
 class FailsOncePageSpeedClient(FakePageSpeedClient):
     def __init__(self):
         super().__init__()
         self.failures = 0
 
-    def test_url(self, url, strategy):
-        self.calls.append((url, strategy))
+    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+        self.calls.append({
+            "warmup_url": warmup_url,
+            "audit_url": audit_url,
+            "strategy": strategy,
+            "cancelled": cancel_event.is_set() if cancel_event else False,
+        })
         if self.failures == 0:
             self.failures += 1
             raise RuntimeError("temporary PageSpeed failure")
@@ -68,8 +99,13 @@ class FailsOncePageSpeedClient(FakePageSpeedClient):
 
 
 class AlwaysFailsPageSpeedClient(FakePageSpeedClient):
-    def test_url(self, url, strategy):
-        self.calls.append((url, strategy))
+    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+        self.calls.append({
+            "warmup_url": warmup_url,
+            "audit_url": audit_url,
+            "strategy": strategy,
+            "cancelled": cancel_event.is_set() if cancel_event else False,
+        })
         raise RuntimeError("permanent PageSpeed failure")
 
 
@@ -80,8 +116,13 @@ class SequencePageSpeedClient(FakePageSpeedClient):
         super().__init__()
         self._fcp_values = list(fcp_values)
 
-    def test_url(self, url, strategy):
-        self.calls.append((url, strategy))
+    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+        self.calls.append({
+            "warmup_url": warmup_url,
+            "audit_url": audit_url,
+            "strategy": strategy,
+            "cancelled": cancel_event.is_set() if cancel_event else False,
+        })
         fcp = self._fcp_values[(len(self.calls) - 1) % len(self._fcp_values)]
         return {"fcp": fcp, "speed_index": 1200, "lcp": 1800, "tbt": 50, "cls": 0.02}
 
@@ -92,8 +133,8 @@ class CancellingPageSpeedClient(FakePageSpeedClient):
         self.repository = repository
         self.run_id_getter = run_id_getter
 
-    def test_url(self, url, strategy):
-        result = super().test_url(url, strategy)
+    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+        result = super().run(warmup_url, audit_url, strategy, cancel_event=cancel_event)
         self.repository.request_cancel(self.run_id_getter())
         return result
 
@@ -105,8 +146,13 @@ class TimestampedPageSpeedClient(FakePageSpeedClient):
         super().__init__()
         self._timestamps = list(timestamps)
 
-    def test_url(self, url, strategy):
-        self.calls.append((url, strategy))
+    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+        self.calls.append({
+            "warmup_url": warmup_url,
+            "audit_url": audit_url,
+            "strategy": strategy,
+            "cancelled": cancel_event.is_set() if cancel_event else False,
+        })
         ts = self._timestamps[(len(self.calls) - 1) % len(self._timestamps)]
         return {
             "fcp": 900, "speed_index": 1200, "lcp": 1800, "tbt": 50, "cls": 0.02,
@@ -122,8 +168,13 @@ class RateLimitedThenOkPageSpeedClient(FakePageSpeedClient):
         super().__init__()
         self._fail_times = fail_times
 
-    def test_url(self, url, strategy):
-        self.calls.append((url, strategy))
+    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+        self.calls.append({
+            "warmup_url": warmup_url,
+            "audit_url": audit_url,
+            "strategy": strategy,
+            "cancelled": cancel_event.is_set() if cancel_event else False,
+        })
         if len(self.calls) <= self._fail_times:
             raise RateLimitError(
                 "rate limited", provider="Google PageSpeed", retry_after=0
@@ -159,6 +210,28 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             self.repo, pagespeed, start_background=False,
             time_source=self.clock.now, sleep_func=self.clock.sleep,
         )
+
+    def test_attempt_sample_uses_target_warmup_and_generated_audit_url(self):
+        runner = FakeBrowserLighthouseRunner()
+        service = CsvLighthouseService(
+            self.repo, runner, start_background=False,
+            time_source=self.clock.now, sleep_func=self.clock.sleep,
+        )
+
+        result = service._attempt_sample({
+            "site_key": "mcprod",
+            "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+            "strategy": "desktop",
+        })
+
+        self.assertEqual(runner.calls, [{
+            "warmup_url": "https://www.lampsplus.com/?sov=AC3624360",
+            "audit_url": "https://www.lampsplus.com/p/brass-lamp/",
+            "strategy": "desktop",
+            "cancelled": False,
+        }])
+        self.assertEqual(result["performance_score"], 88)
+        self.assertEqual(result["raw_data"], {"source": "fake-browser-lighthouse"})
 
     def test_normalize_csv_value_removes_origin_prefix_and_leading_slash(self):
         self.assertEqual(
@@ -393,7 +466,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         # 3 URLs -> min(6, 3) = 3 workers (no longer scaled by samples_per_url).
         self.assertEqual(run["worker_count"], 3)
 
-    def test_run_pending_items_saves_metrics_from_pagespeed_client(self):
+    def test_run_pending_items_saves_metrics_from_browser_runner(self):
         result = self.service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
             site_keys=["www"],
@@ -405,10 +478,12 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         item = detail["items"][0]
 
         self.assertEqual(len(self.pagespeed.calls), 1)
-        called_url, called_strategy = self.pagespeed.calls[0]
-        self.assertEqual(called_strategy, "desktop")
-        self.assertTrue(called_url.startswith(item["generated_url"]))
-        self.assertIn("psi_cb=", called_url)  # cache-busted at request time
+        self.assertEqual(self.pagespeed.calls[0], {
+            "warmup_url": "https://www.lampsplus.com/?sov=LP8675309",
+            "audit_url": item["generated_url"],
+            "strategy": "desktop",
+            "cancelled": False,
+        })
         self.assertEqual(detail["run"]["status"], "completed")
         self.assertEqual(item["status"], "passed")
         self.assertEqual(item["fcp"], 900)
@@ -515,9 +590,9 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(len(samples), 25)          # duplicates were not persisted
         self.assertEqual(len(fetch_times), 25)      # 25 distinct sample slots
 
-    def test_each_sample_gets_unique_cache_bust_param(self):
+    def test_each_sample_uses_unmodified_generated_audit_url(self):
         # Distinct metrics per call so the dedup safety net does not fire
-        # (mirrors production, where each fresh PSI run has a unique timestamp).
+        # (mirrors production, where each fresh Lighthouse run has a unique timestamp).
         pagespeed = SequencePageSpeedClient([100, 200, 300])
         service = self._make_service(pagespeed)
         result = service.create_run(
@@ -526,28 +601,13 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         )
         service.run_pending_items(result["run_id"])
 
-        called_urls = [url for url, _ in pagespeed.calls]
+        called_urls = [call["audit_url"] for call in pagespeed.calls]
         item = self.repo.get_run_detail(result["run_id"])["items"][0]
         generated_url = item["generated_url"]
 
         self.assertEqual(len(called_urls), 3)
-        nonces = set()
         for url in called_urls:
-            parts = urlsplit(url)
-            pairs = parse_qsl(parts.query, keep_blank_values=True)
-            params = dict(pairs)
-            self.assertIn("psi_cb", params)  # every PSI call is cache-busted
-            nonces.add(params["psi_cb"])
-            # Stripping the buster yields the clean, stored generated_url.
-            clean = urlunsplit(
-                parts._replace(
-                    query=urlencode([(k, v) for k, v in pairs if k != "psi_cb"])
-                )
-            )
-            self.assertEqual(clean, generated_url)
-
-        self.assertEqual(len(nonces), 3)  # each sample got a distinct nonce
-        self.assertNotIn("psi_cb", generated_url)  # stored URL stays clean
+            self.assertEqual(url, generated_url)
 
     def test_export_csv_has_raw_samples_and_per_url_summary(self):
         # Mean (400) and median (200) differ, so the two stats are independently pinned.

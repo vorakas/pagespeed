@@ -5,10 +5,9 @@ import io
 import statistics
 import threading
 import time
-import uuid
 from dataclasses import dataclass, field
 from typing import BinaryIO
-from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
+from urllib.parse import urlparse
 
 from config import (
     CSV_LIGHTHOUSE_CACHE_COOLDOWN_SECONDS,
@@ -24,6 +23,8 @@ from config import (
     CSV_LIGHTHOUSE_STALE_RUN_SECONDS,
 )
 from exceptions import RateLimitError, ValidationError
+from services.browser_lighthouse_runner import BrowserLighthouseRunner
+from services.csv_lighthouse_target_modes import get_csv_lighthouse_target_mode
 from services.rate_limiter import RateLimiter
 from services.testdata_registry import GROUPS, SITES, group_for_filename, open_url
 
@@ -129,13 +130,13 @@ class CsvLighthouseService:
     def __init__(
         self,
         repository,
-        pagespeed_client,
+        lighthouse_runner: BrowserLighthouseRunner,
         start_background: bool = True,
         time_source=time.monotonic,
         sleep_func=time.sleep,
     ):
         self.repository = repository
-        self.pagespeed_client = pagespeed_client
+        self.lighthouse_runner = lighthouse_runner
         self.start_background = start_background
         self._now = time_source
         self._sleep = sleep_func
@@ -444,40 +445,35 @@ class CsvLighthouseService:
 
         self.repository.finish_run_if_complete(run_id)
 
-    @staticmethod
-    def _cache_busted_url(url: str) -> str:
-        """Append a unique query param so PSI runs a fresh Lighthouse audit for
-        every sample instead of returning its per-URL cached result.
-
-        The busted URL is used only for the PSI request; the stored
-        ``generated_url`` stays clean for display, export, and comparison.
-        """
-        parts = urlsplit(url)
-        query = parse_qsl(parts.query, keep_blank_values=True)
-        query.append(("psi_cb", uuid.uuid4().hex))
-        return urlunsplit(parts._replace(query=urlencode(query)))
-
-    def _attempt_sample(self, item: dict):
-        """One PSI call.
+    def _attempt_sample(self, item: dict, cancel_event: threading.Event | None = None):
+        """One browser-session Lighthouse call.
 
         Returns ``(metrics|None, rate_limited, retry_after, error_message)``.
-        ``error_message`` carries the friendly PSI failure text (429 vs 500 vs
+        ``error_message`` carries the friendly Lighthouse failure text (429 vs 500 vs
         timeout) so the reason can be persisted for diagnosis.
         """
+        target_mode = get_csv_lighthouse_target_mode(item["site_key"])
         started = self._now()
         try:
             metrics = dict(
-                self.pagespeed_client.test_url(
-                    self._cache_busted_url(item["generated_url"]), item["strategy"]
+                self.lighthouse_runner.run(
+                    warmup_url=target_mode.warmup_url,
+                    audit_url=item["generated_url"],
+                    strategy=item["strategy"],
+                    cancel_event=cancel_event,
                 )
             )
             metrics["performance"] = metrics.get("performance_score")
             metrics["duration_ms"] = int((self._now() - started) * 1000)
-            return metrics, False, 0.0, None
+            return metrics
         except RateLimitError as exc:
-            return None, True, float(getattr(exc, "retry_after", 30) or 30), str(exc)
+            return {
+                "_csv_lighthouse_status": "rate_limited",
+                "retry_after": float(getattr(exc, "retry_after", 30) or 30),
+                "error_message": str(exc),
+            }
         except Exception as exc:
-            return None, False, 0.0, str(exc)
+            return {"_csv_lighthouse_status": "error", "error_message": str(exc)}
 
     @staticmethod
     def _sample_signature(metrics: dict):
@@ -526,7 +522,23 @@ class CsvLighthouseService:
             return  # cancelled while waiting for a rate-limit token
         if cancel_event.is_set():
             return  # cancelled after acquiring, before starting the PSI call
-        metrics, rate_limited, retry_after, error_message = self._attempt_sample(state.item)
+        sample_result = self._attempt_sample(state.item, cancel_event=cancel_event)
+        result_status = sample_result.get("_csv_lighthouse_status")
+        if result_status == "rate_limited":
+            metrics = None
+            rate_limited = True
+            retry_after = sample_result["retry_after"]
+            error_message = sample_result["error_message"]
+        elif result_status == "error":
+            metrics = None
+            rate_limited = False
+            retry_after = 0.0
+            error_message = sample_result["error_message"]
+        else:
+            metrics = sample_result
+            rate_limited = False
+            retry_after = 0.0
+            error_message = None
 
         persist_sample = None
         persist_failure = None

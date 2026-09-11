@@ -8,6 +8,7 @@ from services.validation import parse_time_range_to_minutes, validate_required_f
 from services.site_service import SiteService
 from services.testing_service import TestingService
 from services.pagespeed_client import PageSpeedClient
+from services.browser_lighthouse_runner import BrowserLighthouseRunner
 from services.newrelic_client import NewRelicClient
 from services.azure_client import AzureLogAnalyticsClient
 from services.ai_base import AIServiceBase
@@ -27,6 +28,7 @@ __all__ = [
     "KnowledgeService",
     "TestCaseDatabaseService",
     "PageSpeedClient",
+    "BrowserLighthouseRunner",
     "NewRelicClient",
     "AzureLogAnalyticsClient",
     "AIServiceBase",
