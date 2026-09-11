@@ -12,7 +12,12 @@ WORKDIR /app
 
 # git is required by VaultGitService to clone/commit/push the Obsidian
 # vault repo from the container's persistent volume.
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    chromium \
+    nodejs \
+    npm \
+    && npm install -g lighthouse \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -26,6 +31,8 @@ RUN mkdir -p /app/data
 
 ENV FLASK_APP=app.py
 ENV PYTHONUNBUFFERED=1
+ENV CHROME_BIN=/usr/bin/chromium
+ENV LIGHTHOUSE_BIN=/usr/local/bin/lighthouse
 
 EXPOSE 5000
 

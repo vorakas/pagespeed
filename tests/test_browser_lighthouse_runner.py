@@ -1,7 +1,6 @@
 import json
 import subprocess
 import threading
-from pathlib import Path
 
 import pytest
 
@@ -24,6 +23,10 @@ def _build_fake_report() -> dict:
 
 def _extract_flag_value(command: list[str], flag: str) -> str:
     if flag not in command:
+        prefix = f"{flag}="
+        for value in command:
+            if value.startswith(prefix):
+                return value[len(prefix) :]
         return ""
     idx = command.index(flag)
     return command[idx + 1] if idx + 1 < len(command) else ""
@@ -50,20 +53,25 @@ def test_runner_invokes_lighthouse_with_warmup_script_and_extracts_metrics(monke
     )
 
     command = calls[0]
-    assert command[0] == "node"
-    helper_path = Path(command[1])
-    assert helper_path.name == "browser-lighthouse-runner-helper.js"
-    assert _extract_flag_value(command, "--chrome-bin") == "/usr/bin/chromium"
-    assert _extract_flag_value(command, "--lighthouse-bin") == "lighthouse"
-    assert _extract_flag_value(command, "--warmup-url") == "https://www.lampsplus.com/?sov=AC3624360"
-    assert _extract_flag_value(command, "--audit-url") == "https://www.lampsplus.com/p/brass-lamp/"
-    assert _extract_flag_value(command, "--strategy") == "desktop"
-    assert _extract_flag_value(command, "--remote-debugging-port").isdigit()
-    assert _extract_flag_value(command, "--user-data-dir")
+    assert command[0] == "lighthouse"
+    assert command[1] == "https://www.lampsplus.com/p/brass-lamp/"
+    assert _extract_flag_value(command, "--output") == "json"
+    assert "--quiet" in command
+    assert "--disable-storage-reset" in command
+    assert _extract_flag_value(command, "--form-factor") == "desktop"
+    assert "--screenEmulation.disabled=true" in command
+    assert "--warmupUrl=https://www.lampsplus.com/?sov=AC3624360" in command
+
+    chrome_flags = _extract_flag_value(command, "--chrome-flags")
+    assert "--browser-executable-path=/usr/bin/chromium" in chrome_flags
+    assert "--headless=new" in chrome_flags
+    assert "--no-sandbox" in chrome_flags
+    assert "--disable-dev-shm-usage" in chrome_flags
+    assert "csv-lighthouse-" in chrome_flags
 
     # Ensure command contract forbids unsupported direct warmup/legacy form-factor args
-    assert "--chrome-flags" not in command
-    assert not any(arg.startswith("--warmupUrl") for arg in command)
+    assert "--chrome-bin" not in command
+    assert "--lighthouse-bin" not in command
     assert not any(arg.startswith("--formFactor=") for arg in command)
     assert not any(arg.startswith("--formFactor") for arg in command)
 
@@ -107,11 +115,45 @@ def test_runner_uses_mobile_settings(monkeypatch):
         "mobile",
     )
 
-    assert _extract_flag_value(commands[0], "--strategy") == "mobile"
-    user_data_dir = _extract_flag_value(commands[0], "--user-data-dir")
-    remote_port = _extract_flag_value(commands[0], "--remote-debugging-port")
-    assert remote_port.isdigit()
-    assert "csv-lighthouse-" in user_data_dir
+    assert _extract_flag_value(commands[0], "--form-factor") == "mobile"
+    assert "--preset=perf" in commands[0]
+    assert "--screenEmulation.mobile=true" in commands[0]
+    assert "csv-lighthouse-" in _extract_flag_value(commands[0], "--chrome-flags")
+
+
+def test_runner_uses_env_configured_binaries(monkeypatch):
+    commands = []
+    monkeypatch.setenv("LIGHTHOUSE_BIN", "/opt/bin/lighthouse")
+    monkeypatch.setenv("CHROME_BIN", "/usr/bin/chromium-browser")
+
+    def fake_run(command, capture_output, text, timeout, check):
+        commands.append(command)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps({
+                "categories": {"performance": {"score": 1}},
+                "audits": {
+                    "first-contentful-paint": {"numericValue": 1},
+                    "largest-contentful-paint": {"numericValue": 2},
+                    "cumulative-layout-shift": {"numericValue": 0},
+                    "total-blocking-time": {"numericValue": 3},
+                    "speed-index": {"numericValue": 4},
+                },
+            }),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    BrowserLighthouseRunner().run(
+        "https://www.lampsplus.com/?sov=LP8675309",
+        "https://www.lampsplus.com/",
+        "desktop",
+    )
+
+    assert commands[0][0] == "/opt/bin/lighthouse"
+    assert any("/usr/bin/chromium-browser" in value for value in commands[0])
 
 
 def test_runner_uses_fresh_profile_per_sample(monkeypatch):
@@ -140,7 +182,10 @@ def test_runner_uses_fresh_profile_per_sample(monkeypatch):
         "desktop",
     )
 
-    profile_dirs = [_extract_flag_value(command, "--user-data-dir") for command in commands]
+    profile_dirs = [
+        _extract_flag_value(command, "--chrome-flags").split("--user-data-dir=", 1)[1]
+        for command in commands
+    ]
     assert len(profile_dirs) == 2
     assert profile_dirs[0] != profile_dirs[1]
 
