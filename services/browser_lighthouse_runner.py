@@ -18,10 +18,16 @@ class BrowserLighthouseRunner:
         self,
         lighthouse_bin: str | None = None,
         chrome_bin: str | None = None,
+        node_bin: str | None = None,
+        helper_path: Path | None = None,
         timeout_seconds: int = PAGESPEED_TIMEOUT_SECONDS,
     ) -> None:
         self.lighthouse_bin = lighthouse_bin or os.getenv("LIGHTHOUSE_BIN", "lighthouse")
         self.chrome_bin = chrome_bin or os.getenv("CHROME_BIN", "chromium")
+        self.node_bin = node_bin or os.getenv("NODE_BIN", "node")
+        self.helper_path = helper_path or Path(__file__).with_name(
+            "browser_lighthouse_runner_helper.mjs"
+        )
         self.timeout_seconds = timeout_seconds
 
     def run(
@@ -43,12 +49,17 @@ class BrowserLighthouseRunner:
                     text=True,
                     timeout=self.timeout_seconds,
                     check=False,
-                    env={**os.environ, "CHROME_PATH": self.chrome_bin},
+                    env={
+                        **os.environ,
+                        "CHROME_BIN": self.chrome_bin,
+                        "LIGHTHOUSE_BIN": self.lighthouse_bin,
+                    },
                 )
             except FileNotFoundError as exc:
-                missing_binary = exc.filename or self.lighthouse_bin
+                missing_binary = exc.filename or self.node_bin
                 raise PageSpeedError(
-                    f"Lighthouse executable not found: {missing_binary}"
+                    "Node.js executable not found: "
+                    f"{missing_binary}. Install Node.js or set NODE_BIN."
                 ) from exc
             except subprocess.TimeoutExpired as exc:
                 raise PageSpeedError(
@@ -57,7 +68,12 @@ class BrowserLighthouseRunner:
 
         if completed.returncode != 0:
             stderr = (completed.stderr or "").strip()
-            if "Lighthouse executable not found" in stderr:
+            if (
+                "Lighthouse executable not found" in stderr
+                or "Chrome executable not found" in stderr
+                or "Unable to load Lighthouse runtime package" in stderr
+                or "Unable to load puppeteer-core package" in stderr
+            ):
                 raise PageSpeedError(stderr)
             raise PageSpeedError(
                 f"Lighthouse failed for {audit_url}: {stderr or 'no stderr output'}"
@@ -78,29 +94,19 @@ class BrowserLighthouseRunner:
         profile_dir: Path,
     ) -> list[str]:
         form_factor = "mobile" if strategy == "mobile" else "desktop"
-        chrome_flags = " ".join([
-            "--headless=new",
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            f"--user-data-dir={profile_dir}",
-        ])
+        payload = {
+            "warmupUrl": warmup_url,
+            "auditUrl": audit_url,
+            "strategy": strategy,
+            "formFactor": form_factor,
+            "profileDir": str(profile_dir),
+            "lighthouseBin": self.lighthouse_bin,
+            "chromeBin": self.chrome_bin,
+        }
         return [
-            self.lighthouse_bin,
-            audit_url,
-            "--output=json",
-            "--quiet",
-            "--chrome-flags",
-            chrome_flags,
-            "--disable-storage-reset",
-            "--extra-headers",
-            "{}",
-            "--preset=desktop" if form_factor == "desktop" else "--preset=perf",
-            f"--form-factor={form_factor}",
-            "--screenEmulation.disabled=true"
-            if form_factor == "desktop"
-            else "--screenEmulation.mobile=true",
-            f"--precomputed-lantern-data-path={profile_dir / 'unused-lantern.json'}",
-            f"--warmupUrl={warmup_url}",
+            self.node_bin,
+            str(self.helper_path),
+            json.dumps(payload),
         ]
 
     @staticmethod

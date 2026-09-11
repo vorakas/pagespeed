@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     nodejs \
     npm \
-    && npm install -g lighthouse \
+    && npm install -g lighthouse chrome-launcher puppeteer-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

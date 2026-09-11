@@ -21,23 +21,28 @@ def _build_fake_report() -> dict:
     }
 
 
-def _extract_flag_value(command: list[str], flag: str) -> str:
-    if flag not in command:
-        prefix = f"{flag}="
-        for value in command:
-            if value.startswith(prefix):
-                return value[len(prefix) :]
-        return ""
-    idx = command.index(flag)
-    return command[idx + 1] if idx + 1 < len(command) else ""
+def _helper_payload(command: list[str]) -> dict:
+    assert len(command) == 3
+    assert command[1].endswith("browser_lighthouse_runner_helper.mjs")
+    command_text = " ".join(command)
+    assert "--warmupUrl" not in command_text
+    assert "--precomputed-lantern-data-path" not in command_text
+    return json.loads(command[2])
 
 
-def test_runner_invokes_lighthouse_with_warmup_script_and_extracts_metrics(monkeypatch):
+def test_runner_invokes_programmatic_helper_and_extracts_metrics(monkeypatch):
     calls = []
+    envs = []
 
     def fake_run(command, capture_output, text, timeout, check, env=None):
         calls.append(command)
-        return subprocess.CompletedProcess(command, 0, stdout=json.dumps(_build_fake_report()), stderr="")
+        envs.append(env)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps(_build_fake_report()),
+            stderr="",
+        )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
@@ -53,27 +58,17 @@ def test_runner_invokes_lighthouse_with_warmup_script_and_extracts_metrics(monke
     )
 
     command = calls[0]
-    assert command[0] == "lighthouse"
-    assert command[1] == "https://www.lampsplus.com/p/brass-lamp/"
-    assert _extract_flag_value(command, "--output") == "json"
-    assert "--quiet" in command
-    assert "--disable-storage-reset" in command
-    assert _extract_flag_value(command, "--form-factor") == "desktop"
-    assert "--screenEmulation.disabled=true" in command
-    assert "--warmupUrl=https://www.lampsplus.com/?sov=AC3624360" in command
-
-    chrome_flags = _extract_flag_value(command, "--chrome-flags")
-    assert "--browser-executable-path" not in chrome_flags
-    assert "--headless=new" in chrome_flags
-    assert "--no-sandbox" in chrome_flags
-    assert "--disable-dev-shm-usage" in chrome_flags
-    assert "csv-lighthouse-" in chrome_flags
-
-    # Ensure command contract forbids unsupported direct warmup/legacy form-factor args
-    assert "--chrome-bin" not in command
-    assert "--lighthouse-bin" not in command
-    assert not any(arg.startswith("--formFactor=") for arg in command)
-    assert not any(arg.startswith("--formFactor") for arg in command)
+    assert command[0] == "node"
+    payload = _helper_payload(command)
+    assert payload["warmupUrl"] == "https://www.lampsplus.com/?sov=AC3624360"
+    assert payload["auditUrl"] == "https://www.lampsplus.com/p/brass-lamp/"
+    assert payload["strategy"] == "desktop"
+    assert payload["formFactor"] == "desktop"
+    assert payload["lighthouseBin"] == "lighthouse"
+    assert payload["chromeBin"] == "/usr/bin/chromium"
+    assert "csv-lighthouse-" in payload["profileDir"]
+    assert envs[0]["LIGHTHOUSE_BIN"] == "lighthouse"
+    assert envs[0]["CHROME_BIN"] == "/usr/bin/chromium"
 
     assert result["performance_score"] == 91
     assert result["fcp"] == 1234
@@ -115,10 +110,10 @@ def test_runner_uses_mobile_settings(monkeypatch):
         "mobile",
     )
 
-    assert _extract_flag_value(commands[0], "--form-factor") == "mobile"
-    assert "--preset=perf" in commands[0]
-    assert "--screenEmulation.mobile=true" in commands[0]
-    assert "csv-lighthouse-" in _extract_flag_value(commands[0], "--chrome-flags")
+    payload = _helper_payload(commands[0])
+    assert payload["strategy"] == "mobile"
+    assert payload["formFactor"] == "mobile"
+    assert "csv-lighthouse-" in payload["profileDir"]
 
 
 def test_runner_uses_env_configured_binaries(monkeypatch):
@@ -133,16 +128,18 @@ def test_runner_uses_env_configured_binaries(monkeypatch):
         return subprocess.CompletedProcess(
             command,
             0,
-            stdout=json.dumps({
-                "categories": {"performance": {"score": 1}},
-                "audits": {
-                    "first-contentful-paint": {"numericValue": 1},
-                    "largest-contentful-paint": {"numericValue": 2},
-                    "cumulative-layout-shift": {"numericValue": 0},
-                    "total-blocking-time": {"numericValue": 3},
-                    "speed-index": {"numericValue": 4},
-                },
-            }),
+            stdout=json.dumps(
+                {
+                    "categories": {"performance": {"score": 1}},
+                    "audits": {
+                        "first-contentful-paint": {"numericValue": 1},
+                        "largest-contentful-paint": {"numericValue": 2},
+                        "cumulative-layout-shift": {"numericValue": 0},
+                        "total-blocking-time": {"numericValue": 3},
+                        "speed-index": {"numericValue": 4},
+                    },
+                }
+            ),
             stderr="",
         )
 
@@ -154,9 +151,12 @@ def test_runner_uses_env_configured_binaries(monkeypatch):
         "desktop",
     )
 
-    assert commands[0][0] == "/opt/bin/lighthouse"
-    assert envs[0]["CHROME_PATH"] == "/usr/bin/chromium-browser"
-    assert "/usr/bin/chromium-browser" not in _extract_flag_value(commands[0], "--chrome-flags")
+    assert commands[0][0] == "node"
+    payload = _helper_payload(commands[0])
+    assert payload["lighthouseBin"] == "/opt/bin/lighthouse"
+    assert payload["chromeBin"] == "/usr/bin/chromium-browser"
+    assert envs[0]["CHROME_BIN"] == "/usr/bin/chromium-browser"
+    assert envs[0]["LIGHTHOUSE_BIN"] == "/opt/bin/lighthouse"
 
 
 def test_runner_uses_fresh_profile_per_sample(monkeypatch):
@@ -185,17 +185,22 @@ def test_runner_uses_fresh_profile_per_sample(monkeypatch):
         "desktop",
     )
 
-    profile_dirs = [
-        _extract_flag_value(command, "--chrome-flags").split("--user-data-dir=", 1)[1]
-        for command in commands
-    ]
+    profile_dirs = [_helper_payload(command)["profileDir"] for command in commands]
     assert len(profile_dirs) == 2
     assert profile_dirs[0] != profile_dirs[1]
 
 
 def test_runner_raises_clear_error_when_lighthouse_binary_missing(monkeypatch):
     def fake_run(command, capture_output, text, timeout, check, env=None):
-        raise FileNotFoundError(2, "No such file or directory", "missing-lighthouse")
+        return subprocess.CompletedProcess(
+            command,
+            1,
+            stdout="",
+            stderr=(
+                "Lighthouse executable not found: missing-lighthouse. "
+                "Install Lighthouse or set LIGHTHOUSE_BIN."
+            ),
+        )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
@@ -205,7 +210,53 @@ def test_runner_raises_clear_error_when_lighthouse_binary_missing(monkeypatch):
             "https://www.lampsplus.com/",
             "desktop",
         )
-    assert exc_info.value.message == "Lighthouse executable not found: missing-lighthouse"
+    assert exc_info.value.message == (
+        "Lighthouse executable not found: missing-lighthouse. "
+        "Install Lighthouse or set LIGHTHOUSE_BIN."
+    )
+
+
+def test_runner_raises_clear_error_when_chrome_binary_missing(monkeypatch):
+    def fake_run(command, capture_output, text, timeout, check, env=None):
+        return subprocess.CompletedProcess(
+            command,
+            1,
+            stdout="",
+            stderr=(
+                "Chrome executable not found: missing-chrome. "
+                "Install Chromium/Chrome or set CHROME_BIN."
+            ),
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pytest.raises(PageSpeedError) as exc_info:
+        BrowserLighthouseRunner(chrome_bin="missing-chrome").run(
+            "https://www.lampsplus.com/?sov=LP8675309",
+            "https://www.lampsplus.com/",
+            "desktop",
+        )
+    assert exc_info.value.message == (
+        "Chrome executable not found: missing-chrome. "
+        "Install Chromium/Chrome or set CHROME_BIN."
+    )
+
+
+def test_runner_raises_clear_error_when_node_binary_missing(monkeypatch):
+    def fake_run(command, capture_output, text, timeout, check, env=None):
+        raise FileNotFoundError(2, "No such file or directory", "missing-node")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pytest.raises(PageSpeedError) as exc_info:
+        BrowserLighthouseRunner(node_bin="missing-node").run(
+            "https://www.lampsplus.com/?sov=LP8675309",
+            "https://www.lampsplus.com/",
+            "desktop",
+        )
+    assert exc_info.value.message == (
+        "Node.js executable not found: missing-node. Install Node.js or set NODE_BIN."
+    )
 
 
 def test_runner_skips_subprocess_when_cancelled():
