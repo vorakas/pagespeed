@@ -43,11 +43,12 @@ class BrowserLighthouseRunner:
                     text=True,
                     timeout=self.timeout_seconds,
                     check=False,
+                    env={**os.environ, "CHROME_PATH": self.chrome_bin},
                 )
             except FileNotFoundError as exc:
                 missing_binary = exc.filename or self.lighthouse_bin
                 raise PageSpeedError(
-                    f"Browser Lighthouse executable not found: {missing_binary}"
+                    f"Lighthouse executable not found: {missing_binary}"
                 ) from exc
             except subprocess.TimeoutExpired as exc:
                 raise PageSpeedError(
@@ -78,7 +79,6 @@ class BrowserLighthouseRunner:
     ) -> list[str]:
         form_factor = "mobile" if strategy == "mobile" else "desktop"
         chrome_flags = " ".join([
-            f"--browser-executable-path={self.chrome_bin}",
             "--headless=new",
             "--no-sandbox",
             "--disable-dev-shm-usage",

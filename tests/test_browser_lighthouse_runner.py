@@ -35,7 +35,7 @@ def _extract_flag_value(command: list[str], flag: str) -> str:
 def test_runner_invokes_lighthouse_with_warmup_script_and_extracts_metrics(monkeypatch):
     calls = []
 
-    def fake_run(command, capture_output, text, timeout, check):
+    def fake_run(command, capture_output, text, timeout, check, env=None):
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, stdout=json.dumps(_build_fake_report()), stderr="")
 
@@ -63,7 +63,7 @@ def test_runner_invokes_lighthouse_with_warmup_script_and_extracts_metrics(monke
     assert "--warmupUrl=https://www.lampsplus.com/?sov=AC3624360" in command
 
     chrome_flags = _extract_flag_value(command, "--chrome-flags")
-    assert "--browser-executable-path=/usr/bin/chromium" in chrome_flags
+    assert "--browser-executable-path" not in chrome_flags
     assert "--headless=new" in chrome_flags
     assert "--no-sandbox" in chrome_flags
     assert "--disable-dev-shm-usage" in chrome_flags
@@ -87,7 +87,7 @@ def test_runner_invokes_lighthouse_with_warmup_script_and_extracts_metrics(monke
 def test_runner_uses_mobile_settings(monkeypatch):
     commands = []
 
-    def fake_run(command, capture_output, text, timeout, check):
+    def fake_run(command, capture_output, text, timeout, check, env=None):
         commands.append(command)
         return subprocess.CompletedProcess(
             command,
@@ -123,11 +123,13 @@ def test_runner_uses_mobile_settings(monkeypatch):
 
 def test_runner_uses_env_configured_binaries(monkeypatch):
     commands = []
+    envs = []
     monkeypatch.setenv("LIGHTHOUSE_BIN", "/opt/bin/lighthouse")
     monkeypatch.setenv("CHROME_BIN", "/usr/bin/chromium-browser")
 
-    def fake_run(command, capture_output, text, timeout, check):
+    def fake_run(command, capture_output, text, timeout, check, env=None):
         commands.append(command)
+        envs.append(env)
         return subprocess.CompletedProcess(
             command,
             0,
@@ -153,13 +155,14 @@ def test_runner_uses_env_configured_binaries(monkeypatch):
     )
 
     assert commands[0][0] == "/opt/bin/lighthouse"
-    assert any("/usr/bin/chromium-browser" in value for value in commands[0])
+    assert envs[0]["CHROME_PATH"] == "/usr/bin/chromium-browser"
+    assert "/usr/bin/chromium-browser" not in _extract_flag_value(commands[0], "--chrome-flags")
 
 
 def test_runner_uses_fresh_profile_per_sample(monkeypatch):
     commands = []
 
-    def fake_run(command, capture_output, text, timeout, check):
+    def fake_run(command, capture_output, text, timeout, check, env=None):
         commands.append(command)
         return subprocess.CompletedProcess(
             command,
@@ -191,22 +194,18 @@ def test_runner_uses_fresh_profile_per_sample(monkeypatch):
 
 
 def test_runner_raises_clear_error_when_lighthouse_binary_missing(monkeypatch):
-    def fake_run(command, capture_output, text, timeout, check):
-        return subprocess.CompletedProcess(
-            command,
-            1,
-            stdout="",
-            stderr="Lighthouse executable not found: missing-lighthouse",
-        )
+    def fake_run(command, capture_output, text, timeout, check, env=None):
+        raise FileNotFoundError(2, "No such file or directory", "missing-lighthouse")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    with pytest.raises(PageSpeedError, match="Lighthouse executable not found: missing-lighthouse"):
+    with pytest.raises(PageSpeedError) as exc_info:
         BrowserLighthouseRunner(lighthouse_bin="missing-lighthouse").run(
             "https://www.lampsplus.com/?sov=LP8675309",
             "https://www.lampsplus.com/",
             "desktop",
         )
+    assert exc_info.value.message == "Lighthouse executable not found: missing-lighthouse"
 
 
 def test_runner_skips_subprocess_when_cancelled():
