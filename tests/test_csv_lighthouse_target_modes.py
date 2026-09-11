@@ -16,9 +16,13 @@ def test_target_modes_keep_compatibility_keys_and_warmups():
     assert adobe.label == "Adobe Commerce"
     assert adobe.warmup_url == "https://www.lampsplus.com/?sov=AC3624360"
     assert adobe.base_url == "https://www.lampsplus.com"
+    assert adobe.cookies == {"forceNew": "true"}
+    assert adobe.clear_cookies == ("forceOld",)
     assert lampsplus.label == "LampsPlus"
     assert lampsplus.warmup_url == "https://www.lampsplus.com/?sov=LP8675309"
     assert lampsplus.base_url == "https://www.lampsplus.com"
+    assert lampsplus.cookies == {"forceOld": "true"}
+    assert lampsplus.clear_cookies == ("forceNew",)
 
 
 def test_unknown_target_mode_raises_validation_error():

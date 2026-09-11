@@ -55,6 +55,8 @@ def test_runner_invokes_programmatic_helper_and_extracts_metrics(monkeypatch):
         warmup_url="https://www.lampsplus.com/?sov=AC3624360",
         audit_url="https://www.lampsplus.com/p/brass-lamp/",
         strategy="desktop",
+        cookies={"forceNew": "true"},
+        clear_cookies=("forceOld",),
     )
 
     command = calls[0]
@@ -64,6 +66,8 @@ def test_runner_invokes_programmatic_helper_and_extracts_metrics(monkeypatch):
     assert payload["auditUrl"] == "https://www.lampsplus.com/p/brass-lamp/"
     assert payload["strategy"] == "desktop"
     assert payload["formFactor"] == "desktop"
+    assert payload["cookies"] == {"forceNew": "true"}
+    assert payload["clearCookies"] == ["forceOld"]
     assert payload["lighthouseBin"] == "lighthouse"
     assert payload["chromeBin"] == "/usr/bin/chromium"
     assert "csv-lighthouse-" in payload["profileDir"]

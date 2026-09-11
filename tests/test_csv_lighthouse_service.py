@@ -35,11 +35,16 @@ class FakePageSpeedClient:
     def __init__(self):
         self.calls = []
 
-    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+    def run(
+        self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
+        cancel_event=None,
+    ):
         self.calls.append({
             "warmup_url": warmup_url,
             "audit_url": audit_url,
             "strategy": strategy,
+            "cookies": cookies,
+            "clear_cookies": clear_cookies,
             "cancelled": cancel_event.is_set() if cancel_event else False,
         })
         return {
@@ -56,11 +61,16 @@ class FakeBrowserLighthouseRunner:
     def __init__(self):
         self.calls = []
 
-    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+    def run(
+        self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
+        cancel_event=None,
+    ):
         self.calls.append({
             "warmup_url": warmup_url,
             "audit_url": audit_url,
             "strategy": strategy,
+            "cookies": cookies,
+            "clear_cookies": clear_cookies,
             "cancelled": cancel_event.is_set() if cancel_event else False,
         })
         return {
@@ -79,11 +89,16 @@ class FailsOncePageSpeedClient(FakePageSpeedClient):
         super().__init__()
         self.failures = 0
 
-    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+    def run(
+        self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
+        cancel_event=None,
+    ):
         self.calls.append({
             "warmup_url": warmup_url,
             "audit_url": audit_url,
             "strategy": strategy,
+            "cookies": cookies,
+            "clear_cookies": clear_cookies,
             "cancelled": cancel_event.is_set() if cancel_event else False,
         })
         if self.failures == 0:
@@ -99,11 +114,16 @@ class FailsOncePageSpeedClient(FakePageSpeedClient):
 
 
 class AlwaysFailsPageSpeedClient(FakePageSpeedClient):
-    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+    def run(
+        self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
+        cancel_event=None,
+    ):
         self.calls.append({
             "warmup_url": warmup_url,
             "audit_url": audit_url,
             "strategy": strategy,
+            "cookies": cookies,
+            "clear_cookies": clear_cookies,
             "cancelled": cancel_event.is_set() if cancel_event else False,
         })
         raise RuntimeError("permanent PageSpeed failure")
@@ -116,11 +136,16 @@ class SequencePageSpeedClient(FakePageSpeedClient):
         super().__init__()
         self._fcp_values = list(fcp_values)
 
-    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+    def run(
+        self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
+        cancel_event=None,
+    ):
         self.calls.append({
             "warmup_url": warmup_url,
             "audit_url": audit_url,
             "strategy": strategy,
+            "cookies": cookies,
+            "clear_cookies": clear_cookies,
             "cancelled": cancel_event.is_set() if cancel_event else False,
         })
         fcp = self._fcp_values[(len(self.calls) - 1) % len(self._fcp_values)]
@@ -133,8 +158,14 @@ class CancellingPageSpeedClient(FakePageSpeedClient):
         self.repository = repository
         self.run_id_getter = run_id_getter
 
-    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
-        result = super().run(warmup_url, audit_url, strategy, cancel_event=cancel_event)
+    def run(
+        self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
+        cancel_event=None,
+    ):
+        result = super().run(
+            warmup_url, audit_url, strategy, cookies=cookies,
+            clear_cookies=clear_cookies, cancel_event=cancel_event,
+        )
         self.repository.request_cancel(self.run_id_getter())
         return result
 
@@ -146,11 +177,16 @@ class TimestampedPageSpeedClient(FakePageSpeedClient):
         super().__init__()
         self._timestamps = list(timestamps)
 
-    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+    def run(
+        self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
+        cancel_event=None,
+    ):
         self.calls.append({
             "warmup_url": warmup_url,
             "audit_url": audit_url,
             "strategy": strategy,
+            "cookies": cookies,
+            "clear_cookies": clear_cookies,
             "cancelled": cancel_event.is_set() if cancel_event else False,
         })
         ts = self._timestamps[(len(self.calls) - 1) % len(self._timestamps)]
@@ -168,11 +204,16 @@ class RateLimitedThenOkPageSpeedClient(FakePageSpeedClient):
         super().__init__()
         self._fail_times = fail_times
 
-    def run(self, warmup_url, audit_url, strategy, cancel_event=None):
+    def run(
+        self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
+        cancel_event=None,
+    ):
         self.calls.append({
             "warmup_url": warmup_url,
             "audit_url": audit_url,
             "strategy": strategy,
+            "cookies": cookies,
+            "clear_cookies": clear_cookies,
             "cancelled": cancel_event.is_set() if cancel_event else False,
         })
         if len(self.calls) <= self._fail_times:
@@ -228,6 +269,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             "warmup_url": "https://www.lampsplus.com/?sov=AC3624360",
             "audit_url": "https://www.lampsplus.com/p/brass-lamp/",
             "strategy": "desktop",
+            "cookies": {"forceNew": "true"},
+            "clear_cookies": ("forceOld",),
             "cancelled": False,
         }])
         self.assertEqual(result["performance_score"], 88)
@@ -482,6 +525,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             "warmup_url": "https://www.lampsplus.com/?sov=LP8675309",
             "audit_url": item["generated_url"],
             "strategy": "desktop",
+            "cookies": {"forceOld": "true"},
+            "clear_cookies": ("forceNew",),
             "cancelled": False,
         })
         self.assertEqual(detail["run"]["status"], "completed")

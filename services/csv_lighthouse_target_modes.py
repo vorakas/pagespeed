@@ -14,6 +14,8 @@ class CsvLighthouseTargetMode:
     key: str
     label: str
     warmup_url: str
+    cookies: dict[str, str]
+    clear_cookies: tuple[str, ...]
     base_url: str = WWW_BASE_URL
 
 
@@ -22,11 +24,15 @@ CSV_LIGHTHOUSE_TARGET_MODES: dict[str, CsvLighthouseTargetMode] = {
         key="mcprod",
         label="Adobe Commerce",
         warmup_url=f"{WWW_BASE_URL}/?sov=AC3624360",
+        cookies={"forceNew": "true"},
+        clear_cookies=("forceOld",),
     ),
     "www": CsvLighthouseTargetMode(
         key="www",
         label="LampsPlus",
         warmup_url=f"{WWW_BASE_URL}/?sov=LP8675309",
+        cookies={"forceOld": "true"},
+        clear_cookies=("forceNew",),
     ),
 }
 

@@ -460,6 +460,8 @@ class CsvLighthouseService:
                     warmup_url=target_mode.warmup_url,
                     audit_url=item["generated_url"],
                     strategy=item["strategy"],
+                    cookies=target_mode.cookies,
+                    clear_cookies=target_mode.clear_cookies,
                     cancel_event=cancel_event,
                 )
             )

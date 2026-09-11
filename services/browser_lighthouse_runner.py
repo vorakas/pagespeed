@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 from config import PAGESPEED_TIMEOUT_SECONDS
 from exceptions import PageSpeedError
@@ -35,13 +35,22 @@ class BrowserLighthouseRunner:
         warmup_url: str,
         audit_url: str,
         strategy: str,
+        cookies: Mapping[str, str] | None = None,
+        clear_cookies: Sequence[str] | None = None,
         cancel_event: threading.Event | None = None,
     ) -> dict[str, Any]:
         if cancel_event is not None and cancel_event.is_set():
             raise PageSpeedError("CSV Lighthouse sample cancelled before Lighthouse started")
 
         with tempfile.TemporaryDirectory(prefix="csv-lighthouse-") as profile_dir:
-            command = self._command(warmup_url, audit_url, strategy, Path(profile_dir))
+            command = self._command(
+                warmup_url,
+                audit_url,
+                strategy,
+                Path(profile_dir),
+                cookies=cookies,
+                clear_cookies=clear_cookies,
+            )
             try:
                 completed = subprocess.run(
                     command,
@@ -92,6 +101,8 @@ class BrowserLighthouseRunner:
         audit_url: str,
         strategy: str,
         profile_dir: Path,
+        cookies: Mapping[str, str] | None = None,
+        clear_cookies: Sequence[str] | None = None,
     ) -> list[str]:
         form_factor = "mobile" if strategy == "mobile" else "desktop"
         payload = {
@@ -102,6 +113,8 @@ class BrowserLighthouseRunner:
             "profileDir": str(profile_dir),
             "lighthouseBin": self.lighthouse_bin,
             "chromeBin": self.chrome_bin,
+            "cookies": dict(cookies or {}),
+            "clearCookies": list(clear_cookies or ()),
         }
         return [
             self.node_bin,

@@ -108,6 +108,42 @@ async function importPackage(packageName, friendlyName, extraPaths = []) {
   return import(pathToFileURL(resolved).href);
 }
 
+function cookieOriginFor(url) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    fail(`Invalid warmup URL for cookie setup: ${url}`);
+  }
+}
+
+function buildCookieMutations(warmupUrl, cookies, clearCookies) {
+  const url = cookieOriginFor(warmupUrl);
+  const removals = Array.isArray(clearCookies)
+    ? clearCookies
+        .filter((name) => typeof name === "string" && name.trim())
+        .map((name) => ({
+          name,
+          value: "",
+          url,
+          path: "/",
+          expires: 0,
+        }))
+    : [];
+  const additions =
+    cookies && typeof cookies === "object" && !Array.isArray(cookies)
+      ? Object.entries(cookies)
+          .filter(([name, value]) => name && value !== undefined && value !== null)
+          .map(([name, value]) => ({
+            name,
+            value: String(value),
+            url,
+            path: "/",
+          }))
+      : [];
+
+  return [...removals, ...additions];
+}
+
 async function main() {
   if (process.argv.length < 3) {
     fail("Missing Lighthouse helper JSON payload.");
@@ -130,6 +166,11 @@ async function main() {
   if (!warmupUrl || !auditUrl || !profileDir) {
     fail("Lighthouse helper payload missing warmupUrl, auditUrl, or profileDir.");
   }
+  const cookieMutations = buildCookieMutations(
+    warmupUrl,
+    payload.cookies,
+    payload.clearCookies,
+  );
 
   const lighthouseExecutable = resolveExecutable(
     lighthouseBin,
@@ -187,6 +228,9 @@ async function main() {
       defaultViewport: null,
     });
     const page = await browser.newPage();
+    if (cookieMutations.length > 0) {
+      await page.setCookie(...cookieMutations);
+    }
     await page.goto(warmupUrl, {
       waitUntil: "domcontentloaded",
       timeout: 60000,
