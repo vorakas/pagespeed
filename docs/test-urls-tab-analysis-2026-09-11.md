@@ -86,6 +86,15 @@ Backend:
 - `services/csv_lighthouse_service.py` creates pending runs, reads uploaded CSVs with limits, maps CSV values to target URLs, starts work explicitly, records item status/sample metrics, tracks cancellation, and recovers interrupted runs.
 - `data_access/csv_lighthouse_repository.py` stores run/file/item/sample state in CSV-specific tables.
 
+Execution behavior:
+
+CSV Lighthouse execution now uses a browser-session Lighthouse runner for both Adobe Commerce and LampsPlus targets. Each URL sample creates a fresh browser profile, opens the target warmup URL, then audits the generated normal `www.lampsplus.com` URL in that same session.
+
+Warmup URLs:
+
+- Adobe Commerce: `https://www.lampsplus.com/?sov=AC3624360`
+- LampsPlus: `https://www.lampsplus.com/?sov=LP8675309`
+
 Important prior constraint from memory:
 
 - Keep CSV uploads in the Lighthouse/Test URLs page.
