@@ -84,6 +84,34 @@ class FakeBrowserLighthouseRunner:
         }
 
 
+class ModeEvidenceBrowserLighthouseRunner(FakeBrowserLighthouseRunner):
+    def run(
+        self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
+        cancel_event=None,
+    ):
+        result = super().run(
+            warmup_url,
+            audit_url,
+            strategy,
+            cookies=cookies,
+            clear_cookies=clear_cookies,
+            cancel_event=cancel_event,
+        )
+        if cookies and cookies.get("forceNew") == "true":
+            result.update({
+                "expected_mode": "adobe_commerce",
+                "detected_mode": "adobe_commerce",
+                "mode_evidence": "forceNew=true; forceOld=absent",
+            })
+        else:
+            result.update({
+                "expected_mode": "lampsplus",
+                "detected_mode": "lampsplus",
+                "mode_evidence": "forceOld=true; forceNew=absent",
+            })
+        return result
+
+
 class FailsOncePageSpeedClient(FakePageSpeedClient):
     def __init__(self):
         super().__init__()
@@ -678,7 +706,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                 "original_value", "generated_url", "strategy", "kind",
                 "sample_index", "n", "status", "performance", "fcp", "speed_index", "lcp",
                 "tbt", "cls", "attempts", "duration_ms", "error_message",
-                "completed_at",
+                "completed_at", "expected_mode", "detected_mode", "mode_evidence",
             ],
         )
 
@@ -700,6 +728,37 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(min_row[fcp_idx], "100")
         self.assertEqual(max_row[fcp_idx], "900")
         self.assertEqual(median_row[n_idx], "3")
+
+    def test_export_csv_includes_mode_evidence_for_samples(self):
+        runner = ModeEvidenceBrowserLighthouseRunner()
+        service = CsvLighthouseService(
+            self.repo, runner, start_background=False,
+            time_source=self.clock.now, sleep_func=self.clock.sleep,
+        )
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["mcprod"],
+            strategy="desktop",
+            samples_per_url=1,
+        )
+
+        service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        samples = self.repo.list_samples(result["run_id"])
+        exported = service.export_csv(result["run_id"])
+        rows = list(csv.reader(io.StringIO(exported)))
+        header = rows[0]
+        sample_row = next(row for row in rows[1:] if row[header.index("kind")] == "sample")
+
+        self.assertEqual(detail["items"][0]["expected_mode"], "adobe_commerce")
+        self.assertEqual(detail["items"][0]["detected_mode"], "adobe_commerce")
+        self.assertEqual(detail["items"][0]["mode_evidence"], "forceNew=true; forceOld=absent")
+        self.assertEqual(samples[0]["expected_mode"], "adobe_commerce")
+        self.assertEqual(samples[0]["detected_mode"], "adobe_commerce")
+        self.assertEqual(samples[0]["mode_evidence"], "forceNew=true; forceOld=absent")
+        self.assertEqual(sample_row[header.index("expected_mode")], "adobe_commerce")
+        self.assertEqual(sample_row[header.index("detected_mode")], "adobe_commerce")
+        self.assertEqual(sample_row[header.index("mode_evidence")], "forceNew=true; forceOld=absent")
 
     def test_export_csv_synthesizes_sample_for_legacy_run(self):
         # A run whose item was marked passed directly, with no sample rows.

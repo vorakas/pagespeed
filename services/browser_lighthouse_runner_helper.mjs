@@ -144,6 +144,40 @@ function buildCookieMutations(warmupUrl, cookies, clearCookies) {
   return [...removals, ...additions];
 }
 
+function expectedModeFromCookies(cookies) {
+  if (cookies?.forceNew === "true") {
+    return "adobe_commerce";
+  }
+  if (cookies?.forceOld === "true") {
+    return "lampsplus";
+  }
+  return "unknown";
+}
+
+function cookieValue(cookieMap, name) {
+  return cookieMap.get(name) || "absent";
+}
+
+function detectedModeFromCookieMap(cookieMap) {
+  const forceNew = cookieValue(cookieMap, "forceNew");
+  const forceOld = cookieValue(cookieMap, "forceOld");
+  if (forceNew === "true" && forceOld === "absent") {
+    return "adobe_commerce";
+  }
+  if (forceOld === "true" && forceNew === "absent") {
+    return "lampsplus";
+  }
+  return "unknown";
+}
+
+function modeEvidenceFromCookies(expectedCookies, observedCookies) {
+  const cookieMap = new Map(observedCookies.map((cookie) => [cookie.name, cookie.value]));
+  const expectedMode = expectedModeFromCookies(expectedCookies);
+  const detectedMode = detectedModeFromCookieMap(cookieMap);
+  const evidence = `forceNew=${cookieValue(cookieMap, "forceNew")}; forceOld=${cookieValue(cookieMap, "forceOld")}`;
+  return { expectedMode, detectedMode, evidence };
+}
+
 async function main() {
   if (process.argv.length < 3) {
     fail("Missing Lighthouse helper JSON payload.");
@@ -236,6 +270,18 @@ async function main() {
       timeout: 60000,
     });
     await page.waitForNetworkIdle({ idleTime: 1500, timeout: 15000 }).catch(() => {});
+    const modeEvidence = modeEvidenceFromCookies(
+      payload.cookies,
+      await page.cookies(cookieOriginFor(warmupUrl)),
+    );
+    if (
+      modeEvidence.expectedMode !== "unknown" &&
+      modeEvidence.detectedMode !== modeEvidence.expectedMode
+    ) {
+      fail(
+        `Mode verification failed: expected ${modeEvidence.expectedMode}, detected ${modeEvidence.detectedMode} (${modeEvidence.evidence}).`,
+      );
+    }
     await page.close();
     await browser.disconnect();
     browser = null;
@@ -259,7 +305,10 @@ async function main() {
             },
     });
 
-    process.stdout.write(result.report);
+    process.stdout.write(JSON.stringify({
+      report: JSON.parse(result.report),
+      modeEvidence,
+    }));
   } finally {
     if (browser) {
       await browser.disconnect();

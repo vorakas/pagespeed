@@ -500,6 +500,10 @@ class CsvLighthouseService:
         item_id = state.item["id"]
         if state.passed_samples:
             representative = self._median_metrics(state.passed_samples)
+            evidence_sample = state.passed_samples[0]
+            representative["expected_mode"] = evidence_sample.get("expected_mode")
+            representative["detected_mode"] = evidence_sample.get("detected_mode")
+            representative["mode_evidence"] = evidence_sample.get("mode_evidence")
             representative["attempts"] = state.attempts_used
             durations = [
                 s.get("duration_ms")
@@ -629,7 +633,7 @@ class CsvLighthouseService:
         "original_value", "generated_url", "strategy", "kind",
         "sample_index", "n", "status", "performance", "fcp", "speed_index", "lcp",
         "tbt", "cls", "attempts", "duration_ms", "error_message",
-        "completed_at",
+        "completed_at", "expected_mode", "detected_mode", "mode_evidence",
     ]
 
     def export_csv(self, run_id: int) -> str:
@@ -682,6 +686,9 @@ class CsvLighthouseService:
                     "duration_ms": item.get("duration_ms"),
                     "error_message": item.get("error_message"),
                     "completed_at": item.get("completed_at"),
+                    "expected_mode": item.get("expected_mode"),
+                    "detected_mode": item.get("detected_mode"),
+                    "mode_evidence": item.get("mode_evidence"),
                 }
             ]
         return grouped
@@ -702,6 +709,9 @@ class CsvLighthouseService:
             sample.get("duration_ms"),
             sample.get("error_message"),
             sample.get("completed_at"),
+            sample.get("expected_mode"),
+            sample.get("detected_mode"),
+            sample.get("mode_evidence"),
         ]
 
     def _summary_row(self, run: dict, item: dict, passed: list[dict], stat: str) -> list:
@@ -715,7 +725,7 @@ class CsvLighthouseService:
             self._csv_value(self._summarize(passed, "lcp", stat)),
             self._csv_value(self._summarize(passed, "tbt", stat)),
             self._csv_value(self._summarize(passed, "cls", stat)),
-            "", "", "", "",
+            "", "", "", "", "", "", "",
         ]
 
     @staticmethod

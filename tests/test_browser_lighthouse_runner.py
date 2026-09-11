@@ -21,6 +21,18 @@ def _build_fake_report() -> dict:
     }
 
 
+def _build_wrapped_report(mode_evidence: dict | None = None) -> dict:
+    return {
+        "report": _build_fake_report(),
+        "modeEvidence": mode_evidence
+        or {
+            "expectedMode": "adobe_commerce",
+            "detectedMode": "adobe_commerce",
+            "evidence": "forceNew=true; forceOld=absent",
+        },
+    }
+
+
 def _helper_payload(command: list[str]) -> dict:
     assert len(command) == 3
     assert command[1].endswith("browser_lighthouse_runner_helper.mjs")
@@ -40,7 +52,7 @@ def test_runner_invokes_programmatic_helper_and_extracts_metrics(monkeypatch):
         return subprocess.CompletedProcess(
             command,
             0,
-            stdout=json.dumps(_build_fake_report()),
+            stdout=json.dumps(_build_wrapped_report()),
             stderr="",
         )
 
@@ -81,6 +93,9 @@ def test_runner_invokes_programmatic_helper_and_extracts_metrics(monkeypatch):
     assert result["tbt"] == 123
     assert result["speed_index"] == 3456
     assert result["raw_data"] == _build_fake_report()
+    assert result["expected_mode"] == "adobe_commerce"
+    assert result["detected_mode"] == "adobe_commerce"
+    assert result["mode_evidence"] == "forceNew=true; forceOld=absent"
 
 
 def test_runner_uses_mobile_settings(monkeypatch):

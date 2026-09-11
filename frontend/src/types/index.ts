@@ -1713,6 +1713,9 @@ export interface CsvLighthouseItem {
   cls: number | null
   attempts: number
   valid_samples: number | null
+  expected_mode?: string | null
+  detected_mode?: string | null
+  mode_evidence?: string | null
   started_at?: string | null
   completed_at?: string | null
   duration_ms?: number | null

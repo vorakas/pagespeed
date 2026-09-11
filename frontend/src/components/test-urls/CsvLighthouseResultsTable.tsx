@@ -53,6 +53,26 @@ function StatusPill({ status }: { status: CsvLighthouseItem["status"] }) {
   )
 }
 
+function ModeEvidence({ item }: { item: CsvLighthouseItem }) {
+  if (!item.detected_mode) {
+    return <span className="aurora-text-faint">-</span>
+  }
+
+  const matchesExpected = !item.expected_mode || item.expected_mode === item.detected_mode
+  const className = matchesExpected
+    ? "border-[color:var(--lcc-green)]/40 bg-[color:var(--lcc-green)]/10 text-[color:var(--lcc-green)]"
+    : "border-[color:var(--lcc-red)]/40 bg-[color:var(--lcc-red)]/10 text-[color:var(--lcc-red)]"
+
+  return (
+    <span
+      className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${className}`}
+      title={item.mode_evidence || undefined}
+    >
+      {item.detected_mode}
+    </span>
+  )
+}
+
 export function CsvLighthouseResultsTable({ items, samplesPerUrl }: CsvLighthouseResultsTableProps) {
   const sections = buildCsvLighthouseResultSections(items)
 
@@ -82,6 +102,7 @@ export function CsvLighthouseResultsTable({ items, samplesPerUrl }: CsvLighthous
             <TableHead className="text-right">TBT</TableHead>
             <TableHead className="text-right">CLS</TableHead>
             <TableHead className="text-right">Samples</TableHead>
+            <TableHead>Evidence</TableHead>
             <TableHead>Error</TableHead>
           </TableRow>
         </TableHeader>
@@ -122,6 +143,9 @@ export function CsvLighthouseResultsTable({ items, samplesPerUrl }: CsvLighthous
                     {item.valid_samples == null ? item.attempts : `${item.valid_samples} / ${samplesPerUrl}`}
                   </TableCell>
                   <TableCell>
+                    <ModeEvidence item={item} />
+                  </TableCell>
+                  <TableCell>
                     <TruncatedText value={item.error_message} className="max-w-[16rem]" />
                   </TableCell>
                 </TableRow>
@@ -149,6 +173,7 @@ export function CsvLighthouseResultsTable({ items, samplesPerUrl }: CsvLighthous
                 <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatMilliseconds(section.average.lcp)}</TableCell>
                 <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatMilliseconds(section.average.tbt)}</TableCell>
                 <TableCell className="aurora-num text-right text-[color:var(--lcc-blue)]">{formatCls(section.average.cls)}</TableCell>
+                <TableCell>-</TableCell>
                 <TableCell>-</TableCell>
                 <TableCell>-</TableCell>
               </TableRow>

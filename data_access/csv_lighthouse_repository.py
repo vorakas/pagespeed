@@ -106,9 +106,10 @@ class CsvLighthouseRepository:
                     INSERT INTO csv_lighthouse_samples (
                         run_id, item_id, sample_index, status,
                         fcp, speed_index, lcp, tbt, cls, performance,
+                        expected_mode, detected_mode, mode_evidence,
                         attempts, duration_ms, error_message
                     )
-                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                     {self._cm.returning_id()}
                     """,
                     (
@@ -122,6 +123,9 @@ class CsvLighthouseRepository:
                         metrics.get("tbt"),
                         metrics.get("cls"),
                         metrics.get("performance"),
+                        metrics.get("expected_mode"),
+                        metrics.get("detected_mode"),
+                        metrics.get("mode_evidence"),
                         attempts,
                         duration_ms,
                         error_message,
@@ -452,6 +456,9 @@ class CsvLighthouseRepository:
                         tbt = {ph},
                         cls = {ph},
                         performance = {ph},
+                        expected_mode = {ph},
+                        detected_mode = {ph},
+                        mode_evidence = {ph},
                         valid_samples = {ph},
                         attempts = {ph},
                         duration_ms = {ph},
@@ -465,6 +472,9 @@ class CsvLighthouseRepository:
                         metrics.get("tbt"),
                         metrics.get("cls"),
                         metrics.get("performance"),
+                        metrics.get("expected_mode"),
+                        metrics.get("detected_mode"),
+                        metrics.get("mode_evidence"),
                         metrics.get("valid_samples"),
                         metrics.get("attempts", 1),
                         metrics.get("duration_ms"),
