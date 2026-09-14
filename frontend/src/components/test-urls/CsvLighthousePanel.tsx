@@ -73,6 +73,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
   const [libraryFiles, setLibraryFiles] = useState<CsvLighthouseFile[]>([])
   const [selectedLibraryFilenames, setSelectedLibraryFilenames] = useState<string[]>([])
   const librarySelectionInitialized = useRef(false)
+  const libraryFilenamesRef = useRef<string[]>([])
   const [fileInputKey, setFileInputKey] = useState(0)
   const [label, setLabel] = useState("")
   const [samplesPerUrl, setSamplesPerUrl] = useState(25)
@@ -109,7 +110,8 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
 
   const handleLibraryChanged = useCallback((nextFiles: CsvLighthouseFile[]) => {
     const nextFilenames = nextFiles.map((file) => file.filename)
-    const previousFilenameSet = new Set(libraryFiles.map((file) => file.filename))
+    const previousFilenameSet = new Set(libraryFilenamesRef.current)
+    libraryFilenamesRef.current = nextFilenames
     setLibraryFiles(nextFiles)
     setSelectedLibraryFilenames((current) => {
       if (!librarySelectionInitialized.current) {
@@ -121,7 +123,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
       const newlyAdded = nextFilenames.filter((filename) => !previousFilenameSet.has(filename))
       return [...selected, ...newlyAdded]
     })
-  }, [libraryFiles])
+  }, [])
 
   const loadRuns = useCallback(async () => {
     setLoadingRuns(true)
