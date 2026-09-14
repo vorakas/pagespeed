@@ -63,7 +63,7 @@ CSV_LIGHTHOUSE_MAX_SAMPLES_PER_URL: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_SAMP
 CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_TOTAL_SAMPLES', '3000'))
 """Maximum total PSI calls (items x samples) in one CSV Lighthouse run."""
 
-CSV_LIGHTHOUSE_MAX_WORKERS: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_WORKERS', '6'))
+CSV_LIGHTHOUSE_MAX_WORKERS: int = int(os.getenv('CSV_LIGHTHOUSE_MAX_WORKERS', '4'))
 """Maximum concurrent URLs tested at once in a CSV Lighthouse run."""
 
 CSV_LIGHTHOUSE_REQUESTS_PER_MINUTE: float = float(

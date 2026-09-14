@@ -1720,6 +1720,14 @@ export interface CsvLighthouseItem {
   completed_at?: string | null
   duration_ms?: number | null
   created_at?: string
+  attempt_error_count?: number
+  attempt_error_summary?: CsvLighthouseAttemptErrorSummary[]
+}
+
+export interface CsvLighthouseAttemptErrorSummary {
+  status: string
+  error_message: string
+  count: number
 }
 
 export interface CsvLighthouseFile {

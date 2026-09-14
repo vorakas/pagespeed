@@ -821,6 +821,73 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(recovered, 0)
         self.assertEqual(self.repo.get_run_detail(run_id)["run"]["status"], "running")
 
+    def test_get_run_detail_includes_attempt_error_summary(self):
+        run_id = self.repo.create_run(
+            "Attempt errors", "desktop", ["mcprod"], 1, 540, 1, samples_per_url=5
+        )
+        item_id = self.repo.create_items(
+            run_id,
+            [
+                {
+                    "source_filename": "PDP.csv",
+                    "group_key": "PDP",
+                    "site_key": "mcprod",
+                    "original_value": "brass-lamp/",
+                    "generated_url": "https://www.lampsplus.com/p/brass-lamp/",
+                    "strategy": "desktop",
+                }
+            ],
+        )[0]
+        self.repo.create_sample(
+            run_id=run_id,
+            item_id=item_id,
+            sample_index=0,
+            status="error",
+            metrics=None,
+            attempts=1,
+            duration_ms=None,
+            error_message="Chrome debug port refused",
+        )
+        self.repo.create_sample(
+            run_id=run_id,
+            item_id=item_id,
+            sample_index=0,
+            status="error",
+            metrics=None,
+            attempts=1,
+            duration_ms=None,
+            error_message="Chrome debug port refused",
+        )
+        self.repo.create_sample(
+            run_id=run_id,
+            item_id=item_id,
+            sample_index=0,
+            status="error",
+            metrics=None,
+            attempts=1,
+            duration_ms=None,
+            error_message="Lighthouse timed out after 90s",
+        )
+
+        item = self.repo.get_run_detail(run_id)["items"][0]
+
+        self.assertEqual(item["attempt_error_count"], 3)
+        self.assertEqual(
+            item["attempt_error_summary"],
+            [
+                {
+                    "status": "error",
+                    "error_message": "Chrome debug port refused",
+                    "count": 2,
+                },
+                {
+                    "status": "error",
+                    "error_message": "Lighthouse timed out after 90s",
+                    "count": 1,
+                },
+            ],
+        )
+
     def test_mark_item_passed_stores_valid_samples(self):
         run_id = self.repo.create_run(
             label="valid-samples", strategy="desktop", site_keys=["www"],

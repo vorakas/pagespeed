@@ -384,6 +384,35 @@ class CsvLighthouseRepository:
                 (run_id,),
             )
             items = self._cm.rows_to_dicts(cursor)
+            cursor.execute(
+                f"""
+                SELECT item_id, status, error_message, COUNT(*) AS count
+                FROM csv_lighthouse_samples
+                WHERE run_id = {ph}
+                  AND status != 'passed'
+                  AND error_message IS NOT NULL
+                  AND error_message != ''
+                GROUP BY item_id, status, error_message
+                ORDER BY item_id, count DESC, error_message
+                """,
+                (run_id,),
+            )
+            attempt_error_rows = self._cm.rows_to_dicts(cursor)
+
+        attempt_errors_by_item: dict[int, list[dict]] = {}
+        for row in attempt_error_rows:
+            item_id = row["item_id"]
+            attempt_errors_by_item.setdefault(item_id, []).append(
+                {
+                    "status": row["status"],
+                    "error_message": row["error_message"],
+                    "count": int(row["count"] or 0),
+                }
+            )
+        for item in items:
+            attempt_errors = attempt_errors_by_item.get(item["id"], [])
+            item["attempt_error_count"] = sum(row["count"] for row in attempt_errors)
+            item["attempt_error_summary"] = attempt_errors
 
         return {"run": self._normalize_run(run) if run else None, "items": items}
 

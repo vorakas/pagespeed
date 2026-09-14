@@ -12,6 +12,7 @@ import {
 import type { CsvLighthouseItem } from "@/types"
 import { formatCls, formatMilliseconds } from "@/lib/utils"
 import { ScoreBadge } from "@/components/shared/ScoreBadge"
+import { buildCsvLighthouseAttemptErrorDisplay } from "@/components/test-urls/csv-lighthouse-attempt-errors"
 import { buildCsvLighthouseResultSections } from "@/components/test-urls/csv-lighthouse-results"
 
 interface CsvLighthouseResultsTableProps {
@@ -71,6 +72,19 @@ function ModeEvidence({ item }: { item: CsvLighthouseItem }) {
       {item.detected_mode}
     </span>
   )
+}
+
+function ErrorEvidence({ item }: { item: CsvLighthouseItem }) {
+  const attemptErrors = buildCsvLighthouseAttemptErrorDisplay(item.attempt_error_summary)
+  if (attemptErrors) {
+    return (
+      <span className="aurora-text block max-w-[18rem] truncate" title={attemptErrors.title}>
+        {attemptErrors.summary}
+      </span>
+    )
+  }
+
+  return <TruncatedText value={item.error_message} className="max-w-[16rem]" />
 }
 
 export function CsvLighthouseResultsTable({ items, samplesPerUrl }: CsvLighthouseResultsTableProps) {
@@ -146,7 +160,7 @@ export function CsvLighthouseResultsTable({ items, samplesPerUrl }: CsvLighthous
                     <ModeEvidence item={item} />
                   </TableCell>
                   <TableCell>
-                    <TruncatedText value={item.error_message} className="max-w-[16rem]" />
+                    <ErrorEvidence item={item} />
                   </TableCell>
                 </TableRow>
               ))}

@@ -523,8 +523,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(calculate_worker_count(0), 0)
         self.assertEqual(calculate_worker_count(1), 1)
         self.assertEqual(calculate_worker_count(4), 4)
-        # Capped at CSV_LIGHTHOUSE_MAX_WORKERS (6).
-        self.assertEqual(calculate_worker_count(12), 6)
+        # Capped at CSV_LIGHTHOUSE_MAX_WORKERS (4).
+        self.assertEqual(calculate_worker_count(12), 4)
 
     def test_create_run_worker_count_is_capped_url_count(self):
         result = self.service.create_run(
