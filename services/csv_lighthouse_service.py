@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import statistics
 import threading
 import time
@@ -504,6 +505,9 @@ class CsvLighthouseService:
             representative["expected_mode"] = evidence_sample.get("expected_mode")
             representative["detected_mode"] = evidence_sample.get("detected_mode")
             representative["mode_evidence"] = evidence_sample.get("mode_evidence")
+            representative["cls_diagnostics"] = self._summarize_cls_diagnostics(
+                state.passed_samples
+            )
             representative["attempts"] = state.attempts_used
             durations = [
                 s.get("duration_ms")
@@ -632,7 +636,7 @@ class CsvLighthouseService:
         "run_id", "label", "source_filename", "group_key", "site_key",
         "original_value", "generated_url", "strategy", "kind",
         "sample_index", "n", "status", "performance", "fcp", "speed_index", "lcp",
-        "tbt", "cls", "attempts", "duration_ms", "error_message",
+        "tbt", "cls", "cls_diagnostics", "attempts", "duration_ms", "error_message",
         "completed_at", "expected_mode", "detected_mode", "mode_evidence",
     ]
 
@@ -681,6 +685,7 @@ class CsvLighthouseService:
                     "lcp": item.get("lcp"),
                     "tbt": item.get("tbt"),
                     "cls": item.get("cls"),
+                    "cls_diagnostics": item.get("cls_diagnostics"),
                     "performance": item.get("performance"),
                     "attempts": item.get("attempts"),
                     "duration_ms": item.get("duration_ms"),
@@ -705,6 +710,7 @@ class CsvLighthouseService:
             self._csv_value(sample.get("lcp")),
             self._csv_value(sample.get("tbt")),
             self._csv_value(sample.get("cls")),
+            self._csv_json(sample.get("cls_diagnostics")),
             sample.get("attempts"),
             sample.get("duration_ms"),
             sample.get("error_message"),
@@ -725,7 +731,7 @@ class CsvLighthouseService:
             self._csv_value(self._summarize(passed, "lcp", stat)),
             self._csv_value(self._summarize(passed, "tbt", stat)),
             self._csv_value(self._summarize(passed, "cls", stat)),
-            "", "", "", "", "", "", "",
+            "", "", "", "", "", "", "", "",
         ]
 
     @staticmethod
@@ -908,10 +914,44 @@ class CsvLighthouseService:
             result[key] = statistics.median(values) if values else None
         return result
 
+    @staticmethod
+    def _summarize_cls_diagnostics(samples: list[dict]) -> dict | None:
+        diagnostics = [
+            sample.get("cls_diagnostics")
+            for sample in samples
+            if isinstance(sample.get("cls_diagnostics"), dict)
+        ]
+        if not diagnostics:
+            return None
+
+        total_shift_count = sum(
+            int(diagnostic.get("observed_shift_count") or 0)
+            for diagnostic in diagnostics
+        )
+        largest = max(
+            (
+                diagnostic for diagnostic in diagnostics
+                if isinstance(diagnostic.get("largest_shift_score"), (int, float))
+            ),
+            key=lambda diagnostic: diagnostic["largest_shift_score"],
+            default=None,
+        )
+        return {
+            "observed_shift_count": total_shift_count,
+            "largest_shift_score": (largest or {}).get("largest_shift_score"),
+            "largest_shift_node": (largest or {}).get("largest_shift_node"),
+        }
+
     def _csv_value(self, value):
         if isinstance(value, float) and value.is_integer():
             return int(value)
         return value
+
+    @staticmethod
+    def _csv_json(value):
+        if value is None:
+            return ""
+        return json.dumps(value)
 
     def _stream_size_bytes(self, stream: BinaryIO) -> int:
         try:

@@ -904,6 +904,41 @@ class CsvLighthouseRepositoryTest(unittest.TestCase):
         self.assertEqual(item["valid_samples"], 25)
         self.assertEqual(item["attempts"], 30)
 
+    def test_cls_diagnostics_round_trip_for_samples_and_items(self):
+        run_id = self.repo.create_run(
+            label="cls-diagnostics", strategy="desktop", site_keys=["www"],
+            worker_count=1, target_budget_seconds=60, total_items=1,
+        )
+        item_id = self.repo.create_items(run_id, [
+            {"source_filename": "PDP.csv", "group_key": "PDP", "site_key": "www",
+             "original_value": "brass-lamp/",
+             "generated_url": "https://www.lampsplus.com/p/brass-lamp/", "strategy": "desktop"},
+        ])[0]
+        diagnostics = {
+            "observed_shift_count": 0,
+            "largest_shift_score": None,
+            "largest_shift_node": None,
+        }
+
+        self.repo.mark_item_running(item_id)
+        self.repo.create_sample(
+            run_id=run_id,
+            item_id=item_id,
+            sample_index=1,
+            status="passed",
+            metrics={"cls": 0, "cls_diagnostics": diagnostics},
+            attempts=1,
+            duration_ms=100,
+            error_message=None,
+        )
+        self.repo.mark_item_passed(item_id, {"cls": 0, "cls_diagnostics": diagnostics})
+
+        self.assertEqual(self.repo.list_samples(run_id)[0]["cls_diagnostics"], diagnostics)
+        self.assertEqual(
+            self.repo.get_run_detail(run_id)["items"][0]["cls_diagnostics"],
+            diagnostics,
+        )
+
     def test_mark_unfinished_items_cancelled_covers_pending_and_running(self):
         run_id = self.repo.create_run(
             label="cancel", strategy="desktop", site_keys=["www"],

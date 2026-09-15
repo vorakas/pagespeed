@@ -16,6 +16,14 @@ def _build_fake_report() -> dict:
             "first-contentful-paint": {"numericValue": 1234},
             "largest-contentful-paint": {"numericValue": 2345},
             "cumulative-layout-shift": {"numericValue": 0.02},
+            "layout-shifts": {
+                "details": {
+                    "items": [
+                        {"score": 0.015, "node": {"snippet": "<img class=\"hero\">"}},
+                        {"score": 0.005, "node": {"snippet": "<div class=\"promo\">"}},
+                    ]
+                }
+            },
             "total-blocking-time": {"numericValue": 123},
             "speed-index": {"numericValue": 3456},
         },
@@ -91,6 +99,11 @@ def test_runner_invokes_programmatic_helper_and_extracts_metrics(monkeypatch):
     assert result["fcp"] == 1234
     assert result["lcp"] == 2345
     assert result["cls"] == 0.02
+    assert result["cls_diagnostics"] == {
+        "observed_shift_count": 2,
+        "largest_shift_score": 0.015,
+        "largest_shift_node": "<img class=\"hero\">",
+    }
     assert result["tbt"] == 123
     assert result["speed_index"] == 3456
     assert result["raw_data"] == _build_fake_report()

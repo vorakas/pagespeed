@@ -433,6 +433,7 @@ class ConnectionManager:
                 lcp REAL,
                 tbt REAL,
                 cls REAL,
+                cls_diagnostics TEXT,
                 performance REAL,
                 expected_mode TEXT,
                 detected_mode TEXT,
@@ -460,6 +461,7 @@ class ConnectionManager:
                 lcp REAL,
                 tbt REAL,
                 cls REAL,
+                cls_diagnostics TEXT,
                 performance REAL,
                 expected_mode TEXT,
                 detected_mode TEXT,
@@ -485,9 +487,11 @@ class ConnectionManager:
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS expected_mode TEXT")
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS detected_mode TEXT")
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS mode_evidence TEXT")
+        cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS cls_diagnostics TEXT")
         cursor.execute("ALTER TABLE csv_lighthouse_samples ADD COLUMN IF NOT EXISTS expected_mode TEXT")
         cursor.execute("ALTER TABLE csv_lighthouse_samples ADD COLUMN IF NOT EXISTS detected_mode TEXT")
         cursor.execute("ALTER TABLE csv_lighthouse_samples ADD COLUMN IF NOT EXISTS mode_evidence TEXT")
+        cursor.execute("ALTER TABLE csv_lighthouse_samples ADD COLUMN IF NOT EXISTS cls_diagnostics TEXT")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS migration_snapshots (
@@ -1252,9 +1256,11 @@ class ConnectionManager:
             "ALTER TABLE csv_lighthouse_items ADD COLUMN expected_mode TEXT",
             "ALTER TABLE csv_lighthouse_items ADD COLUMN detected_mode TEXT",
             "ALTER TABLE csv_lighthouse_items ADD COLUMN mode_evidence TEXT",
+            "ALTER TABLE csv_lighthouse_items ADD COLUMN cls_diagnostics TEXT",
             "ALTER TABLE csv_lighthouse_samples ADD COLUMN expected_mode TEXT",
             "ALTER TABLE csv_lighthouse_samples ADD COLUMN detected_mode TEXT",
             "ALTER TABLE csv_lighthouse_samples ADD COLUMN mode_evidence TEXT",
+            "ALTER TABLE csv_lighthouse_samples ADD COLUMN cls_diagnostics TEXT",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_id INTEGER",
             "ALTER TABLE blazemeter_preset_tests ADD COLUMN project_name TEXT",
             "ALTER TABLE requirement_sources ADD COLUMN original_filename TEXT",

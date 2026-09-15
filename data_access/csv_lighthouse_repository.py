@@ -105,11 +105,11 @@ class CsvLighthouseRepository:
                     f"""
                     INSERT INTO csv_lighthouse_samples (
                         run_id, item_id, sample_index, status,
-                        fcp, speed_index, lcp, tbt, cls, performance,
+                        fcp, speed_index, lcp, tbt, cls, cls_diagnostics, performance,
                         expected_mode, detected_mode, mode_evidence,
                         attempts, duration_ms, error_message
                     )
-                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                     {self._cm.returning_id()}
                     """,
                     (
@@ -122,6 +122,7 @@ class CsvLighthouseRepository:
                         metrics.get("lcp"),
                         metrics.get("tbt"),
                         metrics.get("cls"),
+                        self._json_dumps(metrics.get("cls_diagnostics")),
                         metrics.get("performance"),
                         metrics.get("expected_mode"),
                         metrics.get("detected_mode"),
@@ -157,7 +158,7 @@ class CsvLighthouseRepository:
                 """,
                 (run_id,),
             )
-            return self._cm.rows_to_dicts(cursor)
+            return [self._decode_json_fields(row) for row in self._cm.rows_to_dicts(cursor)]
 
     def create_file(
         self,
@@ -410,6 +411,7 @@ class CsvLighthouseRepository:
                 }
             )
         for item in items:
+            self._decode_json_fields(item)
             attempt_errors = attempt_errors_by_item.get(item["id"], [])
             item["attempt_error_count"] = sum(row["count"] for row in attempt_errors)
             item["attempt_error_summary"] = attempt_errors
@@ -484,6 +486,7 @@ class CsvLighthouseRepository:
                         lcp = {ph},
                         tbt = {ph},
                         cls = {ph},
+                        cls_diagnostics = {ph},
                         performance = {ph},
                         expected_mode = {ph},
                         detected_mode = {ph},
@@ -500,6 +503,7 @@ class CsvLighthouseRepository:
                         metrics.get("lcp"),
                         metrics.get("tbt"),
                         metrics.get("cls"),
+                        self._json_dumps(metrics.get("cls_diagnostics")),
                         metrics.get("performance"),
                         metrics.get("expected_mode"),
                         metrics.get("detected_mode"),
@@ -518,6 +522,22 @@ class CsvLighthouseRepository:
                 return True
         except Exception as exc:
             raise DatabaseError(f"Failed to mark CSV Lighthouse item {item_id} passed: {exc}") from exc
+
+    @staticmethod
+    def _json_dumps(value: Any) -> str | None:
+        if value is None:
+            return None
+        return json.dumps(value)
+
+    @staticmethod
+    def _decode_json_fields(row: dict) -> dict:
+        value = row.get("cls_diagnostics")
+        if isinstance(value, str) and value:
+            try:
+                row["cls_diagnostics"] = json.loads(value)
+            except json.JSONDecodeError:
+                row["cls_diagnostics"] = None
+        return row
 
     def mark_item_failed(self, item_id: int, error_message: str, attempts: int = 1) -> bool:
         ph = self._cm.placeholder()

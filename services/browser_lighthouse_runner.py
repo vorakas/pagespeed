@@ -149,11 +149,28 @@ class BrowserLighthouseRunner:
                 raise PageSpeedError(f"Lighthouse report missing metric: {audit_id}")
             return value
 
+        def cls_diagnostics() -> dict[str, Any]:
+            layout_shift_items = (
+                ((audits.get("layout-shifts") or {}).get("details") or {}).get("items") or []
+            )
+            scored_items = [
+                item for item in layout_shift_items
+                if isinstance(item, dict) and isinstance(item.get("score"), (int, float))
+            ]
+            largest_shift = max(scored_items, key=lambda item: item["score"], default=None)
+            largest_node = ((largest_shift or {}).get("node") or {}).get("snippet")
+            return {
+                "observed_shift_count": len(layout_shift_items),
+                "largest_shift_score": (largest_shift or {}).get("score"),
+                "largest_shift_node": largest_node,
+            }
+
         return {
             "performance_score": round(performance * 100),
             "fcp": metric("first-contentful-paint"),
             "lcp": metric("largest-contentful-paint"),
             "cls": metric("cumulative-layout-shift"),
+            "cls_diagnostics": cls_diagnostics(),
             "tbt": metric("total-blocking-time"),
             "speed_index": metric("speed-index"),
             "raw_data": report,

@@ -13,6 +13,7 @@ import type { CsvLighthouseItem } from "@/types"
 import { formatCls, formatMilliseconds } from "@/lib/utils"
 import { ScoreBadge } from "@/components/shared/ScoreBadge"
 import { buildCsvLighthouseAttemptErrorDisplay } from "@/components/test-urls/csv-lighthouse-attempt-errors"
+import { buildCsvLighthouseClsDiagnosticDisplay } from "@/components/test-urls/csv-lighthouse-cls-diagnostics"
 import { buildCsvLighthouseResultSections } from "@/components/test-urls/csv-lighthouse-results"
 
 interface CsvLighthouseResultsTableProps {
@@ -87,6 +88,21 @@ function ErrorEvidence({ item }: { item: CsvLighthouseItem }) {
   return <TruncatedText value={item.error_message} className="max-w-[16rem]" />
 }
 
+function ClsEvidence({ item }: { item: CsvLighthouseItem }) {
+  const diagnostics = buildCsvLighthouseClsDiagnosticDisplay(item.cls_diagnostics)
+
+  return (
+    <div className="text-right">
+      <div className="aurora-num">{formatCls(item.cls)}</div>
+      {diagnostics && (
+        <div className="aurora-text-faint max-w-[5rem] truncate text-[10px]" title={diagnostics.title}>
+          {diagnostics.summary}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function CsvLighthouseResultsTable({ items, samplesPerUrl }: CsvLighthouseResultsTableProps) {
   const sections = buildCsvLighthouseResultSections(items)
 
@@ -152,7 +168,9 @@ export function CsvLighthouseResultsTable({ items, samplesPerUrl }: CsvLighthous
                   <TableCell className="aurora-num text-right">{formatMilliseconds(item.speed_index)}</TableCell>
                   <TableCell className="aurora-num text-right">{formatMilliseconds(item.lcp)}</TableCell>
                   <TableCell className="aurora-num text-right">{formatMilliseconds(item.tbt)}</TableCell>
-                  <TableCell className="aurora-num text-right">{formatCls(item.cls)}</TableCell>
+                  <TableCell>
+                    <ClsEvidence item={item} />
+                  </TableCell>
                   <TableCell className="aurora-num text-right">
                     {item.valid_samples == null ? item.attempts : `${item.valid_samples} / ${samplesPerUrl}`}
                   </TableCell>

@@ -1722,12 +1722,19 @@ export interface CsvLighthouseItem {
   created_at?: string
   attempt_error_count?: number
   attempt_error_summary?: CsvLighthouseAttemptErrorSummary[]
+  cls_diagnostics?: CsvLighthouseClsDiagnostics | null
 }
 
 export interface CsvLighthouseAttemptErrorSummary {
   status: string
   error_message: string
   count: number
+}
+
+export interface CsvLighthouseClsDiagnostics {
+  observed_shift_count: number
+  largest_shift_score: number | null
+  largest_shift_node: string | null
 }
 
 export interface CsvLighthouseFile {

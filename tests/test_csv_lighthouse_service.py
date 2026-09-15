@@ -54,6 +54,11 @@ class FakePageSpeedClient:
             "tbt": 50,
             "cls": 0.02,
             "performance_score": 87,
+            "cls_diagnostics": {
+                "observed_shift_count": 0,
+                "largest_shift_score": None,
+                "largest_shift_node": None,
+            },
         }
 
 
@@ -81,6 +86,11 @@ class FakeBrowserLighthouseRunner:
             "tbt": 50,
             "speed_index": 1500,
             "raw_data": {"source": "fake-browser-lighthouse"},
+            "cls_diagnostics": {
+                "observed_shift_count": 0,
+                "largest_shift_score": None,
+                "largest_shift_node": None,
+            },
         }
 
 
@@ -565,6 +575,14 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(item["tbt"], 50)
         self.assertEqual(item["cls"], 0.02)
         self.assertEqual(item["performance"], 87)
+        self.assertEqual(
+            item["cls_diagnostics"],
+            {
+                "observed_shift_count": 0,
+                "largest_shift_score": None,
+                "largest_shift_node": None,
+            },
+        )
 
     def test_run_samples_each_url_n_times_and_stores_median(self):
         pagespeed = SequencePageSpeedClient([100, 900, 500])
@@ -705,7 +723,7 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                 "run_id", "label", "source_filename", "group_key", "site_key",
                 "original_value", "generated_url", "strategy", "kind",
                 "sample_index", "n", "status", "performance", "fcp", "speed_index", "lcp",
-                "tbt", "cls", "attempts", "duration_ms", "error_message",
+                "tbt", "cls", "cls_diagnostics", "attempts", "duration_ms", "error_message",
                 "completed_at", "expected_mode", "detected_mode", "mode_evidence",
             ],
         )
