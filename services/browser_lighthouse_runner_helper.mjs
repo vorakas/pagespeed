@@ -265,11 +265,6 @@ async function main() {
     if (cookieMutations.length > 0) {
       await page.setCookie(...cookieMutations);
     }
-    await page.goto(warmupUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: 60000,
-    });
-    await page.waitForNetworkIdle({ idleTime: 1500, timeout: 15000 }).catch(() => {});
     const modeEvidence = modeEvidenceFromCookies(
       payload.cookies,
       await page.cookies(cookieOriginFor(warmupUrl)),

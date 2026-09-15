@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import subprocess
 import threading
 
@@ -96,6 +97,15 @@ def test_runner_invokes_programmatic_helper_and_extracts_metrics(monkeypatch):
     assert result["expected_mode"] == "adobe_commerce"
     assert result["detected_mode"] == "adobe_commerce"
     assert result["mode_evidence"] == "forceNew=true; forceOld=absent"
+
+
+def test_helper_sets_mode_cookies_without_navigating_to_warmup_url():
+    helper_source = Path("services/browser_lighthouse_runner_helper.mjs").read_text()
+
+    assert "page.goto(warmupUrl" not in helper_source
+    assert "page.setCookie(...cookieMutations)" in helper_source
+    assert "modeEvidenceFromCookies" in helper_source
+    assert "disableStorageReset: true" in helper_source
 
 
 def test_runner_uses_mobile_settings(monkeypatch):
