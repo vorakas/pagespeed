@@ -1741,6 +1741,8 @@ export interface CsvLighthouseClsDiagnostics {
     largest_shift_score: number | null
     largest_shift_node: string | null
     observation_ms: number | null
+    scroll_steps?: number | null
+    scroll_pause_ms?: number | null
     samples_with_shifts?: number
   } | null
 }

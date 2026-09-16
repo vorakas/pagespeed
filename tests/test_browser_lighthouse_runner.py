@@ -126,6 +126,8 @@ def test_runner_attaches_live_cls_probe_to_diagnostics(monkeypatch):
         "largestShift": 0.02,
         "largestShiftNode": '<img class="slot">',
         "observationMs": 5000,
+        "scrollSteps": 6,
+        "scrollPauseMs": 750,
     }
 
     def fake_run(command, capture_output, text, timeout, check, env=None):
@@ -152,6 +154,8 @@ def test_runner_attaches_live_cls_probe_to_diagnostics(monkeypatch):
         "largest_shift_score": 0.02,
         "largest_shift_node": '<img class="slot">',
         "observation_ms": 5000,
+        "scroll_steps": 6,
+        "scroll_pause_ms": 750,
     }
 
 
@@ -162,6 +166,8 @@ def test_helper_sets_mode_cookies_without_navigating_to_warmup_url():
     assert "page.setCookie(...cookieMutations)" in helper_source
     assert "modeEvidenceFromCookies" in helper_source
     assert "disableStorageReset: true" in helper_source
+    assert "clsProbeScrollSteps" in helper_source
+    assert "window.scrollBy" in helper_source
 
 
 def test_runner_uses_mobile_settings(monkeypatch):

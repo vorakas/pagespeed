@@ -38,6 +38,8 @@ describe("buildCsvLighthouseClsDiagnosticDisplay", () => {
         largest_shift_score: 0.021,
         largest_shift_node: "<img>",
         observation_ms: 5000,
+        scroll_steps: 6,
+        scroll_pause_ms: 750,
         samples_with_shifts: 1,
       },
     })
@@ -46,5 +48,6 @@ describe("buildCsvLighthouseClsDiagnosticDisplay", () => {
     expect(display?.title).toContain("Live CLS probe: 0.031")
     expect(display?.title).toContain("Samples with shifts: 1")
     expect(display?.title).toContain("Largest live shift: 0.021")
+    expect(display?.title).toContain("Scroll steps: 6")
   })
 })

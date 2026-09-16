@@ -990,6 +990,22 @@ class CsvLighthouseService:
             ),
             default=None,
         )
+        scroll_steps = max(
+            (
+                int(probe.get("scroll_steps") or 0)
+                for probe in probes
+                if isinstance(probe.get("scroll_steps"), (int, float))
+            ),
+            default=None,
+        )
+        scroll_pause_ms = max(
+            (
+                int(probe.get("scroll_pause_ms") or 0)
+                for probe in probes
+                if isinstance(probe.get("scroll_pause_ms"), (int, float))
+            ),
+            default=None,
+        )
 
         return {
             "cls": (max_cls_probe or {}).get("cls"),
@@ -997,6 +1013,8 @@ class CsvLighthouseService:
             "largest_shift_score": (largest_shift_probe or {}).get("largest_shift_score"),
             "largest_shift_node": (largest_shift_probe or {}).get("largest_shift_node"),
             "observation_ms": observation_ms,
+            "scroll_steps": scroll_steps,
+            "scroll_pause_ms": scroll_pause_ms,
             "samples_with_shifts": samples_with_shifts,
         }
 

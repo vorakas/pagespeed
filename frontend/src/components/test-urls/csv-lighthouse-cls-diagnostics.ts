@@ -29,7 +29,13 @@ export function buildCsvLighthouseClsDiagnosticDisplay(
       lines.push(`Largest live shift node: ${liveProbe.largest_shift_node}`)
     }
     if (typeof liveProbe?.observation_ms === "number") {
-      lines.push(`Probe window: ${liveProbe.observation_ms}ms after load`)
+      lines.push(`Load observation: ${liveProbe.observation_ms}ms`)
+    }
+    if (typeof liveProbe?.scroll_steps === "number") {
+      lines.push(`Scroll steps: ${liveProbe.scroll_steps}`)
+    }
+    if (typeof liveProbe?.scroll_pause_ms === "number") {
+      lines.push(`Scroll pause: ${liveProbe.scroll_pause_ms}ms`)
     }
 
     return {

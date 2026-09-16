@@ -205,6 +205,8 @@ async function observeLiveCls({
   cookieMutations,
   formFactor,
   observationMs,
+  scrollSteps,
+  scrollPauseMs,
 }) {
   let probeBrowser;
   let page;
@@ -263,6 +265,18 @@ async function observeLiveCls({
 
     await page.goto(auditUrl, { waitUntil: "networkidle2", timeout: 45000 });
     await new Promise((resolve) => setTimeout(resolve, observationMs));
+    for (let step = 0; step < scrollSteps; step += 1) {
+      await page.evaluate(() => {
+        window.scrollBy(0, Math.max(1, Math.floor(window.innerHeight * 0.85)));
+      });
+      await new Promise((resolve) => setTimeout(resolve, scrollPauseMs));
+    }
+    if (scrollSteps > 0) {
+      await page.evaluate(() => {
+        window.scrollTo(0, 0);
+      });
+      await new Promise((resolve) => setTimeout(resolve, scrollPauseMs));
+    }
     const probe = await page.evaluate(() => window.__pharosClsProbe || null);
     return {
       cls: probe?.cls || 0,
@@ -270,6 +284,8 @@ async function observeLiveCls({
       largestShift: probe?.largestShift || null,
       largestShiftNode: probe?.largestShiftNode || null,
       observationMs,
+      scrollSteps,
+      scrollPauseMs,
       error: probe?.error || null,
     };
   } catch (error) {
@@ -279,6 +295,8 @@ async function observeLiveCls({
       largestShift: null,
       largestShiftNode: null,
       observationMs,
+      scrollSteps,
+      scrollPauseMs,
       error: String(error?.message || error),
     };
   } finally {
@@ -419,6 +437,8 @@ async function main() {
       cookieMutations,
       formFactor,
       observationMs: Number(payload.clsProbeObservationMs) || 5000,
+      scrollSteps: Number(payload.clsProbeScrollSteps) || 6,
+      scrollPauseMs: Number(payload.clsProbeScrollPauseMs) || 750,
     });
 
     process.stdout.write(JSON.stringify({

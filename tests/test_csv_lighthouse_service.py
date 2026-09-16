@@ -628,6 +628,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                         "largest_shift_score": None,
                         "largest_shift_node": None,
                         "observation_ms": 5000,
+                        "scroll_steps": 6,
+                        "scroll_pause_ms": 750,
                     },
                 },
                 {
@@ -640,6 +642,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                         "largest_shift_score": 0.021,
                         "largest_shift_node": "<img>",
                         "observation_ms": 5000,
+                        "scroll_steps": 6,
+                        "scroll_pause_ms": 750,
                     },
                 },
                 {
@@ -652,6 +656,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                         "largest_shift_score": None,
                         "largest_shift_node": None,
                         "observation_ms": 5000,
+                        "scroll_steps": 6,
+                        "scroll_pause_ms": 750,
                     },
                 },
             ],
@@ -676,6 +682,8 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                 "largest_shift_score": 0.021,
                 "largest_shift_node": "<img>",
                 "observation_ms": 5000,
+                "scroll_steps": 6,
+                "scroll_pause_ms": 750,
                 "samples_with_shifts": 1,
             },
         )

@@ -102,6 +102,8 @@ class BrowserLighthouseRunner:
                 "largest_shift_score": cls_probe.get("largestShift"),
                 "largest_shift_node": cls_probe.get("largestShiftNode"),
                 "observation_ms": cls_probe.get("observationMs"),
+                "scroll_steps": cls_probe.get("scrollSteps"),
+                "scroll_pause_ms": cls_probe.get("scrollPauseMs"),
             }
         if mode_evidence:
             metrics["expected_mode"] = mode_evidence.get("expectedMode")
