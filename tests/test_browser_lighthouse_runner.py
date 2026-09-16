@@ -1,4 +1,5 @@
 import json
+import json
 from pathlib import Path
 import subprocess
 import threading
@@ -30,8 +31,11 @@ def _build_fake_report() -> dict:
     }
 
 
-def _build_wrapped_report(mode_evidence: dict | None = None) -> dict:
-    return {
+def _build_wrapped_report(
+    mode_evidence: dict | None = None,
+    cls_probe: dict | None = None,
+) -> dict:
+    payload = {
         "report": _build_fake_report(),
         "modeEvidence": mode_evidence
         or {
@@ -40,6 +44,9 @@ def _build_wrapped_report(mode_evidence: dict | None = None) -> dict:
             "evidence": "forceNew=true; forceOld=absent",
         },
     }
+    if cls_probe is not None:
+        payload["clsProbe"] = cls_probe
+    return payload
 
 
 def _helper_payload(command: list[str]) -> dict:
@@ -110,6 +117,42 @@ def test_runner_invokes_programmatic_helper_and_extracts_metrics(monkeypatch):
     assert result["expected_mode"] == "adobe_commerce"
     assert result["detected_mode"] == "adobe_commerce"
     assert result["mode_evidence"] == "forceNew=true; forceOld=absent"
+
+
+def test_runner_attaches_live_cls_probe_to_diagnostics(monkeypatch):
+    cls_probe = {
+        "cls": 0.031,
+        "shiftCount": 3,
+        "largestShift": 0.02,
+        "largestShiftNode": '<img class="slot">',
+        "observationMs": 5000,
+    }
+
+    def fake_run(command, capture_output, text, timeout, check, env=None):
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps(_build_wrapped_report(cls_probe=cls_probe)),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = BrowserLighthouseRunner(timeout_seconds=30).run(
+        warmup_url="https://www.lampsplus.com/?sov=AC3624360",
+        audit_url="https://www.lampsplus.com/more-like-this/53X97/",
+        strategy="desktop",
+        cookies={"forceNew": "true"},
+        clear_cookies=("forceOld",),
+    )
+
+    assert result["cls_diagnostics"]["live_probe"] == {
+        "cls": 0.031,
+        "shift_count": 3,
+        "largest_shift_score": 0.02,
+        "largest_shift_node": '<img class="slot">',
+        "observation_ms": 5000,
+    }
 
 
 def test_helper_sets_mode_cookies_without_navigating_to_warmup_url():

@@ -93,8 +93,16 @@ class BrowserLighthouseRunner:
         except json.JSONDecodeError as exc:
             raise PageSpeedError(f"Lighthouse returned invalid JSON for {audit_url}") from exc
 
-        report, mode_evidence = self._unwrap_helper_payload(payload)
+        report, mode_evidence, cls_probe = self._unwrap_helper_payload(payload)
         metrics = self._extract_metrics(report)
+        if cls_probe:
+            metrics["cls_diagnostics"]["live_probe"] = {
+                "cls": cls_probe.get("cls"),
+                "shift_count": cls_probe.get("shiftCount"),
+                "largest_shift_score": cls_probe.get("largestShift"),
+                "largest_shift_node": cls_probe.get("largestShiftNode"),
+                "observation_ms": cls_probe.get("observationMs"),
+            }
         if mode_evidence:
             metrics["expected_mode"] = mode_evidence.get("expectedMode")
             metrics["detected_mode"] = mode_evidence.get("detectedMode")
@@ -102,12 +110,19 @@ class BrowserLighthouseRunner:
         return metrics
 
     @staticmethod
-    def _unwrap_helper_payload(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    def _unwrap_helper_payload(
+        payload: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any] | None]:
         report = payload.get("report")
         if isinstance(report, dict):
             mode_evidence = payload.get("modeEvidence")
-            return report, mode_evidence if isinstance(mode_evidence, dict) else None
-        return payload, None
+            cls_probe = payload.get("clsProbe")
+            return (
+                report,
+                mode_evidence if isinstance(mode_evidence, dict) else None,
+                cls_probe if isinstance(cls_probe, dict) else None,
+            )
+        return payload, None, None
 
     def _command(
         self,

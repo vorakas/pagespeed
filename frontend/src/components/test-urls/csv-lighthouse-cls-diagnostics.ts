@@ -13,6 +13,31 @@ export function buildCsvLighthouseClsDiagnosticDisplay(
   }
 
   const count = Math.max(0, Number(diagnostics.observed_shift_count) || 0)
+  const liveProbe = diagnostics.live_probe
+  const liveProbeCls = typeof liveProbe?.cls === "number" ? liveProbe.cls : null
+  const liveProbeShiftCount = Math.max(0, Number(liveProbe?.shift_count) || 0)
+  if (count === 0 && (liveProbeShiftCount > 0 || (liveProbeCls ?? 0) > 0)) {
+    const lines = [`Live CLS probe: ${liveProbeCls ?? "n/a"}`]
+    if (typeof liveProbe?.samples_with_shifts === "number") {
+      lines.push(`Samples with shifts: ${liveProbe.samples_with_shifts}`)
+    }
+    lines.push(`Live probe shift entries: ${liveProbeShiftCount}`)
+    if (typeof liveProbe?.largest_shift_score === "number") {
+      lines.push(`Largest live shift: ${liveProbe.largest_shift_score}`)
+    }
+    if (liveProbe?.largest_shift_node) {
+      lines.push(`Largest live shift node: ${liveProbe.largest_shift_node}`)
+    }
+    if (typeof liveProbe?.observation_ms === "number") {
+      lines.push(`Probe window: ${liveProbe.observation_ms}ms after load`)
+    }
+
+    return {
+      summary: `Probe ${liveProbeCls ?? "shift"}`,
+      title: lines.join("\n"),
+    }
+  }
+
   if (count === 0) {
     return {
       summary: "No shifts",

@@ -1735,6 +1735,14 @@ export interface CsvLighthouseClsDiagnostics {
   observed_shift_count: number
   largest_shift_score: number | null
   largest_shift_node: string | null
+  live_probe?: {
+    cls: number | null
+    shift_count: number | null
+    largest_shift_score: number | null
+    largest_shift_node: string | null
+    observation_ms: number | null
+    samples_with_shifts?: number
+  } | null
 }
 
 export interface CsvLighthouseFile {

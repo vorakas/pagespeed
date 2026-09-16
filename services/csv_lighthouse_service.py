@@ -936,10 +936,68 @@ class CsvLighthouseService:
             key=lambda diagnostic: diagnostic["largest_shift_score"],
             default=None,
         )
-        return {
+        summary = {
             "observed_shift_count": total_shift_count,
             "largest_shift_score": (largest or {}).get("largest_shift_score"),
             "largest_shift_node": (largest or {}).get("largest_shift_node"),
+        }
+        live_probe = CsvLighthouseService._summarize_live_cls_probe(diagnostics)
+        if live_probe:
+            summary["live_probe"] = live_probe
+        return summary
+
+    @staticmethod
+    def _summarize_live_cls_probe(diagnostics: list[dict]) -> dict | None:
+        probes = [
+            diagnostic.get("live_probe")
+            for diagnostic in diagnostics
+            if isinstance(diagnostic.get("live_probe"), dict)
+        ]
+        if not probes:
+            return None
+
+        samples_with_shifts = sum(
+            1
+            for probe in probes
+            if (probe.get("shift_count") or 0) > 0 or (probe.get("cls") or 0) > 0
+        )
+        total_shift_count = sum(
+            int(probe.get("shift_count") or 0)
+            for probe in probes
+            if isinstance(probe.get("shift_count"), (int, float))
+        )
+        max_cls_probe = max(
+            (
+                probe for probe in probes
+                if isinstance(probe.get("cls"), (int, float))
+            ),
+            key=lambda probe: probe["cls"],
+            default=None,
+        )
+        largest_shift_probe = max(
+            (
+                probe for probe in probes
+                if isinstance(probe.get("largest_shift_score"), (int, float))
+            ),
+            key=lambda probe: probe["largest_shift_score"],
+            default=None,
+        )
+        observation_ms = max(
+            (
+                int(probe.get("observation_ms") or 0)
+                for probe in probes
+                if isinstance(probe.get("observation_ms"), (int, float))
+            ),
+            default=None,
+        )
+
+        return {
+            "cls": (max_cls_probe or {}).get("cls"),
+            "shift_count": total_shift_count,
+            "largest_shift_score": (largest_shift_probe or {}).get("largest_shift_score"),
+            "largest_shift_node": (largest_shift_probe or {}).get("largest_shift_node"),
+            "observation_ms": observation_ms,
+            "samples_with_shifts": samples_with_shifts,
         }
 
     def _csv_value(self, value):

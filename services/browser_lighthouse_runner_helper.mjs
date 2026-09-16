@@ -178,6 +178,119 @@ function modeEvidenceFromCookies(expectedCookies, observedCookies) {
   return { expectedMode, detectedMode, evidence };
 }
 
+function viewportForFormFactor(formFactor) {
+  if (formFactor === "mobile") {
+    return {
+      width: 412,
+      height: 823,
+      deviceScaleFactor: 1.75,
+      isMobile: true,
+      hasTouch: true,
+    };
+  }
+
+  return {
+    width: 1350,
+    height: 940,
+    deviceScaleFactor: 1,
+    isMobile: false,
+    hasTouch: false,
+  };
+}
+
+async function observeLiveCls({
+  puppeteer,
+  chrome,
+  auditUrl,
+  cookieMutations,
+  formFactor,
+  observationMs,
+}) {
+  let probeBrowser;
+  let page;
+  try {
+    probeBrowser = await puppeteer.connect({
+      browserURL: `http://127.0.0.1:${chrome.port}`,
+      defaultViewport: null,
+    });
+    page = await probeBrowser.newPage();
+    await page.setViewport(viewportForFormFactor(formFactor));
+    if (cookieMutations.length > 0) {
+      await page.setCookie(...cookieMutations);
+    }
+    await page.evaluateOnNewDocument(() => {
+      window.__pharosClsProbe = {
+        cls: 0,
+        shiftCount: 0,
+        largestShift: 0,
+        largestShiftNode: null,
+      };
+
+      function nodeSnippet(node) {
+        const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+        if (!element?.tagName) {
+          return null;
+        }
+        const attrs = ["id", "class", "src", "href", "alt"]
+          .map((name) => {
+            const value = element.getAttribute(name);
+            return value ? `${name}="${String(value).slice(0, 120)}"` : "";
+          })
+          .filter(Boolean)
+          .join(" ");
+        return `<${element.tagName.toLowerCase()}${attrs ? ` ${attrs}` : ""}>`;
+      }
+
+      try {
+        const observer = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            if (entry.hadRecentInput) {
+              continue;
+            }
+            window.__pharosClsProbe.cls += entry.value;
+            window.__pharosClsProbe.shiftCount += 1;
+            if (entry.value > window.__pharosClsProbe.largestShift) {
+              window.__pharosClsProbe.largestShift = entry.value;
+              window.__pharosClsProbe.largestShiftNode = nodeSnippet(entry.sources?.[0]?.node);
+            }
+          }
+        });
+        observer.observe({ type: "layout-shift", buffered: true });
+      } catch (error) {
+        window.__pharosClsProbe.error = String(error?.message || error);
+      }
+    });
+
+    await page.goto(auditUrl, { waitUntil: "networkidle2", timeout: 45000 });
+    await new Promise((resolve) => setTimeout(resolve, observationMs));
+    const probe = await page.evaluate(() => window.__pharosClsProbe || null);
+    return {
+      cls: probe?.cls || 0,
+      shiftCount: probe?.shiftCount || 0,
+      largestShift: probe?.largestShift || null,
+      largestShiftNode: probe?.largestShiftNode || null,
+      observationMs,
+      error: probe?.error || null,
+    };
+  } catch (error) {
+    return {
+      cls: null,
+      shiftCount: null,
+      largestShift: null,
+      largestShiftNode: null,
+      observationMs,
+      error: String(error?.message || error),
+    };
+  } finally {
+    if (page) {
+      await page.close().catch(() => {});
+    }
+    if (probeBrowser) {
+      await probeBrowser.disconnect();
+    }
+  }
+}
+
 async function main() {
   if (process.argv.length < 3) {
     fail("Missing Lighthouse helper JSON payload.");
@@ -297,12 +410,21 @@ async function main() {
               width: 412,
               height: 823,
               deviceScaleFactor: 1.75,
-            },
+        },
+    });
+    const clsProbe = await observeLiveCls({
+      puppeteer,
+      chrome,
+      auditUrl,
+      cookieMutations,
+      formFactor,
+      observationMs: Number(payload.clsProbeObservationMs) || 5000,
     });
 
     process.stdout.write(JSON.stringify({
       report: JSON.parse(result.report),
       modeEvidence,
+      clsProbe,
     }));
   } finally {
     if (browser) {

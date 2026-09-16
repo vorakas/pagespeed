@@ -168,11 +168,13 @@ class AlwaysFailsPageSpeedClient(FakePageSpeedClient):
 
 
 class SequencePageSpeedClient(FakePageSpeedClient):
-    """Returns a scripted FCP per call so median is predictable."""
+    """Returns scripted metrics per call so summaries are predictable."""
 
-    def __init__(self, fcp_values):
+    def __init__(self, fcp_values, cls_values=None, cls_diagnostics=None):
         super().__init__()
         self._fcp_values = list(fcp_values)
+        self._cls_values = list(cls_values or [0.02])
+        self._cls_diagnostics = list(cls_diagnostics or [])
 
     def run(
         self, warmup_url, audit_url, strategy, cookies=None, clear_cookies=None,
@@ -186,8 +188,15 @@ class SequencePageSpeedClient(FakePageSpeedClient):
             "clear_cookies": clear_cookies,
             "cancelled": cancel_event.is_set() if cancel_event else False,
         })
-        fcp = self._fcp_values[(len(self.calls) - 1) % len(self._fcp_values)]
-        return {"fcp": fcp, "speed_index": 1200, "lcp": 1800, "tbt": 50, "cls": 0.02}
+        index = len(self.calls) - 1
+        fcp = self._fcp_values[index % len(self._fcp_values)]
+        cls = self._cls_values[index % len(self._cls_values)]
+        result = {"fcp": fcp, "speed_index": 1200, "lcp": 1800, "tbt": 50, "cls": cls}
+        if self._cls_diagnostics:
+            result["cls_diagnostics"] = self._cls_diagnostics[
+                index % len(self._cls_diagnostics)
+            ]
+        return result
 
 
 class CancellingPageSpeedClient(FakePageSpeedClient):
@@ -603,6 +612,73 @@ class CsvLighthouseServiceTest(unittest.TestCase):
         self.assertEqual(len(samples), 3)
         self.assertEqual(item["status"], "passed")
         self.assertEqual(item["fcp"], 500)  # median of 100, 900, 500
+
+    def test_run_summary_keeps_intermittent_live_cls_probe(self):
+        pagespeed = SequencePageSpeedClient(
+            [100, 900, 500],
+            cls_values=[0, 0.03, 0],
+            cls_diagnostics=[
+                {
+                    "observed_shift_count": 0,
+                    "largest_shift_score": None,
+                    "largest_shift_node": None,
+                    "live_probe": {
+                        "cls": 0,
+                        "shift_count": 0,
+                        "largest_shift_score": None,
+                        "largest_shift_node": None,
+                        "observation_ms": 5000,
+                    },
+                },
+                {
+                    "observed_shift_count": 2,
+                    "largest_shift_score": 0.02,
+                    "largest_shift_node": "<main>",
+                    "live_probe": {
+                        "cls": 0.031,
+                        "shift_count": 3,
+                        "largest_shift_score": 0.021,
+                        "largest_shift_node": "<img>",
+                        "observation_ms": 5000,
+                    },
+                },
+                {
+                    "observed_shift_count": 0,
+                    "largest_shift_score": None,
+                    "largest_shift_node": None,
+                    "live_probe": {
+                        "cls": 0,
+                        "shift_count": 0,
+                        "largest_shift_score": None,
+                        "largest_shift_node": None,
+                        "observation_ms": 5000,
+                    },
+                },
+            ],
+        )
+        service = self._make_service(pagespeed)
+        result = service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www"],
+            strategy="desktop",
+            samples_per_url=3,
+        )
+
+        service.run_pending_items(result["run_id"])
+        item = self.repo.get_run_detail(result["run_id"])["items"][0]
+
+        self.assertEqual(item["cls"], 0)
+        self.assertEqual(
+            item["cls_diagnostics"]["live_probe"],
+            {
+                "cls": 0.031,
+                "shift_count": 3,
+                "largest_shift_score": 0.021,
+                "largest_shift_node": "<img>",
+                "observation_ms": 5000,
+                "samples_with_shifts": 1,
+            },
+        )
 
     def test_single_sample_run_matches_legacy_behavior(self):
         result = self.service.create_run(
