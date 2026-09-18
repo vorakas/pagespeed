@@ -87,9 +87,10 @@ import type {
   AutofixRefreshSummary,
   AutofixFixPatch,
   CsvLighthouseFile,
-  CsvLighthouseRun,
-  CsvLighthouseRunDetail,
-  CsvLighthouseSiteKey,
+    CsvLighthouseRun,
+    CsvLighthouseRunDetail,
+    CsvLighthouseSiteKey,
+    CsvLighthouseAcUrlDomain,
   TestDataListing,
   ValidationSiteKey,
 } from "@/types"
@@ -1321,6 +1322,7 @@ class ApiClient {
     files: File[]
     libraryFilenames?: string[]
     siteKeys: CsvLighthouseSiteKey[]
+    acUrlDomain: CsvLighthouseAcUrlDomain
     strategy: Strategy
     label?: string
     samplesPerUrl?: number
@@ -1329,6 +1331,7 @@ class ApiClient {
     input.files.forEach((file) => formData.append("files", file))
     input.libraryFilenames?.forEach((filename) => formData.append("library_filenames", filename))
     input.siteKeys.forEach((siteKey) => formData.append("site_keys", siteKey))
+    formData.append("ac_url_domain", input.acUrlDomain)
     formData.append("strategy", input.strategy)
     formData.append("samples_per_url", String(input.samplesPerUrl ?? 1))
     const label = input.label?.trim()

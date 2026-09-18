@@ -22,6 +22,7 @@ class CsvLighthouseRepository:
         target_budget_seconds: int | None,
         total_items: int,
         samples_per_url: int = 1,
+        ac_url_domain: str = "cookie",
     ) -> int:
         ph = self._cm.placeholder()
         try:
@@ -31,9 +32,9 @@ class CsvLighthouseRepository:
                     f"""
                     INSERT INTO csv_lighthouse_runs (
                         label, strategy, site_keys, worker_count,
-                        target_budget_seconds, total_items, samples_per_url
+                        target_budget_seconds, total_items, samples_per_url, ac_url_domain
                     )
-                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                     {self._cm.returning_id()}
                     """,
                     (
@@ -44,6 +45,7 @@ class CsvLighthouseRepository:
                         target_budget_seconds,
                         total_items,
                         samples_per_url,
+                        ac_url_domain,
                     ),
                 )
                 return self._cm.last_insert_id(cursor)
@@ -846,6 +848,7 @@ class CsvLighthouseRepository:
     def _normalize_run(self, run: dict) -> dict:
         normalized = dict(run)
         normalized["site_keys"] = self._load_site_keys(normalized.get("site_keys"))
+        normalized["ac_url_domain"] = normalized.get("ac_url_domain") or "cookie"
         normalized["cancel_requested"] = bool(normalized.get("cancel_requested"))
         normalized["cancelled_items"] = int(normalized.get("cancelled_items") or 0)
         return normalized

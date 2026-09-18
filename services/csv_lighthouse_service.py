@@ -6,6 +6,7 @@ import json
 import statistics
 import threading
 import time
+from urllib.parse import urlsplit, urlunsplit
 from dataclasses import dataclass, field
 from typing import BinaryIO
 from urllib.parse import urlparse
@@ -25,7 +26,11 @@ from config import (
 )
 from exceptions import RateLimitError, ValidationError
 from services.browser_lighthouse_runner import BrowserLighthouseRunner
-from services.csv_lighthouse_target_modes import get_csv_lighthouse_target_mode
+from services.csv_lighthouse_target_modes import (
+    AC_URL_DOMAIN_COOKIE,
+    normalize_ac_url_domain,
+    resolve_csv_lighthouse_target_mode,
+)
 from services.rate_limiter import RateLimiter
 from services.testdata_registry import GROUPS, SITES, group_for_filename, open_url
 
@@ -154,10 +159,12 @@ class CsvLighthouseService:
         label: str | None = None,
         samples_per_url: int = 1,
         library_filenames: list[str] | None = None,
+        ac_url_domain: str | None = AC_URL_DOMAIN_COOKIE,
     ) -> dict:
         strategy = self._validate_strategy(strategy)
         site_keys = self._validate_site_keys(site_keys)
         samples_per_url = self._validate_samples_per_url(samples_per_url)
+        ac_url_domain = normalize_ac_url_domain(ac_url_domain)
 
         upload_records = self._read_file_records(files)
         uploaded_names = {record["filename"] for record in upload_records}
@@ -174,7 +181,12 @@ class CsvLighthouseService:
                 "No CSV files available — add files to the library or upload some"
             )
 
-        items = self._build_items_from_file_records(file_records, site_keys, strategy)
+        items = self._build_items_from_file_records(
+            file_records,
+            site_keys,
+            strategy,
+            ac_url_domain,
+        )
         if not items:
             raise ValidationError("Upload did not contain any recognized CSV rows")
         if len(items) > CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN:
@@ -197,6 +209,7 @@ class CsvLighthouseService:
             target_budget_seconds=TARGET_BUDGET_SECONDS,
             total_items=len(items),
             samples_per_url=samples_per_url,
+            ac_url_domain=ac_url_domain,
         )
         for file_record in file_records:
             self.repository.create_file(
@@ -343,6 +356,8 @@ class CsvLighthouseService:
         self.repository.mark_run_running(run_id)
 
         pending = self.repository.pending_items(run_id)
+        for item in pending:
+            item["_ac_url_domain"] = run.get("ac_url_domain") or AC_URL_DOMAIN_COOKIE
         if not pending:
             self.repository.finish_run_if_complete(run_id)
             return
@@ -453,7 +468,10 @@ class CsvLighthouseService:
         ``error_message`` carries the friendly Lighthouse failure text (429 vs 500 vs
         timeout) so the reason can be persisted for diagnosis.
         """
-        target_mode = get_csv_lighthouse_target_mode(item["site_key"])
+        target_mode = resolve_csv_lighthouse_target_mode(
+            item["site_key"],
+            item.get("_ac_url_domain") or AC_URL_DOMAIN_COOKIE,
+        )
         started = self._now()
         try:
             metrics = dict(
@@ -840,6 +858,7 @@ class CsvLighthouseService:
             file_records,
             run["site_keys"],
             run["strategy"],
+            run.get("ac_url_domain") or AC_URL_DOMAIN_COOKIE,
         )
         if len(items) > CSV_LIGHTHOUSE_MAX_ITEMS_PER_RUN:
             raise ValidationError(
@@ -853,7 +872,9 @@ class CsvLighthouseService:
         file_records: list[dict],
         site_keys: list[str],
         strategy: str,
+        ac_url_domain: str = AC_URL_DOMAIN_COOKIE,
     ) -> list[dict]:
+        ac_url_domain = normalize_ac_url_domain(ac_url_domain)
         items = []
         seen = set()
         for file_record in file_records:
@@ -864,6 +885,8 @@ class CsvLighthouseService:
             for original_value in file_record["values"]:
                 for site_key in site_keys:
                     generated_url = open_url(group, site_key, original_value)
+                    if site_key == "mcprod" and ac_url_domain != AC_URL_DOMAIN_COOKIE:
+                        generated_url = self._replace_url_domain(generated_url, ac_url_domain)
                     dedupe_key = (site_key, generated_url, strategy)
                     if dedupe_key in seen:
                         continue
@@ -886,6 +909,11 @@ class CsvLighthouseService:
             site_keys,
             strategy,
         )
+
+    @staticmethod
+    def _replace_url_domain(url: str, domain: str) -> str:
+        parsed = urlsplit(url)
+        return urlunsplit((parsed.scheme or "https", domain, parsed.path, parsed.query, parsed.fragment))
 
     @staticmethod
     def _csv_text_from_values(values: list[str]) -> str:

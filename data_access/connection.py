@@ -380,6 +380,8 @@ class ConnectionManager:
                 completed_items INTEGER NOT NULL DEFAULT 0,
                 failed_items INTEGER NOT NULL DEFAULT 0,
                 cancelled_items INTEGER NOT NULL DEFAULT 0,
+                samples_per_url INTEGER NOT NULL DEFAULT 1,
+                ac_url_domain TEXT NOT NULL DEFAULT 'cookie',
                 cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
                 average_item_duration_ms INTEGER,
                 error_message TEXT,
@@ -480,6 +482,7 @@ class ConnectionManager:
         cursor.execute("ALTER TABLE scheduled_triggers ADD COLUMN IF NOT EXISTS last_run_status TEXT")
         cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS cancelled_items INTEGER NOT NULL DEFAULT 0")
         cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS samples_per_url INTEGER NOT NULL DEFAULT 1")
+        cursor.execute("ALTER TABLE csv_lighthouse_runs ADD COLUMN IF NOT EXISTS ac_url_domain TEXT NOT NULL DEFAULT 'cookie'")
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 1")
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS performance REAL")
         cursor.execute("ALTER TABLE csv_lighthouse_items ADD COLUMN IF NOT EXISTS valid_samples INTEGER")
@@ -890,6 +893,9 @@ class ConnectionManager:
                 total_items INTEGER NOT NULL DEFAULT 0,
                 completed_items INTEGER NOT NULL DEFAULT 0,
                 failed_items INTEGER NOT NULL DEFAULT 0,
+                cancelled_items INTEGER NOT NULL DEFAULT 0,
+                samples_per_url INTEGER NOT NULL DEFAULT 1,
+                ac_url_domain TEXT NOT NULL DEFAULT 'cookie',
                 cancel_requested INTEGER NOT NULL DEFAULT 0,
                 average_item_duration_ms INTEGER,
                 error_message TEXT,
@@ -1249,6 +1255,7 @@ class ConnectionManager:
             "ALTER TABLE scheduled_triggers ADD COLUMN last_run_status TEXT",
             "ALTER TABLE csv_lighthouse_runs ADD COLUMN cancelled_items INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE csv_lighthouse_runs ADD COLUMN samples_per_url INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE csv_lighthouse_runs ADD COLUMN ac_url_domain TEXT NOT NULL DEFAULT 'cookie'",
             "ALTER TABLE csv_lighthouse_items ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE csv_lighthouse_items ADD COLUMN performance REAL",
             "ALTER TABLE csv_lighthouse_items ADD COLUMN valid_samples INTEGER",

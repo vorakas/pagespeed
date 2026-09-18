@@ -39,6 +39,7 @@ def create_csv_lighthouse_blueprint(service):
         strategy = request.form.get("strategy") or "desktop"
         label = request.form.get("label") or None
         samples_per_url = request.form.get("samples_per_url") or 1
+        ac_url_domain = request.form.get("ac_url_domain") or "cookie"
         uploaded_files = []
         for file in files:
             size = _stream_size_bytes(file.stream)
@@ -55,6 +56,7 @@ def create_csv_lighthouse_blueprint(service):
             label=label,
             samples_per_url=samples_per_url,
             library_filenames=library_filenames,
+            ac_url_domain=ac_url_domain,
         )
         return jsonify({"success": True, **result})
 

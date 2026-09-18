@@ -383,6 +383,84 @@ class CsvLighthouseServiceTest(unittest.TestCase):
             ],
         )
 
+    def test_direct_ac_domain_rewrites_ac_urls_and_uses_plain_wup(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www", "mcprod"],
+            strategy="desktop",
+            ac_url_domain="ppe.lampsplus.com",
+        )
+
+        self.service.run_pending_items(result["run_id"])
+        detail = self.repo.get_run_detail(result["run_id"])
+        calls_by_url = {call["audit_url"]: call for call in self.pagespeed.calls}
+
+        self.assertEqual(detail["run"]["ac_url_domain"], "ppe.lampsplus.com")
+        self.assertEqual(
+            [item["generated_url"] for item in detail["items"]],
+            [
+                "https://www.lampsplus.com/p/brass-lamp/",
+                "https://ppe.lampsplus.com/p/brass-lamp/",
+            ],
+        )
+        self.assertEqual(
+            calls_by_url["https://www.lampsplus.com/p/brass-lamp/"]["cookies"],
+            {},
+        )
+        self.assertEqual(
+            calls_by_url["https://ppe.lampsplus.com/p/brass-lamp/"]["cookies"],
+            {},
+        )
+        self.assertEqual(
+            calls_by_url["https://ppe.lampsplus.com/p/brass-lamp/"]["clear_cookies"],
+            (),
+        )
+
+    def test_cookie_ac_domain_keeps_current_ac_and_wup_cookie_modes(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+            site_keys=["www", "mcprod"],
+            strategy="desktop",
+            ac_url_domain="cookie",
+        )
+
+        self.service.run_pending_items(result["run_id"])
+
+        self.assertEqual(
+            [call["cookies"] for call in self.pagespeed.calls],
+            [{"forceOld": "true"}, {"forceNew": "true"}],
+        )
+        self.assertEqual(
+            [call["clear_cookies"] for call in self.pagespeed.calls],
+            [("forceNew",), ("forceOld",)],
+        )
+
+    def test_update_file_preserves_direct_ac_domain_when_rebuilding_items(self):
+        result = self.service.create_run(
+            [("PDP.csv", io.BytesIO(b"old-lamp/\n"))],
+            site_keys=["mcprod"],
+            strategy="desktop",
+            ac_url_domain="mcstaging2.lampsplus.com",
+        )
+        file_id = self.service.list_files(result["run_id"])[0]["id"]
+
+        self.service.update_file(file_id, "new-lamp/\n")
+        detail = self.service.get_run(result["run_id"])
+
+        self.assertEqual(
+            [item["generated_url"] for item in detail["items"]],
+            ["https://mcstaging2.lampsplus.com/p/new-lamp/"],
+        )
+
+    def test_create_run_rejects_unknown_ac_url_domain(self):
+        with self.assertRaisesRegex(ValidationError, "Unknown AC URL domain"):
+            self.service.create_run(
+                [("PDP.csv", io.BytesIO(b"brass-lamp/\n"))],
+                site_keys=["mcprod"],
+                strategy="desktop",
+                ac_url_domain="evil.example.com",
+            )
+
     def test_create_run_saves_uploaded_file_records(self):
         result = self.service.create_run(
             [("PDP.csv", io.BytesIO(b"brass-lamp/\nfloor-lamp/\n"))],

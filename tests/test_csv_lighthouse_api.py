@@ -20,7 +20,7 @@ class FakeCsvLighthouseService:
 
     def create_run(
         self, files, site_keys, strategy, label=None, samples_per_url=1,
-        library_filenames=None,
+        library_filenames=None, ac_url_domain="cookie",
     ):
         self.create_calls.append(
             {
@@ -29,6 +29,7 @@ class FakeCsvLighthouseService:
                 "strategy": strategy,
                 "label": label,
                 "library_filenames": library_filenames,
+                "ac_url_domain": ac_url_domain,
             }
         )
         return {"run_id": 42, "worker_count": 3, "total_items": 9}
@@ -127,6 +128,7 @@ def test_create_run_accepts_multipart_files_label_strategy_and_site_keys(client,
             "label": "Regression batch",
             "strategy": "mobile",
             "site_keys": ["www", "mcprod"],
+            "ac_url_domain": "mcstaging.lampsplus.com",
         },
         content_type="multipart/form-data",
     )
@@ -148,6 +150,7 @@ def test_create_run_accepts_multipart_files_label_strategy_and_site_keys(client,
             "strategy": "mobile",
             "label": "Regression batch",
             "library_filenames": None,
+            "ac_url_domain": "mcstaging.lampsplus.com",
         }
     ]
 
@@ -167,6 +170,7 @@ def test_create_run_accepts_comma_separated_site_keys_and_default_strategy(clien
     assert service.create_calls[0]["strategy"] == "desktop"
     assert service.create_calls[0]["label"] is None
     assert service.create_calls[0]["library_filenames"] is None
+    assert service.create_calls[0]["ac_url_domain"] == "cookie"
 
 
 def test_create_run_accepts_selected_library_files_without_uploads(client, service):
@@ -187,6 +191,7 @@ def test_create_run_accepts_selected_library_files_without_uploads(client, servi
             "strategy": "desktop",
             "label": None,
             "library_filenames": ["Homepage.csv", "SFP.csv"],
+            "ac_url_domain": "cookie",
         }
     ]
 

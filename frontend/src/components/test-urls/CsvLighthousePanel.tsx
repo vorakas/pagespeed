@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CsvLibraryPanel } from "@/components/test-urls/CsvLibraryPanel"
 import { CsvLighthouseFilesPanel } from "@/components/test-urls/CsvLighthouseFilesPanel"
 import { CsvLighthouseResultsTable } from "@/components/test-urls/CsvLighthouseResultsTable"
@@ -15,6 +16,7 @@ import type {
   CsvLighthouseRunStatus,
   CsvLighthouseFile,
   CsvLighthouseSiteKey,
+  CsvLighthouseAcUrlDomain,
   Strategy,
 } from "@/types"
 import { formatDateTime } from "@/lib/utils"
@@ -37,6 +39,15 @@ const exportableStatuses: CsvLighthouseRunStatus[] = ["completed", "completed_wi
 const targetOptions: Array<{ key: CsvLighthouseSiteKey; label: string; shortLabel: string }> = [
   { key: "mcprod", label: "Adobe Commerce", shortLabel: "Adobe" },
   { key: "www", label: "LampsPlus", shortLabel: "LP" },
+]
+
+const acUrlDomainOptions: Array<{ value: CsvLighthouseAcUrlDomain; label: string }> = [
+  { value: "cookie", label: "Cookie option" },
+  { value: "mcprod.lampsplus.com", label: "mcprod.lampsplus.com" },
+  { value: "ppe.lampsplus.com", label: "ppe.lampsplus.com" },
+  { value: "mcuat.lampsplus.com", label: "mcuat.lampsplus.com" },
+  { value: "mcstaging.lampsplus.com", label: "mcstaging.lampsplus.com" },
+  { value: "mcstaging2.lampsplus.com", label: "mcstaging2.lampsplus.com" },
 ]
 
 function isTerminalStatus(status: CsvLighthouseRunStatus) {
@@ -78,6 +89,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
   const [label, setLabel] = useState("")
   const [samplesPerUrl, setSamplesPerUrl] = useState(25)
   const [selectedTargets, setSelectedTargets] = useState<CsvLighthouseSiteKey[]>(["mcprod", "www"])
+  const [acUrlDomain, setAcUrlDomain] = useState<CsvLighthouseAcUrlDomain | "">("")
   const [runs, setRuns] = useState<CsvLighthouseRun[]>([])
   const [selectedDetail, setSelectedDetail] = useState<CsvLighthouseRunDetail | null>(null)
   const [activeRunId, setActiveRunId] = useState<number | null>(null)
@@ -95,7 +107,11 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
     ? selectedRun.completed_items + selectedRun.failed_items + selectedRun.cancelled_items
     : 0
   const progress = selectedRun?.total_items ? Math.round((processedItems / selectedRun.total_items) * 100) : 0
-  const canStart = (files.length > 0 || selectedLibraryFilenames.length > 0) && selectedTargets.length > 0 && !starting
+  const canStart =
+    (files.length > 0 || selectedLibraryFilenames.length > 0) &&
+    selectedTargets.length > 0 &&
+    Boolean(acUrlDomain) &&
+    !starting
   const canRunSelected = Boolean(selectedRun?.status === "pending" && !launching)
   const canCancel = Boolean(activeRun?.status === "running" && !cancelling)
   const canDownload = Boolean(selectedRun && exportableStatuses.includes(selectedRun.status))
@@ -226,6 +242,7 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
         strategy,
         label,
         samplesPerUrl,
+        acUrlDomain: acUrlDomain as CsvLighthouseAcUrlDomain,
       })
       setFiles([])
       setFileInputKey((current) => current + 1)
@@ -392,6 +409,26 @@ export function CsvLighthousePanel({ strategy }: CsvLighthousePanelProps) {
                 }
                 className="h-9 w-24"
               />
+            </div>
+            <div className="min-w-[14rem] space-y-1.5">
+              <label className="aurora-text-dim text-xs font-medium" htmlFor="csv-lighthouse-ac-domain">
+                AC URL Domain
+              </label>
+              <Select
+                value={acUrlDomain}
+                onValueChange={(value) => setAcUrlDomain(value as CsvLighthouseAcUrlDomain)}
+              >
+                <SelectTrigger id="csv-lighthouse-ac-domain" className="h-9 w-full">
+                  <SelectValue placeholder="Select domain" />
+                </SelectTrigger>
+                <SelectContent align="start">
+                  {acUrlDomainOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button onClick={handleStart} disabled={!canStart} className="h-9 text-black!">
               {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}

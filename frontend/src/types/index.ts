@@ -1671,12 +1671,20 @@ export type CsvLighthouseRunStatus =
 export type CsvLighthouseItemStatus = "pending" | "running" | "passed" | "failed" | "cancelled"
 
 export type CsvLighthouseSiteKey = "www" | "mcprod"
+export type CsvLighthouseAcUrlDomain =
+  | "cookie"
+  | "mcprod.lampsplus.com"
+  | "ppe.lampsplus.com"
+  | "mcuat.lampsplus.com"
+  | "mcstaging.lampsplus.com"
+  | "mcstaging2.lampsplus.com"
 
 export interface CsvLighthouseRun {
   id: number
   label: string
   strategy: Strategy
   site_keys: CsvLighthouseSiteKey[]
+  ac_url_domain?: CsvLighthouseAcUrlDomain
   status: CsvLighthouseRunStatus
   worker_count: number
   samples_per_url?: number
