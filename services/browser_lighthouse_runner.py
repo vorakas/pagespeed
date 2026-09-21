@@ -104,6 +104,8 @@ class BrowserLighthouseRunner:
                 "observation_ms": cls_probe.get("observationMs"),
                 "scroll_steps": cls_probe.get("scrollSteps"),
                 "scroll_pause_ms": cls_probe.get("scrollPauseMs"),
+                "page": cls_probe.get("page"),
+                "error": cls_probe.get("error"),
             }
         if mode_evidence:
             metrics["expected_mode"] = mode_evidence.get("expectedMode")
@@ -180,6 +182,42 @@ class BrowserLighthouseRunner:
                 "observed_shift_count": len(layout_shift_items),
                 "largest_shift_score": (largest_shift or {}).get("score"),
                 "largest_shift_node": largest_node,
+                "lighthouse": lighthouse_diagnostics(),
+            }
+
+        def audit_metric(audit_id: str) -> object:
+            return (audits.get(audit_id) or {}).get("numericValue")
+
+        def lcp_element() -> str | None:
+            items = (
+                ((audits.get("largest-contentful-paint-element") or {}).get("details") or {})
+                .get("items")
+                or []
+            )
+            if not items:
+                return None
+            node = (items[0] or {}).get("node") or {}
+            snippet = node.get("snippet")
+            return snippet if isinstance(snippet, str) else None
+
+        def lighthouse_diagnostics() -> dict[str, Any]:
+            network_items = (
+                ((audits.get("network-requests") or {}).get("details") or {}).get("items")
+                or []
+            )
+            return {
+                "requested_url": report.get("requestedUrl"),
+                "final_url": report.get("finalUrl"),
+                "final_displayed_url": report.get("finalDisplayedUrl"),
+                "fetch_time": report.get("fetchTime"),
+                "lighthouse_version": report.get("lighthouseVersion"),
+                "user_agent": report.get("userAgent"),
+                "environment_user_agent": (report.get("environment") or {}).get("networkUserAgent"),
+                "throttling_method": (report.get("configSettings") or {}).get("throttlingMethod"),
+                "server_response_time": audit_metric("server-response-time"),
+                "total_byte_weight": audit_metric("total-byte-weight"),
+                "network_request_count": len(network_items),
+                "lcp_element": lcp_element(),
             }
 
         return {

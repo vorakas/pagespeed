@@ -12,10 +12,25 @@ from services.browser_lighthouse_runner import BrowserLighthouseRunner
 
 def _build_fake_report() -> dict:
     return {
+        "requestedUrl": "https://www.lampsplus.com/p/brass-lamp/",
+        "finalUrl": "https://www.lampsplus.com/p/brass-lamp/",
+        "finalDisplayedUrl": "https://www.lampsplus.com/p/brass-lamp/",
+        "fetchTime": "2026-09-21T23:06:28.019Z",
+        "lighthouseVersion": "12.0.0",
+        "userAgent": "Mozilla/5.0 HeadlessChrome",
+        "environment": {"networkUserAgent": "Mozilla/5.0 HeadlessChrome"},
+        "configSettings": {"throttlingMethod": "simulate"},
         "categories": {"performance": {"score": 0.91}},
         "audits": {
             "first-contentful-paint": {"numericValue": 1234},
             "largest-contentful-paint": {"numericValue": 2345},
+            "largest-contentful-paint-element": {
+                "details": {
+                    "items": [
+                        {"node": {"snippet": '<img class="product-image">'}},
+                    ]
+                }
+            },
             "cumulative-layout-shift": {"numericValue": 0.02},
             "layout-shifts": {
                 "details": {
@@ -27,6 +42,16 @@ def _build_fake_report() -> dict:
             },
             "total-blocking-time": {"numericValue": 123},
             "speed-index": {"numericValue": 3456},
+            "server-response-time": {"numericValue": 42},
+            "total-byte-weight": {"numericValue": 765432},
+            "network-requests": {
+                "details": {
+                    "items": [
+                        {"url": "https://www.lampsplus.com/"},
+                        {"url": "https://www.lampsplus.com/app.js"},
+                    ]
+                }
+            },
         },
     }
 
@@ -110,6 +135,20 @@ def test_runner_invokes_programmatic_helper_and_extracts_metrics(monkeypatch):
         "observed_shift_count": 2,
         "largest_shift_score": 0.015,
         "largest_shift_node": "<img class=\"hero\">",
+        "lighthouse": {
+            "requested_url": "https://www.lampsplus.com/p/brass-lamp/",
+            "final_url": "https://www.lampsplus.com/p/brass-lamp/",
+            "final_displayed_url": "https://www.lampsplus.com/p/brass-lamp/",
+            "fetch_time": "2026-09-21T23:06:28.019Z",
+            "lighthouse_version": "12.0.0",
+            "user_agent": "Mozilla/5.0 HeadlessChrome",
+            "environment_user_agent": "Mozilla/5.0 HeadlessChrome",
+            "throttling_method": "simulate",
+            "server_response_time": 42,
+            "total_byte_weight": 765432,
+            "network_request_count": 2,
+            "lcp_element": '<img class="product-image">',
+        },
     }
     assert result["tbt"] == 123
     assert result["speed_index"] == 3456
@@ -128,6 +167,13 @@ def test_runner_attaches_live_cls_probe_to_diagnostics(monkeypatch):
         "observationMs": 5000,
         "scrollSteps": 6,
         "scrollPauseMs": 750,
+        "page": {
+            "status": 200,
+            "finalUrl": "https://www.lampsplus.com/",
+            "title": "Lamps Plus",
+            "bodyTextSample": "Lighting, fixtures, and home decor.",
+        },
+        "error": None,
     }
 
     def fake_run(command, capture_output, text, timeout, check, env=None):
@@ -156,6 +202,13 @@ def test_runner_attaches_live_cls_probe_to_diagnostics(monkeypatch):
         "observation_ms": 5000,
         "scroll_steps": 6,
         "scroll_pause_ms": 750,
+        "page": {
+            "status": 200,
+            "finalUrl": "https://www.lampsplus.com/",
+            "title": "Lamps Plus",
+            "bodyTextSample": "Lighting, fixtures, and home decor.",
+        },
+        "error": None,
     }
 
 

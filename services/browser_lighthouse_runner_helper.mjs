@@ -263,7 +263,7 @@ async function observeLiveCls({
       }
     });
 
-    await page.goto(auditUrl, { waitUntil: "networkidle2", timeout: 45000 });
+    const initialResponse = await page.goto(auditUrl, { waitUntil: "networkidle2", timeout: 45000 });
     await new Promise((resolve) => setTimeout(resolve, observationMs));
     for (let step = 0; step < scrollSteps; step += 1) {
       await page.evaluate(() => {
@@ -277,6 +277,27 @@ async function observeLiveCls({
       });
       await new Promise((resolve) => setTimeout(resolve, scrollPauseMs));
     }
+    const pageDiagnostics = await page.evaluate(() => {
+      const text = document.body?.innerText || "";
+      const resources = performance.getEntriesByType("resource") || [];
+      const navigation = performance.getEntriesByType("navigation")?.[0] || null;
+      return {
+        finalUrl: window.location.href,
+        title: document.title || null,
+        bodyTextSample: text.replace(/\s+/g, " ").trim().slice(0, 240),
+        resourceCount: resources.length,
+        transferSize: resources.reduce((total, entry) => total + (entry.transferSize || 0), 0),
+        navigation: navigation
+          ? {
+              type: navigation.type || null,
+              domContentLoadedMs: Math.round(navigation.domContentLoadedEventEnd || 0),
+              loadEventMs: Math.round(navigation.loadEventEnd || 0),
+              responseStartMs: Math.round(navigation.responseStart || 0),
+              responseEndMs: Math.round(navigation.responseEnd || 0),
+            }
+          : null,
+      };
+    });
     const probe = await page.evaluate(() => window.__pharosClsProbe || null);
     return {
       cls: probe?.cls || 0,
@@ -286,6 +307,12 @@ async function observeLiveCls({
       observationMs,
       scrollSteps,
       scrollPauseMs,
+      page: {
+        status: initialResponse?.status() || null,
+        responseUrl: initialResponse?.url() || null,
+        contentType: initialResponse?.headers()?.["content-type"] || null,
+        ...pageDiagnostics,
+      },
       error: probe?.error || null,
     };
   } catch (error) {
