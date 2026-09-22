@@ -223,6 +223,8 @@ def test_helper_sets_mode_cookies_without_navigating_to_warmup_url():
     assert "window.scrollBy" in helper_source
     assert "emulatedUserAgent" in helper_source
     assert "desktopUserAgentFromBrowserVersion" in helper_source
+    assert "waitForChromeReady" in helper_source
+    assert "[phase=" in helper_source
 
 
 def test_runner_uses_mobile_settings(monkeypatch):

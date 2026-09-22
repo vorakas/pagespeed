@@ -204,6 +204,33 @@ function desktopUserAgentFromBrowserVersion(version) {
   return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForChromeReady(port, timeoutMs = 10000) {
+  const endpoint = `http://127.0.0.1:${port}/json/version`;
+  const started = Date.now();
+  let lastError = null;
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const response = await fetch(endpoint);
+      if (response.ok) {
+        return await response.json();
+      }
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    await sleep(100);
+  }
+  throw new Error(
+    `Chrome debugging endpoint did not become ready at ${endpoint}: ${
+      lastError?.message || lastError || "unknown error"
+    }`,
+  );
+}
+
 async function observeLiveCls({
   puppeteer,
   chrome,
@@ -217,6 +244,7 @@ async function observeLiveCls({
   let probeBrowser;
   let page;
   try {
+    await waitForChromeReady(chrome.port);
     probeBrowser = await puppeteer.connect({
       browserURL: `http://127.0.0.1:${chrome.port}`,
       defaultViewport: null,
@@ -409,8 +437,10 @@ async function main() {
   const puppeteer = puppeteerModule.default || puppeteerModule;
   let chrome;
   let browser;
+  let phase = "initializing";
 
   try {
+    phase = "launching_chrome";
     chrome = await chromeLauncher.launch({
       chromePath: chromeExecutable,
       chromeFlags: [
@@ -421,10 +451,15 @@ async function main() {
       ],
     });
 
+    phase = "waiting_for_chrome_debug_endpoint";
+    await waitForChromeReady(chrome.port);
+
+    phase = "connecting_puppeteer";
     browser = await puppeteer.connect({
       browserURL: `http://127.0.0.1:${chrome.port}`,
       defaultViewport: null,
     });
+    phase = "verifying_mode_cookies";
     const page = await browser.newPage();
     const browserVersion = await browser.version().catch(() => null);
     if (cookieMutations.length > 0) {
@@ -446,6 +481,7 @@ async function main() {
     await browser.disconnect();
     browser = null;
 
+    phase = "running_lighthouse";
     const lighthouseOptions = {
       port: chrome.port,
       output: "json",
@@ -468,6 +504,7 @@ async function main() {
       lighthouseOptions.emulatedUserAgent = desktopUserAgentFromBrowserVersion(browserVersion);
     }
     const result = await lighthouse(auditUrl, lighthouseOptions);
+    phase = "observing_live_cls";
     const clsProbe = await observeLiveCls({
       puppeteer,
       chrome,
@@ -484,6 +521,9 @@ async function main() {
       modeEvidence,
       clsProbe,
     }));
+  } catch (error) {
+    const stack = error?.stack || error?.message || String(error);
+    throw new Error(`[phase=${phase}] ${stack}`);
   } finally {
     if (browser) {
       await browser.disconnect();
