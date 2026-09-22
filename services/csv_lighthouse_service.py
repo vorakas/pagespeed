@@ -969,6 +969,16 @@ class CsvLighthouseService:
             "largest_shift_score": (largest or {}).get("largest_shift_score"),
             "largest_shift_node": (largest or {}).get("largest_shift_node"),
         }
+        lighthouse = next(
+            (
+                diagnostic.get("lighthouse")
+                for diagnostic in diagnostics
+                if isinstance(diagnostic.get("lighthouse"), dict)
+            ),
+            None,
+        )
+        if lighthouse:
+            summary["lighthouse"] = lighthouse
         live_probe = CsvLighthouseService._summarize_live_cls_probe(diagnostics)
         if live_probe:
             summary["live_probe"] = live_probe
@@ -1035,7 +1045,7 @@ class CsvLighthouseService:
             default=None,
         )
 
-        return {
+        summary = {
             "cls": (max_cls_probe or {}).get("cls"),
             "shift_count": total_shift_count,
             "largest_shift_score": (largest_shift_probe or {}).get("largest_shift_score"),
@@ -1045,6 +1055,12 @@ class CsvLighthouseService:
             "scroll_pause_ms": scroll_pause_ms,
             "samples_with_shifts": samples_with_shifts,
         }
+        if isinstance((max_cls_probe or {}).get("page"), dict):
+            summary["page"] = (max_cls_probe or {}).get("page")
+        error = (max_cls_probe or {}).get("error")
+        if error:
+            summary["error"] = error
+        return summary
 
     def _csv_value(self, value):
         if isinstance(value, float) and value.is_integer():

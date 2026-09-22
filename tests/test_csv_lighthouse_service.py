@@ -700,6 +700,11 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                     "observed_shift_count": 0,
                     "largest_shift_score": None,
                     "largest_shift_node": None,
+                    "lighthouse": {
+                        "final_url": "https://www.lampsplus.com/p/brass-lamp/",
+                        "environment_user_agent": "Mozilla/5.0 HeadlessChrome",
+                        "server_response_time": 42,
+                    },
                     "live_probe": {
                         "cls": 0,
                         "shift_count": 0,
@@ -722,6 +727,10 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                         "observation_ms": 5000,
                         "scroll_steps": 6,
                         "scroll_pause_ms": 750,
+                        "page": {
+                            "status": 200,
+                            "title": "Lamps Plus",
+                        },
                     },
                 },
                 {
@@ -763,6 +772,18 @@ class CsvLighthouseServiceTest(unittest.TestCase):
                 "scroll_steps": 6,
                 "scroll_pause_ms": 750,
                 "samples_with_shifts": 1,
+                "page": {
+                    "status": 200,
+                    "title": "Lamps Plus",
+                },
+            },
+        )
+        self.assertEqual(
+            item["cls_diagnostics"]["lighthouse"],
+            {
+                "final_url": "https://www.lampsplus.com/p/brass-lamp/",
+                "environment_user_agent": "Mozilla/5.0 HeadlessChrome",
+                "server_response_time": 42,
             },
         )
 

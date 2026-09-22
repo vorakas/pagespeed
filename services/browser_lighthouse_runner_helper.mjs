@@ -198,6 +198,12 @@ function viewportForFormFactor(formFactor) {
   };
 }
 
+function desktopUserAgentFromBrowserVersion(version) {
+  const match = String(version || "").match(/(?:Chrome|HeadlessChrome)\/([\d.]+)/);
+  const chromeVersion = match?.[1] || "120.0.0.0";
+  return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
+}
+
 async function observeLiveCls({
   puppeteer,
   chrome,
@@ -420,6 +426,7 @@ async function main() {
       defaultViewport: null,
     });
     const page = await browser.newPage();
+    const browserVersion = await browser.version().catch(() => null);
     if (cookieMutations.length > 0) {
       await page.setCookie(...cookieMutations);
     }
@@ -439,7 +446,7 @@ async function main() {
     await browser.disconnect();
     browser = null;
 
-    const result = await lighthouse(auditUrl, {
+    const lighthouseOptions = {
       port: chrome.port,
       output: "json",
       logLevel: "error",
@@ -456,7 +463,11 @@ async function main() {
               height: 823,
               deviceScaleFactor: 1.75,
         },
-    });
+    };
+    if (formFactor === "desktop") {
+      lighthouseOptions.emulatedUserAgent = desktopUserAgentFromBrowserVersion(browserVersion);
+    }
+    const result = await lighthouse(auditUrl, lighthouseOptions);
     const clsProbe = await observeLiveCls({
       puppeteer,
       chrome,
